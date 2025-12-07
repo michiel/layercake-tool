@@ -94,8 +94,10 @@ pub fn correlate_code_infra(
                                 .iter()
                                 .find(|f| f.to_ascii_lowercase() == func_part)
                             {
+                                let qualified =
+                                    format!("{}::{}", path_part.replace('\\', "/"), func_original);
                                 report.matches.push(CorrelationMatch {
-                                    code_node: func_original.clone(),
+                                    code_node: qualified,
                                     infra_node: resource.id.clone(),
                                     reason: format!("handler maps to {path_part}.{func_part}"),
                                 });
@@ -108,7 +110,7 @@ pub fn correlate_code_infra(
                         if file.contains(&path_clean) {
                             for f in funcs {
                                 report.matches.push(CorrelationMatch {
-                                    code_node: f.clone(),
+                                    code_node: format!("{}::{}", path_part, f),
                                     infra_node: resource.id.clone(),
                                     reason: format!("handler references file {path_part}"),
                                 });
