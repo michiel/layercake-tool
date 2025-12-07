@@ -14,29 +14,30 @@ Repository: `resources/reference-codebases/sample-amazon-bedrock-agentcore-onboa
 
 ### Component Inventory (nodes)
 ```csv
-id,label,layer,comment
-comp_code_interpreter,cost_estimator_agent,COMPUTE,From 01_code_interpreter/cost_estimator_agent implementation in README
-comp_runtime_preparer,runtime_preparer,COMPUTE,From 02_runtime/prepare_agent.py described in README
-comp_identity_authorizer,identity_oauth_setup,COMPUTE,From 03_identity/setup_inbound_authorizer.py and README
-comp_gateway_lambda,gateway_lambda_handler,COMPUTE,From 04_gateway/src/app.py lambda handler
-comp_observability_runner,observability_runner,COMPUTE,From 05_observability/test_observability.py running agent calls
-comp_memory_agent,memory_agent,COMPUTE,From 06_memory/test_memory.py memory client usage
-comp_custom_weather,custom_weather_agent,COMPUTE,From a1_custom/weather_agent README
-data_architecture_input,architecture_description,DATA,Input architecture text passed to cost estimator (01_code_interpreter README)
-data_cost_output,cost_estimate,DATA,Cost estimate output from code interpreter agent (01_code_interpreter README)
-data_oauth_tokens,oauth_tokens,DATA,OAuth tokens handled in identity samples (03_identity README)
-data_gateway_requests,gateway_requests,DATA,API requests flowing through gateway sample (04_gateway README/app.py)
-data_observability_logs,observability_events,DATA,Log/trace events collected in observability sample (05_observability README)
-data_memory_events,memory_events,DATA,Memory events persisted in 06_memory/test_memory.py
-data_weather_payload,weather_payload,DATA,Payloads served by custom weather agent (a1_custom README)
-aws_agent_runtime,bedrock_agent_runtime,AWS,Bedrock Agent Runtime referenced in 02_runtime README/template
-aws_gateway,bedrock_gateway,AWS,Bedrock Agent Gateway from 04_gateway README
-aws_cognito,cognito_oauth,AWS,Cognito OAuth provider setup in 03_identity README
-aws_dynamodb,dynamodb_memory_table,AWS,DynamoDB used for memory persistence in 06_memory README
-aws_cloudwatch,cloudwatch_observability,AWS,CloudWatch metrics/traces in 05_observability README
-aws_s3,s3_artifacts,AWS,S3 artifact storage mentioned in deployment steps (02_runtime README)
-aws_lambda,lambda_runtime,AWS,Lambda runtime for gateway/custom agents (04_gateway/src/app.py, a1_custom)
-aws_api_gateway,api_gateway_edge,AWS,API Gateway fronting the Lambda gateway (04_gateway README)
+id,label,layer,is_partition,belongs_to,comment
+root_scope,Codebase Root,SCOPE,true,,Logical root for all nodes
+comp_code_interpreter,Cost Estimator Agent,COMPUTE,false,root_scope,From 01_code_interpreter/cost_estimator_agent implementation in README
+comp_runtime_preparer,Runtime Preparer,COMPUTE,false,root_scope,From 02_runtime/prepare_agent.py described in README
+comp_identity_authorizer,Identity OAuth Setup,COMPUTE,false,root_scope,From 03_identity/setup_inbound_authorizer.py and README
+comp_gateway_lambda,Gateway Lambda Handler,COMPUTE,false,root_scope,From 04_gateway/src/app.py lambda handler
+comp_observability_runner,Observability Runner,COMPUTE,false,root_scope,From 05_observability/test_observability.py running agent calls
+comp_memory_agent,Memory Agent,COMPUTE,false,root_scope,From 06_memory/test_memory.py memory client usage
+comp_custom_weather,Custom Weather Agent,COMPUTE,false,root_scope,From a1_custom/weather_agent README
+data_architecture_input,Architecture Description,DATA,false,root_scope,Input architecture text passed to cost estimator (01_code_interpreter README)
+data_cost_output,Cost Estimate,DATA,false,root_scope,Cost estimate output from code interpreter agent (01_code_interpreter README)
+data_oauth_tokens,OAuth Tokens,DATA,false,root_scope,OAuth tokens handled in identity samples (03_identity README)
+data_gateway_requests,Gateway Requests,DATA,false,root_scope,API requests flowing through gateway sample (04_gateway README/app.py)
+data_observability_logs,Observability Events,DATA,false,root_scope,Log/trace events collected in observability sample (05_observability README)
+data_memory_events,Memory Events,DATA,false,root_scope,Memory events persisted in 06_memory/test_memory.py
+data_weather_payload,Weather Payload,DATA,false,root_scope,Payloads served by custom weather agent (a1_custom README)
+aws_agent_runtime,Bedrock Agent Runtime,AWS,false,root_scope,Bedrock Agent Runtime referenced in 02_runtime README/template
+aws_gateway,Bedrock Gateway,AWS,false,root_scope,Bedrock Agent Gateway from 04_gateway README
+aws_cognito,Cognito OAuth,AWS,false,root_scope,Cognito OAuth provider setup in 03_identity README
+aws_dynamodb,DynamoDB Memory Table,AWS,false,root_scope,DynamoDB used for memory persistence in 06_memory README
+aws_cloudwatch,CloudWatch Observability,AWS,false,root_scope,CloudWatch metrics/traces in 05_observability README
+aws_s3,S3 Artifacts,AWS,false,root_scope,S3 artifact storage mentioned in deployment steps (02_runtime README)
+aws_lambda,Lambda Runtime,AWS,false,root_scope,Lambda runtime for gateway/custom agents (04_gateway/src/app.py, a1_custom)
+aws_api_gateway,API Gateway Edge,AWS,false,root_scope,API Gateway fronting the Lambda gateway (04_gateway README)
 ```
 
 ### Relationship Inventory (edges)

@@ -14,22 +14,23 @@ Repository: `resources/reference-codebases/sam-python-crud-sample`
 
 ### Component Inventory (nodes)
 ```csv
-id,label,layer,comment
-comp_create_fn,CreateActivityFunction,COMPUTE,Lambda handler defined in template.yaml and src/create_activity/app.py
-comp_get_fn,GetActivityFunction,COMPUTE,Lambda handler defined in template.yaml and src/get_activity/app.py
-comp_list_fn,ListActivitiesFunction,COMPUTE,Lambda handler defined in template.yaml and src/list_activities/app.py
-comp_update_fn,UpdateActivityFunction,COMPUTE,Lambda handler defined in template.yaml and src/update_activity/app.py
-comp_delete_fn,DeleteActivityFunction,COMPUTE,Lambda handler defined in template.yaml and src/delete_activity/app.py
-comp_tests,ActivityIntegrationTests,COMPUTE,Test suite in tests/*.py invoking API/Lambda
-data_activity_request,ActivityRequest,DATA,HTTP request payloads (template.yaml + tests)
-data_activity_record,ActivityRecord,DATA,DynamoDB item representing an activity (app.py files)
-data_activity_list,ActivityList,DATA,Collection returned by list handler (list_activities/app.py)
-data_activity_response,ActivityResponse,DATA,Successful response bodies (handlers/tests)
-data_error_response,ErrorResponse,DATA,Error payloads for validation/missing items (handlers)
-aws_dynamodb_table,ActivitiesTable,AWS,DynamoDB table in template.yaml
-aws_api_gateway,APIGatewayCRUD,AWS,API Gateway defined in template.yaml
-aws_lambda_runtime,LambdaRuntime,AWS,Lambda runtime environment for handlers (SAM)
-aws_cloudwatch,CloudWatchLogs,AWS,Logging for Lambda and API Gateway (SAM defaults)
+id,label,layer,is_partition,belongs_to,comment
+root_scope,Codebase Root,SCOPE,true,,Logical root for all nodes
+comp_create_fn,Create Activity Function,COMPUTE,false,root_scope,Lambda handler defined in template.yaml and src/create_activity/app.py
+comp_get_fn,Get Activity Function,COMPUTE,false,root_scope,Lambda handler defined in template.yaml and src/get_activity/app.py
+comp_list_fn,List Activities Function,COMPUTE,false,root_scope,Lambda handler defined in template.yaml and src/list_activities/app.py
+comp_update_fn,Update Activity Function,COMPUTE,false,root_scope,Lambda handler defined in template.yaml and src/update_activity/app.py
+comp_delete_fn,Delete Activity Function,COMPUTE,false,root_scope,Lambda handler defined in template.yaml and src/delete_activity/app.py
+comp_tests,Activity Integration Tests,COMPUTE,false,root_scope,Test suite in tests/*.py invoking API/Lambda
+data_activity_request,Activity Request,DATA,false,root_scope,HTTP request payloads (template.yaml + tests)
+data_activity_record,Activity Record,DATA,false,root_scope,DynamoDB item representing an activity (app.py files)
+data_activity_list,Activity List,DATA,false,root_scope,Collection returned by list handler (list_activities/app.py)
+data_activity_response,Activity Response,DATA,false,root_scope,Successful response bodies (handlers/tests)
+data_error_response,Error Response,DATA,false,root_scope,Error payloads for validation/missing items (handlers)
+aws_dynamodb_table,Activities Table,AWS,false,root_scope,DynamoDB table in template.yaml
+aws_api_gateway,API Gateway CRUD,AWS,false,root_scope,API Gateway defined in template.yaml
+aws_lambda_runtime,Lambda Runtime,AWS,false,root_scope,Lambda runtime environment for handlers (SAM)
+aws_cloudwatch,CloudWatch Logs,AWS,false,root_scope,Logging for Lambda and API Gateway (SAM defaults)
 ```
 
 ### Relationship Inventory (edges)
