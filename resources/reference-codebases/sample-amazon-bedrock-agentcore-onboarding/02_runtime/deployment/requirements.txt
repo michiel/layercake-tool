@@ -1,0 +1,7 @@
+# Base requirements for AgentCore Runtime deployment
+boto3>=1.39.9
+bedrock-agentcore>=0.1.0
+bedrock-agentcore-starter-toolkit>=0.1.1
+strands-agents>=1.0.1
+strands-agents-tools>=0.2.1
+uv

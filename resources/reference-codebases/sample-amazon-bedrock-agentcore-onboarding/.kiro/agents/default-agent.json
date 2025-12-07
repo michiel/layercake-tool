@@ -1,0 +1,47 @@
+{
+  "name": "default-agent",
+  "description": "Workshop builder agent configuration",
+  "mcpServers": {
+    "aws-mcp": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws@v1.1.2",
+        "https://aws-mcp.us-east-1.api.aws/mcp",
+        "--metadata", "AWS_REGION=us-west-2"
+      ],
+      "env": {}
+    },
+    "strands": {
+      "command": "uvx",
+      "args": ["strands-agents-mcp-server"]
+    }
+  },
+  "tools": [
+	"*"
+  ],
+  "allowedTools": [
+    "read",
+    "@strands/search_docs",
+    "@strands/fetch_doc"
+  ],
+  "toolsSettings": {
+    "execute_bash": {
+      "alwaysAllow": [
+        {
+          "preset": "readOnly"
+        }
+      ]
+    },
+    "use_aws": {
+      "alwaysAllow": [
+        {
+          "preset": "readOnly"
+        }
+      ]
+    }
+  },
+  "resources": [
+    "file://.kiro/steering/principle.md"
+  ]
+}

@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  AgentCore Gateway Lambda function that converts markdown to HTML and sends via SES
+
+Parameters:
+  SenderEmail:
+    Type: String
+    Description: The verified sender email address for Amazon SES
+    Default: ""
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 512
+    Runtime: python3.12
+
+Resources:
+  AgentCoreGatewayFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Description: Lambda function that converts markdown to HTML and sends via SES
+      Environment:
+        Variables:
+          SES_SENDER_EMAIL: !Ref SenderEmail
+          LOG_LEVEL: INFO
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Version: '2012-10-17'
+          Statement:
+            # Permission to send emails via SES
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: 
+                - !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
+            # Permission to verify email addresses (optional, for development)
+            - Effect: Allow
+              Action:
+                - ses:GetIdentityVerificationAttributes
+                - ses:VerifyEmailIdentity
+              Resource: '*'
+
+Outputs:
+  AgentCoreGatewayFunctionArn:
+    Description: ARN of the Lambda function for AgentCore Gateway
+    Value: !GetAtt AgentCoreGatewayFunction.Arn
+  AgentCoreGatewayFunctionName:
+    Description: Name of the Lambda function
+    Value: !Ref AgentCoreGatewayFunction
