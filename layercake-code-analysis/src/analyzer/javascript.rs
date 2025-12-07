@@ -133,6 +133,8 @@ impl<'a> JsVisitor<'a> {
             env_vars: self.env_vars,
             files: Vec::new(),
             directories: Vec::new(),
+            infra: None,
+            infra_correlation: None,
         }
     }
 

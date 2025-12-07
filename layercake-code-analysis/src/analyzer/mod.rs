@@ -60,6 +60,8 @@ pub struct AnalysisResult {
     pub env_vars: Vec<EnvVarUsage>,
     pub files: Vec<String>,
     pub directories: Vec<String>,
+    pub infra: Option<crate::infra::InfrastructureGraph>,
+    pub infra_correlation: Option<crate::infra::CorrelationReport>,
 }
 
 impl AnalysisResult {
@@ -72,6 +74,12 @@ impl AnalysisResult {
         self.env_vars.extend(other.env_vars);
         self.files.extend(other.files);
         self.directories.extend(other.directories);
+        if self.infra.is_none() {
+            self.infra = other.infra;
+        }
+        if self.infra_correlation.is_none() {
+            self.infra_correlation = other.infra_correlation;
+        }
         self
     }
 
@@ -277,6 +285,18 @@ pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
 
     let mut result = aggregated;
     result.sort_deterministic();
+
+    // Default infra parsing & correlation
+    match crate::infra::analyze_infra(&root) {
+        Ok(infra_graph) => {
+            let correlation = crate::infra::correlate_code_infra(&result, &infra_graph);
+            result.infra = Some(infra_graph);
+            result.infra_correlation = Some(correlation);
+        }
+        Err(err) => {
+            warn!("Infra analysis failed: {err}");
+        }
+    }
 
     Ok(AnalysisRun {
         result,

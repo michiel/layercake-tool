@@ -29,11 +29,11 @@ This document describes the major stages, inputs, and outputs of the `layercake-
    - **Data flow**: source→sink edges for variable flows between functions; label is the variable name when known.
    - **Import links**: library→function edges for imported modules actually used in a file.
 
-4. **Infrastructure parsing (optional)**
-   - `infra::analyze_infra` produces an `InfrastructureGraph` when infra files are present (e.g., AWS SAM/CloudFormation/Terraform-like descriptors).
-   - Infra nodes: resources and partitions; edges: depends-on, references, and code-link placeholders.
+4. **Infrastructure parsing (default)**
+   - Always invoked after code analysis. `infra::analyze_infra` produces an `InfrastructureGraph` when infra/IaC files are present (e.g., AWS SAM/CloudFormation/Terraform/CDK/Bicep/Terraform).
+   - Infra nodes: resources and partitions; edges: depends-on, references, and code-link placeholders; diagnostics are recorded on the graph.
 
-5. **Code↔Infra correlation (optional)**
+5. **Code↔Infra correlation (default)**
    - `infra::correlate_code_infra` matches resources to code by:
      - Handler strings (`path.func`), function names, file names, and property references.
      - Produces `CorrelationReport` (matches, unresolved, warnings) with qualified `path::function` hints.
@@ -53,6 +53,8 @@ The analyzer returns a structured `AnalysisResult` containing:
 - `env_vars`: detected environment variable names/usages.
 - `directories` / `files`: relative paths for hierarchy building.
 - `libraries` (when applicable): derived from imports.
+- `infra`: optional `InfrastructureGraph` produced by default infra scanning (resources, partitions, edges, diagnostics).
+- `infra_correlation`: optional `CorrelationReport` aligning infra resources with code (matches/unresolved/warnings).
 - `report`: Markdown string (rendered by the reporter, often cleaned before persistence).
 - `stats`: LOC and language breakdown (from `tokei`), included in annotations.
 

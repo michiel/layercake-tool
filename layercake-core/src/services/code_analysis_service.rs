@@ -598,9 +598,15 @@ impl CodeAnalysisService {
         let (infra_graph, correlation) = if no_infra_flag || !opts.include_infra {
             (None, None)
         } else {
-            let infra = analyze_infra(&path)?;
-            let corr = correlate_code_infra(&result, &infra);
-            (Some(infra), Some(corr))
+            let infra = result
+                .infra
+                .clone()
+                .or_else(|| analyze_infra(&path).ok());
+            let corr = result
+                .infra_correlation
+                .clone()
+                .or_else(|| infra.as_ref().map(|g| correlate_code_infra(&result, g)));
+            (infra, corr)
         };
 
         let report_markdown = reporter.render_with_infra(
