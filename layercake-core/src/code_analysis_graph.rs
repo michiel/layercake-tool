@@ -14,6 +14,8 @@ pub fn analysis_to_graph(
 
     let mut function_ids: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
+    let mut functions_by_name: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     let mut library_ids: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     let _data_ids: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -180,6 +182,10 @@ pub fn analysis_to_graph(
     }
 
     for function in &result.functions {
+        functions_by_name
+            .entry(function.name.clone())
+            .or_default()
+            .push(function.file_path.clone());
         let attrs = json!({
             "complexity": function.complexity,
             "return_type": function.return_type,
@@ -296,11 +302,30 @@ pub fn analysis_to_graph(
         });
         let callee_key = function_key(&call.callee, Some(&call.file_path));
         let callee_id = function_ids.get(&callee_key).cloned().unwrap_or_else(|| {
+            let chosen_file = functions_by_name.get(&call.callee).and_then(|list| {
+                if list.len() == 1 {
+                    Some(list[0].clone())
+                } else {
+                    let caller_dir = std::path::Path::new(&call.file_path)
+                        .parent()
+                        .and_then(|p| p.to_str().map(|s| s.to_string()));
+                    caller_dir
+                        .and_then(|dir| {
+                            list.iter()
+                                .find(|p| {
+                                    std::path::Path::new(p).parent().and_then(|pp| pp.to_str())
+                                        == Some(dir.as_str())
+                                })
+                                .cloned()
+                        })
+                        .or_else(|| list.first().cloned())
+                }
+            });
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
                 &call.callee,
-                Some(&call.file_path),
+                chosen_file.as_deref().or(Some(&call.file_path)),
                 file_nodes
                     .get(&call.file_path)
                     .cloned()
