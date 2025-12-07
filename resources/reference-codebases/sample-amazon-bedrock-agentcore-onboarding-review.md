@@ -2,6 +2,11 @@
 
 Repository: `resources/reference-codebases/sample-amazon-bedrock-agentcore-onboarding`
 
+### Comments
+- Samples are runnable and well-documented; keeping infra/test exclusion toggles off is recommended when exploring full context.
+- Graph export uses scaled edge weights (`relative_weight`) to avoid oversized pen widths; raw weights are preserved for other uses.
+- Node IDs/labels are already file- and capability-oriented; coalescing can further simplify views by collapsing functions into files.
+
 ### Context
 - Progressive samples that demonstrate AgentCore capabilities: code interpreter, runtime deployment, identity, gateway, observability, memory, and a custom appendix.
 - Workflows combine Python agents/tests with AWS platform resources (Agent Runtime, Cognito OAuth, API Gateway/Lambda, DynamoDB, CloudWatch).
