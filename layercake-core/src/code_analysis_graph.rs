@@ -16,6 +16,8 @@ pub fn analysis_to_graph(
         std::collections::HashMap::new();
     let mut functions_by_name: std::collections::HashMap<String, Vec<String>> =
         std::collections::HashMap::new();
+    let mut functions_by_canonical: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
     let mut library_ids: std::collections::HashMap<String, String> =
         std::collections::HashMap::new();
     let _data_ids: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -122,6 +124,16 @@ pub fn analysis_to_graph(
         }
     }
 
+    fn canonical_name(name: &str) -> String {
+        let trimmed = name.trim();
+        let base = trimmed
+            .rsplit(['.', ':', ' '])
+            .next()
+            .unwrap_or(trimmed)
+            .trim();
+        base.trim_matches(|c| c == '(' || c == ')').to_string()
+    }
+
     fn add_function_node(
         function_ids: &mut std::collections::HashMap<String, String>,
         nodes: &mut Vec<Node>,
@@ -186,6 +198,10 @@ pub fn analysis_to_graph(
             .entry(function.name.clone())
             .or_default()
             .push(function.file_path.clone());
+        functions_by_canonical
+            .entry(canonical_name(&function.name))
+            .or_default()
+            .push(function.file_path.clone());
         let attrs = json!({
             "complexity": function.complexity,
             "return_type": function.return_type,
@@ -223,6 +239,22 @@ pub fn analysis_to_graph(
             .push(import.module.clone());
     }
 
+    // Helper to normalize absolute file paths back to known relative paths
+    let known_files: Vec<String> = file_nodes.keys().cloned().collect();
+    let normalize_file_ref = |path: &str| -> String {
+        if known_files.contains(&path.to_string()) {
+            return path.to_string();
+        }
+        if let Some(found) = known_files
+            .iter()
+            .find(|f| path.ends_with(f.as_str()))
+            .cloned()
+        {
+            return found;
+        }
+        path.to_string()
+    };
+
     for entry in &result.entry_points {
         let id = unique_id(&format!("entry_{}_{}", entry.file_path, entry.line_number));
         entry_ids.push((entry.file_path.clone(), id.clone()));
@@ -246,26 +278,27 @@ pub fn analysis_to_graph(
     };
 
     for flow in &result.data_flows {
-        let src_key = function_key(&flow.source, Some(&flow.file_path));
+        let flow_file = normalize_file_ref(&flow.file_path);
+        let src_key = function_key(&flow.source, Some(&flow_file));
         let src_id = function_ids.get(&src_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
                 &flow.source,
-                Some(&flow.file_path),
-                file_nodes.get(&flow.file_path).cloned(),
+                Some(&flow_file),
+                file_nodes.get(&flow_file).cloned(),
                 json!({"generated": true}),
                 &mut unique_id,
             )
         });
-        let sink_key = function_key(&flow.sink, Some(&flow.file_path));
+        let sink_key = function_key(&flow.sink, Some(&flow_file));
         let sink_id = function_ids.get(&sink_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
                 &flow.sink,
-                Some(&flow.file_path),
-                file_nodes.get(&flow.file_path).cloned(),
+                Some(&flow_file),
+                file_nodes.get(&flow_file).cloned(),
                 json!({"generated": true}),
                 &mut unique_id,
             )
@@ -285,49 +318,56 @@ pub fn analysis_to_graph(
     }
 
     for call in &result.call_edges {
-        let caller_key = function_key(&call.caller, Some(&call.file_path));
+        let call_file = normalize_file_ref(&call.file_path);
+        let caller_key = function_key(&call.caller, Some(&call_file));
         let caller_id = function_ids.get(&caller_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
                 &call.caller,
-                Some(&call.file_path),
+                Some(&call_file),
                 file_nodes
-                    .get(&call.file_path)
+                    .get(&call_file)
                     .cloned()
                     .or_else(|| Some(scope_id.clone())),
                 json!({"generated": true}),
                 &mut unique_id,
             )
         });
-        let callee_key = function_key(&call.callee, Some(&call.file_path));
+        let callee_key = function_key(&call.callee, Some(&call_file));
         let callee_id = function_ids.get(&callee_key).cloned().unwrap_or_else(|| {
-            let chosen_file = functions_by_name.get(&call.callee).and_then(|list| {
-                if list.len() == 1 {
-                    Some(list[0].clone())
-                } else {
-                    let caller_dir = std::path::Path::new(&call.file_path)
-                        .parent()
-                        .and_then(|p| p.to_str().map(|s| s.to_string()));
-                    caller_dir
-                        .and_then(|dir| {
-                            list.iter()
-                                .find(|p| {
-                                    std::path::Path::new(p).parent().and_then(|pp| pp.to_str())
-                                        == Some(dir.as_str())
-                                })
-                                .cloned()
-                        })
-                        .or_else(|| list.first().cloned())
-                }
-            });
+            let callee_canon = canonical_name(&call.callee);
+            let chosen_file = functions_by_canonical
+                .get(&callee_canon)
+                .or_else(|| functions_by_name.get(&call.callee))
+                .and_then(|list| {
+                    if list.len() == 1 {
+                        Some(list[0].clone())
+                    } else {
+                        let caller_dir = std::path::Path::new(&call.file_path)
+                            .parent()
+                            .and_then(|p| p.to_str().map(|s| s.to_string()));
+                        caller_dir
+                            .and_then(|dir| {
+                                list.iter()
+                                    .find(|p| {
+                                        std::path::Path::new(p).parent().and_then(|pp| pp.to_str())
+                                            == Some(dir.as_str())
+                                    })
+                                    .cloned()
+                            })
+                            .or_else(|| list.first().cloned())
+                    }
+                })
+                .map(|p| normalize_file_ref(&p));
+            let target_file = chosen_file.as_deref().unwrap_or(&call_file);
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
                 &call.callee,
-                chosen_file.as_deref().or(Some(&call.file_path)),
+                Some(target_file),
                 file_nodes
-                    .get(&call.file_path)
+                    .get(target_file)
                     .cloned()
                     .or_else(|| Some(scope_id.clone())),
                 json!({"generated": true}),
