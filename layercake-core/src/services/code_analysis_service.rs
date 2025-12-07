@@ -590,12 +590,66 @@ impl CodeAnalysisService {
             let root_id = root_id.unwrap();
 
             // Make sure every node belongs to the solution root and treat file scopes as flow nodes
+            let mut codebase_ids: std::collections::HashSet<String> =
+                std::collections::HashSet::new();
             for node in graph.nodes.iter_mut() {
                 if node.id != root_id && node.belongs_to.is_none() {
                     node.belongs_to = Some(root_id.clone());
                 }
+                if node.layer == "scope" && node.label == "Codebase" {
+                    codebase_ids.insert(node.id.clone());
+                }
                 if node.layer == "scope" && node.id != root_id {
                     node.is_partition = false;
+                }
+                if node.layer == "infra" {
+                    node.is_partition = true;
+                    node.belongs_to = Some(root_id.clone());
+                }
+            }
+
+            // Promote top-level directories to component partitions to better represent services/functions
+            let mut component_for_dir = std::collections::HashMap::new();
+            let dir_stubs: Vec<(String, String)> = graph
+                .nodes
+                .iter()
+                .filter(|n| n.layer == "scope" && !n.label.contains('/') && n.id != root_id)
+                .map(|n| (n.id.clone(), n.label.clone()))
+                .collect();
+            for (dir_id, dir_label) in dir_stubs {
+                let comp_id = format!("component_{}", dir_id);
+                if graph.nodes.iter().any(|n| n.id == comp_id) {
+                    continue;
+                }
+                component_for_dir.insert(dir_id.clone(), comp_id.clone());
+                graph.nodes.push(crate::graph::Node {
+                    id: comp_id.clone(),
+                    label: dir_label.clone(),
+                    layer: "infra".to_string(),
+                    is_partition: true,
+                    belongs_to: Some(root_id.clone()),
+                    weight: 1,
+                    comment: Some("Inferred service from directory".to_string()),
+                    dataset: None,
+                    attributes: None,
+                });
+            }
+
+            // Re-parent scope/file nodes into inferred components where available
+            for node in graph.nodes.iter_mut() {
+                if node.layer == "scope" && node.belongs_to.as_deref() == Some(&root_id) {
+                    if let Some(comp) = component_for_dir
+                        .iter()
+                        .find(|(dir_id, _)| node.id.starts_with(*dir_id))
+                        .map(|(_, comp)| comp.clone())
+                    {
+                        node.belongs_to = Some(comp);
+                    }
+                }
+                if let Some(parent) = node.belongs_to.clone() {
+                    if codebase_ids.contains(&parent) {
+                        node.belongs_to = Some(root_id.clone());
+                    }
                 }
             }
 
@@ -650,10 +704,31 @@ impl CodeAnalysisService {
 
                 rewired_edges.push(edge);
             }
+            // Re-parent anything pointing at the synthetic "Codebase" node to the solution root, then drop it
+            let rewired_edges: Vec<_> = rewired_edges
+                .into_iter()
+                .map(|mut e| {
+                    if codebase_ids.contains(&e.source) {
+                        e.source = root_id.clone();
+                    }
+                    if codebase_ids.contains(&e.target) {
+                        e.target = root_id.clone();
+                    }
+                    e
+                })
+                .filter(|e| e.source != e.target && e.source != root_id && e.target != root_id)
+                .collect();
+
             graph.edges = rewired_edges;
-            graph
-                .nodes
-                .retain(|n| n.layer != "function" && n.layer != "library");
+            graph.nodes.retain(|n| {
+                n.layer != "function" && n.layer != "library" && !codebase_ids.contains(&n.id)
+            });
+
+            for node in graph.nodes.iter_mut() {
+                if node.belongs_to.is_none() {
+                    node.belongs_to = Some(root_id.clone());
+                }
+            }
 
             graph.append_annotation(cleaned_report.clone());
             graph

@@ -113,6 +113,13 @@ pub fn analysis_to_graph(
         });
     }
 
+    fn function_key(name: &str, file: Option<&str>) -> String {
+        match file {
+            Some(path) => format!("{}::{}", path, name),
+            None => name.to_string(),
+        }
+    }
+
     fn add_function_node(
         function_ids: &mut std::collections::HashMap<String, String>,
         nodes: &mut Vec<Node>,
@@ -122,11 +129,12 @@ pub fn analysis_to_graph(
         attrs: serde_json::Value,
         mut unique_id: impl FnMut(&str) -> String,
     ) -> String {
-        if let Some(id) = function_ids.get(name) {
+        let key = function_key(name, file);
+        if let Some(id) = function_ids.get(&key) {
             return id.clone();
         }
         let id = unique_id(&format!("func_{}", name));
-        function_ids.insert(name.to_string(), id.clone());
+        function_ids.insert(key, id.clone());
         nodes.push(Node {
             id: id.clone(),
             label: name.to_string(),
@@ -232,7 +240,8 @@ pub fn analysis_to_graph(
     };
 
     for flow in &result.data_flows {
-        let src_id = function_ids.get(&flow.source).cloned().unwrap_or_else(|| {
+        let src_key = function_key(&flow.source, Some(&flow.file_path));
+        let src_id = function_ids.get(&src_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
@@ -243,7 +252,8 @@ pub fn analysis_to_graph(
                 &mut unique_id,
             )
         });
-        let sink_id = function_ids.get(&flow.sink).cloned().unwrap_or_else(|| {
+        let sink_key = function_key(&flow.sink, Some(&flow.file_path));
+        let sink_id = function_ids.get(&sink_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
@@ -269,7 +279,8 @@ pub fn analysis_to_graph(
     }
 
     for call in &result.call_edges {
-        let caller_id = function_ids.get(&call.caller).cloned().unwrap_or_else(|| {
+        let caller_key = function_key(&call.caller, Some(&call.file_path));
+        let caller_id = function_ids.get(&caller_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
@@ -283,7 +294,8 @@ pub fn analysis_to_graph(
                 &mut unique_id,
             )
         });
-        let callee_id = function_ids.get(&call.callee).cloned().unwrap_or_else(|| {
+        let callee_key = function_key(&call.callee, Some(&call.file_path));
+        let callee_id = function_ids.get(&callee_key).cloned().unwrap_or_else(|| {
             add_function_node(
                 &mut function_ids,
                 &mut nodes,
@@ -313,23 +325,21 @@ pub fn analysis_to_graph(
     for (file_path, entry_id) in &entry_ids {
         for function in &result.functions {
             if &function.file_path == file_path {
-                let func_id = function_ids
-                    .get(&function.name)
-                    .cloned()
-                    .unwrap_or_else(|| {
-                        add_function_node(
-                            &mut function_ids,
-                            &mut nodes,
-                            &function.name,
-                            Some(&function.file_path),
-                            file_nodes
-                                .get(&function.file_path)
-                                .cloned()
-                                .or_else(|| Some(scope_id.clone())),
-                            json!({}),
-                            &mut unique_id,
-                        )
-                    });
+                let func_key = function_key(&function.name, Some(&function.file_path));
+                let func_id = function_ids.get(&func_key).cloned().unwrap_or_else(|| {
+                    add_function_node(
+                        &mut function_ids,
+                        &mut nodes,
+                        &function.name,
+                        Some(&function.file_path),
+                        file_nodes
+                            .get(&function.file_path)
+                            .cloned()
+                            .or_else(|| Some(scope_id.clone())),
+                        json!({}),
+                        &mut unique_id,
+                    )
+                });
                 edges.push(Edge {
                     id: next_edge_id(),
                     source: entry_id.clone(),
@@ -348,20 +358,18 @@ pub fn analysis_to_graph(
     // Import edges: library -> function using it
     for function in &result.functions {
         if let Some(libs) = function_imports.get(&function.file_path) {
-            let func_id = function_ids
-                .get(&function.name)
-                .cloned()
-                .unwrap_or_else(|| {
-                    add_function_node(
-                        &mut function_ids,
-                        &mut nodes,
-                        &function.name,
-                        Some(&function.file_path),
-                        file_nodes.get(&function.file_path).cloned(),
-                        json!({}),
-                        &mut unique_id,
-                    )
-                });
+            let func_key = function_key(&function.name, Some(&function.file_path));
+            let func_id = function_ids.get(&func_key).cloned().unwrap_or_else(|| {
+                add_function_node(
+                    &mut function_ids,
+                    &mut nodes,
+                    &function.name,
+                    Some(&function.file_path),
+                    file_nodes.get(&function.file_path).cloned(),
+                    json!({}),
+                    &mut unique_id,
+                )
+            });
 
             for lib in libs {
                 let lib_id = ensure_library_node(
