@@ -519,22 +519,26 @@ impl CodeAnalysisService {
         };
 
         let combined_graph = if analysis_type == "solution" {
-            // Build solution-level graph: coalesce to files, drop libraries, attach root/belongs_to
-            let mut graph = analysis_to_graph(&result, Some(cleaned_report.clone()), true);
-            graph.nodes.retain(|n| n.layer != "library" && n.layer != "function");
-            // Convert scopes to compute-ish flow nodes
+            // Build solution-level graph: coalesce to files (if requested), drop libraries, ensure single root
+            let mut graph = analysis_to_graph(&result, Some(cleaned_report.clone()), opts.coalesce_functions);
+            graph.nodes.retain(|n| n.layer != "library");
+
+            // Identify or create root
+            let mut root_id = None;
             for node in graph.nodes.iter_mut() {
-                if node.layer == "scope" {
-                    node.is_partition = false;
-                }
-                if node.belongs_to.is_none() {
-                    node.belongs_to = Some("root_scope".to_string());
+                if node.layer == "scope" && node.belongs_to.is_none() {
+                    root_id = Some(node.id.clone());
+                    node.label = "Solution".to_string();
+                    node.is_partition = true;
+                    break;
                 }
             }
-            if !graph.nodes.iter().any(|n| n.id == "root_scope") {
+            if root_id.is_none() {
+                let rid = "root_solution".to_string();
+                root_id = Some(rid.clone());
                 graph.nodes.push(crate::graph::Node {
-                    id: "root_scope".to_string(),
-                    label: "Codebase".to_string(),
+                    id: rid.clone(),
+                    label: "Solution".to_string(),
                     layer: "scope".to_string(),
                     is_partition: true,
                     belongs_to: None,
@@ -544,7 +548,28 @@ impl CodeAnalysisService {
                     attributes: None,
                 });
             }
-            graph.edges.retain(|e| e.layer != "import");
+            let root_id = root_id.unwrap();
+
+            for node in graph.nodes.iter_mut() {
+                if node.belongs_to.is_none() {
+                    node.belongs_to = Some(root_id.clone());
+                }
+            }
+
+            // Drop noisy edges (imports) and any edges to root/partition scope nodes
+            graph
+                .edges
+                .retain(|e| e.layer != "import" && e.source != root_id && e.target != root_id);
+            // Remove edges that connect to scope partitions
+            let scope_ids: std::collections::HashSet<String> = graph
+                .nodes
+                .iter()
+                .filter(|n| n.layer == "scope" && n.is_partition)
+                .map(|n| n.id.clone())
+                .collect();
+            graph
+                .edges
+                .retain(|e| !scope_ids.contains(&e.source) && !scope_ids.contains(&e.target));
             graph
         } else if let Some(infra_graph) = infra_graph {
             merge_graphs(
