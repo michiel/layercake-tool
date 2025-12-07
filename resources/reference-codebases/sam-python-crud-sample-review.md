@@ -6,6 +6,7 @@ Repository: `resources/reference-codebases/sam-python-crud-sample`
 - Straightforward SAM stack: Lambda-per-verb plus DynamoDB table; API Gateway fronts handlers. CloudWatch logging assumed via SAM defaults.
 - Use coalescing to collapse per-function nodes into file-level if desired; edge weights are scaled (`relative_weight`) in Graphviz exports to avoid extreme pen widths.
 - Tests exercise API and DynamoDB directly; keep them included for full coverage unless using support-file exclusions.
+- When exporting to DOT/Graphviz, enable `use_edge_weight` to use `relative_weight` for pen width; leave raw `weight` available for analytics or aggregation.
 
 ### Context
 - AWS SAM-based CRUD sample with Lambda functions per CRUD verb, DynamoDB table backing, API Gateway exposure, and tests.
