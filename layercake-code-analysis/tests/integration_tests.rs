@@ -99,8 +99,8 @@ fn analyzes_agentcore_onboarding_reference_project() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("workspace root");
-    let sample_path = repo_root
-        .join("resources/reference-codebases/sample-amazon-bedrock-agentcore-onboarding");
+    let sample_path =
+        repo_root.join("resources/reference-codebases/sample-amazon-bedrock-agentcore-onboarding");
     assert!(
         sample_path.exists(),
         "expected sample project at {:?}",

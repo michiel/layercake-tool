@@ -188,8 +188,10 @@ impl Graph {
             }
         }
 
-        let mut aggregated: indexmap::IndexMap<(String, String, String), (Edge, i32, IndexSet<String>)> =
-            indexmap::IndexMap::new();
+        let mut aggregated: indexmap::IndexMap<
+            (String, String, String),
+            (Edge, i32, IndexSet<String>),
+        > = indexmap::IndexMap::new();
 
         for edge in self.edges.iter() {
             let mut new_edge = edge.clone();
@@ -201,7 +203,11 @@ impl Graph {
             }
 
             let weight = std::cmp::max(1, new_edge.weight);
-            let key = (new_edge.source.clone(), new_edge.target.clone(), new_edge.layer.clone());
+            let key = (
+                new_edge.source.clone(),
+                new_edge.target.clone(),
+                new_edge.layer.clone(),
+            );
             let labels = new_edge
                 .label
                 .split(',')

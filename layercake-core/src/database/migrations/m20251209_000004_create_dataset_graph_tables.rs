@@ -11,11 +11,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(DatasetGraphLayers::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(DatasetGraphLayers::Id)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(DatasetGraphLayers::Id).string().not_null())
                     .col(
                         ColumnDef::new(DatasetGraphLayers::DatasetId)
                             .integer()
@@ -55,11 +51,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(DatasetGraphNodes::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(DatasetGraphNodes::Id)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(DatasetGraphNodes::Id).string().not_null())
                     .col(
                         ColumnDef::new(DatasetGraphNodes::DatasetId)
                             .integer()
@@ -99,11 +91,7 @@ impl MigrationTrait for Migration {
                 Table::create()
                     .table(DatasetGraphEdges::Table)
                     .if_not_exists()
-                    .col(
-                        ColumnDef::new(DatasetGraphEdges::Id)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(DatasetGraphEdges::Id).string().not_null())
                     .col(
                         ColumnDef::new(DatasetGraphEdges::DatasetId)
                             .integer()

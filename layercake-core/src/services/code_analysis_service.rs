@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
-use layercake_code_analysis::AnalysisResult;
 use crate::database::entities::code_analysis_profiles;
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
 use crate::services::data_set_service::DataSetService;
+use layercake_code_analysis::AnalysisResult;
 
 fn normalize_path(path: &str) -> String {
     path.trim().to_string()
@@ -276,20 +276,29 @@ impl CodeAnalysisService {
             || (opts.exclude_inferred_support && Self::is_inferred_support_path(path))
     }
 
-    fn filter_support_files(mut result: AnalysisResult, opts: &CodeAnalysisOptions) -> AnalysisResult {
-        result.functions.retain(|f| !Self::should_exclude(&f.file_path, opts));
-        result.imports.retain(|i| !Self::should_exclude(&i.file_path, opts));
-        result.data_flows
+    fn filter_support_files(
+        mut result: AnalysisResult,
+        opts: &CodeAnalysisOptions,
+    ) -> AnalysisResult {
+        result
+            .functions
             .retain(|f| !Self::should_exclude(&f.file_path, opts));
-        result.call_edges
+        result
+            .imports
+            .retain(|i| !Self::should_exclude(&i.file_path, opts));
+        result
+            .data_flows
+            .retain(|f| !Self::should_exclude(&f.file_path, opts));
+        result
+            .call_edges
             .retain(|c| !Self::should_exclude(&c.file_path, opts));
-        result.entry_points
-            .retain(|e| !Self::should_exclude(&e.file_path, opts));
-        result.env_vars
+        result
+            .entry_points
             .retain(|e| !Self::should_exclude(&e.file_path, opts));
         result
-            .files
-            .retain(|f| !Self::should_exclude(f, opts));
+            .env_vars
+            .retain(|e| !Self::should_exclude(&e.file_path, opts));
+        result.files.retain(|f| !Self::should_exclude(f, opts));
         result
             .directories
             .retain(|d| !Self::should_exclude(d, opts));
@@ -450,13 +459,19 @@ impl CodeAnalysisService {
     pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
         let no_infra_flag = profile.no_infra.unwrap_or(false);
-        let analysis_type = profile.analysis_type.clone().unwrap_or_else(|| "code".to_string());
+        let analysis_type = profile
+            .analysis_type
+            .clone()
+            .unwrap_or_else(|| "code".to_string());
 
         let reporter = MarkdownReporter::default();
         let normalized_path = normalize_path(&profile.file_path);
         let path: PathBuf = normalized_path.clone().into();
         if !path.exists() {
-            return Err(anyhow!("Code analysis path does not exist: {}", normalized_path));
+            return Err(anyhow!(
+                "Code analysis path does not exist: {}",
+                normalized_path
+            ));
         }
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
@@ -519,22 +534,46 @@ impl CodeAnalysisService {
         };
 
         let combined_graph = if analysis_type == "solution" {
-            // Build solution-level graph: coalesce to files (if requested), drop libraries, ensure single root
-            let mut graph = analysis_to_graph(&result, Some(cleaned_report.clone()), opts.coalesce_functions);
-            graph.nodes.retain(|n| n.layer != "library");
+            // Build solution-level graph: force coalesce to files, combine infra if available, drop function detail
+            let code_graph = analysis_to_graph(&result, Some(cleaned_report.clone()), true);
+            let mut graph = if !no_infra_flag && opts.include_infra {
+                if let Some(infra) = infra_graph.as_ref() {
+                    merge_graphs(
+                        code_graph,
+                        infra_to_graph(infra, None),
+                        None,
+                        correlation.as_ref(),
+                    )
+                } else {
+                    code_graph
+                }
+            } else {
+                code_graph
+            };
 
-            // Identify or create root
-            let mut root_id = None;
-            for node in graph.nodes.iter_mut() {
-                if node.layer == "scope" && node.belongs_to.is_none() {
-                    root_id = Some(node.id.clone());
-                    node.label = "Solution".to_string();
-                    node.is_partition = true;
-                    break;
+            // Ensure a single root partition labelled "Solution"
+            let mut root_id = graph
+                .nodes
+                .iter()
+                .find(|n| n.is_partition && n.belongs_to.is_none() && n.layer == "scope")
+                .map(|n| n.id.clone())
+                .or_else(|| {
+                    graph
+                        .nodes
+                        .iter()
+                        .find(|n| n.is_partition && n.belongs_to.is_none())
+                        .map(|n| n.id.clone())
+                });
+            if let Some(rid) = root_id.clone() {
+                if let Some(root) = graph.nodes.iter_mut().find(|n| n.id == rid) {
+                    root.label = "Solution".to_string();
+                    root.layer = "scope".to_string();
+                    root.is_partition = true;
+                    root.belongs_to = None;
                 }
             }
             if root_id.is_none() {
-                let rid = "root_solution".to_string();
+                let rid = "solution_root".to_string();
                 root_id = Some(rid.clone());
                 graph.nodes.push(crate::graph::Node {
                     id: rid.clone(),
@@ -550,26 +589,73 @@ impl CodeAnalysisService {
             }
             let root_id = root_id.unwrap();
 
+            // Make sure every node belongs to the solution root and treat file scopes as flow nodes
             for node in graph.nodes.iter_mut() {
-                if node.belongs_to.is_none() {
+                if node.id != root_id && node.belongs_to.is_none() {
                     node.belongs_to = Some(root_id.clone());
+                }
+                if node.layer == "scope" && node.id != root_id {
+                    node.is_partition = false;
                 }
             }
 
-            // Drop noisy edges (imports) and any edges to root/partition scope nodes
-            graph
-                .edges
-                .retain(|e| e.layer != "import" && e.source != root_id && e.target != root_id);
-            // Remove edges that connect to scope partitions
-            let scope_ids: std::collections::HashSet<String> = graph
+            // Rewire edges away from function nodes to their owning file (or root) and drop function detail
+            let parent_lookup: std::collections::HashMap<String, String> = graph
                 .nodes
                 .iter()
-                .filter(|n| n.layer == "scope" && n.is_partition)
+                .filter_map(|n| {
+                    if n.id == root_id {
+                        None
+                    } else {
+                        n.belongs_to
+                            .clone()
+                            .or_else(|| Some(root_id.clone()))
+                            .map(|p| (n.id.clone(), p))
+                    }
+                })
+                .collect();
+            let function_ids: std::collections::HashSet<String> = graph
+                .nodes
+                .iter()
+                .filter(|n| n.layer == "function")
                 .map(|n| n.id.clone())
                 .collect();
+
+            let mut rewired_edges = Vec::new();
+            for mut edge in graph.edges.into_iter() {
+                if function_ids.contains(&edge.source) {
+                    if let Some(parent) = parent_lookup.get(&edge.source) {
+                        edge.source = parent.clone();
+                    } else {
+                        continue;
+                    }
+                }
+                if function_ids.contains(&edge.target) {
+                    if let Some(parent) = parent_lookup.get(&edge.target) {
+                        edge.target = parent.clone();
+                    } else {
+                        continue;
+                    }
+                }
+
+                // Skip intra-node self loops created by collapsing
+                if edge.source == edge.target {
+                    continue;
+                }
+
+                // Drop import-only edges to keep the solution view focused on files and system components
+                if edge.layer == "import" {
+                    continue;
+                }
+
+                rewired_edges.push(edge);
+            }
+            graph.edges = rewired_edges;
             graph
-                .edges
-                .retain(|e| !scope_ids.contains(&e.source) && !scope_ids.contains(&e.target));
+                .nodes
+                .retain(|n| n.layer != "function" && n.layer != "library");
+
+            graph.append_annotation(cleaned_report.clone());
             graph
         } else if let Some(infra_graph) = infra_graph {
             merge_graphs(
@@ -579,7 +665,11 @@ impl CodeAnalysisService {
                 correlation.as_ref(),
             )
         } else {
-            analysis_to_graph(&result, Some(cleaned_report.clone()), opts.coalesce_functions)
+            analysis_to_graph(
+                &result,
+                Some(cleaned_report.clone()),
+                opts.coalesce_functions,
+            )
         };
         let graph_json = serde_json::to_string(&combined_graph)?;
         let annotation_text = cleaned_report.clone();

@@ -47,21 +47,57 @@ fn export_csv(result: &crate::analyzer::AnalysisResult, dir: &PathBuf) -> Result
     let mut nodes = Vec::new();
     let mut edges = Vec::new();
 
-    nodes.push(("root_scope".to_string(), "Codebase Root".to_string(), "SCOPE".to_string(), true, "".to_string(), "Logical root".to_string()));
+    nodes.push((
+        "root_scope".to_string(),
+        "Codebase Root".to_string(),
+        "SCOPE".to_string(),
+        true,
+        "".to_string(),
+        "Logical root".to_string(),
+    ));
     node_ids.insert("root_scope".to_string());
 
     for func in &result.functions {
-        let id = format!("func_{}", func.name.replace(|c: char| !c.is_alphanumeric(), "_").to_lowercase());
+        let id = format!(
+            "func_{}",
+            func.name
+                .replace(|c: char| !c.is_alphanumeric(), "_")
+                .to_lowercase()
+        );
         if node_ids.insert(id.clone()) {
-            nodes.push((id.clone(), func.name.clone(), "COMPUTE".to_string(), false, "root_scope".to_string(), format!("Function in {}", func.file_path)));
+            nodes.push((
+                id.clone(),
+                func.name.clone(),
+                "COMPUTE".to_string(),
+                false,
+                "root_scope".to_string(),
+                format!("Function in {}", func.file_path),
+            ));
         }
     }
 
     for flow in &result.data_flows {
-        let src = format!("func_{}", flow.source.replace(|c: char| !c.is_alphanumeric(), "_").to_lowercase());
-        let dst = format!("func_{}", flow.sink.replace(|c: char| !c.is_alphanumeric(), "_").to_lowercase());
+        let src = format!(
+            "func_{}",
+            flow.source
+                .replace(|c: char| !c.is_alphanumeric(), "_")
+                .to_lowercase()
+        );
+        let dst = format!(
+            "func_{}",
+            flow.sink
+                .replace(|c: char| !c.is_alphanumeric(), "_")
+                .to_lowercase()
+        );
         let id = format!("edge_{}", edges.len() + 1);
-        edges.push((id, src, dst, "DATA".to_string(), flow.variable.clone().unwrap_or_default(), format!("Data flow in {}", flow.file_path)));
+        edges.push((
+            id,
+            src,
+            dst,
+            "DATA".to_string(),
+            flow.variable.clone().unwrap_or_default(),
+            format!("Data flow in {}", flow.file_path),
+        ));
     }
 
     let mut nodes_file = File::create(dir.join("nodes.csv"))?;
@@ -80,7 +116,10 @@ fn export_csv(result: &crate::analyzer::AnalysisResult, dir: &PathBuf) -> Result
     }
 
     let mut edges_file = File::create(dir.join("edges.csv"))?;
-    writeln!(edges_file, "id,source,target,layer,label,relative_weight,comment")?;
+    writeln!(
+        edges_file,
+        "id,source,target,layer,label,relative_weight,comment"
+    )?;
     for (id, src, dst, layer, label, comment) in edges {
         writeln!(
             edges_file,
@@ -134,7 +173,11 @@ pub fn run(args: CodeAnalysisArgs) -> Result<()> {
             }
             if csv {
                 let dir = csv_dir
-                    .or_else(|| output.as_ref().and_then(|p| p.parent().map(|p| p.to_path_buf())))
+                    .or_else(|| {
+                        output
+                            .as_ref()
+                            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                    })
                     .unwrap_or(std::env::current_dir()?);
                 export_csv(&result, &dir)?;
             }

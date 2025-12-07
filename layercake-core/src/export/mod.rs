@@ -156,10 +156,12 @@ pub mod renderer {
             return Vec::new();
         }
 
-        let (min_w, max_w) = edges.iter().fold((i32::MAX, i32::MIN), |(min_w, max_w), e| {
-            let w = std::cmp::max(1, e.weight);
-            (min_w.min(w), max_w.max(w))
-        });
+        let (min_w, max_w) = edges
+            .iter()
+            .fold((i32::MAX, i32::MIN), |(min_w, max_w), e| {
+                let w = std::cmp::max(1, e.weight);
+                (min_w.min(w), max_w.max(w))
+            });
 
         let range = (max_w - min_w).max(1) as f64;
 
