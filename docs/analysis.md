@@ -74,6 +74,10 @@ Objective: enable automatic generation of node/edge CSV inventories (data/comput
 - Migrate `data_sets` with JSON column for annotations; expose via GraphQL/REST; update dataset services to append, replace, and retrieve annotations.
 - Use annotations to store analysis report markdown (including warnings/diagnostics) instead of overloading description.
 
+## Frontend vs CLI Outputs
+- CLI: `ca report --csv` generates markdown + CSV inventories to disk.
+- Frontend: runs analysis (code/solution) and writes graph + structured annotations directly to the linked dataset; no CSV intermediary.
+
 ## Risks & Tradeoffs
 - **Heuristic accuracy**: mapping code to resources via env vars/paths can mislink. Mitigation: keep confidence scores, allow opting out of bindings, log diagnostics.
 - **Parser maintenance**: IaC formats evolve; keep parsers lightweight and fail-soft (skip invalid blocks, annotate warnings).

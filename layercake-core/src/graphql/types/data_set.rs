@@ -164,7 +164,15 @@ impl From<DataSetSummary> for DataSet {
             edge_count: summary.edge_count.map(|c| c as i32),
             layer_count: summary.layer_count.map(|c| c as i32),
             has_layers: summary.has_layers,
-            annotations: vec![],
+            annotations: summary
+                .annotations
+                .into_iter()
+                .map(|a| DataSetAnnotationGql {
+                    title: a.title,
+                    date: a.date,
+                    body: a.body,
+                })
+                .collect(),
         }
     }
 }

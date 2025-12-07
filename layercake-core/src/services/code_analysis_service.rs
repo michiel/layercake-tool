@@ -450,6 +450,7 @@ impl CodeAnalysisService {
     pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
         let no_infra_flag = profile.no_infra.unwrap_or(false);
+        let analysis_type = profile.analysis_type.clone().unwrap_or_else(|| "code".to_string());
 
         let reporter = MarkdownReporter::default();
         let normalized_path = normalize_path(&profile.file_path);
@@ -517,7 +518,35 @@ impl CodeAnalysisService {
             }
         };
 
-        let combined_graph = if let Some(infra_graph) = infra_graph {
+        let combined_graph = if analysis_type == "solution" {
+            // Build solution-level graph: coalesce to files, drop libraries, attach root/belongs_to
+            let mut graph = analysis_to_graph(&result, Some(cleaned_report.clone()), true);
+            graph.nodes.retain(|n| n.layer != "library" && n.layer != "function");
+            // Convert scopes to compute-ish flow nodes
+            for node in graph.nodes.iter_mut() {
+                if node.layer == "scope" {
+                    node.is_partition = false;
+                }
+                if node.belongs_to.is_none() {
+                    node.belongs_to = Some("root_scope".to_string());
+                }
+            }
+            if !graph.nodes.iter().any(|n| n.id == "root_scope") {
+                graph.nodes.push(crate::graph::Node {
+                    id: "root_scope".to_string(),
+                    label: "Codebase".to_string(),
+                    layer: "scope".to_string(),
+                    is_partition: true,
+                    belongs_to: None,
+                    weight: 1,
+                    comment: None,
+                    dataset: None,
+                    attributes: None,
+                });
+            }
+            graph.edges.retain(|e| e.layer != "import");
+            graph
+        } else if let Some(infra_graph) = infra_graph {
             merge_graphs(
                 analysis_to_graph(&result, None, opts.coalesce_functions),
                 infra_to_graph(&infra_graph, None),

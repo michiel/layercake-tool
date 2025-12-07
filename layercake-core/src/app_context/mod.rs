@@ -256,12 +256,18 @@ pub struct DataSetSummary {
     pub edge_count: Option<usize>,
     pub layer_count: Option<usize>,
     pub has_layers: bool,
+    pub annotations: Vec<crate::services::data_set_service::DataSetAnnotation>,
 }
 
 impl From<data_sets::Model> for DataSetSummary {
     fn from(model: data_sets::Model) -> Self {
         let (node_count, edge_count, layer_count) = summarize_graph_counts(&model.graph_json);
         let has_layers = layer_count.unwrap_or(0) > 0;
+        let annotations = model
+            .annotations
+            .as_ref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or_default();
         Self {
             id: model.id,
             project_id: model.project_id,
@@ -281,6 +287,7 @@ impl From<data_sets::Model> for DataSetSummary {
             edge_count,
             layer_count,
             has_layers,
+            annotations,
         }
     }
 }
