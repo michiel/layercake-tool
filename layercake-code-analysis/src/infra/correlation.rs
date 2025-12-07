@@ -1,11 +1,12 @@
 use std::collections::HashSet;
 
 use crate::analyzer::AnalysisResult;
+use serde::{Deserialize, Serialize};
 
 use super::graph::InfrastructureGraph;
 use super::model::CorrelationMatch;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CorrelationReport {
     pub matches: Vec<CorrelationMatch>,
     pub unresolved: Vec<String>,

@@ -4,20 +4,21 @@ mod python;
 use anyhow::Result;
 use ignore::WalkBuilder;
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use tracing::warn;
 
 pub use javascript::JavascriptAnalyzer;
 pub use python::PythonAnalyzer;
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct Import {
     pub module: String,
     pub file_path: String,
     pub line_number: usize,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct FunctionInfo {
     pub name: String,
     pub file_path: String,
@@ -28,7 +29,7 @@ pub struct FunctionInfo {
     pub calls: Vec<String>,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct DataFlow {
     pub source: String,
     pub sink: String,
@@ -36,21 +37,21 @@ pub struct DataFlow {
     pub file_path: String,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CallEdge {
     pub caller: String,
     pub callee: String,
     pub file_path: String,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct EntryPoint {
     pub file_path: String,
     pub line_number: usize,
     pub condition: String,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct AnalysisResult {
     pub imports: Vec<Import>,
     pub functions: Vec<FunctionInfo>,
@@ -198,13 +199,13 @@ impl Default for AnalyzerRegistry {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct AnalysisRun {
     pub result: AnalysisResult,
     pub files_scanned: usize,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct EnvVarUsage {
     pub name: String,
     pub file_path: String,

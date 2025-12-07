@@ -45,6 +45,7 @@ const GET_PROFILES = gql`
       noInfra
       options
       analysisType
+      lastResult
     }
   }
 `
@@ -61,6 +62,7 @@ const CREATE_PROFILE = gql`
       noInfra
       options
       analysisType
+      lastResult
     }
   }
 `
@@ -99,6 +101,7 @@ const RUN_PROFILE = gql`
         report
         noInfra
         options
+        lastResult
       }
     }
   }

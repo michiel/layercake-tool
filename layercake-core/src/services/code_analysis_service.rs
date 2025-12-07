@@ -34,6 +34,7 @@ pub struct CodeAnalysisProfile {
     pub no_infra: bool,
     pub options: Option<String>,
     pub analysis_type: String,
+    pub last_result: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -77,6 +78,7 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             no_infra: model.no_infra.unwrap_or(false),
             options: model.options,
             analysis_type: model.analysis_type.unwrap_or_else(|| "code".to_string()),
+            last_result: model.last_result,
         }
     }
 }
@@ -408,7 +410,8 @@ impl CodeAnalysisService {
             report TEXT,
             no_infra INTEGER DEFAULT 0,
             options TEXT,
-            analysis_type TEXT DEFAULT 'code'
+            analysis_type TEXT DEFAULT 'code',
+            last_result TEXT
         )";
         self.db
             .execute(Statement::from_string(
@@ -441,6 +444,15 @@ impl CodeAnalysisService {
             .execute(Statement::from_string(
                 self.db.get_database_backend(),
                 alter_analysis_type.to_string(),
+            ))
+            .await;
+        let alter_last_result =
+            "ALTER TABLE code_analysis_profiles ADD COLUMN last_result TEXT";
+        let _ = self
+            .db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                alter_last_result.to_string(),
             ))
             .await;
         Ok(())
@@ -476,6 +488,7 @@ impl CodeAnalysisService {
             no_infra: Set(Some(no_infra)),
             options: Set(options),
             analysis_type: Set(Some(analysis_type)),
+            last_result: Set(None),
         };
 
         code_analysis_profiles::Entity::insert(active.clone())
@@ -598,10 +611,7 @@ impl CodeAnalysisService {
         let (infra_graph, correlation) = if no_infra_flag || !opts.include_infra {
             (None, None)
         } else {
-            let infra = result
-                .infra
-                .clone()
-                .or_else(|| analyze_infra(&path).ok());
+            let infra = result.infra.clone().or_else(|| analyze_infra(&path).ok());
             let corr = result
                 .infra_correlation
                 .clone()
@@ -852,6 +862,7 @@ impl CodeAnalysisService {
         active.dataset_id = Set(Some(dataset_id));
         active.last_run = Set(Some(Utc::now()));
         active.report = Set(Some(cleaned_report));
+        active.last_result = Set(serde_json::to_string(&result).ok());
 
         let updated = active.update(&self.db).await?;
         Ok(CodeAnalysisProfile::from(updated))

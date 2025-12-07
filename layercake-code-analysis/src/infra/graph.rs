@@ -1,8 +1,9 @@
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
 use super::model::{GraphEdge, ResourceNode};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InfrastructureGraph {
     pub root_id: String,
     pub root_label: String,
@@ -12,7 +13,7 @@ pub struct InfrastructureGraph {
     pub diagnostics: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PartitionNode {
     pub id: String,
     pub label: String,

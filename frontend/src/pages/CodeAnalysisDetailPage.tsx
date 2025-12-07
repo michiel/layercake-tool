@@ -12,6 +12,7 @@ import { Spinner } from '../components/ui/spinner'
 import { Textarea } from '../components/ui/textarea'
 import { Group, Stack } from '../components/layout-primitives'
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
+import { AnalysisResultViewer } from '../components/code-analysis/AnalysisResultViewer'
 
 const GET_PROFILE = gql`
   query CodeAnalysisProfile($id: String!) {
@@ -24,6 +25,7 @@ const GET_PROFILE = gql`
       report
       noInfra
       options
+      lastResult
     }
   }
 `
@@ -45,6 +47,7 @@ const RUN_PROFILE = gql`
         lastRun
         report
         datasetId
+        lastResult
       }
     }
   }
@@ -161,6 +164,15 @@ export const CodeAnalysisDetailPage: React.FC = () => {
             </CardHeader>
             <CardContent>
               <Textarea readOnly value={profile.report ?? 'No report'} className="min-h-[240px]" />
+            </CardContent>
+          </Card>
+
+          <Card className="border">
+            <CardHeader className="pb-2">
+              <CardTitle>Latest Analysis Result</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <AnalysisResultViewer resultJson={profile.lastResult} />
             </CardContent>
           </Card>
         </Stack>
