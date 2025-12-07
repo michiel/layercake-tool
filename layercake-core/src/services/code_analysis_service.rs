@@ -33,6 +33,7 @@ pub struct CodeAnalysisProfile {
     pub report: Option<String>,
     pub no_infra: bool,
     pub options: Option<String>,
+    pub analysis_type: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -75,6 +76,7 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             report: model.report,
             no_infra: model.no_infra.unwrap_or(false),
             options: model.options,
+            analysis_type: model.analysis_type.unwrap_or_else(|| "code".to_string()),
         }
     }
 }
@@ -303,7 +305,8 @@ impl CodeAnalysisService {
             last_run TEXT,
             report TEXT,
             no_infra INTEGER DEFAULT 0,
-            options TEXT
+            options TEXT,
+            analysis_type TEXT DEFAULT 'code'
         )";
         self.db
             .execute(Statement::from_string(
@@ -329,6 +332,15 @@ impl CodeAnalysisService {
                 alter_opts.to_string(),
             ))
             .await;
+        let alter_analysis_type =
+            "ALTER TABLE code_analysis_profiles ADD COLUMN analysis_type TEXT DEFAULT 'code'";
+        let _ = self
+            .db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                alter_analysis_type.to_string(),
+            ))
+            .await;
         Ok(())
     }
 
@@ -348,6 +360,7 @@ impl CodeAnalysisService {
         dataset_id: Option<i32>,
         no_infra: bool,
         options: Option<String>,
+        analysis_type: String,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
@@ -360,6 +373,7 @@ impl CodeAnalysisService {
             report: Set(None),
             no_infra: Set(Some(no_infra)),
             options: Set(options),
+            analysis_type: Set(Some(analysis_type)),
         };
 
         code_analysis_profiles::Entity::insert(active.clone())
@@ -381,6 +395,7 @@ impl CodeAnalysisService {
         dataset_id: Option<Option<i32>>,
         no_infra: Option<bool>,
         options: Option<Option<String>>,
+        analysis_type: Option<String>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
@@ -400,6 +415,9 @@ impl CodeAnalysisService {
         }
         if let Some(opts) = options {
             model.options = Set(opts);
+        }
+        if let Some(t) = analysis_type {
+            model.analysis_type = Set(Some(t));
         }
 
         let updated = model.update(&self.db).await?;
@@ -514,7 +532,7 @@ impl CodeAnalysisService {
         let ds_service = DataSetService::new(self.db.clone());
         ds_service.update_graph_data(dataset_id, graph_json).await?;
         let _ = ds_service
-            .update_annotation(dataset_id, Some(annotation_text))
+            .update_annotation(dataset_id, "Analysis Report".to_string(), annotation_text)
             .await;
 
         let mut active = profile.into_active_model();

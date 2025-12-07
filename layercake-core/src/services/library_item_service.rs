@@ -439,6 +439,7 @@ impl LibraryItemService {
             processed_at: Set(Some(now)),
             created_at: Set(now),
             updated_at: Set(now),
+            annotations: Set(Some("[]".to_string())),
             ..Default::default()
         }
         .insert(&self.db)

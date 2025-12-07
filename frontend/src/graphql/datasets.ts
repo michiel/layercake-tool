@@ -22,6 +22,11 @@ export const GET_DATASOURCES = gql`
       edgeCount
       layerCount
       hasLayers
+      annotations {
+        title
+        date
+        body
+      }
     }
   }
 `
@@ -48,6 +53,11 @@ export const GET_DATASOURCE = gql`
       edgeCount
       layerCount
       hasLayers
+      annotations {
+        title
+        date
+        body
+      }
     }
   }
 `
@@ -74,6 +84,11 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
       edgeCount
       layerCount
       hasLayers
+      annotations {
+        title
+        date
+        body
+      }
     }
   }
 `
@@ -345,7 +360,7 @@ export interface DataSet {
   projectId: number
   name: string
   description?: string
-  annotations?: string | null
+  annotations?: Array<{ title: string; date: string; body: string }>
   fileFormat: string
   origin: string
   filename: string

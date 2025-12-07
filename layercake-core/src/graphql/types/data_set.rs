@@ -7,6 +7,14 @@ use crate::app_context::{summarize_graph_counts, DataSetSummary, DataSetValidati
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
+use crate::services::data_set_service::DataSetAnnotation;
+
+#[derive(SimpleObject, Serialize, Deserialize, Clone)]
+pub struct DataSetAnnotationGql {
+    pub title: String,
+    pub date: chrono::DateTime<chrono::Utc>,
+    pub body: String,
+}
 
 #[derive(SimpleObject)]
 #[graphql(complex)]
@@ -42,6 +50,7 @@ pub struct DataSet {
     pub layer_count: Option<i32>,
     #[graphql(name = "hasLayers")]
     pub has_layers: bool,
+    pub annotations: Vec<DataSetAnnotationGql>,
 }
 
 #[ComplexObject]
@@ -97,6 +106,18 @@ impl DataSet {
 impl From<crate::database::entities::data_sets::Model> for DataSet {
     fn from(model: crate::database::entities::data_sets::Model) -> Self {
         let (node_count, edge_count, layer_count) = summarize_graph_counts(&model.graph_json);
+        let annotations: Vec<DataSetAnnotationGql> = model
+            .annotations
+            .as_ref()
+            .and_then(|raw| serde_json::from_str::<Vec<DataSetAnnotation>>(raw).ok())
+            .unwrap_or_default()
+            .into_iter()
+            .map(|a| DataSetAnnotationGql {
+                title: a.title,
+                date: a.date,
+                body: a.body,
+            })
+            .collect();
         Self {
             id: model.id,
             project_id: model.project_id,
@@ -117,6 +138,7 @@ impl From<crate::database::entities::data_sets::Model> for DataSet {
             edge_count: edge_count.map(|c| c as i32),
             layer_count: layer_count.map(|c| c as i32),
             has_layers: layer_count.unwrap_or(0) > 0,
+            annotations,
         }
     }
 }
@@ -142,6 +164,7 @@ impl From<DataSetSummary> for DataSet {
             edge_count: summary.edge_count.map(|c| c as i32),
             layer_count: summary.layer_count.map(|c| c as i32),
             has_layers: summary.has_layers,
+            annotations: vec![],
         }
     }
 }

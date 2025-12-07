@@ -341,6 +341,7 @@ impl GraphBuilder {
             processed_at: Some(chrono::Utc::now()),
             created_at: graph.created_at,
             updated_at: graph.updated_at,
+            annotations: Some("[]".to_string()),
         })
     }
 

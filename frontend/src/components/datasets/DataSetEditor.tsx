@@ -146,7 +146,13 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   }, { id: number }>(VALIDATE_DATASET)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
-  const annotationMarkdown = dataSource?.annotations || ''
+  const annotationMarkdown = useMemo(() => {
+    if (!dataSource?.annotations || (dataSource.annotations as any).length === 0) return ''
+    const list = (dataSource as any).annotations as Array<{title: string; date: string; body: string}>
+    return list
+      .map(a => `## ${a.title || 'Annotation'}\n${a.date ? `_${new Date(a.date).toLocaleString()}_\n` : ''}${a.body || ''}`)
+      .join('\n\n')
+  }, [dataSource?.annotations])
   const graphPage = graphNodes.length ? { nodes: graphNodes, edges: graphEdges, layers: graphLayers, hasMore: graphHasMore } : undefined
   const rawGraphData = useMemo((): GraphData | null => {
     if (graphPage && graphPage.nodes.length > 0) {

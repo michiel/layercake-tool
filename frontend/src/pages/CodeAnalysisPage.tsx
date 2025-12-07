@@ -28,6 +28,7 @@ type Profile = {
   report?: string | null
   noInfra?: boolean
   options?: string | null
+  analysisType?: string | null
 }
 
 type DataSetOption = { id: number; name: string }
@@ -43,6 +44,7 @@ const GET_PROFILES = gql`
       report
       noInfra
       options
+      analysisType
     }
   }
 `
@@ -58,6 +60,7 @@ const CREATE_PROFILE = gql`
       report
       noInfra
       options
+      analysisType
     }
   }
 `
@@ -73,6 +76,7 @@ const UPDATE_PROFILE = gql`
       report
       noInfra
       options
+      analysisType
     }
   }
 `
@@ -122,6 +126,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [includeControlFlow, setIncludeControlFlow] = useState(true)
   const [includeImports, setIncludeImports] = useState(true)
   const [coalesceFunctions, setCoalesceFunctions] = useState(false)
+  const [analysisType, setAnalysisType] = useState<string>('code')
   const [excludeKnownSupport, setExcludeKnownSupport] = useState(false)
   const [excludeInferredSupport, setExcludeInferredSupport] = useState(false)
 
@@ -148,6 +153,7 @@ export const CodeAnalysisPage: React.FC = () => {
         report: p.report,
         noInfra: p.noInfra,
         options: p.options,
+        analysisType: p.analysisType,
       })) || []
     setProfiles(mapped)
   }, [profilesData])
@@ -213,6 +219,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setCoalesceFunctions(opts.coalesceFunctions ?? false)
     setExcludeKnownSupport(opts.excludeKnownSupportFiles ?? false)
     setExcludeInferredSupport(opts.excludeInferredSupport ?? false)
+    setAnalysisType(p.analysisType || 'code')
     setModalOpen(true)
   }
 
@@ -229,7 +236,7 @@ export const CodeAnalysisPage: React.FC = () => {
     })
     if (editing) {
       updateProfile({
-        variables: { input: { id: editing.id, filePath: trimmedPath, datasetId, noInfra, options } },
+        variables: { input: { id: editing.id, filePath: trimmedPath, datasetId, noInfra, options, analysisType } },
       })
     } else {
       createProfile({
@@ -240,6 +247,7 @@ export const CodeAnalysisPage: React.FC = () => {
             datasetId,
             noInfra,
             options,
+            analysisType,
           },
         },
       })
@@ -373,6 +381,18 @@ export const CodeAnalysisPage: React.FC = () => {
             <DialogTitle>{editing ? 'Edit profile' : 'New profile'}</DialogTitle>
           </DialogHeader>
           <Stack gap="md">
+            <div className="space-y-2">
+              <Label htmlFor="analysisType">Analysis type</Label>
+              <Select value={analysisType} onValueChange={(value) => setAnalysisType(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose analysis type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="code">Code analysis</SelectItem>
+                  <SelectItem value="solution">Solution analysis</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label htmlFor="filePath">Project path</Label>
               <Input

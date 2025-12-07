@@ -13,6 +13,8 @@ pub struct CodeAnalysisProfile {
     #[graphql(name = "noInfra")]
     pub no_infra: bool,
     pub options: Option<String>,
+    #[graphql(name = "analysisType")]
+    pub analysis_type: String,
 }
 
 impl From<ServiceProfile> for CodeAnalysisProfile {
@@ -26,6 +28,7 @@ impl From<ServiceProfile> for CodeAnalysisProfile {
             report: profile.report,
             no_infra: profile.no_infra,
             options: profile.options,
+            analysis_type: profile.analysis_type,
         }
     }
 }
@@ -38,6 +41,8 @@ pub struct CreateCodeAnalysisProfileInput {
     #[graphql(name = "noInfra")]
     pub no_infra: Option<bool>,
     pub options: Option<String>,
+    #[graphql(name = "analysisType")]
+    pub analysis_type: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -48,6 +53,8 @@ pub struct UpdateCodeAnalysisProfileInput {
     #[graphql(name = "noInfra")]
     pub no_infra: Option<bool>,
     pub options: Option<String>,
+    #[graphql(name = "analysisType")]
+    pub analysis_type: Option<String>,
 }
 
 #[derive(SimpleObject)]

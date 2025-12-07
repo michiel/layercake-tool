@@ -1,4 +1,5 @@
 use anyhow::{anyhow, Result};
+use async_graphql::SimpleObject;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -12,6 +13,14 @@ use crate::database::entities::{dataset_graph_edges, dataset_graph_layers, datas
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+pub struct DataSetAnnotation {
+    pub title: String,
+    pub date: chrono::DateTime<chrono::Utc>,
+    pub body: String,
+}
 
 /// Service for managing DataSets with file processing capabilities
 #[derive(Clone)]
@@ -163,6 +172,7 @@ impl DataSetService {
             file_size: Set(file_data.len() as i64),
             status: Set("processing".to_string()),
             graph_json: Set("{}".to_string()),
+            annotations: Set(Some("[]".to_string())),
             ..data_sets::ActiveModel::new()
         };
 
@@ -344,11 +354,12 @@ impl DataSetService {
         Ok(updated)
     }
 
-    /// Update annotation text (graph_json untouched)
+    /// Append an annotation (graph_json untouched)
     pub async fn update_annotation(
         &self,
         id: i32,
-        annotation: Option<String>,
+        title: String,
+        body: String,
     ) -> Result<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
@@ -356,19 +367,21 @@ impl DataSetService {
             .ok_or_else(|| anyhow!("DataSet not found"))?;
 
         let mut active_model: data_sets::ActiveModel = data_set.into();
-        // Persist as description fallback since data_sets has no annotations column
-        if let Some(text) = annotation {
-            let merged = match active_model.description.clone().into_value() {
-                Some(sea_orm::Value::String(Some(boxed))) => Some((*boxed).to_string()),
+        let mut annotations: Vec<DataSetAnnotation> = active_model
+            .annotations
+            .clone()
+            .into_value()
+            .and_then(|v| match v {
+                sea_orm::Value::String(Some(s)) => serde_json::from_str(&s).ok(),
                 _ => None,
-            };
-            let combined = if let Some(existing) = merged {
-                format!("{existing}\n\n{text}")
-            } else {
-                text.clone()
-            };
-            active_model.description = Set(Some(combined));
-        }
+            })
+            .unwrap_or_default();
+        annotations.push(DataSetAnnotation {
+            title,
+            date: chrono::Utc::now(),
+            body,
+        });
+        active_model.annotations = Set(Some(serde_json::to_string(&annotations)?));
         active_model.updated_at = Set(chrono::Utc::now());
 
         let updated = active_model.update(&self.db).await?;

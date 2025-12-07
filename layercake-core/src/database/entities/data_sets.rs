@@ -42,6 +42,7 @@ pub struct Model {
     pub processed_at: Option<ChronoDateTimeUtc>,
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
+    pub annotations: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -82,6 +83,7 @@ impl ActiveModel {
             processed_at: ActiveValue::NotSet,
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
+            annotations: Set(Some("[]".to_string())),
         }
     }
 
@@ -189,6 +191,7 @@ mod tests {
             processed_at: Some(chrono::Utc::now()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            annotations: Some("[]".to_string()),
         };
 
         assert!(model.validate_format_type_combination().is_ok());
@@ -221,6 +224,7 @@ mod tests {
             processed_at: Some(chrono::Utc::now()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            annotations: Some("[]".to_string()),
         };
 
         assert!(model.is_ready());
@@ -250,6 +254,7 @@ mod tests {
             processed_at: Some(chrono::Utc::now()),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
+            annotations: Some("[]".to_string()),
         };
 
         assert_eq!(model.get_file_size_formatted(), "1.5 KB");

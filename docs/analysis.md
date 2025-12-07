@@ -9,11 +9,11 @@ Objective: enable automatic generation of node/edge CSV inventories (data/comput
 - Gaps: no infra-as-code parsers; limited semantic tagging of data vs compute; file/dir scope only; no AWS/CDK/TF resource extraction; no weight normalization in exports.
 
 ## Goals
-1. Generate CSV node/edge inventories matching prompts without manual editing.
+1. Generate CSV node/edge inventories matching prompts without manual editing (CLI opt-in flag).
 2. Support multi-language projects (Python, JS/TS) plus IaC (CDK, Terraform, Bicep, SAM templates).
 3. Identify platform resources (AWS services) and map compute/data nodes to them.
 4. Derive data/control/import flows and annotate origins for traceability.
-5. Provide stable, documented APIs for downstream UI/exports.
+5. Provide stable, documented APIs for downstream UI/exports; frontend calls should hydrate graphs directly without intermediate CSV.
 
 ## Technical Plan
 ### 1) Core Model Extensions
@@ -39,13 +39,13 @@ Objective: enable automatic generation of node/edge CSV inventories (data/comput
 - Coalesce functions into file-level compute nodes by default for CSV export; keep per-function edges optional.
 - Compute `relative_weight` for edges based on frequency or confidence (1–6) for rendering.
 
-### 5) CSV Export Pipeline
-- New exporter that takes enriched graph and emits:
+### 5) CSV Export Pipeline (CLI only)
+- CLI flag `--csv` on `ca report` emits:
   - `nodes.csv`: id, label (human-readable), layer, is_partition, belongs_to, comment (provenance).
   - `edges.csv`: id, source, target, layer, label, relative_weight, comment.
 - Ensure a single `root_scope` partition; every node has `belongs_to` set (file→dir→root).
 - Strip labels from coalesced edges if noisy; keep comments for traceability.
-- Provide CLI flag to emit CSVs alongside JSON graph (`layercake ca report --csv`).
+- Frontend: no intermediate CSV; service returns graph directly for dataset hydration.
 
 ### 6) API & Config
 - Extend `CodeAnalysisOptions` with:
@@ -53,10 +53,12 @@ Objective: enable automatic generation of node/edge CSV inventories (data/comput
   - `coalesce_functions`, `emit_csv`
   - `include_iac` (cdk/terraform/bicep/sam)
 - Add defaults and validation; document in README.
+- Introduce analysis types: `code` (existing) and `solution` (new profile type for CSV/report generation). Profiles store `analysis_type`; frontend chooses type first (default `code`).
 
 ### 7) Frontend Exposure
-- Profile edit form: toggles for CSV export, include/exclude tests/support, include IaC.
-- Dataset viewer: allow downloading latest CSV outputs; display provenance comments on hover.
+- Profile creation: select analysis type (`Code analysis` default, `Solution analysis` for CSV/report flow).
+- Profile edit: toggles for include/exclude tests/support, include IaC, coalesce; CLI CSV export is not used in frontend path.
+- Dataset viewer: allow downloading latest CSV outputs (if produced by CLI); display provenance comments on hover.
 
 ### 8) Testing Strategy
 - Add fixtures for:
@@ -66,6 +68,11 @@ Objective: enable automatic generation of node/edge CSV inventories (data/comput
   - Bicep/ARM minimal template.
   - Synthetic test/support-heavy repo to validate exclusions.
 - Snapshot CSV outputs and graph annotations; unit tests for resource parsers and correlation heuristics.
+
+## Dataset Annotations Upgrade
+- Add structured annotations to datasets: ordered list stored in DB (`title`, `date`, `body` markdown).
+- Migrate `data_sets` with JSON column for annotations; expose via GraphQL/REST; update dataset services to append, replace, and retrieve annotations.
+- Use annotations to store analysis report markdown (including warnings/diagnostics) instead of overloading description.
 
 ## Risks & Tradeoffs
 - **Heuristic accuracy**: mapping code to resources via env vars/paths can mislink. Mitigation: keep confidence scores, allow opting out of bindings, log diagnostics.
