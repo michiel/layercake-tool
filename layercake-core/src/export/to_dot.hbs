@@ -64,9 +64,9 @@ digraph G {
 
   {{#each flow_edges as |edge|}}
     {{#if (exists edge.label)}}
-      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}" {{#if ../config.apply_layers}}{{#each layer in ../layers}} {{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}" {{/if}} {{/each}}{{/if}}{{#if ../config.use_edge_weight}} penwidth={{edge_penwidth edge.weight}}{{/if}}];
+      {{edge.source}} -> {{edge.target}} [label="{{edge.label}}" {{#if ../config.apply_layers}}{{#each layer in ../layers}} {{#if (eq edge.layer layer.id)}} fontcolor="#{{layer.background_color}}" {{/if}} {{/each}}{{/if}}{{#if ../config.use_edge_weight}} penwidth={{edge_penwidth edge.relative_weight}}{{/if}}];
     {{else}}
-      {{edge.source}} -> {{edge.target}}{{#if ../config.use_edge_weight}} [penwidth={{edge_penwidth edge.weight}}]{{/if}};
+      {{edge.source}} -> {{edge.target}}{{#if ../config.use_edge_weight}} [penwidth={{edge_penwidth edge.relative_weight}}]{{/if}};
     {{/if}}
   {{/each}}
 }

@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
+use layercake_code_analysis::AnalysisResult;
 use crate::database::entities::code_analysis_profiles;
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;

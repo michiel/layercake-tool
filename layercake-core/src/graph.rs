@@ -236,15 +236,11 @@ impl Graph {
         let mut next_id: usize = 1;
         self.edges = aggregated
             .into_iter()
-            .map(|((_s, _t, _l), (mut edge, total_weight, labels))| {
+            .map(|((_s, _t, _l), (mut edge, total_weight, _labels))| {
                 edge.id = format!("edge_coalesced_{next_id}");
                 next_id += 1;
                 edge.weight = total_weight;
-                if !labels.is_empty() {
-                    edge.label = labels.into_iter().collect::<Vec<_>>().join(", ");
-                } else {
-                    edge.label = edge.label.clone();
-                }
+                edge.label = String::new();
                 edge
             })
             .collect();
