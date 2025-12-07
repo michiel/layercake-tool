@@ -790,11 +790,6 @@ impl CodeAnalysisService {
                     continue;
                 }
 
-                // Drop import-only edges to keep the solution view focused on files and system components
-                if edge.layer == "import" {
-                    continue;
-                }
-
                 rewired_edges.push(edge);
             }
             // Re-parent anything pointing at the synthetic "Codebase" node to the solution root, then drop it
@@ -809,7 +804,7 @@ impl CodeAnalysisService {
                     }
                     e
                 })
-                .filter(|e| e.source != e.target && e.source != root_id && e.target != root_id)
+                .filter(|e| e.source != e.target)
                 .collect();
 
             graph.edges = rewired_edges;
