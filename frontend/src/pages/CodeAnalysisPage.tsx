@@ -219,7 +219,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setCoalesceFunctions(opts.coalesceFunctions ?? false)
     setExcludeKnownSupport(opts.excludeKnownSupportFiles ?? false)
     setExcludeInferredSupport(opts.excludeInferredSupport ?? false)
-    setAnalysisType(p.analysisType || 'code')
+    setAnalysisType(profile?.analysisType || 'code')
     setModalOpen(true)
   }
 
