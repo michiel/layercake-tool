@@ -1,6 +1,7 @@
 use anyhow::Result;
 use hcl::{Body, Value as HclValue};
 use ignore::WalkBuilder;
+use rayon::prelude::*;
 use rustpython_ast::Visitor;
 use rustpython_parser::{parse, Mode};
 use serde_yaml::Value as YamlValue;
@@ -36,42 +37,45 @@ pub fn analyze_infra(path: &Path) -> Result<InfrastructureGraph> {
         .git_global(true)
         .build();
 
-    for entry in walker {
-        let entry = match entry {
-            Ok(e) => e,
+    let entries: Vec<_> = walker
+        .filter_map(|entry| match entry {
+            Ok(e) if e.file_type().map(|t| t.is_file()).unwrap_or(false) => Some(e.into_path()),
+            Ok(_) => None,
             Err(err) => {
                 warn!("Skipping infra entry: {err}");
-                continue;
+                None
             }
-        };
+        })
+        .collect();
 
-        if !entry.file_type().map(|t| t.is_file()).unwrap_or(false) {
-            continue;
-        }
+    let scans: Vec<_> = entries
+        .par_iter()
+        .map(|entry_path| {
+            let ext = entry_path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or_default()
+                .to_ascii_lowercase();
 
-        let ext = entry
-            .path()
-            .extension()
-            .and_then(|s| s.to_str())
-            .unwrap_or_default()
-            .to_ascii_lowercase();
+            let relative = entry_path
+                .strip_prefix(&root)
+                .unwrap_or_else(|_| entry_path.as_path())
+                .to_string_lossy()
+                .to_string();
 
-        let relative = entry
-            .path()
-            .strip_prefix(&root)
-            .unwrap_or_else(|_| entry.path())
-            .to_string_lossy()
-            .to_string();
+            let scan = match ext.as_str() {
+                "tf" => parse_terraform(entry_path, &relative),
+                "yaml" | "yml" => parse_cloudformation(entry_path, &relative),
+                "bicep" => parse_bicep(entry_path, &relative),
+                "ts" | "tsx" => parse_cdk_typescript(entry_path, &relative),
+                "py" => parse_cdk_python(entry_path, &relative),
+                _ => InfraScanResult::default(),
+            };
+            (relative, scan)
+        })
+        .collect();
 
-        let scan = match ext.as_str() {
-            "tf" => parse_terraform(entry.path(), &relative),
-            "yaml" | "yml" => parse_cloudformation(entry.path(), &relative),
-            "bicep" => parse_bicep(entry.path(), &relative),
-            "ts" | "tsx" => parse_cdk_typescript(entry.path(), &relative),
-            "py" => parse_cdk_python(entry.path(), &relative),
-            _ => InfraScanResult::default(),
-        };
-
+    for (relative, scan) in scans {
         diagnostics.extend(scan.diagnostics);
         for mut resource in scan.resources {
             if resource.belongs_to.is_none() {

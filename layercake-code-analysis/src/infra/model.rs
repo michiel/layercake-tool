@@ -72,4 +72,5 @@ pub struct CorrelationMatch {
     pub code_node: String,
     pub infra_node: String,
     pub reason: String,
+    pub confidence: u8,
 }

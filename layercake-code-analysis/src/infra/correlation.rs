@@ -56,6 +56,7 @@ pub fn correlate_code_infra(
                         code_node: qualified,
                         infra_node: resource.id.clone(),
                         reason: format!("handler property {handler}"),
+                        confidence: 95,
                     });
                     matched = true;
                 }
@@ -72,6 +73,7 @@ pub fn correlate_code_infra(
                         code_node: f.clone(),
                         infra_node: resource.id.clone(),
                         reason: format!("property references file {f}"),
+                        confidence: 70,
                     });
                     matched = true;
                 }
@@ -89,6 +91,7 @@ pub fn correlate_code_infra(
                         code_node: func.clone(),
                         infra_node: resource.id.clone(),
                         reason: format!("property references handler/function {func}"),
+                        confidence: 60,
                     });
                     matched = true;
                 }
@@ -118,6 +121,7 @@ pub fn correlate_code_infra(
                                     code_node: qualified,
                                     infra_node: resource.id.clone(),
                                     reason: format!("handler maps to {path_part}.{func_part}"),
+                                    confidence: 90,
                                 });
                                 matched = true;
                             }
@@ -131,6 +135,7 @@ pub fn correlate_code_infra(
                                     code_node: format!("{}::{}", path_part, f),
                                     infra_node: resource.id.clone(),
                                     reason: format!("handler references file {path_part}"),
+                                    confidence: 70,
                                 });
                                 matched = true;
                             }
@@ -151,6 +156,7 @@ pub fn correlate_code_infra(
                         code_node: env.clone(),
                         infra_node: resource.id.clone(),
                         reason: format!("property references env var {env}"),
+                        confidence: 40,
                     });
                     matched = true;
                 }
@@ -161,6 +167,7 @@ pub fn correlate_code_infra(
                     code_node: k.clone(),
                     infra_node: resource.id.clone(),
                     reason: format!("property key matches env var {k}"),
+                    confidence: 30,
                 });
                 matched = true;
             }

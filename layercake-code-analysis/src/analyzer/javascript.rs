@@ -196,11 +196,16 @@ impl<'a> JsVisitor<'a> {
         }
     }
 
-    fn enter_function(&mut self, context: FunctionContext) {
+    fn enter_function(&mut self, mut context: FunctionContext) {
+        context.name = format!(
+            "{}::{}",
+            self.file_path_string(),
+            self.qualify_name(&context.name)
+        );
         self.function_stack.push(
             context
                 .name
-                .rsplit('.')
+                .rsplit("::")
                 .next()
                 .unwrap_or_default()
                 .to_string(),
