@@ -157,6 +157,18 @@ fn parse_terraform(path: &Path, relative: &str) -> InfraScanResult {
                 props.insert(key, val);
             }
         }
+        // Handler hint for Lambda functions
+        if provider_type.contains("aws_lambda_function") {
+            if let Some(handler) = props.get("handler").cloned() {
+                let code = props
+                    .get("filename")
+                    .or_else(|| props.get("source_code_hash"))
+                    .cloned()
+                    .unwrap_or_default();
+                let clean = format!("{}/{}", code.trim_end_matches('/'), handler);
+                props.insert("handler_path".into(), clean);
+            }
+        }
         node.properties = props;
         result.resources.push(node);
     }

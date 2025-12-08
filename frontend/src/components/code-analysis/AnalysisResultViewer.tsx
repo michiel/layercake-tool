@@ -163,6 +163,9 @@ const Section: React.FC<SectionProps> = ({ title, items, labelKey, fallback }) =
                 ? item
                 : item[labelKey] ?? item.label ?? item.name ?? JSON.stringify(item)}
               {item.file_path ? <span className="text-muted-foreground ml-1">({item.file_path})</span> : null}
+              {item.confidence !== undefined ? (
+                <span className="text-muted-foreground ml-1">[{item.confidence}%]</span>
+              ) : null}
             </li>
           ))}
           {list.length > 10 && <li className="text-muted-foreground">… {list.length - 10} more</li>}
