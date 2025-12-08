@@ -305,6 +305,33 @@ fn parse_bicep(path: &Path, relative: &str) -> InfraScanResult {
     result
 }
 
+fn enrich_construct_props(construct: &str, props: &mut HashMap<String, String>) {
+    let lc = construct.to_ascii_lowercase();
+    if lc.contains("function") {
+        if let Some(handler) = props.get("handler").cloned() {
+            let base = props
+                .get("code")
+                .or_else(|| props.get("entry"))
+                .cloned()
+                .unwrap_or_default();
+            let hint = if base.is_empty() {
+                handler.clone()
+            } else {
+                format!("{}/{}", base.trim_end_matches('/'), handler)
+            };
+            props.entry("handler_path".into()).or_insert(hint);
+        }
+    }
+    if lc.contains("table") {
+        if let Some(pk) = props.get("partitionKey").cloned() {
+            props.entry("key.partition".into()).or_insert(pk);
+        }
+        if let Some(sk) = props.get("sortKey").cloned() {
+            props.entry("key.sort".into()).or_insert(sk);
+        }
+    }
+}
+
 fn parse_cdk_python(path: &Path, relative: &str) -> InfraScanResult {
     let mut result = InfraScanResult::default();
     let content = match std::fs::read_to_string(path) {
@@ -478,9 +505,7 @@ impl<'a> CdkPyVisitor<'a> {
             ResourceNode::new(id, ResourceType::from_raw(&module), name.clone(), self.file);
         node.properties
             .insert("construct".into(), construct.clone());
-        if construct.to_ascii_lowercase().contains("function") {
-            node.properties.insert("handler_path".into(), name.clone());
-        }
+        enrich_construct_props(&construct, &mut props);
         node.properties.extend(props.drain());
         self.resources.push(node);
     }
@@ -566,9 +591,7 @@ impl CdkTsVisitor {
         );
         node.properties
             .insert("construct".into(), construct.clone());
-        if construct.to_ascii_lowercase().contains("function") {
-            node.properties.insert("handler_path".into(), name);
-        }
+        enrich_construct_props(&construct, &mut props);
         node.properties.extend(props.drain());
         self.resources.push(node);
     }
