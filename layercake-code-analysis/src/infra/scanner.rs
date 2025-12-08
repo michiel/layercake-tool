@@ -8,7 +8,7 @@ use serde_yaml::Value as YamlValue;
 use std::collections::HashMap;
 use std::path::Path;
 use swc_common::{sync::Lrc, FileName, SourceMap};
-use swc_ecma_ast::{CallExpr, Expr, NewExpr};
+use swc_ecma_ast::{CallExpr, Expr, NewExpr, PropName};
 use swc_ecma_parser::{lexer::Lexer, Parser, StringInput, Syntax, TsSyntax};
 use swc_ecma_visit::{noop_visit_type, Visit, VisitWith};
 use tracing::warn;
@@ -466,7 +466,13 @@ impl<'a> CdkPyVisitor<'a> {
         }
     }
 
-    fn push_resource(&mut self, module: String, construct: String, name: String) {
+    fn push_resource(
+        &mut self,
+        module: String,
+        construct: String,
+        name: String,
+        mut props: HashMap<String, String>,
+    ) {
         let id = slugify_id(&format!("{module}.{name}"));
         let mut node =
             ResourceNode::new(id, ResourceType::from_raw(&module), name.clone(), self.file);
@@ -475,6 +481,7 @@ impl<'a> CdkPyVisitor<'a> {
         if construct.to_ascii_lowercase().contains("function") {
             node.properties.insert("handler_path".into(), name.clone());
         }
+        node.properties.extend(props.drain());
         self.resources.push(node);
     }
 }
@@ -490,9 +497,28 @@ impl<'a> rustpython_ast::Visitor for CdkPyVisitor<'a> {
             };
             let is_cdk_construct = matches!(
                 construct.as_str(),
-                "Bucket" | "Table" | "Function" | "Queue" | "Topic" | "Api" | "Stack"
+                "Bucket"
+                    | "Table"
+                    | "Function"
+                    | "Queue"
+                    | "Topic"
+                    | "Api"
+                    | "Stack"
+                    | "RestApi"
+                    | "HttpApi"
+                    | "StateMachine"
             );
             if is_cdk_construct {
+                let mut props = HashMap::new();
+                for kw in &node.keywords {
+                    if let Some(key) = kw.arg.as_ref().map(|s| s.to_string()) {
+                        if let rustpython_ast::Expr::Constant(c) = &kw.value {
+                            if let rustpython_ast::Constant::Str(s) = &c.value {
+                                props.insert(key, s.to_string());
+                            }
+                        }
+                    }
+                }
                 let name = node
                     .args
                     .get(1)
@@ -504,7 +530,7 @@ impl<'a> rustpython_ast::Visitor for CdkPyVisitor<'a> {
                         _ => None,
                     })
                     .unwrap_or_else(|| construct.clone());
-                self.push_resource(base.clone(), construct.to_string(), name);
+                self.push_resource(base.clone(), construct.to_string(), name, props);
             }
         }
         self.generic_visit_expr_call(node);
@@ -524,7 +550,13 @@ impl CdkTsVisitor {
         }
     }
 
-    fn record(&mut self, type_name: String, construct: String, name: String) {
+    fn record(
+        &mut self,
+        type_name: String,
+        construct: String,
+        name: String,
+        mut props: HashMap<String, String>,
+    ) {
         let id = slugify_id(&format!("{type_name}.{name}"));
         let mut node = ResourceNode::new(
             id,
@@ -537,6 +569,7 @@ impl CdkTsVisitor {
         if construct.to_ascii_lowercase().contains("function") {
             node.properties.insert("handler_path".into(), name);
         }
+        node.properties.extend(props.drain());
         self.resources.push(node);
     }
 
@@ -570,6 +603,35 @@ impl CdkTsVisitor {
         }
         None
     }
+
+    fn extract_props(&self, args: &[swc_ecma_ast::ExprOrSpread]) -> HashMap<String, String> {
+        // Typical CDK new Construct(this, 'Id', { ...props })
+        if args.len() < 3 {
+            return HashMap::new();
+        }
+        match &*args[2].expr {
+            Expr::Object(obj) => {
+                let mut map = HashMap::new();
+                for prop in &obj.props {
+                    if let swc_ecma_ast::PropOrSpread::Prop(p) = prop {
+                        if let swc_ecma_ast::Prop::KeyValue(kv) = &**p {
+                            if let Some(key) = match &kv.key {
+                                PropName::Ident(id) => Some(id.sym.to_string()),
+                                PropName::Str(s) => Some(s.value.to_string_lossy().into_owned()),
+                                _ => None,
+                            } {
+                                if let Some(val) = literal_to_string(&kv.value) {
+                                    map.insert(key, val);
+                                }
+                            }
+                        }
+                    }
+                }
+                map
+            }
+            _ => HashMap::new(),
+        }
+    }
 }
 
 impl Visit for CdkTsVisitor {
@@ -586,7 +648,19 @@ impl Visit for CdkTsVisitor {
             let type_name = self.member_to_string(member);
             let is_construct = matches!(
                 construct.as_str(),
-                "Bucket" | "Function" | "Table" | "Queue" | "Topic" | "Stack" | "Api"
+                "Bucket"
+                    | "Function"
+                    | "Table"
+                    | "Queue"
+                    | "Topic"
+                    | "Stack"
+                    | "Api"
+                    | "RestApi"
+                    | "HttpApi"
+                    | "StateMachine"
+                    | "Distribution"
+                    | "UserPool"
+                    | "GraphqlApi"
             );
             if is_construct {
                 let name = node
@@ -594,7 +668,12 @@ impl Visit for CdkTsVisitor {
                     .as_ref()
                     .and_then(|args| self.extract_name(args))
                     .unwrap_or_else(|| construct.clone());
-                self.record(type_name, construct, name);
+                let props = node
+                    .args
+                    .as_ref()
+                    .map(|args| self.extract_props(args))
+                    .unwrap_or_default();
+                self.record(type_name, construct, name, props);
             }
         }
         node.visit_children_with(self);
