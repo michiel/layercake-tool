@@ -1,5 +1,6 @@
 use super::{
-    AnalysisResult, Analyzer, CallEdge, DataFlow, EntryPoint, EnvVarUsage, FunctionInfo, Import,
+    AnalysisResult, Analyzer, CallEdge, DataFlow, EntryPoint, EnvVarUsage, ExternalCall,
+    FunctionInfo, Import,
 };
 use anyhow::{anyhow, Context, Result};
 use std::collections::HashMap;
@@ -97,6 +98,8 @@ struct JsVisitor<'a> {
     data_flows: Vec<DataFlow>,
     call_edges: Vec<CallEdge>,
     entry_points: Vec<EntryPoint>,
+    exits: Vec<EntryPoint>,
+    external_calls: Vec<ExternalCall>,
     env_vars: Vec<EnvVarUsage>,
     class_stack: Vec<String>,
     function_stack: Vec<String>,
@@ -116,6 +119,8 @@ impl<'a> JsVisitor<'a> {
             data_flows: Vec::new(),
             call_edges: Vec::new(),
             entry_points: Vec::new(),
+            exits: Vec::new(),
+            external_calls: Vec::new(),
             env_vars: Vec::new(),
             class_stack: Vec::new(),
             function_stack: Vec::new(),
@@ -132,6 +137,8 @@ impl<'a> JsVisitor<'a> {
             data_flows: self.data_flows,
             call_edges: self.call_edges,
             entry_points: self.entry_points,
+            exits: self.exits,
+            external_calls: self.external_calls,
             env_vars: self.env_vars,
             files: Vec::new(),
             directories: Vec::new(),

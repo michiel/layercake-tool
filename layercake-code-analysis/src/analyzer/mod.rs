@@ -58,6 +58,8 @@ pub struct AnalysisResult {
     pub data_flows: Vec<DataFlow>,
     pub call_edges: Vec<CallEdge>,
     pub entry_points: Vec<EntryPoint>,
+    pub exits: Vec<EntryPoint>,
+    pub external_calls: Vec<ExternalCall>,
     pub env_vars: Vec<EnvVarUsage>,
     pub files: Vec<String>,
     pub directories: Vec<String>,
@@ -72,6 +74,8 @@ impl AnalysisResult {
         self.data_flows.extend(other.data_flows);
         self.call_edges.extend(other.call_edges);
         self.entry_points.extend(other.entry_points);
+        self.exits.extend(other.exits);
+        self.external_calls.extend(other.external_calls);
         self.env_vars.extend(other.env_vars);
         self.files.extend(other.files);
         self.directories.extend(other.directories);
@@ -211,6 +215,15 @@ pub struct EnvVarUsage {
     pub file_path: String,
     pub line_number: usize,
     pub kind: String,
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct ExternalCall {
+    pub target: String,
+    pub method: Option<String>,
+    pub path: Option<String>,
+    pub file_path: String,
+    pub line_number: usize,
 }
 
 pub fn analyze_path(path: &Path) -> Result<AnalysisRun> {
