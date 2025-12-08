@@ -468,8 +468,13 @@ impl<'a> CdkPyVisitor<'a> {
 
     fn push_resource(&mut self, module: String, construct: String, name: String) {
         let id = slugify_id(&format!("{module}.{name}"));
-        let mut node = ResourceNode::new(id, ResourceType::from_raw(&module), name, self.file);
-        node.properties.insert("construct".into(), construct);
+        let mut node =
+            ResourceNode::new(id, ResourceType::from_raw(&module), name.clone(), self.file);
+        node.properties
+            .insert("construct".into(), construct.clone());
+        if construct.to_ascii_lowercase().contains("function") {
+            node.properties.insert("handler_path".into(), name.clone());
+        }
         self.resources.push(node);
     }
 }
@@ -521,8 +526,17 @@ impl CdkTsVisitor {
 
     fn record(&mut self, type_name: String, construct: String, name: String) {
         let id = slugify_id(&format!("{type_name}.{name}"));
-        let mut node = ResourceNode::new(id, ResourceType::from_raw(&type_name), name, &self.file);
-        node.properties.insert("construct".into(), construct);
+        let mut node = ResourceNode::new(
+            id,
+            ResourceType::from_raw(&type_name),
+            name.clone(),
+            &self.file,
+        );
+        node.properties
+            .insert("construct".into(), construct.clone());
+        if construct.to_ascii_lowercase().contains("function") {
+            node.properties.insert("handler_path".into(), name);
+        }
         self.resources.push(node);
     }
 
