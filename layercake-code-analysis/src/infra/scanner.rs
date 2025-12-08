@@ -609,9 +609,8 @@ impl CdkTsVisitor {
         if args.len() < 3 {
             return HashMap::new();
         }
-        match &*args[2].expr {
-            Expr::Object(obj) => {
-                let mut map = HashMap::new();
+        fn flatten_object(expr: &Expr, map: &mut HashMap<String, String>, prefix: Option<&str>) {
+            if let Expr::Object(obj) = expr {
                 for prop in &obj.props {
                     if let swc_ecma_ast::PropOrSpread::Prop(p) = prop {
                         if let swc_ecma_ast::Prop::KeyValue(kv) = &**p {
@@ -620,17 +619,26 @@ impl CdkTsVisitor {
                                 PropName::Str(s) => Some(s.value.to_string_lossy().into_owned()),
                                 _ => None,
                             } {
+                                let full_key = if let Some(pref) = prefix {
+                                    format!("{pref}.{key}")
+                                } else {
+                                    key
+                                };
                                 if let Some(val) = literal_to_string(&kv.value) {
-                                    map.insert(key, val);
+                                    map.insert(full_key, val);
+                                } else if let Expr::Object(_) = &*kv.value {
+                                    flatten_object(&kv.value, map, Some(&full_key));
                                 }
                             }
                         }
                     }
                 }
-                map
             }
-            _ => HashMap::new(),
         }
+
+        let mut map = HashMap::new();
+        flatten_object(&args[2].expr, &mut map, None);
+        map
     }
 }
 
