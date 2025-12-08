@@ -1,6 +1,6 @@
 # Layercake Code Analysis – Processing Specification
 
-This document describes the major stages, inputs, and outputs of the `layercake-code-analysis` crate. It focuses on how source code is discovered, analyzed, and converted into the `AnalysisResult` model that downstream consumers (CLI, backend, frontend) turn into graphs, datasets, or CSV exports.
+This document describes the major stages, inputs, and outputs of the `layercake-code-analysis` crate. It focuses on how source code is discovered, analyzed, and converted into the `AnalysisResult` model that downstream consumers (CLI, backend, frontend) turn into graphs, datasets, or CSV exports. Notes from the latest review are included as “findings” where relevant.
 
 ## Inputs
 - **Root path**: Filesystem directory to analyze (typically a project root).
@@ -10,6 +10,7 @@ This document describes the major stages, inputs, and outputs of the `layercake-
   - `coalesce_functions` (convert function nodes to file nodes during graph export).
   - `exclude_known_support_files`, `exclude_inferred_support` (filter out lockfiles/tests/fixtures, etc.).
   - CSV export flag (CLI) for emitting CSVs instead of graph JSON when requested.
+  - **Finding:** Infra parsing and correlation are now run by default; callers only opt out by setting `include_infra=false` or profile `noInfra=true`.
 
 ## Processing Stages
 1. **Workspace discovery**
@@ -31,13 +32,15 @@ This document describes the major stages, inputs, and outputs of the `layercake-
 
 4. **Infrastructure parsing (default)**
    - Always invoked after code analysis. `infra::analyze_infra` produces an `InfrastructureGraph` when infra/IaC files are present (e.g., AWS SAM/CloudFormation/Terraform/CDK/Bicep/Terraform).
-   - Infra nodes: resources and partitions; edges: depends-on, references, and code-link placeholders; diagnostics are recorded on the graph.
+   - Infra nodes: resources and partitions; edges: depends-on, references, and code-link placeholders; diagnostics are recorded on the graph. Handler hints (CodeUri + Handler) are stitched into resource properties to aid correlation.
+   - **Finding:** infra structures are now part of `AnalysisResult` (serialized) and reused by the backend to avoid re-scans.
 
 5. **Code↔Infra correlation (default)**
    - `infra::correlate_code_infra` matches resources to code by:
-     - Handler strings (`path.func`), function names, file names, and property references.
-     - Produces `CorrelationReport` (matches, unresolved, warnings) with qualified `path::function` hints.
+     - Handler strings (`path.func`), function names, file names, and property references (including stitched `handler_path`).
+   - Produces `CorrelationReport` (matches, unresolved, warnings) with qualified `path::function` hints.
    - Correlation edges are merged later by the consumer (see Graph conversion).
+   - **Finding:** correlation now prefers file-scoped handler matches (using `path::function`) to avoid fanning out onto a single handler.
 
 6. **Statistics & annotations**
    - Source metrics (LOC by language) via `tokei`.
@@ -57,6 +60,7 @@ The analyzer returns a structured `AnalysisResult` containing:
 - `infra_correlation`: optional `CorrelationReport` aligning infra resources with code (matches/unresolved/warnings).
 - `report`: Markdown string (rendered by the reporter, often cleaned before persistence).
 - `stats`: LOC and language breakdown (from `tokei`), included in annotations.
+  - **Finding:** `AnalysisResult` is `Serialize`/`Deserialize` and persisted on profiles (`last_result`) for replay and UI viewing; ensure future fields remain serialization-friendly.
 
 ### Graph Conversion (consumer stage)
 Although performed in `layercake-core`, the conversion follows these rules:
@@ -77,6 +81,7 @@ Although performed in `layercake-core`, the conversion follows these rules:
   - Partition flags mark structural nodes; flow nodes are `is_partition: false`.
 - Coalescing (optional):
   - Function nodes can be rewired to their owning file nodes; duplicate edges are merged and weights summed.
+  - **Finding:** Function IDs are keyed by file+name to prevent cross-file collisions (e.g., multiple `lambda_handler` functions).
 
 ### CSV Export (CLI option)
 - When `--csv`/`--csv-dir` is provided, the analysis emits nodes/edges CSVs instead of (or alongside) graph JSON.
@@ -86,8 +91,16 @@ Although performed in `layercake-core`, the conversion follows these rules:
 - Missing paths or unreadable files return errors to the caller.
 - Correlation emits warnings when infra resources cannot be linked to code.
 - Label sanitization and node/edge ID normalization append annotations when modifications occur.
+- Infra parsing emits diagnostics for dropped edges or malformed resources; correlation warnings are appended to annotations when merged.
 
 ## Extensibility
 - New language handlers plug into stage 2 (parsing) while preserving the `AnalysisResult` schema.
 - New infra providers plug into `infra::analyze_infra` and reuse correlation heuristics.
 - Additional analysis dimensions (e.g., taint sources/sinks, more control-flow details) should extend `AnalysisResult` and the graph mapper in compatible ways.
+
+## Open Gaps / Future Improvements (from review)
+- Broader language coverage: JavaScript analyzer is basic; TypeScript/CDK parsing is early-stage.
+- Infra scanning: Terraform/CloudFormation/CDK coverage is heuristic; needs richer resource typing and file→resource provenance.
+- Correlation: add confidence scores, path normalization across OSes, and clearer diagnostics when multiple handlers match.
+- Data/control flow: inter-file call resolution is best-effort; consider symbol tables per language for cross-module calls.
+- Performance: parallel parsing is in place; infra scan could short-circuit when disabled to avoid overhead.

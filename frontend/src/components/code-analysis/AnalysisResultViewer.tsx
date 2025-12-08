@@ -13,7 +13,8 @@ type AnalysisResult = {
   files?: string[]
   directories?: string[]
   infra?: {
-    resources?: Record<string, unknown>
+    resources?: Record<string, any>
+    partitions?: Record<string, any>
     edges?: any[]
     diagnostics?: string[]
   }
@@ -94,6 +95,18 @@ export const AnalysisResultViewer: React.FC<Props> = ({ resultJson }) => {
           fallback="No infra resources detected."
         />
         <Section
+          title="Infra partitions"
+          items={parsed.infra ? Object.values(parsed.infra.partitions ?? {}) : []}
+          labelKey="label"
+          fallback="No infra partitions detected."
+        />
+        <Section
+          title="Infra edges"
+          items={parsed.infra?.edges}
+          labelKey="edge_type"
+          fallback="No infra edges detected."
+        />
+        <Section
           title="Infra diagnostics"
           items={parsed.infra?.diagnostics?.map((d) => ({ label: d })) ?? []}
           labelKey="label"
@@ -104,6 +117,12 @@ export const AnalysisResultViewer: React.FC<Props> = ({ resultJson }) => {
           items={parsed.infra_correlation?.matches}
           labelKey="reason"
           fallback="No infra correlations."
+        />
+        <Section
+          title="Correlation unresolved"
+          items={parsed.infra_correlation?.unresolved?.map((d) => ({ label: d })) ?? []}
+          labelKey="label"
+          fallback="No unresolved items."
         />
         <Section
           title="Correlation warnings"

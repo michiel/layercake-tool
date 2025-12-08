@@ -43,6 +43,23 @@ pub fn correlate_code_infra(
         for (k, v) in &resource.properties {
             let v_lower = v.to_ascii_lowercase();
             let k_lower = k.to_ascii_lowercase();
+
+            // Handler-specific hint (e.g., CodeUri + Handler from SAM/CFN)
+            if k_lower == "handler" {
+                let handler = v.replace("::", ".").replace('\\', "/");
+                let parts: Vec<&str> = handler.rsplitn(2, '.').collect();
+                if parts.len() == 2 {
+                    let func_part = parts[0].to_string();
+                    let path_part = parts[1].to_string();
+                    let qualified = format!("{path_part}::{func_part}");
+                    report.matches.push(CorrelationMatch {
+                        code_node: qualified,
+                        infra_node: resource.id.clone(),
+                        reason: format!("handler property {handler}"),
+                    });
+                    matched = true;
+                }
+            }
             // File match: property contains a code file path or filename
             if files.iter().any(|f| v.contains(f))
                 || file_names.iter().any(|name| v_lower.contains(name))

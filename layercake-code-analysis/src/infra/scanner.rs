@@ -211,6 +211,20 @@ fn parse_cloudformation(path: &Path, relative: &str) -> InfraScanResult {
                     props.insert(key.to_string(), yaml_to_string(v));
                 }
             }
+
+            // If we have CodeUri + Handler, stitch a handler_path hint to help correlation
+            if let Some(handler) = props_map
+                .get(&YamlValue::from("Handler"))
+                .and_then(|v| v.as_str())
+            {
+                if let Some(code_uri) = props_map
+                    .get(&YamlValue::from("CodeUri"))
+                    .and_then(|v| v.as_str())
+                {
+                    let clean = format!("{}/{}", code_uri.trim_end_matches('/'), handler);
+                    props.insert("handler_path".into(), clean);
+                }
+            }
         }
         node.properties = props;
 

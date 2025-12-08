@@ -92,6 +92,7 @@ struct JsVisitor<'a> {
     file_path: &'a Path,
     cm: Lrc<SourceMap>,
     imports: Vec<Import>,
+    import_aliases: HashMap<String, String>,
     functions: Vec<FunctionInfo>,
     data_flows: Vec<DataFlow>,
     call_edges: Vec<CallEdge>,
@@ -110,6 +111,7 @@ impl<'a> JsVisitor<'a> {
             file_path,
             cm,
             imports: Vec::new(),
+            import_aliases: HashMap::new(),
             functions: Vec::new(),
             data_flows: Vec::new(),
             call_edges: Vec::new(),
@@ -263,10 +265,22 @@ impl<'a> JsVisitor<'a> {
 
     fn get_expr_name(&self, expr: &Expr) -> String {
         match expr {
-            Expr::Ident(ident) => ident.sym.to_string(),
+            Expr::Ident(ident) => {
+                if let Some(module) = self.import_aliases.get(&ident.sym.to_string()) {
+                    format!("{module}::{}", ident.sym)
+                } else {
+                    ident.sym.to_string()
+                }
+            }
             Expr::Member(member) => {
                 let obj = match &*member.obj {
-                    Expr::Ident(ident) => ident.sym.to_string(),
+                    Expr::Ident(ident) => {
+                        if let Some(module) = self.import_aliases.get(&ident.sym.to_string()) {
+                            format!("{module}::{}", ident.sym)
+                        } else {
+                            ident.sym.to_string()
+                        }
+                    }
                     Expr::This(_) => "this".to_string(),
                     Expr::Member(inner) => self.get_expr_name(&Expr::Member(inner.clone())),
                     other => format!("({})", self.get_expr_name(other)),
@@ -399,8 +413,25 @@ impl<'a> JsVisitor<'a> {
 
 impl<'a> Visit for JsVisitor<'a> {
     fn visit_import_decl(&mut self, n: &ImportDecl) {
+        let module = n.src.value.to_string_lossy().into_owned();
+        for spec in &n.specifiers {
+            match spec {
+                swc_ecma_ast::ImportSpecifier::Named(named) => {
+                    let local = named.local.sym.to_string();
+                    self.import_aliases.insert(local.clone(), module.clone());
+                }
+                swc_ecma_ast::ImportSpecifier::Default(default) => {
+                    let local = default.local.sym.to_string();
+                    self.import_aliases.insert(local.clone(), module.clone());
+                }
+                swc_ecma_ast::ImportSpecifier::Namespace(ns) => {
+                    let local = ns.local.sym.to_string();
+                    self.import_aliases.insert(local.clone(), module.clone());
+                }
+            }
+        }
         self.imports.push(Import {
-            module: n.src.value.to_string_lossy().into_owned(),
+            module: module.clone(),
             file_path: self.file_path_string(),
             line_number: self.line_for_span(n.span),
         });

@@ -446,8 +446,7 @@ impl CodeAnalysisService {
                 alter_analysis_type.to_string(),
             ))
             .await;
-        let alter_last_result =
-            "ALTER TABLE code_analysis_profiles ADD COLUMN last_result TEXT";
+        let alter_last_result = "ALTER TABLE code_analysis_profiles ADD COLUMN last_result TEXT";
         let _ = self
             .db
             .execute(Statement::from_string(
