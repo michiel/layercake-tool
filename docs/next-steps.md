@@ -31,7 +31,7 @@
 
 Progress:
 - [ ] 1) Structured options
-- [ ] 2) Solution-mode graph builder + attributes
+- [x] 2) Solution-mode graph builder + attributes (baseline solution graph without functions, includes entries/exits/external calls)
 - [ ] 3) Preserve labels/annotations only
 - [ ] 4) External call + exit detection (Python heuristics added; JS/TS pending)
 - [ ] 5) Infra correlation attributes/belongs_to (handler/key hints + inferred refs added; belong-to audit pending)

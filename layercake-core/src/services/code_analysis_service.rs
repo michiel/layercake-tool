@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
+use crate::code_analysis_solution_graph::analysis_to_solution_graph;
 use crate::database::entities::code_analysis_profiles;
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
@@ -642,8 +643,8 @@ impl CodeAnalysisService {
         };
 
         let combined_graph = if analysis_type == "solution" {
-            // Build solution-level graph: force coalesce to files, combine infra if available, drop function detail
-            let code_graph = analysis_to_graph(&result, Some(cleaned_report.clone()), true);
+            // Build solution-level graph without function detail
+            let code_graph = analysis_to_solution_graph(&result, Some(cleaned_report.clone()));
             let mut graph = if !no_infra_flag && opts.include_infra {
                 if let Some(infra) = infra_graph.as_ref() {
                     merge_graphs(

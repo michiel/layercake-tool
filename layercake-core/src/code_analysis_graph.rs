@@ -58,6 +58,13 @@ pub fn analysis_to_graph(
     ensure_layer("library", "Library", "#f1f5f9", "#0f172a", "#94a3b8");
     ensure_layer("entry", "Entry", "#ecfccb", "#1a2e05", "#84cc16");
     ensure_layer("exit", "Exit", "#fee2e2", "#450a0a", "#ef4444");
+    ensure_layer(
+        "external_call",
+        "External Call",
+        "#e0f2fe",
+        "#0f172a",
+        "#0ea5e9",
+    );
     ensure_layer("scope", "Scope", "#eef2ff", "#111827", "#6366f1");
 
     let scope_id = unique_id("scope");
