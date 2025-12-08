@@ -93,6 +93,41 @@ pub fn analyze_infra(path: &Path) -> Result<InfrastructureGraph> {
         }
     }
 
+    // Infer reference edges when resource properties mention other resources by id/name
+    let mut inferred = Vec::new();
+    let resources_snapshot: Vec<(String, String)> = graph
+        .resources
+        .values()
+        .map(|r| (r.id.clone(), r.name.clone()))
+        .collect();
+    let mut seen = std::collections::HashSet::new();
+    for resource in graph.resources.values() {
+        for val in resource.properties.values() {
+            let lower = val.to_ascii_lowercase();
+            for (other_id, other_name) in &resources_snapshot {
+                if other_id == &resource.id {
+                    continue;
+                }
+                if lower.contains(&other_id.to_ascii_lowercase())
+                    || lower.contains(&other_name.to_ascii_lowercase())
+                {
+                    let key = (resource.id.clone(), other_id.clone());
+                    if seen.insert(key.clone()) {
+                        inferred.push(GraphEdge {
+                            from: resource.id.clone(),
+                            to: other_id.clone(),
+                            edge_type: EdgeType::References,
+                            label: Some("inferred_ref".into()),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    for edge in inferred {
+        graph.add_edge(edge);
+    }
+
     graph.validate_edges();
     graph.diagnostics.extend(diagnostics);
     Ok(graph)
