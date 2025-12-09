@@ -81,10 +81,12 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   // Get client ID at top level to follow React hook rules
   const { clientId } = useSubscriptionFilter()
 
-  // Initialize CQRS service
-  const cqrsService = useMemo(() => {
-    return new PlanDagCQRSService(apollo, clientId)
-  }, [apollo, clientId])
+  // Initialize CQRS service once per planId/clientId
+  const cqrsServiceRef = useRef<PlanDagCQRSService | null>(null)
+  if (!cqrsServiceRef.current) {
+    cqrsServiceRef.current = new PlanDagCQRSService(apollo, clientId)
+  }
+  const cqrsService = cqrsServiceRef.current
 
   // Local state
   const [planDag, setPlanDag] = useState<PlanDag | null>(null)

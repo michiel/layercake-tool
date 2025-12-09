@@ -74,6 +74,12 @@ pub struct SolutionAnalysisOptions {
     pub include_data_flow: bool,
     #[serde(default)]
     pub include_control_flow: bool,
+    #[serde(default)]
+    pub exclude_known_support_files: bool,
+    #[serde(default)]
+    pub exclude_inferred_support: bool,
+    #[serde(default)]
+    pub exclude_helpers: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -170,6 +176,9 @@ fn merge_graphs(
     for mut node in secondary.nodes {
         if let Some(mapped) = id_map.get(&node.id) {
             node.id = mapped.clone();
+        }
+        if node.layer == "infra" {
+            node.is_partition = false;
         }
         if let Some(parent) = node.belongs_to.clone() {
             if let Some(mapped_parent) = id_map.get(&parent) {
@@ -640,6 +649,9 @@ impl CodeAnalysisService {
                 include_imports: false,
                 include_data_flow: false,
                 include_control_flow: false,
+                exclude_known_support_files: false,
+                exclude_inferred_support: false,
+                exclude_helpers: false,
             });
         let mut result = analysis.result;
         if opts.exclude_known_support_files || opts.exclude_inferred_support {
@@ -692,6 +704,34 @@ impl CodeAnalysisService {
         let combined_graph = if analysis_type == "solution" {
             // Build solution-level graph without function detail
             let mut filtered_result = result.clone();
+            if solution_opts.exclude_known_support_files || solution_opts.exclude_inferred_support {
+                filtered_result = Self::filter_support_files(
+                    filtered_result,
+                    &CodeAnalysisOptions {
+                        include_data_flow: true,
+                        include_control_flow: true,
+                        include_imports: true,
+                        include_infra: true,
+                        coalesce_functions: false,
+                        exclude_known_support_files: solution_opts.exclude_known_support_files,
+                        exclude_inferred_support: solution_opts.exclude_inferred_support,
+                    },
+                );
+            }
+            if solution_opts.exclude_helpers {
+                filtered_result.exclude_functions_named(&[
+                    "map",
+                    "reduce",
+                    "print",
+                    "log",
+                    "debug",
+                    "console.log",
+                    "console.debug",
+                    "console.error",
+                    "logging.info",
+                    "logging.debug",
+                ]);
+            }
             if !solution_opts.include_imports {
                 filtered_result.imports.clear();
             }
@@ -774,8 +814,10 @@ impl CodeAnalysisService {
                     node.is_partition = false;
                 }
                 if node.layer == "infra" {
-                    node.is_partition = true;
-                    node.belongs_to = Some(root_id.clone());
+                    node.is_partition = false;
+                    if node.belongs_to.is_none() {
+                        node.belongs_to = Some(root_id.clone());
+                    }
                 }
             }
 

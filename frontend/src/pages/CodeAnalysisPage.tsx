@@ -139,6 +139,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [excludeKnownSupport, setExcludeKnownSupport] = useState(false)
   const [excludeInferredSupport, setExcludeInferredSupport] = useState(false)
   const [solutionIncludeInfra, setSolutionIncludeInfra] = useState(true)
+  const [excludeHelpers, setExcludeHelpers] = useState(false)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -224,14 +225,15 @@ export const CodeAnalysisPage: React.FC = () => {
     setNoInfra(profile?.noInfra ?? false)
     const opts = profile?.options ? JSON.parse(profile.options) : {}
     const solOpts = profile?.solutionOptions ? JSON.parse(profile.solutionOptions) : {}
+    setAnalysisType(profile?.analysisType || 'code')
     setIncludeDataFlow(opts.includeDataFlow ?? true)
     setIncludeControlFlow(opts.includeControlFlow ?? true)
     setIncludeImports(opts.includeImports ?? true)
     setCoalesceFunctions(opts.coalesceFunctions ?? false)
-    setExcludeKnownSupport(opts.excludeKnownSupportFiles ?? false)
-    setExcludeInferredSupport(opts.excludeInferredSupport ?? false)
-    setAnalysisType(profile?.analysisType || 'code')
+    setExcludeKnownSupport(solOpts.excludeKnownSupportFiles ?? opts.excludeKnownSupportFiles ?? false)
+    setExcludeInferredSupport(solOpts.excludeInferredSupport ?? opts.excludeInferredSupport ?? false)
     setSolutionIncludeInfra(solOpts.includeInfra ?? true)
+    setExcludeHelpers(solOpts.excludeHelpers ?? false)
     setModalOpen(true)
   }
 
@@ -258,6 +260,9 @@ export const CodeAnalysisPage: React.FC = () => {
               includeImports: false,
               includeDataFlow: false,
               includeControlFlow: false,
+              excludeKnownSupportFiles: excludeKnownSupport,
+              excludeInferredSupport,
+              excludeHelpers,
             }
           : null,
     }
@@ -529,6 +534,30 @@ export const CodeAnalysisPage: React.FC = () => {
                     onChange={(e) => setSolutionIncludeInfra(e.target.checked)}
                   />
                   Include infra
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={excludeKnownSupport}
+                    onChange={(e) => setExcludeKnownSupport(e.target.checked)}
+                  />
+                  Exclude known support files
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={excludeInferredSupport}
+                    onChange={(e) => setExcludeInferredSupport(e.target.checked)}
+                  />
+                  Exclude inferred support/tests
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={coalesceFunctions}
+                    onChange={(e) => setCoalesceFunctions(e.target.checked)}
+                  />
+                  Exclude helpers/built-ins/logging
                 </Label>
               </div>
             )}

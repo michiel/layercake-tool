@@ -68,6 +68,21 @@ pub struct AnalysisResult {
 }
 
 impl AnalysisResult {
+    pub fn exclude_functions_named(&mut self, names: &[&str]) {
+        let lower: std::collections::HashSet<String> =
+            names.iter().map(|n| n.to_ascii_lowercase()).collect();
+        self.functions
+            .retain(|f| !lower.contains(&f.name.to_ascii_lowercase()));
+        self.call_edges
+            .retain(|c| !lower.contains(&c.callee.to_ascii_lowercase()));
+        self.data_flows.retain(|f| {
+            !lower.contains(&f.source.to_ascii_lowercase())
+                && !lower.contains(&f.sink.to_ascii_lowercase())
+        });
+    }
+}
+
+impl AnalysisResult {
     pub fn merge(mut self, other: AnalysisResult) -> AnalysisResult {
         self.imports.extend(other.imports);
         self.functions.extend(other.functions);
