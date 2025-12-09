@@ -1,4 +1,0 @@
- - Use the example in https://vasturiano.github.io/force-graph/example/highlight/ to implement highlighting in graph previews for graphnode
- - On load the frontend appears to be in dark mode but is actually light mode. it requires two theme switches to get to a properly rendered light mode. fix this and always start in light mode 
- - In the graph preview component, use the layer styling to color the nodes and the edges/links if it exists (defaults otherwise), but not the text and borders (defaults only)
- - Add a button "Delete chat history" to the Chat logs page, this removes all historical chats but not the current one
