@@ -39,7 +39,7 @@ pub struct CodeAnalysisProfile {
     pub solution_options: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct CodeAnalysisOptions {
     #[serde(alias = "includeDataFlow")]
     #[serde(default = "default_true")]
