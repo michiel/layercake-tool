@@ -17,6 +17,8 @@ pub struct CodeAnalysisProfile {
     pub analysis_type: String,
     #[graphql(name = "lastResult")]
     pub last_result: Option<String>,
+    #[graphql(name = "solutionOptions")]
+    pub solution_options: Option<String>,
 }
 
 impl From<ServiceProfile> for CodeAnalysisProfile {
@@ -32,6 +34,7 @@ impl From<ServiceProfile> for CodeAnalysisProfile {
             options: profile.options,
             analysis_type: profile.analysis_type,
             last_result: profile.last_result,
+            solution_options: profile.solution_options,
         }
     }
 }
