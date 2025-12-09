@@ -317,6 +317,27 @@ impl<'a> JsVisitor<'a> {
         }
     }
 
+    fn detect_external_call(&self, call: &CallExpr, callee_name: &str) -> Option<ExternalCall> {
+        let lc = callee_name.to_ascii_lowercase();
+        let is_fetch = lc == "fetch" || lc.ends_with(".fetch");
+        let is_axios = lc.contains("axios") || lc.ends_with(".get") || lc.ends_with(".post");
+        let is_sdk = lc.contains("client.") || lc.contains("sdk.") || lc.contains("aws.");
+        if !(is_fetch || is_axios || is_sdk) {
+            return None;
+        }
+        let path = call.args.first().and_then(|a| match &*a.expr {
+            Expr::Lit(swc_ecma_ast::Lit::Str(s)) => Some(s.value.to_string_lossy().into_owned()),
+            _ => None,
+        });
+        Some(ExternalCall {
+            target: callee_name.to_string(),
+            method: None,
+            path,
+            file_path: self.file_path_string(),
+            line_number: self.line_for_span(call.span),
+        })
+    }
+
     fn ts_type_to_string(&self, ty: &TsType) -> String {
         match ty {
             TsType::TsKeywordType(keyword) => format!("{:?}", keyword.kind)
@@ -639,10 +660,15 @@ impl<'a> Visit for JsVisitor<'a> {
             if let Some(caller) = self.function_stack.last().cloned() {
                 self.call_edges.push(CallEdge {
                     caller,
-                    callee: callee_raw,
+                    callee: callee_raw.clone(),
                     file_path: self.file_path_string(),
                 });
             }
+        }
+
+        // External call detection: fetch/axios/http/SDK
+        if let Some(ext) = self.detect_external_call(&n, &callee_raw) {
+            self.external_calls.push(ext);
         }
 
         n.visit_children_with(self);
