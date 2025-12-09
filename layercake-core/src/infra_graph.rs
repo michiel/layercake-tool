@@ -59,12 +59,23 @@ pub fn infra_to_graph(graph: &InfrastructureGraph, annotation: Option<String>) -
     }
 
     for resource in graph.resources.values() {
+        let belongs_to = resource
+            .belongs_to
+            .clone()
+            .or_else(|| {
+                // fall back to partition matching the directory of the source file
+                std::path::Path::new(&resource.source_file)
+                    .parent()
+                    .and_then(|p| p.to_str())
+                    .and_then(|dir| graph.partitions.get(dir).map(|p| p.id.clone()))
+            })
+            .or(Some(graph.root_id.clone()));
         nodes.push(Node {
             id: resource.id.clone(),
             label: resource.name.clone(),
             layer: "infra".to_string(),
             is_partition: false,
-            belongs_to: resource.belongs_to.clone().or(Some(graph.root_id.clone())),
+            belongs_to,
             weight: 1,
             comment: Some(resource.source_file.clone()),
             dataset: None,

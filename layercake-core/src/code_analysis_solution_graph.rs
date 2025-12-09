@@ -177,7 +177,8 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
             dataset: None,
             attributes: Some(serde_json::json!({
                 "method": call.method,
-                "path": call.path
+                "path": call.path,
+                "line": call.line_number
             })),
         });
         if let Some(file_id) = file_nodes.get(&call.file_path) {
