@@ -31,6 +31,7 @@ impl CodeAnalysisMutation {
                     .analysis_type
                     .clone()
                     .unwrap_or_else(|| "code".to_string()),
+                input.solution_options.clone(),
             )
             .await
             .map_err(|e| StructuredError::service("CodeAnalysisService::create", e))?;
@@ -53,6 +54,7 @@ impl CodeAnalysisMutation {
                 input.no_infra,
                 Some(input.options.clone()),
                 input.analysis_type,
+                Some(input.solution_options.clone()),
             )
             .await
             .map_err(|e| StructuredError::service("CodeAnalysisService::update", e))?;

@@ -46,6 +46,8 @@ pub struct CreateCodeAnalysisProfileInput {
     pub options: Option<String>,
     #[graphql(name = "analysisType")]
     pub analysis_type: Option<String>,
+    #[graphql(name = "solutionOptions")]
+    pub solution_options: Option<String>,
 }
 
 #[derive(InputObject)]
@@ -58,6 +60,8 @@ pub struct UpdateCodeAnalysisProfileInput {
     pub options: Option<String>,
     #[graphql(name = "analysisType")]
     pub analysis_type: Option<String>,
+    #[graphql(name = "solutionOptions")]
+    pub solution_options: Option<String>,
 }
 
 #[derive(SimpleObject)]

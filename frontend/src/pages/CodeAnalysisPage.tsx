@@ -29,6 +29,7 @@ type Profile = {
   noInfra?: boolean
   options?: string | null
   analysisType?: string | null
+   solutionOptions?: string | null
 }
 
 type DataSetOption = { id: number; name: string }
@@ -46,6 +47,7 @@ const GET_PROFILES = gql`
       options
       analysisType
       lastResult
+      solutionOptions
     }
   }
 `
@@ -63,6 +65,7 @@ const CREATE_PROFILE = gql`
       options
       analysisType
       lastResult
+      solutionOptions
     }
   }
 `
@@ -79,6 +82,7 @@ const UPDATE_PROFILE = gql`
       noInfra
       options
       analysisType
+      solutionOptions
     }
   }
 `
@@ -101,6 +105,8 @@ const RUN_PROFILE = gql`
         report
         noInfra
         options
+        analysisType
+        solutionOptions
         lastResult
       }
     }
@@ -132,6 +138,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [analysisType, setAnalysisType] = useState<string>('code')
   const [excludeKnownSupport, setExcludeKnownSupport] = useState(false)
   const [excludeInferredSupport, setExcludeInferredSupport] = useState(false)
+  const [solutionIncludeInfra, setSolutionIncludeInfra] = useState(true)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -229,17 +236,36 @@ export const CodeAnalysisPage: React.FC = () => {
   const handleSave = () => {
     const trimmedPath = filePath.trim()
     if (!trimmedPath) return
-    const options = JSON.stringify({
-      includeDataFlow,
-      includeControlFlow,
-      includeImports,
-      coalesceFunctions,
-      excludeKnownSupportFiles: excludeKnownSupport,
-      excludeInferredSupport,
-    })
+    const options =
+      analysisType === 'solution'
+        ? null
+        : JSON.stringify({
+            includeDataFlow,
+            includeControlFlow,
+            includeImports,
+            coalesceFunctions,
+            excludeKnownSupportFiles: excludeKnownSupport,
+            excludeInferredSupport,
+          })
+    const solutionOptions =
+      analysisType === 'solution'
+        ? JSON.stringify({
+            includeInfra: solutionIncludeInfra,
+          })
+        : null
     if (editing) {
       updateProfile({
-        variables: { input: { id: editing.id, filePath: trimmedPath, datasetId, noInfra, options, analysisType } },
+        variables: {
+          input: {
+            id: editing.id,
+            filePath: trimmedPath,
+            datasetId,
+            noInfra,
+            options,
+            analysisType,
+            solutionOptions,
+          },
+        },
       })
     } else {
       createProfile({
@@ -251,6 +277,7 @@ export const CodeAnalysisPage: React.FC = () => {
             noInfra,
             options,
             analysisType,
+            solutionOptions,
           },
         },
       })
@@ -421,64 +448,77 @@ export const CodeAnalysisPage: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1">
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={noInfra}
-                  onChange={(e) => setNoInfra(e.target.checked)}
-                />
-                Disable infra correlation
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={includeDataFlow}
-                  onChange={(e) => setIncludeDataFlow(e.target.checked)}
-                />
-                Include data flow
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={includeControlFlow}
-                  onChange={(e) => setIncludeControlFlow(e.target.checked)}
-                />
-                Include control flow
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={includeImports}
-                  onChange={(e) => setIncludeImports(e.target.checked)}
-                />
-                Include imports
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={coalesceFunctions}
-                  onChange={(e) => setCoalesceFunctions(e.target.checked)}
-                />
-                Coalesce functions into files (aggregate edges)
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={excludeKnownSupport}
-                  onChange={(e) => setExcludeKnownSupport(e.target.checked)}
-                />
-                Exclude known support files (locks, manifests, setup)
-              </Label>
-              <Label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={excludeInferredSupport}
-                  onChange={(e) => setExcludeInferredSupport(e.target.checked)}
-                />
-                Exclude inferred support/tests (test/spec/fixtures)
-              </Label>
-            </div>
+            {analysisType === 'code' ? (
+              <div className="space-y-1">
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={noInfra}
+                    onChange={(e) => setNoInfra(e.target.checked)}
+                  />
+                  Disable infra correlation
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeDataFlow}
+                    onChange={(e) => setIncludeDataFlow(e.target.checked)}
+                  />
+                  Include data flow
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeControlFlow}
+                    onChange={(e) => setIncludeControlFlow(e.target.checked)}
+                  />
+                  Include control flow
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={includeImports}
+                    onChange={(e) => setIncludeImports(e.target.checked)}
+                  />
+                  Include imports
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={coalesceFunctions}
+                    onChange={(e) => setCoalesceFunctions(e.target.checked)}
+                  />
+                  Coalesce functions into files (aggregate edges)
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={excludeKnownSupport}
+                    onChange={(e) => setExcludeKnownSupport(e.target.checked)}
+                  />
+                  Exclude known support files (locks, manifests, setup)
+                </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={excludeInferredSupport}
+                    onChange={(e) => setExcludeInferredSupport(e.target.checked)}
+                  />
+                  Exclude inferred support/tests (test/spec/fixtures)
+                </Label>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={solutionIncludeInfra}
+                    onChange={(e) => setSolutionIncludeInfra(e.target.checked)}
+                  />
+                  Include infra
+                </Label>
+              </div>
+            )}
           </Stack>
           <DialogFooter className="mt-4">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>

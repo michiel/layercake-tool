@@ -15,6 +15,7 @@ pub struct Model {
     pub options: Option<String>,
     pub analysis_type: Option<String>,
     pub last_result: Option<String>,
+    pub solution_options: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

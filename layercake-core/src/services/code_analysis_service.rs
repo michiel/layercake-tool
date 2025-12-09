@@ -36,6 +36,7 @@ pub struct CodeAnalysisProfile {
     pub options: Option<String>,
     pub analysis_type: String,
     pub last_result: Option<String>,
+    pub solution_options: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -63,6 +64,18 @@ pub struct CodeAnalysisOptions {
     pub exclude_inferred_support: bool,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+pub struct SolutionAnalysisOptions {
+    #[serde(default = "default_true")]
+    pub include_infra: bool,
+    #[serde(default)]
+    pub include_imports: bool,
+    #[serde(default)]
+    pub include_data_flow: bool,
+    #[serde(default)]
+    pub include_control_flow: bool,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -80,6 +93,7 @@ impl From<code_analysis_profiles::Model> for CodeAnalysisProfile {
             options: model.options,
             analysis_type: model.analysis_type.unwrap_or_else(|| "code".to_string()),
             last_result: model.last_result,
+            solution_options: model.solution_options,
         }
     }
 }
@@ -455,6 +469,15 @@ impl CodeAnalysisService {
                 alter_last_result.to_string(),
             ))
             .await;
+        let alter_solution_options =
+            "ALTER TABLE code_analysis_profiles ADD COLUMN solution_options TEXT";
+        let _ = self
+            .db
+            .execute(Statement::from_string(
+                self.db.get_database_backend(),
+                alter_solution_options.to_string(),
+            ))
+            .await;
         Ok(())
     }
 
@@ -475,6 +498,7 @@ impl CodeAnalysisService {
         no_infra: bool,
         options: Option<String>,
         analysis_type: String,
+        solution_options: Option<String>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
@@ -489,6 +513,7 @@ impl CodeAnalysisService {
             options: Set(options),
             analysis_type: Set(Some(analysis_type)),
             last_result: Set(None),
+            solution_options: Set(solution_options),
         };
 
         code_analysis_profiles::Entity::insert(active.clone())
@@ -511,6 +536,7 @@ impl CodeAnalysisService {
         no_infra: Option<bool>,
         options: Option<Option<String>>,
         analysis_type: Option<String>,
+        solution_options: Option<Option<String>>,
     ) -> Result<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
@@ -533,6 +559,9 @@ impl CodeAnalysisService {
         }
         if let Some(t) = analysis_type {
             model.analysis_type = Set(Some(t));
+        }
+        if let Some(opts) = solution_options {
+            model.solution_options = Set(opts);
         }
 
         let updated = model.update(&self.db).await?;
