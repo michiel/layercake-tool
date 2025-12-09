@@ -623,6 +623,16 @@ impl CodeAnalysisService {
                 exclude_known_support_files: false,
                 exclude_inferred_support: false,
             });
+        let solution_opts: SolutionAnalysisOptions = profile
+            .solution_options
+            .as_ref()
+            .and_then(|raw| serde_json::from_str(raw).ok())
+            .unwrap_or_else(|| SolutionAnalysisOptions {
+                include_infra: true,
+                include_imports: false,
+                include_data_flow: false,
+                include_control_flow: false,
+            });
         let mut result = analysis.result;
         if opts.exclude_known_support_files || opts.exclude_inferred_support {
             result = Self::filter_support_files(result, &opts);
@@ -673,8 +683,14 @@ impl CodeAnalysisService {
 
         let combined_graph = if analysis_type == "solution" {
             // Build solution-level graph without function detail
-            let code_graph = analysis_to_solution_graph(&result, Some(cleaned_report.clone()));
-            let mut graph = if !no_infra_flag && opts.include_infra {
+            let mut filtered_result = result.clone();
+            if !solution_opts.include_infra {
+                filtered_result.infra = None;
+                filtered_result.infra_correlation = None;
+            }
+            let code_graph =
+                analysis_to_solution_graph(&filtered_result, Some(cleaned_report.clone()));
+            let mut graph = if !no_infra_flag && solution_opts.include_infra {
                 if let Some(infra) = infra_graph.as_ref() {
                     merge_graphs(
                         code_graph,

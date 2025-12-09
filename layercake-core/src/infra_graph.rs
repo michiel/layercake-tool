@@ -96,7 +96,9 @@ pub fn infra_to_graph(graph: &InfrastructureGraph, annotation: Option<String>) -
             weight: 1,
             comment: None,
             dataset: None,
-            attributes: None,
+            attributes: Some(json!({
+                "edge_type": format!("{:?}", edge.edge_type),
+            })),
         });
     }
 

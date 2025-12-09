@@ -53,6 +53,8 @@ export const AnalysisResultViewer: React.FC<Props> = ({ resultJson }) => {
     dataFlows: parsed.data_flows?.length ?? 0,
     controlFlows: parsed.call_edges?.length ?? 0,
     entries: parsed.entry_points?.length ?? 0,
+    exits: parsed.exits?.length ?? 0,
+    externalCalls: parsed.external_calls?.length ?? 0,
     envs: parsed.env_vars?.length ?? 0,
     files: parsed.files?.length ?? 0,
     dirs: parsed.directories?.length ?? 0,
@@ -70,6 +72,8 @@ export const AnalysisResultViewer: React.FC<Props> = ({ resultJson }) => {
         <Badge variant="outline">Control flow edges: {counts.controlFlows}</Badge>
         <Badge variant="outline">Imports: {counts.imports}</Badge>
         <Badge variant="outline">Entry points: {counts.entries}</Badge>
+        <Badge variant="outline">Exits: {counts.exits}</Badge>
+        <Badge variant="outline">External calls: {counts.externalCalls}</Badge>
         <Badge variant="outline">Env vars: {counts.envs}</Badge>
         <Badge variant="outline">Files: {counts.files}</Badge>
         <Badge variant="outline">Directories: {counts.dirs}</Badge>
@@ -87,6 +91,13 @@ export const AnalysisResultViewer: React.FC<Props> = ({ resultJson }) => {
         <Section title="Data flows" items={parsed.data_flows} labelKey="variable" fallback="No data flows captured." />
         <Section title="Control flows" items={parsed.call_edges} labelKey="callee" fallback="No control flows captured." />
         <Section title="Entry points" items={parsed.entry_points} labelKey="condition" fallback="No entry points captured." />
+        <Section title="Exits" items={parsed.exits} labelKey="condition" fallback="No exits captured." />
+        <Section
+          title="External calls"
+          items={parsed.external_calls}
+          labelKey="target"
+          fallback="No external calls captured."
+        />
         <Section title="Env vars" items={parsed.env_vars} labelKey="name" fallback="No env vars captured." />
         <Section
           title="Infra resources"
