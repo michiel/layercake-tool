@@ -50,7 +50,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
    cargo run --bin layercake -- serve \
      --port 3001 \
      --database layercake.db \
-     --cors-origin http://localhost:1420
+     --cors-origin http://localhost:1422
    ```
 2. Point the frontend at that API by creating `frontend/.env.local` (or exporting before the next step):
    ```bash
@@ -61,7 +61,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
    npm run frontend:dev
    ```
 
-Open http://localhost:1420 to access the plan editor, data source manager, graph editors, chat workspace, and system settings.
+Open http://localhost:1422 to access the plan editor, data source manager, graph editors, chat workspace, and system settings.
 
 The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scripts that wire up the services, enforce ports (`3001`/`1422`), initialize the database, and stream logs.
 

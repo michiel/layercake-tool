@@ -1,4 +1,6 @@
-# Layercake plan
+# Layercake Specification
+
+> **Note**: This document represents the original product vision and specification from the project's inception. Many features described here have been implemented. For current implementation details, see [README.md](README.md), [BUILD.md](BUILD.md), and documentation in the `docs/` directory.
 
 ## Goals and high level requirements
 
