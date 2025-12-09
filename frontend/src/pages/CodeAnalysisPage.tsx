@@ -29,7 +29,7 @@ type Profile = {
   noInfra?: boolean
   options?: string | null
   analysisType?: string | null
-   solutionOptions?: string | null
+  solutionOptions?: string | null
 }
 
 type DataSetOption = { id: number; name: string }
@@ -238,23 +238,34 @@ export const CodeAnalysisPage: React.FC = () => {
   const handleSave = () => {
     const trimmedPath = filePath.trim()
     if (!trimmedPath) return
-    const options =
-      analysisType === 'solution'
-        ? null
-        : JSON.stringify({
-            includeDataFlow,
-            includeControlFlow,
-            includeImports,
-            coalesceFunctions,
-            excludeKnownSupportFiles: excludeKnownSupport,
-            excludeInferredSupport,
-          })
+    const optionsPayload = {
+      code:
+        analysisType === 'code'
+          ? {
+              includeDataFlow,
+              includeControlFlow,
+              includeImports,
+              includeInfra: !noInfra,
+              coalesceFunctions,
+              excludeKnownSupportFiles: excludeKnownSupport,
+              excludeInferredSupport,
+            }
+          : null,
+      solution:
+        analysisType === 'solution'
+          ? {
+              includeInfra: solutionIncludeInfra,
+              includeImports: false,
+              includeDataFlow: false,
+              includeControlFlow: false,
+            }
+          : null,
+    }
+    const options = JSON.stringify(optionsPayload)
     const solutionOptions =
       analysisType === 'solution'
-        ? JSON.stringify({
-            includeInfra: solutionIncludeInfra,
-          })
-        : null
+        ? JSON.stringify(optionsPayload.solution)
+        : profile?.solutionOptions ?? null
     if (editing) {
       updateProfile({
         variables: {

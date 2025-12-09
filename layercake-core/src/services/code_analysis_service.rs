@@ -76,6 +76,12 @@ pub struct SolutionAnalysisOptions {
     pub include_control_flow: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct AnalysisOptions {
+    pub code: Option<CodeAnalysisOptions>,
+    pub solution: Option<SolutionAnalysisOptions>,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -610,23 +616,25 @@ impl CodeAnalysisService {
         }
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
-        let opts: CodeAnalysisOptions = profile
+        let parsed_opts: AnalysisOptions = profile
             .options
             .as_ref()
             .and_then(|raw| serde_json::from_str(raw).ok())
-            .unwrap_or(CodeAnalysisOptions {
-                include_data_flow: true,
-                include_control_flow: true,
-                include_imports: true,
-                include_infra: true,
-                coalesce_functions: false,
-                exclude_known_support_files: false,
-                exclude_inferred_support: false,
-            });
+            .unwrap_or_default();
+        let opts: CodeAnalysisOptions = parsed_opts.code.unwrap_or(CodeAnalysisOptions {
+            include_data_flow: true,
+            include_control_flow: true,
+            include_imports: true,
+            include_infra: true,
+            coalesce_functions: false,
+            exclude_known_support_files: false,
+            exclude_inferred_support: false,
+        });
         let solution_opts: SolutionAnalysisOptions = profile
             .solution_options
             .as_ref()
             .and_then(|raw| serde_json::from_str(raw).ok())
+            .or(parsed_opts.solution)
             .unwrap_or_else(|| SolutionAnalysisOptions {
                 include_infra: true,
                 include_imports: false,

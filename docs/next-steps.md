@@ -30,7 +30,7 @@
 6) Update UI to gate options per analysis type and display external calls/exits in the result viewer.
 
 Progress:
-- [ ] 1) Structured options
+- [x] 1) Structured options
 - [x] 2) Solution-mode graph builder + attributes (baseline solution graph without functions, includes entries/exits/external calls)
 - [ ] 3) Preserve labels/annotations only
 - [x] 4) External call + exit detection (Python + JS/TS heuristics added)
