@@ -32,7 +32,7 @@
 Progress:
 - [x] 1) Structured options
 - [x] 2) Solution-mode graph builder + attributes (baseline solution graph without functions, includes entries/exits/external calls)
-- [ ] 3) Preserve labels/annotations only
+- [x] 3) Preserve labels/annotations only (coalescing keeps aggregate counts and label samples; reports remain annotations)
 - [x] 4) External call + exit detection (Python + JS/TS heuristics added)
-- [ ] 5) Infra correlation attributes/belongs_to (handler/key hints + inferred refs added; belong-to audit pending)
-- [ ] 6) UI gating & viewer enhancements (partial: viewer shows external calls/exits)
+- [x] 5) Infra correlation attributes/belongs_to (edge_type attrs; handler/key hints; inferred refs; belongs_to fallback to partitions)
+- [x] 6) UI gating & viewer enhancements (type-gated options; viewer shows external calls/exits/envs)
