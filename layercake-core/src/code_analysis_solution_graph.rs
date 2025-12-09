@@ -39,6 +39,7 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
         "#0f172a",
         "#0ea5e9",
     );
+    ensure_layer("env", "Env Var", "#fef9c3", "#713f12", "#f59e0b");
 
     let root_id = "solution_root".to_string();
     nodes.push(Node {
@@ -117,7 +118,10 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
             weight: 1,
             comment: Some(entry.file_path.clone()),
             dataset: None,
-            attributes: None,
+            attributes: Some(serde_json::json!({
+                "line": entry.line_number,
+                "file": entry.file_path,
+            })),
         });
         if let Some(file_id) = file_nodes.get(&entry.file_path) {
             edges.push(Edge {
@@ -146,7 +150,10 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
             weight: 1,
             comment: Some(exit.file_path.clone()),
             dataset: None,
-            attributes: None,
+            attributes: Some(serde_json::json!({
+                "line": exit.line_number,
+                "file": exit.file_path,
+            })),
         });
         if let Some(file_id) = file_nodes.get(&exit.file_path) {
             edges.push(Edge {
@@ -188,6 +195,39 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
                 target: node_id.clone(),
                 label: call.method.clone().unwrap_or_else(|| "call".to_string()),
                 layer: "external_call".to_string(),
+                weight: 1,
+                comment: None,
+                dataset: None,
+                attributes: None,
+            });
+        }
+    }
+
+    // Env vars: summarize as nodes per file
+    for env in &result.env_vars {
+        let node_id = format!("env_{}_{}", slugify(&env.name), env.line_number);
+        nodes.push(Node {
+            id: node_id.clone(),
+            label: env.name.clone(),
+            layer: "env".to_string(),
+            is_partition: false,
+            belongs_to: Some(root_id.clone()),
+            weight: 1,
+            comment: Some(env.file_path.clone()),
+            dataset: None,
+            attributes: Some(serde_json::json!({
+                "kind": env.kind,
+                "line": env.line_number,
+                "file": env.file_path,
+            })),
+        });
+        if let Some(file_id) = file_nodes.get(&env.file_path) {
+            edges.push(Edge {
+                id: next_edge_id(),
+                source: file_id.clone(),
+                target: node_id.clone(),
+                label: env.kind.clone(),
+                layer: "env".to_string(),
                 weight: 1,
                 comment: None,
                 dataset: None,

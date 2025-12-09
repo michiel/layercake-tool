@@ -223,6 +223,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setDatasetId(profile?.datasetId ?? undefined)
     setNoInfra(profile?.noInfra ?? false)
     const opts = profile?.options ? JSON.parse(profile.options) : {}
+    const solOpts = profile?.solutionOptions ? JSON.parse(profile.solutionOptions) : {}
     setIncludeDataFlow(opts.includeDataFlow ?? true)
     setIncludeControlFlow(opts.includeControlFlow ?? true)
     setIncludeImports(opts.includeImports ?? true)
@@ -230,6 +231,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setExcludeKnownSupport(opts.excludeKnownSupportFiles ?? false)
     setExcludeInferredSupport(opts.excludeInferredSupport ?? false)
     setAnalysisType(profile?.analysisType || 'code')
+    setSolutionIncludeInfra(solOpts.includeInfra ?? true)
     setModalOpen(true)
   }
 

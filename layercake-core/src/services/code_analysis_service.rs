@@ -684,6 +684,15 @@ impl CodeAnalysisService {
         let combined_graph = if analysis_type == "solution" {
             // Build solution-level graph without function detail
             let mut filtered_result = result.clone();
+            if !solution_opts.include_imports {
+                filtered_result.imports.clear();
+            }
+            if !solution_opts.include_data_flow {
+                filtered_result.data_flows.clear();
+            }
+            if !solution_opts.include_control_flow {
+                filtered_result.call_edges.clear();
+            }
             if !solution_opts.include_infra {
                 filtered_result.infra = None;
                 filtered_result.infra_correlation = None;
