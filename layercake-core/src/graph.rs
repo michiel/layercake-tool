@@ -242,11 +242,25 @@ impl Graph {
         let mut next_id: usize = 1;
         self.edges = aggregated
             .into_iter()
-            .map(|((_s, _t, _l), (mut edge, total_weight, _labels))| {
+            .map(|((_s, _t, _l), (mut edge, total_weight, labels))| {
                 edge.id = format!("edge_coalesced_{next_id}");
                 next_id += 1;
                 edge.weight = total_weight;
-                edge.label = String::new();
+                if labels.len() == 1 {
+                    edge.label = labels.iter().next().cloned().unwrap_or_default();
+                } else {
+                    // Preserve one example in attributes to avoid losing context
+                    let first = labels.iter().next().cloned();
+                    edge.label = String::new();
+                    if let Some(example) = first {
+                        let mut attrs = edge.attributes.unwrap_or_else(|| serde_json::json!({}));
+                        if let Some(map) = attrs.as_object_mut() {
+                            map.entry("label_example")
+                                .or_insert(serde_json::json!(example));
+                        }
+                        edge.attributes = Some(attrs);
+                    }
+                }
                 edge
             })
             .collect();
@@ -258,6 +272,29 @@ impl Graph {
             }
             true
         });
+        // If we aggregated nodes, adjust labels: identical labels keep original; mixed become Agg(count) with layer as fallback
+        let mut aggregate_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        for file_id in file_ids.iter() {
+            *aggregate_counts.entry(file_id.clone()).or_insert(0) += 1;
+        }
+        for node in self.nodes.iter_mut() {
+            if let Some(count) = aggregate_counts.get(&node.id) {
+                if *count > 1 {
+                    node.label = format!("Agg({count})");
+                    let mut attrs = node
+                        .attributes
+                        .clone()
+                        .unwrap_or_else(|| serde_json::json!({}));
+                    if let Some(map) = attrs.as_object_mut() {
+                        map.insert("aggregate_count".into(), serde_json::json!(count));
+                    }
+                    node.attributes = Some(attrs);
+                } else if node.label.is_empty() {
+                    node.label = node.layer.clone();
+                }
+            }
+        }
         let removed_nodes = before_nodes.saturating_sub(self.nodes.len());
 
         let annotation = format!(
