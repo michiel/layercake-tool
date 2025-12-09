@@ -14,6 +14,7 @@ use uuid::Uuid;
 
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::code_analysis_solution_graph::analysis_to_solution_graph;
+use crate::code_analysis_enhanced_solution_graph::analysis_to_enhanced_solution_graph;
 use crate::database::entities::code_analysis_profiles;
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
@@ -80,6 +81,8 @@ pub struct SolutionAnalysisOptions {
     pub exclude_inferred_support: bool,
     #[serde(default)]
     pub exclude_helpers: bool,
+    #[serde(default)]
+    pub use_enhanced_correlation: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -315,10 +318,14 @@ fn merge_graphs(
                         target: infra_id.clone(),
                         label: m.reason.clone(),
                         layer: "infra-code-link".to_string(),
-                        weight: 1,
-                        comment: None,
+                        weight: m.confidence.max(10) as i32,
+                        comment: Some(format!("Confidence: {}%", m.confidence)),
                         dataset: None,
-                        attributes: None,
+                        attributes: Some(serde_json::json!({
+                            "confidence": m.confidence,
+                            "reason": m.reason,
+                            "edge_type": "correlation"
+                        })),
                     });
                 }
             }
@@ -652,6 +659,7 @@ impl CodeAnalysisService {
                 exclude_known_support_files: false,
                 exclude_inferred_support: false,
                 exclude_helpers: false,
+                use_enhanced_correlation: false,
             });
         let mut result = analysis.result;
         if opts.exclude_known_support_files || opts.exclude_inferred_support {
@@ -745,8 +753,11 @@ impl CodeAnalysisService {
                 filtered_result.infra = None;
                 filtered_result.infra_correlation = None;
             }
-            let code_graph =
-                analysis_to_solution_graph(&filtered_result, Some(cleaned_report.clone()));
+            let code_graph = if solution_opts.use_enhanced_correlation {
+                analysis_to_enhanced_solution_graph(&filtered_result, Some(cleaned_report.clone()))
+            } else {
+                analysis_to_solution_graph(&filtered_result, Some(cleaned_report.clone()))
+            };
             let mut graph = if !no_infra_flag && solution_opts.include_infra {
                 if let Some(infra) = infra_graph.as_ref() {
                     merge_graphs(

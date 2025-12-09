@@ -319,19 +319,115 @@ impl<'a> JsVisitor<'a> {
 
     fn detect_external_call(&self, call: &CallExpr, callee_name: &str) -> Option<ExternalCall> {
         let lc = callee_name.to_ascii_lowercase();
+
+        // HTTP clients
         let is_fetch = lc == "fetch" || lc.ends_with(".fetch");
-        let is_axios = lc.contains("axios") || lc.ends_with(".get") || lc.ends_with(".post");
-        let is_sdk = lc.contains("client.") || lc.contains("sdk.") || lc.contains("aws.");
-        if !(is_fetch || is_axios || is_sdk) {
+        let is_axios = lc.contains("axios")
+            || lc.ends_with(".get")
+            || lc.ends_with(".post")
+            || lc.ends_with(".put")
+            || lc.ends_with(".delete")
+            || lc.ends_with(".patch");
+        let is_http_client = lc.contains("httpclient")
+            || lc.contains("superagent")
+            || lc.contains("got.")
+            || lc.contains("node-fetch");
+
+        // Cloud SDKs
+        let is_aws = lc.contains("aws.")
+            || lc.contains("awssdk")
+            || lc.contains("s3.")
+            || lc.contains("dynamodb.")
+            || lc.contains("lambda.")
+            || lc.contains("sqs.")
+            || lc.contains("sns.");
+        let is_gcp = lc.contains("google.cloud")
+            || lc.contains("@google-cloud")
+            || lc.contains("storage.")
+            || lc.contains("bigquery.");
+        let is_azure = lc.contains("@azure/")
+            || lc.contains("azure.")
+            || lc.contains("blobserviceclient")
+            || lc.contains("cosmosclient");
+
+        // Databases
+        let is_database = lc.contains("pg.")
+            || lc.contains("postgres")
+            || lc.contains("mysql")
+            || lc.contains("mongodb")
+            || lc.contains("redis")
+            || lc.contains(".query(")
+            || lc.contains(".execute(")
+            || lc.contains("prisma.")
+            || lc.contains("sequelize.")
+            || lc.contains("typeorm.");
+
+        // Message queues & streaming
+        let is_messaging = lc.contains("kafka")
+            || lc.contains("amqp")
+            || lc.contains("rabbitmq")
+            || lc.contains("producer.")
+            || lc.contains("consumer.")
+            || lc.contains("publish(");
+
+        if !(is_fetch
+            || is_axios
+            || is_http_client
+            || is_aws
+            || is_gcp
+            || is_azure
+            || is_database
+            || is_messaging)
+        {
             return None;
         }
+
         let path = call.args.first().and_then(|a| match &*a.expr {
             Expr::Lit(swc_ecma_ast::Lit::Str(s)) => Some(s.value.to_string_lossy().into_owned()),
             _ => None,
         });
+
+        let method = if is_fetch || is_axios || is_http_client {
+            // Extract HTTP method
+            if lc.contains(".get") || lc.ends_with(".get") {
+                Some("GET".to_string())
+            } else if lc.contains(".post") || lc.ends_with(".post") {
+                Some("POST".to_string())
+            } else if lc.contains(".put") || lc.ends_with(".put") {
+                Some("PUT".to_string())
+            } else if lc.contains(".delete") || lc.ends_with(".delete") {
+                Some("DELETE".to_string())
+            } else if lc.contains(".patch") || lc.ends_with(".patch") {
+                Some("PATCH".to_string())
+            } else {
+                // Check for method in options object (second argument)
+                call.args.get(1).and_then(|opt| match &*opt.expr {
+                    Expr::Object(obj) => obj.props.iter().find_map(|prop| {
+                        if let swc_ecma_ast::PropOrSpread::Prop(p) = prop {
+                            if let swc_ecma_ast::Prop::KeyValue(kv) = &**p {
+                                if let PropName::Ident(id) = &kv.key {
+                                    if id.sym.as_ref() == "method" {
+                                        if let Expr::Lit(swc_ecma_ast::Lit::Str(s)) = &*kv.value {
+                                            return Some(
+                                                s.value.to_string_lossy().to_uppercase(),
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    }),
+                    _ => None,
+                })
+            }
+        } else {
+            None
+        };
+
         Some(ExternalCall {
             target: callee_name.to_string(),
-            method: None,
+            method,
             path,
             file_path: self.file_path_string(),
             line_number: self.line_for_span(call.span),

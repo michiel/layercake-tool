@@ -318,9 +318,13 @@ pub fn analysis_to_graph(
             label: flow.variable.clone().unwrap_or_default(),
             layer: "dataflow".to_string(),
             weight: 1,
-            comment: None,
+            comment: Some(format!("Data flow: {}", flow.variable.clone().unwrap_or_else(|| "value".to_string()))),
             dataset: None,
-            attributes: None,
+            attributes: Some(json!({
+                "edge_type": "data_flow",
+                "variable_name": flow.variable,
+                "file": flow.file_path
+            })),
         });
     }
 
@@ -389,39 +393,81 @@ pub fn analysis_to_graph(
             label: call.callee.clone(),
             layer: "controlflow".to_string(),
             weight: 1,
-            comment: None,
+            comment: Some(format!("Calls: {}", call.callee)),
             dataset: None,
-            attributes: None,
+            attributes: Some(json!({
+                "edge_type": "function_call",
+                "callee": call.callee,
+                "file": call.file_path
+            })),
         });
     }
+    // Build a reachability map from entry points
+    // For now, connect entry points to functions they likely call based on naming heuristics
+    // Future: use call graph for precise reachability
     for (file_path, entry_id) in &entry_ids {
+        let mut connected = false;
+
+        // First, try to find main/handler/entry functions
         for function in &result.functions {
             if &function.file_path == file_path {
-                let func_key = function_key(&function.name, Some(&function.file_path));
-                let func_id = function_ids.get(&func_key).cloned().unwrap_or_else(|| {
-                    add_function_node(
-                        &mut function_ids,
-                        &mut nodes,
-                        &function.name,
-                        Some(&function.file_path),
-                        file_nodes
-                            .get(&function.file_path)
-                            .cloned()
-                            .or_else(|| Some(scope_id.clone())),
-                        json!({}),
-                        &mut unique_id,
-                    )
-                });
+                let is_likely_entry = function.name.to_lowercase().contains("main")
+                    || function.name.to_lowercase().contains("handler")
+                    || function.name.to_lowercase().contains("lambda_handler")
+                    || function.name.to_lowercase().contains("run")
+                    || function.name.to_lowercase().contains("execute");
+
+                if is_likely_entry {
+                    let func_key = function_key(&function.name, Some(&function.file_path));
+                    let func_id = function_ids.get(&func_key).cloned().unwrap_or_else(|| {
+                        add_function_node(
+                            &mut function_ids,
+                            &mut nodes,
+                            &function.name,
+                            Some(&function.file_path),
+                            file_nodes
+                                .get(&function.file_path)
+                                .cloned()
+                                .or_else(|| Some(scope_id.clone())),
+                            json!({"is_entry_target": true}),
+                            &mut unique_id,
+                        )
+                    });
+                    edges.push(Edge {
+                        id: next_edge_id(),
+                        source: entry_id.clone(),
+                        target: func_id,
+                        label: function.name.clone(),
+                        layer: "entry".to_string(),
+                        weight: 1,
+                        comment: Some("Entry point target".to_string()),
+                        dataset: None,
+                        attributes: Some(json!({
+                            "edge_type": "entry_invocation",
+                            "inferred": true
+                        })),
+                    });
+                    connected = true;
+                }
+            }
+        }
+
+        // If no likely entry functions found, don't create spurious edges
+        // Instead, connect to the file node to show entry point location
+        if !connected {
+            if let Some(file_id) = file_nodes.get(file_path) {
                 edges.push(Edge {
                     id: next_edge_id(),
                     source: entry_id.clone(),
-                    target: func_id,
-                    label: function.name.clone(),
+                    target: file_id.clone(),
+                    label: "in file".to_string(),
                     layer: "entry".to_string(),
                     weight: 1,
-                    comment: None,
+                    comment: Some("Entry point in file".to_string()),
                     dataset: None,
-                    attributes: None,
+                    attributes: Some(json!({
+                        "edge_type": "entry_location"
+                    })),
                 });
             }
         }
@@ -459,9 +505,12 @@ pub fn analysis_to_graph(
                     label: lib.clone(),
                     layer: "import".to_string(),
                     weight: 1,
-                    comment: None,
+                    comment: Some(format!("Imports: {}", lib)),
                     dataset: None,
-                    attributes: None,
+                    attributes: Some(json!({
+                        "edge_type": "import",
+                        "module": lib
+                    })),
                 });
             }
         }

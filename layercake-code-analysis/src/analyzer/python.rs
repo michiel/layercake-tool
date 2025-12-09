@@ -412,13 +412,55 @@ impl<'a> PythonVisitor<'a> {
     fn detect_external_call(&self, node: &ast::ExprCall) -> Option<ExternalCall> {
         let callee = self.get_expr_name(&node.func);
         let lc = callee.to_ascii_lowercase();
-        let is_http =
-            lc.starts_with("requests.") || lc.starts_with("httpx.") || lc.contains("session.");
-        let is_boto =
-            lc.starts_with("boto3.") || lc.contains("client(") || lc.contains("resource(");
-        if !(is_http || is_boto) {
+
+        // HTTP clients
+        let is_http = lc.starts_with("requests.")
+            || lc.starts_with("httpx.")
+            || lc.starts_with("aiohttp.")
+            || lc.starts_with("urllib.")
+            || lc.contains("session.")
+            || lc.contains(".get(")
+            || lc.contains(".post(")
+            || lc.contains(".put(")
+            || lc.contains(".delete(")
+            || lc.contains(".patch(");
+
+        // Cloud SDKs
+        let is_aws = lc.starts_with("boto3.")
+            || lc.contains("client(")
+            || lc.contains("resource(")
+            || lc.starts_with("aioboto3.");
+        let is_gcp = lc.starts_with("google.cloud.")
+            || lc.contains("storage.client")
+            || lc.contains("bigquery.client");
+        let is_azure = lc.starts_with("azure.")
+            || lc.contains("blobserviceclient")
+            || lc.contains("cosmosclient");
+
+        // Databases
+        let is_database = lc.starts_with("psycopg2.")
+            || lc.starts_with("pymongo.")
+            || lc.starts_with("redis.")
+            || lc.starts_with("mysql.")
+            || lc.starts_with("sqlite3.")
+            || lc.starts_with("sqlalchemy.")
+            || lc.contains(".execute(")
+            || lc.contains(".query(")
+            || lc.contains("database.");
+
+        // Message queues & streaming
+        let is_messaging = lc.starts_with("celery.")
+            || lc.starts_with("kafka.")
+            || lc.starts_with("pika.")
+            || lc.starts_with("kombu.")
+            || lc.contains("producer.")
+            || lc.contains("consumer.")
+            || lc.contains("publish(");
+
+        if !(is_http || is_aws || is_gcp || is_azure || is_database || is_messaging) {
             return None;
         }
+
         let path = node.args.first().and_then(|a| match a {
             ast::Expr::Constant(c) => match &c.value {
                 ast::Constant::Str(s) => Some(s.to_string()),
@@ -426,12 +468,38 @@ impl<'a> PythonVisitor<'a> {
             },
             _ => None,
         });
+
+        let method = if is_http {
+            // Extract HTTP method from function name or keyword
+            if lc.contains(".get") {
+                Some("GET".to_string())
+            } else if lc.contains(".post") {
+                Some("POST".to_string())
+            } else if lc.contains(".put") {
+                Some("PUT".to_string())
+            } else if lc.contains(".delete") {
+                Some("DELETE".to_string())
+            } else if lc.contains(".patch") {
+                Some("PATCH".to_string())
+            } else {
+                node.keywords
+                    .iter()
+                    .find(|k| k.arg.as_ref().map(|a| a.to_string()).as_deref() == Some("method"))
+                    .and_then(|k| match &k.value {
+                        ast::Expr::Constant(c) => match &c.value {
+                            ast::Constant::Str(s) => Some(s.to_string()),
+                            _ => None,
+                        },
+                        _ => None,
+                    })
+            }
+        } else {
+            None
+        };
+
         Some(ExternalCall {
             target: callee,
-            method: node
-                .keywords
-                .first()
-                .and_then(|k| k.arg.as_ref().map(|s| s.to_string())),
+            method,
             path,
             file_path: self.file_path_string(),
             line_number: self.line_for_range(node.range),

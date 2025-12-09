@@ -124,7 +124,7 @@ impl Graph {
             })
             .collect();
 
-        let mut resolve_file = |hints: &[String]| -> Option<String> {
+        let resolve_file = |hints: &[String]| -> Option<String> {
             for candidate in &file_candidates {
                 for hint in hints {
                     if candidate.id == *hint

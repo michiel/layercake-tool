@@ -140,6 +140,7 @@ export const CodeAnalysisPage: React.FC = () => {
   const [excludeInferredSupport, setExcludeInferredSupport] = useState(false)
   const [solutionIncludeInfra, setSolutionIncludeInfra] = useState(true)
   const [excludeHelpers, setExcludeHelpers] = useState(false)
+  const [useEnhancedCorrelation, setUseEnhancedCorrelation] = useState(false)
 
   const selectedProjectName = useMemo(() => `Project ${projectId ?? ''}`, [projectId])
 
@@ -234,6 +235,7 @@ export const CodeAnalysisPage: React.FC = () => {
     setExcludeInferredSupport(solOpts.excludeInferredSupport ?? opts.excludeInferredSupport ?? false)
     setSolutionIncludeInfra(solOpts.includeInfra ?? true)
     setExcludeHelpers(solOpts.excludeHelpers ?? false)
+    setUseEnhancedCorrelation(solOpts.useEnhancedCorrelation ?? false)
     setModalOpen(true)
   }
 
@@ -263,6 +265,7 @@ export const CodeAnalysisPage: React.FC = () => {
               excludeKnownSupportFiles: excludeKnownSupport,
               excludeInferredSupport,
               excludeHelpers,
+              useEnhancedCorrelation,
             }
           : null,
     }
@@ -270,7 +273,7 @@ export const CodeAnalysisPage: React.FC = () => {
     const solutionOptions =
       analysisType === 'solution'
         ? JSON.stringify(optionsPayload.solution)
-        : profile?.solutionOptions ?? null
+        : editing?.solutionOptions ?? null
     if (editing) {
       updateProfile({
         variables: {
@@ -554,11 +557,27 @@ export const CodeAnalysisPage: React.FC = () => {
                 <Label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    checked={coalesceFunctions}
-                    onChange={(e) => setCoalesceFunctions(e.target.checked)}
+                    checked={excludeHelpers}
+                    onChange={(e) => setExcludeHelpers(e.target.checked)}
                   />
                   Exclude helpers/built-ins/logging
                 </Label>
+                <Label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={useEnhancedCorrelation}
+                    onChange={(e) => setUseEnhancedCorrelation(e.target.checked)}
+                  />
+                  <span className="flex items-center gap-1">
+                    Use enhanced correlation
+                    <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                      NEW
+                    </span>
+                  </span>
+                </Label>
+                <p className="text-xs text-muted-foreground ml-5">
+                  Enhanced correlation links external calls to infrastructure, maps environment variables, and infers data flows between code and resources.
+                </p>
               </div>
             )}
           </Stack>
