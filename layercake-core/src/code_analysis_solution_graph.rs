@@ -22,10 +22,26 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
     let mut nodes: Vec<Node> = Vec::new();
     let mut edges: Vec<Edge> = Vec::new();
     let mut layers: Vec<Layer> = Vec::new();
+    let mut id_set: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     let mut ensure_layer = |id: &str, label: &str, bg: &str, text: &str, border: &str| {
         if !layers.iter().any(|l| l.id == id) {
             layers.push(Layer::new(id, label, bg, text, border));
+        }
+    };
+
+    let mut unique_id = |base: String| {
+        if id_set.insert(base.clone()) {
+            base
+        } else {
+            let mut counter = 2;
+            loop {
+                let cand = format!("{base}_{counter}");
+                if id_set.insert(cand.clone()) {
+                    break cand;
+                }
+                counter += 1;
+            }
         }
     };
 
@@ -42,6 +58,7 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
     ensure_layer("env", "Env Var", "#fef9c3", "#713f12", "#f59e0b");
 
     let root_id = "solution_root".to_string();
+    let root_id = unique_id(root_id);
     nodes.push(Node {
         id: root_id.clone(),
         label: "Solution".to_string(),
@@ -57,7 +74,7 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
     // Directories as partitions
     let mut dir_nodes = std::collections::HashMap::new();
     for dir in &result.directories {
-        let id = format!("dir_{}", slugify(dir));
+        let id = unique_id(format!("dir_{}", slugify(dir)));
         let parent = dir
             .rsplit_once('/')
             .map(|(p, _)| p.to_string())
@@ -80,7 +97,7 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
     // Files as flow nodes
     let mut file_nodes = std::collections::HashMap::new();
     for file in &result.files {
-        let id = format!("file_{}", slugify(file));
+        let id = unique_id(format!("file_{}", slugify(file)));
         let parent_dir = file
             .rsplit_once('/')
             .map(|(p, _)| p.to_string())
@@ -108,7 +125,11 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
 
     // Entry nodes and edges to files in the same file_path
     for entry in &result.entry_points {
-        let id = format!("entry_{}_{}", slugify(&entry.file_path), entry.line_number);
+        let id = unique_id(format!(
+            "entry_{}_{}",
+            slugify(&entry.file_path),
+            entry.line_number
+        ));
         nodes.push(Node {
             id: id.clone(),
             label: entry.condition.clone(),
@@ -140,7 +161,11 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
 
     // Exit nodes: attach to files
     for exit in &result.exits {
-        let id = format!("exit_{}_{}", slugify(&exit.file_path), exit.line_number);
+        let id = unique_id(format!(
+            "exit_{}_{}",
+            slugify(&exit.file_path),
+            exit.line_number
+        ));
         nodes.push(Node {
             id: id.clone(),
             label: exit.condition.clone(),
@@ -172,7 +197,11 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
 
     // External calls: create nodes and edges from owning file
     for call in &result.external_calls {
-        let node_id = format!("extcall_{}_{}", slugify(&call.target), call.line_number);
+        let node_id = unique_id(format!(
+            "extcall_{}_{}",
+            slugify(&call.target),
+            call.line_number
+        ));
         nodes.push(Node {
             id: node_id.clone(),
             label: call.target.clone(),
@@ -205,7 +234,7 @@ pub fn analysis_to_solution_graph(result: &AnalysisResult, annotation: Option<St
 
     // Env vars: summarize as nodes per file
     for env in &result.env_vars {
-        let node_id = format!("env_{}_{}", slugify(&env.name), env.line_number);
+        let node_id = unique_id(format!("env_{}_{}", slugify(&env.name), env.line_number));
         nodes.push(Node {
             id: node_id.clone(),
             label: env.name.clone(),
