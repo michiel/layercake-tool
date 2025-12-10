@@ -835,6 +835,8 @@ FROM dataset_graph_nodes;
 
 **Estimated Effort**: 3-4 days (increased from 2-3 due to graph_edits + annotation handling)
 
+**Status**: Validation queries implemented in migration and tested (counts, FK integrity, annotations).
+
 ---
 
 ### 4.3 Phase 3: Update Pipeline to Use graph_data
