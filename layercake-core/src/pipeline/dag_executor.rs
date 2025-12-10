@@ -150,28 +150,44 @@ impl DagExecutor {
                 }
             }
             "GraphNode" => {
-                // Get upstream node IDs
-                let upstream_ids = self.get_upstream_nodes(node_id, edges);
+                // Prefer unified graph_data path when config supplies graphDataIds
+                if let Some(ids) = config["graphDataIds"].as_array() {
+                    let upstream_ids: Vec<i32> = ids
+                        .iter()
+                        .filter_map(|v| v.as_i64().map(|n| n as i32))
+                        .collect();
+                    let _graph_data = self
+                        .graph_data_builder
+                        .build_graph(
+                            project_id,
+                            node_id.to_string(),
+                            node_name,
+                            upstream_ids,
+                        )
+                        .await?;
+                } else {
+                    // Legacy path: build via data_sets/graphs tables
+                    let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
-                // Build graph from upstream datasets (reads from data_sets table)
-                let graph_record = self
-                    .graph_builder
-                    .build_graph(
-                        project_id,
-                        plan_id,
-                        node_id.to_string(),
-                        node_name,
-                        upstream_ids,
-                    )
-                    .await?;
+                    let graph_record = self
+                        .graph_builder
+                        .build_graph(
+                            project_id,
+                            plan_id,
+                            node_id.to_string(),
+                            node_name,
+                            upstream_ids,
+                        )
+                        .await?;
 
-                if let Some(ctx) = context.as_deref_mut() {
-                    let graph_service = GraphService::new(self.db.clone());
-                    if let Ok(graph) = graph_service
-                        .build_graph_from_dag_graph(graph_record.id)
-                        .await
-                    {
-                        ctx.set_graph(node_id.to_string(), graph);
+                    if let Some(ctx) = context.as_deref_mut() {
+                        let graph_service = GraphService::new(self.db.clone());
+                        if let Ok(graph) = graph_service
+                            .build_graph_from_dag_graph(graph_record.id)
+                            .await
+                        {
+                            ctx.set_graph(node_id.to_string(), graph);
+                        }
                     }
                 }
             }
