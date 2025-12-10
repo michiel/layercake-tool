@@ -139,7 +139,7 @@ impl MigrationTrait for Migration {
                 file_format, origin, filename, blob, file_size, processed_at,
                 status, 0, 0, error_message, metadata,
                 json(annotations),  -- normalize to JSON array
-                created_at, updated_at
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM data_sets;
             "#,
         ))
@@ -201,7 +201,7 @@ impl MigrationTrait for Migration {
                     ELSE 'processing'
                 END,
                 node_count, edge_count, error_message, annotations, metadata,
-                created_at, updated_at
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM graphs;",
                 offset = GRAPH_ID_OFFSET
             ),
