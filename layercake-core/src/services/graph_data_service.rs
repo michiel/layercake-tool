@@ -245,6 +245,98 @@ impl GraphDataService {
             )))
         }
     }
+
+    /// Convenience method for listing datasets in a project
+    pub async fn list_datasets(&self, project_id: i32) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+        self.list_by_project_and_source(project_id, "dataset").await
+    }
+
+    /// Convenience method for listing computed graphs in a project
+    pub async fn list_computed(&self, project_id: i32) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+        self.list_by_project_and_source(project_id, "computed").await
+    }
+
+    /// Mark a graph_data as processing (transitional status)
+    pub async fn mark_processing(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+        self.mark_status(graph_data_id, GraphDataStatus::Processing, None).await
+    }
+
+    /// Mark a graph_data as error with an error message
+    pub async fn mark_error(&self, graph_data_id: i32, error: String) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.status = Set(GraphDataStatus::Error.into());
+        model.error_message = Set(Some(error));
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Create a computed graph_data entry (convenience wrapper)
+    pub async fn create_computed(
+        &self,
+        project_id: i32,
+        dag_node_id: String,
+        name: String,
+    ) -> Result<graph_data::Model, sea_orm::DbErr> {
+        self.create(GraphDataCreate {
+            project_id,
+            name,
+            source_type: "computed".to_string(),
+            dag_node_id: Some(dag_node_id),
+            file_format: None,
+            origin: None,
+            filename: None,
+            blob: None,
+            file_size: None,
+            processed_at: None,
+            source_hash: None,
+            computed_date: None,
+            last_edit_sequence: Some(0),
+            has_pending_edits: Some(false),
+            last_replay_at: None,
+            metadata: None,
+            annotations: None,
+            status: Some(GraphDataStatus::Processing),
+        })
+        .await
+    }
+
+    /// Create a dataset graph_data entry from JSON (convenience wrapper)
+    pub async fn create_from_json(
+        &self,
+        project_id: i32,
+        name: String,
+        metadata: Option<Value>,
+    ) -> Result<graph_data::Model, sea_orm::DbErr> {
+        self.create(GraphDataCreate {
+            project_id,
+            name,
+            source_type: "dataset".to_string(),
+            dag_node_id: None,
+            file_format: Some("json".to_string()),
+            origin: Some("api".to_string()),
+            filename: None,
+            blob: None,
+            file_size: None,
+            processed_at: Some(Utc::now()),
+            source_hash: None,
+            computed_date: None,
+            last_edit_sequence: None,
+            has_pending_edits: None,
+            last_replay_at: None,
+            metadata,
+            annotations: None,
+            status: Some(GraphDataStatus::Active),
+        })
+        .await
+    }
 }
 
 pub struct GraphDataCreate {

@@ -136,29 +136,10 @@ impl GraphDataBuilder {
             return Ok(graph);
         }
 
-        // Create the new computed graph_data shell
+        // Create the new computed graph_data shell using convenience method
         let created = self
             .graph_data_service
-            .create(crate::services::GraphDataCreate {
-                project_id,
-                name,
-                source_type: "computed".into(),
-                dag_node_id: Some(dag_node_id),
-                file_format: None,
-                origin: None,
-                filename: None,
-                blob: None,
-                file_size: None,
-                processed_at: None,
-                source_hash: None,
-                computed_date: None,
-                last_edit_sequence: Some(0),
-                has_pending_edits: Some(false),
-                last_replay_at: None,
-                metadata: None,
-                annotations: Some(serde_json::json!([])),
-                status: Some(graph_data::GraphDataStatus::Processing),
-            })
+            .create_computed(project_id, dag_node_id, name)
             .await?;
 
         // Persist merged nodes/edges
