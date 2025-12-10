@@ -966,10 +966,14 @@ FROM dataset_graph_nodes;
 - ❌ Update existing dataSet/graph queries to optionally delegate to graph_data (optional, can defer)
 - ❌ Frontend actual migration implementation (separate effort)
 
+**Project Status**: ✅ **SUBSTANTIALLY COMPLETE** (2025-12-10)
+
 **Next Actions**:
-1. Phase 4 is substantially complete - move to Phase 5 (Layer Storage Removal) or Phase 6 (Cleanup)
-2. Frontend team can begin gradual migration using the guide
-3. Consider whether to update legacy queries to use graph_data internally (optimization, not required)
+1. ✅ Refactoring marked as complete - Phases 1-4 delivered (~95% of value)
+2. ✅ Frontend team can begin gradual migration using the guide
+3. ⏸️ Phase 5 & 6 deferred until after frontend migration (3-6 months)
+4. See `docs/refactoring-complete-summary.md` for complete summary
+5. See `docs/phase5-6-cleanup-plan.md` for future cleanup plan
 
 ---
 
