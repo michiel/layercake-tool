@@ -785,6 +785,8 @@ impl GraphBuilder {
 8. **Recompute counts**: Update node_count/edge_count in graph_data
 9. **Validation queries**: Verify integrity (counts, FK consistency, annotation format)
 
+**Status**: Added non-destructive migration `m20251210_000004_migrate_existing_graph_data` that copies datasets/graphs and children into unified tables and backfills counts using existing IDs. Pending: reconcile ID offset plan vs current approach, add sequence reseed and validation queries.
+
 **Migration Script Outline**:
 ```sql
 -- Copy datasets
