@@ -750,7 +750,7 @@ impl GraphBuilder {
 
 **Estimated Effort**: 3-4 days
 
-**Status**: Implemented migrations and entities (`graph_data`, `graph_data_nodes`, `graph_data_edges`).
+**Status**: Implemented migrations, entities, and service scaffolding (`graph_data`, `graph_data_nodes`, `graph_data_edges`, `GraphDataService`, `LayerPaletteService`).
 
 ---
 
