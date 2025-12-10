@@ -2,8 +2,9 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::database::entities::{
-    data_sets, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases, plan_dag_edges,
-    plan_dag_nodes, plans, project_collaborators, sequences, stories, user_sessions, users,
+    data_sets, graph_data, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases,
+    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, sequences, stories,
+    user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -15,9 +16,10 @@ use crate::graphql::types::plan_dag::{PlanDag, PlanDagInput, ValidationResult};
 use crate::graphql::types::project::Project;
 use crate::graphql::types::sample_project::SampleProject;
 use crate::graphql::types::{
-    DataSet, DataSetPreview, GraphEdgePreview, GraphEdit, GraphNodePreview, GraphPreview, Layer,
-    LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator, ProjectLayer, Sequence,
-    Story, SystemSetting, TableColumn, TableRow, User, UserFilter, UserSession,
+    DataSet, DataSetPreview, GraphData, GraphEdgePreview, GraphEdit, GraphNodePreview,
+    GraphPreview, Layer, LayerAlias, LibraryItem, LibraryItemFilterInput, ProjectCollaborator,
+    ProjectLayer, Sequence, Story, SystemSetting, TableColumn, TableRow, User, UserFilter,
+    UserSession,
 };
 use crate::graphql::types::{GraphPage, GraphSummary};
 use crate::services::{
@@ -714,6 +716,63 @@ impl Query {
             .map_err(|e| StructuredError::service("AppContext::list_data_sets", e))?;
 
         Ok(summaries.into_iter().map(DataSet::from).collect())
+    }
+
+    /// Get GraphData by ID (unified query for datasets and computed graphs)
+    async fn graph_data(&self, ctx: &Context<'_>, id: i32) -> Result<Option<GraphData>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        use sea_orm::EntityTrait;
+        let model = graph_data::Entity::find_by_id(id)
+            .one(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("graph_data::Entity::find_by_id", e))?;
+
+        Ok(model.map(GraphData::from))
+    }
+
+    /// Get all GraphData for a project (both datasets and computed graphs)
+    async fn graph_data_list(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        source_type: Option<String>,
+    ) -> Result<Vec<GraphData>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        use sea_orm::{EntityTrait, QueryFilter};
+        let mut query = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id));
+
+        // Optionally filter by source_type ("dataset" or "computed")
+        if let Some(st) = source_type {
+            query = query.filter(graph_data::Column::SourceType.eq(st));
+        }
+
+        let models = query
+            .all(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("graph_data::Entity::find", e))?;
+
+        Ok(models.into_iter().map(GraphData::from).collect())
+    }
+
+    /// Get GraphData by DAG node ID (for computed graphs)
+    async fn graph_data_by_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        dag_node_id: String,
+    ) -> Result<Option<GraphData>> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        use sea_orm::{EntityTrait, QueryFilter};
+        let model = graph_data::Entity::find()
+            .filter(graph_data::Column::DagNodeId.eq(dag_node_id))
+            .one(&context.db)
+            .await
+            .map_err(|e| StructuredError::database("graph_data::Entity::find", e))?;
+
+        Ok(model.map(GraphData::from))
     }
 
     /// Get all library items with optional filtering
