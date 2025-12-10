@@ -16,11 +16,18 @@ async fn add_column_if_missing<C>(
     backend: sea_orm::DatabaseBackend,
     table: &str,
     column: &str,
-    definition: &str,
+    sql_type: &str,
 ) -> Result<(), DbErr>
 where
     C: sea_orm::ConnectionTrait,
 {
+    // SQLite lacks IF NOT EXISTS on ALTER TABLE ADD COLUMN in some versions; we ignore duplicate errors.
+    let definition = match sql_type.to_uppercase().as_str() {
+        "JSON" => "JSON",
+        "TEXT" => "TEXT",
+        "TIMESTAMP" => "TIMESTAMP",
+        _ => sql_type,
+    };
     let stmt = match backend {
         sea_orm::DatabaseBackend::Postgres => format!(
             "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition};"
@@ -31,7 +38,10 @@ where
     match db.execute(Statement::from_string(backend, stmt)).await {
         Ok(_) => Ok(()),
         Err(DbErr::Exec(sea_orm::RuntimeErr::SqlxError(err)))
-            if err.to_string().contains("duplicate column") || err.to_string().contains("already exists") =>
+            if err.to_string().contains("duplicate column")
+                || err.to_string().contains("already exists")
+                || err.to_string().contains("Duplicate column")
+                || err.to_string().contains("duplicate column name") =>
         {
             Ok(())
         }
@@ -45,72 +55,15 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = manager.get_database_backend();
 
-        // Legacy DBs may be missing metadata columns; add them if absent
-        add_column_if_missing(
-            db,
-            backend,
-            "data_sets",
-            "metadata",
-            "JSON DEFAULT '{}' NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "graphs",
-            "metadata",
-            "JSON DEFAULT '{}' NOT NULL",
-        )
-        .await?;
-        // Some legacy DBs may also lack timestamps/annotations columns
-        add_column_if_missing(
-            db,
-            backend,
-            "data_sets",
-            "annotations",
-            "TEXT DEFAULT '[]' NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "graphs",
-            "annotations",
-            "TEXT DEFAULT '[]' NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "data_sets",
-            "created_at",
-            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "data_sets",
-            "updated_at",
-            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "graphs",
-            "created_at",
-            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
-        )
-        .await?;
-        add_column_if_missing(
-            db,
-            backend,
-            "graphs",
-            "updated_at",
-            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
-        )
-        .await?;
+        // Legacy DBs may be missing key columns; add them if absent (best-effort, ignore if already there)
+        let _ = add_column_if_missing(db, backend, "data_sets", "metadata", "JSON").await;
+        let _ = add_column_if_missing(db, backend, "graphs", "metadata", "JSON").await;
+        let _ = add_column_if_missing(db, backend, "data_sets", "annotations", "TEXT").await;
+        let _ = add_column_if_missing(db, backend, "graphs", "annotations", "TEXT").await;
+        let _ = add_column_if_missing(db, backend, "data_sets", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "data_sets", "updated_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "graphs", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "graphs", "updated_at", "TIMESTAMP").await;
 
         // 0. Offset graph_edits references (only once)
         db.execute(Statement::from_string(
@@ -138,7 +91,7 @@ impl MigrationTrait for Migration {
                 id, project_id, name, 'dataset', NULL,
                 file_format, origin, filename, blob, file_size, processed_at,
                 status, 0, 0, error_message, metadata,
-                json(annotations),  -- normalize to JSON array
+                COALESCE(json(annotations), json('[]')),  -- normalize to JSON array
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM data_sets;
             "#,
@@ -200,7 +153,7 @@ impl MigrationTrait for Migration {
                     WHEN execution_state = 'Error' THEN 'error'
                     ELSE 'processing'
                 END,
-                node_count, edge_count, error_message, annotations, metadata,
+                node_count, edge_count, error_message, COALESCE(json(annotations), json('[]')), metadata,
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM graphs;",
                 offset = GRAPH_ID_OFFSET
