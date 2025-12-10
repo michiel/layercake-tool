@@ -862,6 +862,11 @@ FROM dataset_graph_nodes;
 
 **Status**: `GraphDataBuilder` merges upstream graph_data, validates layers, computes source hashes, reuses existing graph_data when hashes match, and marks complete. Wired into `DagExecutor` when `graphDataIds` are provided; legacy `GraphBuilder` remains for configs without unified IDs.
 
+**Next Actions**:
+- Add edit replay/change-detection parity for `graph_data` (reuse graph_edits or migrate to new store).
+- Phase out legacy `GraphBuilder` paths and update GraphQL/MCP/console callers to use `graphDataId`.
+- Use `docs/graph_id_audit.md` to drive removal of remaining legacy `graph_id` usage.
+
 ---
 
 ### 4.4 Phase 4: Update GraphQL API (with Facades)
