@@ -1,7 +1,7 @@
 use chrono::Utc;
 use layercake as layercake_core;
 use layercake_core::database::entities::{
-    graph_data, graph_data_edges, graph_data_nodes, project_layers, projects,
+    graph_data, project_layers, projects,
 };
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::GraphDataBuilder;
@@ -23,6 +23,7 @@ async fn seed_project_and_palette(db: &DatabaseConnection) -> i32 {
         id: Set(1),
         name: Set("Test Project".into()),
         description: Set(None),
+        tags: Set("[]".to_string()),
         created_at: Set(Utc::now()),
         updated_at: Set(Utc::now()),
     };
