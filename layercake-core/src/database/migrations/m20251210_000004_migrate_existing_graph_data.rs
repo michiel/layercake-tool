@@ -31,7 +31,7 @@ where
     match db.execute(Statement::from_string(backend, stmt)).await {
         Ok(_) => Ok(()),
         Err(DbErr::Exec(sea_orm::RuntimeErr::SqlxError(err)))
-            if err.to_string().contains("duplicate column") =>
+            if err.to_string().contains("duplicate column") || err.to_string().contains("already exists") =>
         {
             Ok(())
         }
@@ -60,6 +60,55 @@ impl MigrationTrait for Migration {
             "graphs",
             "metadata",
             "JSON DEFAULT '{}' NOT NULL",
+        )
+        .await?;
+        // Some legacy DBs may also lack timestamps/annotations columns
+        add_column_if_missing(
+            db,
+            backend,
+            "data_sets",
+            "annotations",
+            "TEXT DEFAULT '[]' NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "graphs",
+            "annotations",
+            "TEXT DEFAULT '[]' NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "data_sets",
+            "created_at",
+            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "data_sets",
+            "updated_at",
+            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "graphs",
+            "created_at",
+            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "graphs",
+            "updated_at",
+            "TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL",
         )
         .await?;
 
