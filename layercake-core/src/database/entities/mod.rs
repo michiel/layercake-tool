@@ -34,6 +34,11 @@ pub mod graph_nodes;
 pub mod graphs;
 pub mod layer_aliases;
 
+// Unified graph data model (Phase 1 of refactoring)
+pub mod graph_data;
+pub mod graph_data_edges;
+pub mod graph_data_nodes;
+
 // Re-export specific entities to avoid naming conflicts
 pub use execution_state::ExecutionState;
 

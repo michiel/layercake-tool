@@ -37,6 +37,9 @@ mod m20251207_000002_add_alias_to_layers;
 mod m20251208_000003_create_code_analysis_profiles;
 mod m20251209_000004_create_dataset_graph_tables;
 mod m20251209_000005_add_dataset_annotations;
+mod m20251210_000001_create_graph_data;
+mod m20251210_000002_create_graph_data_nodes;
+mod m20251210_000003_create_graph_data_edges;
 
 pub struct Migrator;
 
@@ -81,6 +84,9 @@ impl MigratorTrait for Migrator {
             Box::new(m20251208_000003_create_code_analysis_profiles::Migration),
             Box::new(m20251209_000004_create_dataset_graph_tables::Migration),
             Box::new(m20251209_000005_add_dataset_annotations::Migration),
+            Box::new(m20251210_000001_create_graph_data::Migration),
+            Box::new(m20251210_000002_create_graph_data_nodes::Migration),
+            Box::new(m20251210_000003_create_graph_data_edges::Migration),
         ]
     }
 }

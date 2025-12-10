@@ -750,6 +750,8 @@ impl GraphBuilder {
 
 **Estimated Effort**: 3-4 days
 
+**Status**: Implemented migrations and entities (`graph_data`, `graph_data_nodes`, `graph_data_edges`).
+
 ---
 
 ### 4.2 Phase 2: Data Migration (Batch)
