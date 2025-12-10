@@ -14,6 +14,7 @@ mod collaboration;
 mod data_acquisition;
 mod data_set;
 mod graph;
+mod graph_data;
 mod graph_edit;
 mod layer;
 mod library;
@@ -41,6 +42,7 @@ pub struct Mutation(
     pub data_set::DataSetMutation,
     pub data_acquisition::DataAcquisitionMutation,
     pub graph::GraphMutation,
+    pub graph_data::GraphDataMutation,
     pub graph_edit::GraphEditMutation,
     pub library::LibraryMutation,
     pub mcp::McpMutation,
