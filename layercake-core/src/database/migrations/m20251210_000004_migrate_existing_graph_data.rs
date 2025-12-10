@@ -64,6 +64,10 @@ impl MigrationTrait for Migration {
         let _ = add_column_if_missing(db, backend, "data_sets", "updated_at", "TIMESTAMP").await;
         let _ = add_column_if_missing(db, backend, "graphs", "created_at", "TIMESTAMP").await;
         let _ = add_column_if_missing(db, backend, "graphs", "updated_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "dataset_graph_nodes", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "dataset_graph_edges", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "graph_nodes", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(db, backend, "graph_edges", "created_at", "TIMESTAMP").await;
 
         // 0. Offset graph_edits references (only once)
         db.execute(Statement::from_string(
@@ -91,7 +95,7 @@ impl MigrationTrait for Migration {
                 id, project_id, name, 'dataset', NULL,
                 file_format, origin, filename, blob, file_size, processed_at,
                 status, 0, 0, error_message, metadata,
-                COALESCE(json(annotations), json('[]')),  -- normalize to JSON array
+                COALESCE(annotations, '[]'),  -- normalize to JSON array
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM data_sets;
             "#,
@@ -140,7 +144,7 @@ impl MigrationTrait for Migration {
                 file_format, origin, filename, blob, file_size, processed_at,
                 source_hash, computed_date,
                 last_edit_sequence, has_pending_edits, last_replay_at,
-                status, node_count, edge_count, error_message, json(annotations), metadata,
+                status, node_count, edge_count, error_message, annotations, metadata,
                 created_at, updated_at
             )
             SELECT
@@ -153,7 +157,7 @@ impl MigrationTrait for Migration {
                     WHEN execution_state = 'Error' THEN 'error'
                     ELSE 'processing'
                 END,
-                node_count, edge_count, error_message, COALESCE(json(annotations), json('[]')), metadata,
+                node_count, edge_count, error_message, COALESCE(annotations, '[]'), metadata,
                 CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
             FROM graphs;",
                 offset = GRAPH_ID_OFFSET
