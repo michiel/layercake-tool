@@ -102,6 +102,43 @@ impl From<crate::database::entities::graphs::Model> for Graph {
     }
 }
 
+/// Facade: Convert graph_data (with source_type="computed") to Graph
+/// This allows Graph GraphQL type to work with the unified graph_data table
+impl From<crate::database::entities::graph_data::Model> for Graph {
+    fn from(model: crate::database::entities::graph_data::Model) -> Self {
+        // Map graph_data status to legacy execution_state
+        let execution_state = match model.status.as_str() {
+            "pending" => "pending".to_string(),
+            "processing" => "running".to_string(),
+            "active" => "completed".to_string(),
+            "error" => "failed".to_string(),
+            _ => model.status.clone(),
+        };
+
+        // Serialize annotations back to JSON string for legacy compatibility
+        let annotations = model.annotations.as_ref().and_then(|val| {
+            serde_json::to_string(val).ok()
+        });
+
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            name: model.name,
+            node_id: model.dag_node_id.unwrap_or_else(|| format!("graph-{}", model.id)),
+            execution_state,
+            computed_date: model.computed_date,
+            source_hash: model.source_hash,
+            node_count: model.node_count,
+            edge_count: model.edge_count,
+            error_message: model.error_message,
+            metadata: model.metadata,
+            annotations,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
 #[derive(InputObject)]
 pub struct CreateGraphInput {
     #[graphql(name = "projectId")]

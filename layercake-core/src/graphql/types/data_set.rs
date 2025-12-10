@@ -177,6 +177,52 @@ impl From<DataSetSummary> for DataSet {
     }
 }
 
+/// Facade: Convert graph_data (with source_type="dataset") to DataSet
+/// This allows DataSet GraphQL type to work with the unified graph_data table
+impl From<crate::database::entities::graph_data::Model> for DataSet {
+    fn from(model: crate::database::entities::graph_data::Model) -> Self {
+        // Parse annotations from JSON
+        let annotations: Vec<DataSetAnnotationGql> = model
+            .annotations
+            .as_ref()
+            .and_then(|val| serde_json::from_value(val.clone()).ok())
+            .unwrap_or_default();
+
+        // Extract description from metadata if present
+        let description = model.metadata.as_ref().and_then(|meta| {
+            meta.get("description")
+                .and_then(|d| d.as_str())
+                .map(|s| s.to_string())
+        });
+
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            name: model.name,
+            description,
+            // Map graph_data fields to DataSet (with defaults for missing fields)
+            file_format: model.file_format.unwrap_or_else(|| "unknown".to_string()),
+            origin: model.origin.unwrap_or_else(|| "upload".to_string()),
+            filename: model.filename.unwrap_or_else(|| "unknown".to_string()),
+            // graph_json is deprecated - use nodes/edges queries instead
+            // Setting to empty for backward compatibility
+            graph_json: String::new(),
+            status: model.status,
+            error_message: model.error_message,
+            file_size: model.file_size.unwrap_or(0),
+            processed_at: model.processed_at,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            node_count: Some(model.node_count),
+            edge_count: Some(model.edge_count),
+            // Layers are now in project palette, not dataset-specific
+            layer_count: Some(0),
+            has_layers: false,
+            annotations,
+        }
+    }
+}
+
 #[derive(SimpleObject)]
 #[graphql(name = "DataSetValidationResult")]
 pub struct DataSetValidationResult {
