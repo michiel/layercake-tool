@@ -937,16 +937,29 @@ FROM dataset_graph_nodes;
   - `clearGraphDataEdits(graphDataId: i32)`: Clear all edits
   - Note: Create/delete mutations deferred (dataset creation still uses legacy AppContext)
 
-**Completion**: ~40%
+**Completion**: ~70%
+
+**Completed Work** (2025-12-10 Evening):
+- ✅ **Facade pattern implemented**:
+  - `From<graph_data::Model> for DataSet`: Maps graph_data with source_type="dataset" to DataSet
+  - `From<graph_data::Model> for Graph`: Maps graph_data with source_type="computed" to Graph
+  - Field mapping with sensible defaults for deprecated fields:
+    - graph_json → empty (deprecated, use nodes/edges queries)
+    - description → extracted from metadata JSON
+    - layer_count → 0 (layers now in project palette)
+    - execution_state → mapped from status ("processing"→"running", "active"→"completed", etc.)
+    - annotations → bidirectional JSON conversion
+  - Both facades coexist with legacy From implementations for smooth migration
 
 **Remaining Work**:
-- ❌ Create facade types (DataSet → GraphData, Graph → GraphData) for backward compatibility
 - ❌ Add deprecation warnings to old types
+- ❌ Update existing queries to optionally use graph_data table with facades
 - ❌ Frontend migration to use unified GraphData type (optional, can defer)
 
 **Next Actions**:
-1. Implement facade pattern for DataSet/Graph types (recommended next)
-2. Consider whether to add create dataset mutation now or defer to AppContext refactor
+1. Add deprecation warnings to DataSet/Graph GraphQL types
+2. Consider updating existing dataSet/graph queries to delegate to graph_data (optional)
+3. Document migration path for frontend
 
 ---
 
