@@ -1,7 +1,7 @@
 use chrono::Utc;
 use layercake as layercake_core;
 use layercake_core::database::entities::{
-    graph_data, project_layers, projects,
+    graph_data, graph_edits, project_layers, projects,
 };
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::GraphDataBuilder;
@@ -9,11 +9,23 @@ use layercake_core::services::{GraphDataCreate, GraphDataEdgeInput, GraphDataNod
 use sea_orm::prelude::*;
 use sea_orm::{ActiveModelTrait, Database, Set};
 use sea_orm_migration::MigratorTrait;
+use serde_json::json;
 use std::sync::Arc;
 
 async fn setup_db() -> DatabaseConnection {
     let db = Database::connect("sqlite::memory:").await.unwrap();
     Migrator::up(&db, None).await.unwrap();
+
+    // Disable foreign key checks for testing since graph_edits references
+    // the legacy graphs table but we're creating graph_data directly
+    use sea_orm::Statement;
+    db.execute(Statement::from_string(
+        sea_orm::DatabaseBackend::Sqlite,
+        "PRAGMA foreign_keys = OFF;".to_string(),
+    ))
+    .await
+    .unwrap();
+
     db
 }
 
@@ -406,4 +418,301 @@ async fn test_graph_data_lazy_loading() {
     assert_eq!(full_edges.len(), 1);
     assert_eq!(full_graph.node_count, 2);
     assert_eq!(full_graph.edge_count, 1);
+}
+
+#[tokio::test]
+async fn test_graph_data_edit_replay() {
+    let db = setup_db().await;
+    let project_id = seed_project_and_palette(&db).await;
+
+    let service = GraphDataService::new(db.clone());
+
+    // Create a graph_data with initial nodes
+    let graph = service
+        .create_from_json(project_id, "Test Graph".to_string(), None)
+        .await
+        .unwrap();
+
+    service
+        .replace_nodes(
+            graph.id,
+            vec![
+                GraphDataNodeInput {
+                    external_id: "n1".to_string(),
+                    label: Some("Original Label".to_string()),
+                    layer: Some("L1".to_string()),
+                    weight: Some(1.0),
+                    is_partition: Some(false),
+                    belongs_to: None,
+                    comment: None,
+                    source_dataset_id: None,
+                    attributes: Some(json!({"key": "value"})),
+                    created_at: None,
+                },
+                GraphDataNodeInput {
+                    external_id: "n2".to_string(),
+                    label: Some("Node 2".to_string()),
+                    layer: Some("L1".to_string()),
+                    weight: Some(2.0),
+                    is_partition: Some(false),
+                    belongs_to: None,
+                    comment: None,
+                    source_dataset_id: None,
+                    attributes: None,
+                    created_at: None,
+                },
+            ],
+        )
+        .await
+        .unwrap();
+
+    service
+        .replace_edges(
+            graph.id,
+            vec![GraphDataEdgeInput {
+                external_id: "e1".to_string(),
+                source: "n1".to_string(),
+                target: "n2".to_string(),
+                label: Some("Original Edge".to_string()),
+                layer: Some("L1".to_string()),
+                weight: Some(1.5),
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            }],
+        )
+        .await
+        .unwrap();
+
+    // Create edit records for node label change
+    let edit1 = graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(graph.id),
+        target_type: Set("node".to_string()),
+        target_id: Set("n1".to_string()),
+        operation: Set("update".to_string()),
+        field_name: Set(Some("label".to_string())),
+        old_value: Set(Some(json!("Original Label"))),
+        new_value: Set(Some(json!("Updated Label"))),
+        sequence_number: Set(1),
+        applied: Set(false),
+        created_at: Set(Utc::now()),
+        created_by: Set(None),
+    };
+    edit1.insert(&db).await.unwrap();
+
+    // Create edit for node attributes
+    let edit2 = graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(graph.id),
+        target_type: Set("node".to_string()),
+        target_id: Set("n1".to_string()),
+        operation: Set("update".to_string()),
+        field_name: Set(Some("attributes".to_string())),
+        old_value: Set(Some(json!({"key": "value"}))),
+        new_value: Set(Some(json!({"key": "new_value", "extra": "data"}))),
+        sequence_number: Set(2),
+        applied: Set(false),
+        created_at: Set(Utc::now()),
+        created_by: Set(None),
+    };
+    edit2.insert(&db).await.unwrap();
+
+    // Create edit for edge label
+    let edit3 = graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(graph.id),
+        target_type: Set("edge".to_string()),
+        target_id: Set("e1".to_string()),
+        operation: Set("update".to_string()),
+        field_name: Set(Some("label".to_string())),
+        old_value: Set(Some(json!("Original Edge"))),
+        new_value: Set(Some(json!("Updated Edge"))),
+        sequence_number: Set(3),
+        applied: Set(false),
+        created_at: Set(Utc::now()),
+        created_by: Set(None),
+    };
+    edit3.insert(&db).await.unwrap();
+
+    // Update graph metadata to show pending edits
+    service.update_edit_metadata(graph.id, 3, false).await.unwrap();
+
+    // Verify edits are pending
+    let edit_count = service.get_edit_count(graph.id, true).await.unwrap();
+    assert_eq!(edit_count, 3, "Should have 3 unapplied edits");
+
+    let updated_graph = service.get_by_id(graph.id).await.unwrap().unwrap();
+    assert_eq!(updated_graph.last_edit_sequence, 3);
+    assert_eq!(updated_graph.has_pending_edits, true);
+
+    // Replay edits
+    let summary = service.replay_edits(graph.id).await.unwrap();
+
+    assert_eq!(summary.total, 3, "Should replay 3 edits");
+    assert_eq!(summary.applied, 3, "All edits should be applied");
+    assert_eq!(summary.skipped, 0, "No edits should be skipped");
+    assert_eq!(summary.failed, 0, "No edits should fail");
+
+    // Verify nodes were updated
+    let nodes = service.load_nodes(graph.id).await.unwrap();
+    let n1 = nodes.iter().find(|n| n.external_id == "n1").unwrap();
+    assert_eq!(n1.label, Some("Updated Label".to_string()));
+    assert_eq!(
+        n1.attributes,
+        Some(json!({"key": "new_value", "extra": "data"}))
+    );
+
+    // Verify edges were updated
+    let edges = service.load_edges(graph.id).await.unwrap();
+    let e1 = edges.iter().find(|e| e.external_id == "e1").unwrap();
+    assert_eq!(e1.label, Some("Updated Edge".to_string()));
+
+    // Verify graph metadata updated
+    let replayed_graph = service.get_by_id(graph.id).await.unwrap().unwrap();
+    assert!(replayed_graph.last_replay_at.is_some());
+    assert_eq!(replayed_graph.has_pending_edits, false);
+
+    // Verify no more pending edits
+    let remaining_edits = service.get_edit_count(graph.id, true).await.unwrap();
+    assert_eq!(remaining_edits, 0, "Should have no unapplied edits after replay");
+}
+
+#[tokio::test]
+async fn test_graph_data_edit_create_and_delete() {
+    let db = setup_db().await;
+    let project_id = seed_project_and_palette(&db).await;
+
+    let service = GraphDataService::new(db.clone());
+
+    // Create a graph_data with one node
+    let graph = service
+        .create_from_json(project_id, "Test Graph".to_string(), None)
+        .await
+        .unwrap();
+
+    service
+        .replace_nodes(
+            graph.id,
+            vec![GraphDataNodeInput {
+                external_id: "n1".to_string(),
+                label: Some("Node 1".to_string()),
+                layer: Some("L1".to_string()),
+                weight: Some(1.0),
+                is_partition: Some(false),
+                belongs_to: None,
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            }],
+        )
+        .await
+        .unwrap();
+
+    // Create edit to add new node
+    let create_edit = graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(graph.id),
+        target_type: Set("node".to_string()),
+        target_id: Set("n2".to_string()),
+        operation: Set("create".to_string()),
+        field_name: Set(None),
+        old_value: Set(None),
+        new_value: Set(Some(json!({
+            "label": "New Node",
+            "layer": "L1",
+            "weight": 2.0,
+            "isPartition": false
+        }))),
+        sequence_number: Set(1),
+        applied: Set(false),
+        created_at: Set(Utc::now()),
+        created_by: Set(None),
+    };
+    create_edit.insert(&db).await.unwrap();
+
+    // Create edit to delete original node
+    let delete_edit = graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(graph.id),
+        target_type: Set("node".to_string()),
+        target_id: Set("n1".to_string()),
+        operation: Set("delete".to_string()),
+        field_name: Set(None),
+        old_value: Set(None),
+        new_value: Set(None),
+        sequence_number: Set(2),
+        applied: Set(false),
+        created_at: Set(Utc::now()),
+        created_by: Set(None),
+    };
+    delete_edit.insert(&db).await.unwrap();
+
+    // Replay edits
+    let summary = service.replay_edits(graph.id).await.unwrap();
+
+    assert_eq!(summary.applied, 2);
+    assert_eq!(summary.failed, 0);
+
+    // Verify nodes
+    let nodes = service.load_nodes(graph.id).await.unwrap();
+    assert_eq!(nodes.len(), 1, "Should have 1 node after delete");
+
+    let n2 = &nodes[0];
+    assert_eq!(n2.external_id, "n2");
+    assert_eq!(n2.label, Some("New Node".to_string()));
+}
+
+#[tokio::test]
+async fn test_graph_data_clear_edits() {
+    let db = setup_db().await;
+    let project_id = seed_project_and_palette(&db).await;
+
+    let service = GraphDataService::new(db.clone());
+
+    let graph = service
+        .create_from_json(project_id, "Test Graph".to_string(), None)
+        .await
+        .unwrap();
+
+    // Create some edits
+    for i in 1..=5 {
+        let edit = graph_edits::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            graph_id: Set(graph.id),
+            target_type: Set("node".to_string()),
+            target_id: Set(format!("n{}", i)),
+            operation: Set("create".to_string()),
+            field_name: Set(None),
+            old_value: Set(None),
+            new_value: Set(Some(json!({"label": format!("Node {}", i)}))),
+            sequence_number: Set(i),
+            applied: Set(false),
+            created_at: Set(Utc::now()),
+            created_by: Set(None),
+        };
+        edit.insert(&db).await.unwrap();
+    }
+
+    service.update_edit_metadata(graph.id, 5, false).await.unwrap();
+
+    // Verify edits exist
+    let count_before = service.get_edit_count(graph.id, false).await.unwrap();
+    assert_eq!(count_before, 5);
+
+    // Clear edits
+    let cleared = service.clear_edits(graph.id).await.unwrap();
+    assert_eq!(cleared, 5, "Should clear 5 edits");
+
+    // Verify all cleared
+    let count_after = service.get_edit_count(graph.id, false).await.unwrap();
+    assert_eq!(count_after, 0);
+
+    // Verify metadata reset
+    let updated_graph = service.get_by_id(graph.id).await.unwrap().unwrap();
+    assert_eq!(updated_graph.last_edit_sequence, 0);
+    assert_eq!(updated_graph.has_pending_edits, false);
+    assert!(updated_graph.last_replay_at.is_none());
 }
