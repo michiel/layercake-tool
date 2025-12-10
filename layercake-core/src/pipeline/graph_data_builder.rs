@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
 use crate::database::entities::graph_data;
@@ -134,11 +135,53 @@ impl GraphDataBuilder {
 
         // Mark complete with no hash (hashing to be added later)
         self.graph_data_service
-            .mark_status(created.id, graph_data::GraphDataStatus::Active, None)
+            .mark_complete(created.id, self.compute_source_hash(&nodes, &edges))
             .await?;
 
         // Reload full record with counts
         let (graph, _, _) = self.graph_data_service.load_full(created.id).await?;
         Ok(graph)
+    }
+
+    fn compute_source_hash(
+        &self,
+        nodes: &[crate::database::entities::graph_data_nodes::Model],
+        edges: &[crate::database::entities::graph_data_edges::Model],
+    ) -> String {
+        let mut hasher = Sha256::new();
+
+        let mut sorted_nodes = nodes.to_owned();
+        sorted_nodes.sort_by(|a, b| a.external_id.cmp(&b.external_id));
+        for n in sorted_nodes {
+            hasher.update(n.external_id.as_bytes());
+            if let Some(label) = &n.label {
+                hasher.update(label.as_bytes());
+            }
+            if let Some(layer) = &n.layer {
+                hasher.update(layer.as_bytes());
+            }
+            if let Some(weight) = n.weight {
+                hasher.update(weight.to_le_bytes());
+            }
+        }
+
+        let mut sorted_edges = edges.to_owned();
+        sorted_edges.sort_by(|a, b| a.external_id.cmp(&b.external_id));
+        for e in sorted_edges {
+            hasher.update(e.external_id.as_bytes());
+            hasher.update(e.source.as_bytes());
+            hasher.update(e.target.as_bytes());
+            if let Some(label) = &e.label {
+                hasher.update(label.as_bytes());
+            }
+            if let Some(layer) = &e.layer {
+                hasher.update(layer.as_bytes());
+            }
+            if let Some(weight) = e.weight {
+                hasher.update(weight.to_le_bytes());
+            }
+        }
+
+        format!("{:x}", hasher.finalize())
     }
 }

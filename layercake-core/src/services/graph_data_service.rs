@@ -194,6 +194,27 @@ impl GraphDataService {
         model.update(&self.db).await.map(|_| ())
     }
 
+    pub async fn mark_complete(
+        &self,
+        graph_data_id: i32,
+        source_hash: String,
+    ) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.status = Set(GraphDataStatus::Active.into());
+        model.source_hash = Set(Some(source_hash));
+        model.computed_date = Set(Some(Utc::now()));
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
     pub async fn load_full(
         &self,
         graph_data_id: i32,
