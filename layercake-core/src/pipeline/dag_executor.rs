@@ -21,7 +21,7 @@ use crate::pipeline::persist_utils::{
     node_to_active_model,
 };
 use crate::pipeline::types::LayerData;
-use crate::pipeline::{DatasourceImporter, GraphBuilder, MergeBuilder};
+use crate::pipeline::{DatasourceImporter, GraphBuilder, GraphDataBuilder, MergeBuilder};
 use crate::sequence_context::{build_story_context, SequenceStoryContext};
 use crate::services::graph_service::GraphService;
 use chrono::Utc;
@@ -31,6 +31,7 @@ pub struct DagExecutor {
     db: DatabaseConnection,
     dataset_importer: DatasourceImporter,
     graph_builder: GraphBuilder,
+    graph_data_builder: GraphDataBuilder,
     merge_builder: MergeBuilder,
 }
 
@@ -38,12 +39,17 @@ impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
         let dataset_importer = DatasourceImporter::new(db.clone());
         let graph_builder = GraphBuilder::new(db.clone());
+        let graph_data_builder = GraphDataBuilder::new(
+            std::sync::Arc::new(crate::services::GraphDataService::new(db.clone())),
+            std::sync::Arc::new(crate::services::LayerPaletteService::new(db.clone())),
+        );
         let merge_builder = MergeBuilder::new(db.clone());
 
         Self {
             db,
             dataset_importer,
             graph_builder,
+            graph_data_builder,
             merge_builder,
         }
     }
