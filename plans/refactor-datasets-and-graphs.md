@@ -785,7 +785,7 @@ impl GraphBuilder {
 8. **Recompute counts**: Update node_count/edge_count in graph_data
 9. **Validation queries**: Verify integrity (counts, FK consistency, annotation format)
 
-**Status**: Added non-destructive migration `m20251210_000004_migrate_existing_graph_data` that copies datasets/graphs and children into unified tables and backfills counts using existing IDs. Pending: reconcile ID offset plan vs current approach, add sequence reseed and validation queries.
+**Status**: Added migration `m20251210_000004_migrate_existing_graph_data` (non-destructive) that copies datasets/graphs and children into unified tables, applies +1,000,000 offset to computed graph IDs and children, backfills counts, writes validation counts to `graph_data_migration_validation`, and reseeds sequences (SQLite/Postgres). Pending: reconcile ID offset in downstream references (plan configs/graph_edits) and extend validation to FK checks.
 
 **Migration Script Outline**:
 ```sql
@@ -857,6 +857,8 @@ FROM dataset_graph_nodes;
 - All pipeline tests pass
 
 **Estimated Effort**: 4-5 days
+
+**Status**: Started by adding `GraphDataBuilder` scaffold that will replace legacy `GraphBuilder` once pipeline logic is migrated.
 
 ---
 

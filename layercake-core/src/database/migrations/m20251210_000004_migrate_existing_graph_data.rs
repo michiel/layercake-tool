@@ -3,10 +3,12 @@ use sea_orm_migration::prelude::*;
 /// Migration to copy existing datasets/graphs into unified graph_data tables.
 ///
 /// This is additive and non-destructive: old tables remain in place. It can be
-/// rerun safely because inserts target the same IDs; callsites should ensure
-/// it is executed only once per environment.
+/// rerun safely because inserts target the same IDs (+ offset for graphs);
+/// callsites should ensure it is executed only once per environment.
 #[derive(DeriveMigrationName)]
 pub struct Migration;
+
+const GRAPH_ID_OFFSET: i64 = 1_000_000;
 
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
@@ -80,7 +82,7 @@ impl MigrationTrait for Migration {
                 created_at, updated_at
             )
             SELECT
-                id, project_id, name, 'computed', node_id,
+                (id + $1), project_id, name, 'computed', node_id,
                 NULL, NULL, NULL, NULL, NULL, NULL,
                 source_hash, computed_date,
                 last_edit_sequence, has_pending_edits, last_replay_at,
@@ -94,6 +96,7 @@ impl MigrationTrait for Migration {
             FROM graphs;
             "#,
         ))
+        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 5. Migrate computed graph nodes into graph_data_nodes
@@ -105,11 +108,12 @@ impl MigrationTrait for Migration {
                 belongs_to, comment, source_dataset_id, attributes, created_at
             )
             SELECT
-                graph_id, id, label, layer, weight, is_partition,
+                (graph_id + $1), id, label, layer, weight, is_partition,
                 belongs_to, comment, dataset_id, attrs, COALESCE(created_at, CURRENT_TIMESTAMP)
             FROM graph_nodes;
             "#,
         ))
+        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 6. Migrate computed graph edges into graph_data_edges
@@ -121,11 +125,12 @@ impl MigrationTrait for Migration {
                 comment, source_dataset_id, attributes, created_at
             )
             SELECT
-                graph_id, id, source, target, label, layer, weight,
+                (graph_id + $1), id, source, target, label, layer, weight,
                 comment, dataset_id, attrs, COALESCE(created_at, CURRENT_TIMESTAMP)
             FROM graph_edges;
             "#,
         ))
+        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 7. Recompute node/edge counts in graph_data
@@ -142,6 +147,100 @@ impl MigrationTrait for Migration {
             "#,
         ))
         .await?;
+
+        // 8. Capture validation counts
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            CREATE TABLE IF NOT EXISTS graph_data_migration_validation (
+                check_name TEXT NOT NULL,
+                old_count INTEGER,
+                new_count INTEGER,
+                delta INTEGER,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            "#,
+        ))
+        .await?;
+
+        // Dataset count comparison
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'datasets', (SELECT COUNT(*) FROM data_sets), (SELECT COUNT(*) FROM graph_data WHERE source_type = 'dataset'),
+                   (SELECT COUNT(*) FROM data_sets) - (SELECT COUNT(*) FROM graph_data WHERE source_type = 'dataset');
+            "#,
+        ))
+        .await?;
+
+        // Graph count comparison
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'graphs', (SELECT COUNT(*) FROM graphs), (SELECT COUNT(*) FROM graph_data WHERE source_type = 'computed'),
+                   (SELECT COUNT(*) FROM graphs) - (SELECT COUNT(*) FROM graph_data WHERE source_type = 'computed');
+            "#,
+        ))
+        .await?;
+
+        // Node count comparison
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'nodes',
+                   (SELECT COUNT(*) FROM dataset_graph_nodes) + (SELECT COUNT(*) FROM graph_nodes),
+                   (SELECT COUNT(*) FROM graph_data_nodes),
+                   ((SELECT COUNT(*) FROM dataset_graph_nodes) + (SELECT COUNT(*) FROM graph_nodes)) - (SELECT COUNT(*) FROM graph_data_nodes);
+            "#,
+        ))
+        .await?;
+
+        // Edge count comparison
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'edges',
+                   (SELECT COUNT(*) FROM dataset_graph_edges) + (SELECT COUNT(*) FROM graph_edges),
+                   (SELECT COUNT(*) FROM graph_data_edges),
+                   ((SELECT COUNT(*) FROM dataset_graph_edges) + (SELECT COUNT(*) FROM graph_edges)) - (SELECT COUNT(*) FROM graph_data_edges);
+            "#,
+        ))
+        .await?;
+
+        // 9. Reseed sequences/autoincrement to max(id)
+        match backend {
+            sea_orm::DatabaseBackend::Sqlite => {
+                for table in &["graph_data", "graph_data_nodes", "graph_data_edges"] {
+                    let stmt = format!(
+                        "UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX(id), 0) FROM {tbl}) WHERE name = '{tbl}';",
+                        tbl = table
+                    );
+                    db.execute(Statement::from_string(backend, stmt)).await?;
+                }
+            }
+            sea_orm::DatabaseBackend::Postgres => {
+                db.execute(Statement::from_string(
+                    backend,
+                    "SELECT setval(pg_get_serial_sequence('graph_data','id'), GREATEST((SELECT MAX(id) FROM graph_data), 1), true);",
+                ))
+                .await?;
+                db.execute(Statement::from_string(
+                    backend,
+                    "SELECT setval(pg_get_serial_sequence('graph_data_nodes','id'), GREATEST((SELECT MAX(id) FROM graph_data_nodes), 1), true);",
+                ))
+                .await?;
+                db.execute(Statement::from_string(
+                    backend,
+                    "SELECT setval(pg_get_serial_sequence('graph_data_edges','id'), GREATEST((SELECT MAX(id) FROM graph_data_edges), 1), true);",
+                ))
+                .await?;
+            }
+            _ => { /* no-op for other backends */ }
+        }
 
         Ok(())
     }
