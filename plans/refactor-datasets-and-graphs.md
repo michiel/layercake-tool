@@ -858,7 +858,7 @@ FROM dataset_graph_nodes;
 
 **Estimated Effort**: 4-5 days
 
-**Status**: Basic `GraphDataBuilder` implemented (merge upstream graph_data, validate layers, hash/mark complete) and wired into `DagExecutor` when `graphDataIds` are provided; legacy `GraphBuilder` remains for configs without unified IDs.
+**Status**: `GraphDataBuilder` merges upstream graph_data, validates layers, computes source hashes, reuses existing graph_data when hashes match, and marks complete. Wired into `DagExecutor` when `graphDataIds` are provided; legacy `GraphBuilder` remains for configs without unified IDs.
 
 ---
 
