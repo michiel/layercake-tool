@@ -16,6 +16,18 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = manager.get_database_backend();
 
+        // 0. Offset graph_edits references (only once)
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            UPDATE graph_edits
+            SET graph_id = graph_id + $1
+            WHERE graph_id < $1;
+            "#,
+        ))
+        .bind(GRAPH_ID_OFFSET)
+        .await?;
+
         // 1. Migrate datasets into graph_data (source_type = 'dataset')
         db.execute(Statement::from_string(
             backend,
@@ -30,7 +42,7 @@ impl MigrationTrait for Migration {
                 id, project_id, name, 'dataset', NULL,
                 file_format, origin, filename, blob, file_size, processed_at,
                 status, 0, 0, error_message, metadata,
-                annotations,  -- stored as JSON/text; schema expects JSON
+                json(annotations),  -- normalize to JSON array
                 created_at, updated_at
             FROM data_sets;
             "#,
@@ -78,7 +90,7 @@ impl MigrationTrait for Migration {
                 file_format, origin, filename, blob, file_size, processed_at,
                 source_hash, computed_date,
                 last_edit_sequence, has_pending_edits, last_replay_at,
-                status, node_count, edge_count, error_message, annotations, metadata,
+                status, node_count, edge_count, error_message, json(annotations), metadata,
                 created_at, updated_at
             )
             SELECT
@@ -207,6 +219,37 @@ impl MigrationTrait for Migration {
                    (SELECT COUNT(*) FROM dataset_graph_edges) + (SELECT COUNT(*) FROM graph_edges),
                    (SELECT COUNT(*) FROM graph_data_edges),
                    ((SELECT COUNT(*) FROM dataset_graph_edges) + (SELECT COUNT(*) FROM graph_edges)) - (SELECT COUNT(*) FROM graph_data_edges);
+            "#,
+        ))
+        .await?;
+
+        // Orphaned edge references (edges whose source/target nodes do not exist)
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'orphaned_edge_source',
+                   NULL,
+                   (SELECT COUNT(*) FROM graph_data_edges e WHERE NOT EXISTS (
+                        SELECT 1 FROM graph_data_nodes n
+                        WHERE n.graph_data_id = e.graph_data_id AND n.external_id = e.source
+                   )),
+                   NULL;
+            "#,
+        ))
+        .await?;
+
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'orphaned_edge_target',
+                   NULL,
+                   (SELECT COUNT(*) FROM graph_data_edges e WHERE NOT EXISTS (
+                        SELECT 1 FROM graph_data_nodes n
+                        WHERE n.graph_data_id = e.graph_data_id AND n.external_id = e.target
+                   )),
+                   NULL;
             "#,
         ))
         .await?;

@@ -170,6 +170,50 @@ impl GraphDataService {
             .all(&self.db)
             .await
     }
+
+    pub async fn mark_status(
+        &self,
+        graph_data_id: i32,
+        status: GraphDataStatus,
+        source_hash: Option<String>,
+    ) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.status = Set(status.into());
+        if let Some(hash) = source_hash {
+            model.source_hash = Set(Some(hash));
+        }
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    pub async fn load_full(
+        &self,
+        graph_data_id: i32,
+    ) -> Result<(graph_data::Model, Vec<graph_data_nodes::Model>, Vec<graph_data_edges::Model>), sea_orm::DbErr>
+    {
+        let graph = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?;
+
+        if let Some(graph) = graph {
+            let nodes = self.load_nodes(graph.id).await?;
+            let edges = self.load_edges(graph.id).await?;
+            Ok((graph, nodes, edges))
+        } else {
+            Err(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))
+        }
+    }
 }
 
 pub struct GraphDataCreate {

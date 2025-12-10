@@ -785,7 +785,7 @@ impl GraphBuilder {
 8. **Recompute counts**: Update node_count/edge_count in graph_data
 9. **Validation queries**: Verify integrity (counts, FK consistency, annotation format)
 
-**Status**: Added migration `m20251210_000004_migrate_existing_graph_data` (non-destructive) that copies datasets/graphs and children into unified tables, applies +1,000,000 offset to computed graph IDs and children, backfills counts, writes validation counts to `graph_data_migration_validation`, and reseeds sequences (SQLite/Postgres). Pending: reconcile ID offset in downstream references (plan configs/graph_edits) and extend validation to FK checks.
+**Status**: Added migration `m20251210_000004_migrate_existing_graph_data` (non-destructive) that copies datasets/graphs and children into unified tables, applies +1,000,000 offset to computed graph IDs and children (and graph_edits graph_id), normalizes annotations, backfills counts, captures validation counts (datasets/graphs/nodes/edges + orphaned edge refs), and reseeds sequences (SQLite/Postgres). Pending: reconcile ID offset in downstream references (plan configs) and extend validation to full FK checks.
 
 **Migration Script Outline**:
 ```sql
