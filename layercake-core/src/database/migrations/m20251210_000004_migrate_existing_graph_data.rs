@@ -254,9 +254,59 @@ impl MigrationTrait for Migration {
         ))
         .await?;
 
+        // Plan config graphId offset check (number of configs still below offset)
+        match backend {
+            sea_orm::DatabaseBackend::Sqlite => {
+                db.execute(Statement::from_string(
+                    backend,
+                    r#"
+                    INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+                    SELECT 'plan_config_graphId_below_offset',
+                           NULL,
+                           (SELECT COUNT(*) FROM plan_dag_nodes
+                            WHERE config_json LIKE '%"graphId"%'
+                              AND CAST(json_extract(config_json, '$.graphId') AS INTEGER) < ?1),
+                           NULL;
+                    "#,
+                ))
+                .bind(GRAPH_ID_OFFSET)
+                .await?;
+            }
+            sea_orm::DatabaseBackend::Postgres => {
+                db.execute(Statement::from_string(
+                    backend,
+                    r#"
+                    INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+                    SELECT 'plan_config_graphId_below_offset',
+                           NULL,
+                           (SELECT COUNT(*) FROM plan_dag_nodes
+                            WHERE config_json::jsonb ? 'graphId'
+                              AND (config_json::jsonb ->> 'graphId')::bigint < $1),
+                           NULL;
+                    "#,
+                ))
+                .bind(GRAPH_ID_OFFSET)
+                .await?;
+            }
+            _ => {}
+        }
+
         // 9. Reseed sequences/autoincrement to max(id)
         match backend {
             sea_orm::DatabaseBackend::Sqlite => {
+                // Offset graphId in plan_dag_nodes config_json (GraphNode)
+                db.execute(Statement::from_string(
+                    backend,
+                    format!(
+                        "UPDATE plan_dag_nodes
+                         SET config_json = json_set(config_json, '$.graphId', json_extract(config_json, '$.graphId') + {offset})
+                         WHERE json_type(config_json, '$.graphId') = 'integer'
+                         AND json_extract(config_json, '$.graphId') < {offset};",
+                        offset = GRAPH_ID_OFFSET
+                    ),
+                ))
+                .await?;
+
                 for table in &["graph_data", "graph_data_nodes", "graph_data_edges"] {
                     let stmt = format!(
                         "UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX(id), 0) FROM {tbl}) WHERE name = '{tbl}';",
@@ -266,6 +316,20 @@ impl MigrationTrait for Migration {
                 }
             }
             sea_orm::DatabaseBackend::Postgres => {
+                // Offset graphId in plan_dag_nodes config_json (GraphNode)
+                db.execute(Statement::from_string(
+                    backend,
+                    format!(
+                        "UPDATE plan_dag_nodes
+                         SET config_json = jsonb_set(config_json::jsonb, '{{graphId}}',
+                             to_jsonb((config_json::jsonb ->> 'graphId')::bigint + {offset}))
+                         WHERE config_json::jsonb ? 'graphId'
+                         AND (config_json::jsonb ->> 'graphId')::bigint < {offset};",
+                        offset = GRAPH_ID_OFFSET
+                    ),
+                ))
+                .await?;
+
                 db.execute(Statement::from_string(
                     backend,
                     "SELECT setval(pg_get_serial_sequence('graph_data','id'), GREATEST((SELECT MAX(id) FROM graph_data), 1), true);",
