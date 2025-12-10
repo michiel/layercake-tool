@@ -65,6 +65,77 @@ impl GraphDataBuilder {
             );
         }
 
+        // Compute source hash for change detection
+        let source_hash = self.compute_source_hash(&nodes, &edges);
+
+        // Reuse existing graph_data by dag_node_id if hash matches
+        if let Some(existing) = self
+            .graph_data_service
+            .get_by_dag_node(&dag_node_id)
+            .await?
+        {
+            if existing.source_hash.as_deref() == Some(&source_hash)
+                && existing.status == graph_data::GraphDataStatus::Active.into()
+            {
+                return Ok(existing);
+            }
+
+            // Mark processing before replacing content
+            self.graph_data_service
+                .mark_status(existing.id, graph_data::GraphDataStatus::Processing, None)
+                .await?;
+
+            // Persist merged nodes/edges onto existing record
+            self.graph_data_service
+                .replace_nodes(
+                    existing.id,
+                    nodes
+                        .into_iter()
+                        .map(|n| crate::services::GraphDataNodeInput {
+                            external_id: n.external_id,
+                            label: n.label,
+                            layer: n.layer,
+                            weight: n.weight,
+                            is_partition: Some(n.is_partition),
+                            belongs_to: n.belongs_to,
+                            comment: n.comment,
+                            source_dataset_id: n.source_dataset_id,
+                            attributes: n.attributes,
+                            created_at: Some(n.created_at),
+                        })
+                        .collect(),
+                )
+                .await?;
+
+            self.graph_data_service
+                .replace_edges(
+                    existing.id,
+                    edges
+                        .into_iter()
+                        .map(|e| crate::services::GraphDataEdgeInput {
+                            external_id: e.external_id,
+                            source: e.source,
+                            target: e.target,
+                            label: e.label,
+                            layer: e.layer,
+                            weight: e.weight,
+                            comment: e.comment,
+                            source_dataset_id: e.source_dataset_id,
+                            attributes: e.attributes,
+                            created_at: Some(e.created_at),
+                        })
+                        .collect(),
+                )
+                .await?;
+
+            self.graph_data_service
+                .mark_complete(existing.id, source_hash)
+                .await?;
+
+            let (graph, _, _) = self.graph_data_service.load_full(existing.id).await?;
+            return Ok(graph);
+        }
+
         // Create the new computed graph_data shell
         let created = self
             .graph_data_service
@@ -135,7 +206,7 @@ impl GraphDataBuilder {
 
         // Mark complete with no hash (hashing to be added later)
         self.graph_data_service
-            .mark_complete(created.id, self.compute_source_hash(&nodes, &edges))
+            .mark_complete(created.id, source_hash)
             .await?;
 
         // Reload full record with counts

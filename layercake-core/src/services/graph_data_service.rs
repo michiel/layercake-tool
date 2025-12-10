@@ -171,6 +171,16 @@ impl GraphDataService {
             .await
     }
 
+    pub async fn get_by_dag_node(
+        &self,
+        dag_node_id: &str,
+    ) -> Result<Option<graph_data::Model>, sea_orm::DbErr> {
+        graph_data::Entity::find()
+            .filter(graph_data::Column::DagNodeId.eq(dag_node_id))
+            .one(&self.db)
+            .await
+    }
+
     pub async fn mark_status(
         &self,
         graph_data_id: i32,
