@@ -860,31 +860,35 @@ FROM dataset_graph_nodes;
 
 **Estimated Effort**: 4-5 days
 
-**Status** (Updated 2025-12-10):
+**Status** (Updated 2025-12-10 Evening):
 - ✅ `GraphDataBuilder` merges upstream graph_data, validates layers, computes source hashes, reuses existing graph_data when hashes match, and marks complete
 - ✅ Wired into `DagExecutor` when `graphDataIds` are provided; legacy `GraphBuilder` remains for configs without unified IDs
-- ✅ **NEW**: GraphDataService API completed with all convenience methods (list_datasets, list_computed, mark_processing, mark_error, create_computed, create_from_json)
-- ✅ **NEW**: Comprehensive integration tests added (`tests/graph_data_builder_test.rs`) covering:
+- ✅ GraphDataService API completed with all convenience methods (list_datasets, list_computed, mark_processing, mark_error, create_computed, create_from_json)
+- ✅ Comprehensive integration tests added (`tests/graph_data_builder_test.rs`) covering:
   - Upstream graph merging
   - Layer validation (missing layers fail)
   - Change detection and hash-based reuse
   - Convenience method functionality
   - Lazy loading (load_nodes, load_edges, load_full)
-- ✅ **NEW**: Created `docs/graph_id_audit.md` to track legacy references (47 GraphService refs, 47 DataSetService refs, 2 graph_to_data_set refs)
+- ✅ Created `docs/graph_id_audit.md` to track legacy references (47 GraphService refs, 47 DataSetService refs, 2 graph_to_data_set refs)
+- ✅ **NEW**: Edit replay fully implemented for graph_data:
+  - GraphDataEditApplicator applies edits to graph_data_nodes/edges
+  - GraphDataService edit methods (replay_edits, clear_edits, update_edit_metadata, etc.)
+  - Integration tests for node/edge create/update/delete operations
+  - Edit sequencing and metadata tracking validated
+  - Skips layer edits (Phase 5 will remove layer storage)
 
-**Completion**: ~75% (was 60%)
+**Completion**: ~90% (was 75%)
 
 **Remaining Work**:
-- ❌ Edit replay implementation for `graph_data` (reuse graph_edits or migrate to new store)
 - ❌ Remove `graph_to_data_set()` conversion (2 references)
 - ❌ Phase out legacy `GraphBuilder` paths and update GraphQL/MCP/console callers to use `graphDataId`
 - ❌ Full DAG execution tests with graph_data path
 
 **Next Actions** (Priority Order):
-1. Implement edit replay for graph_data (Phase 3 blocker)
-2. Remove graph_to_data_set conversion
-3. Add full DAG execution integration tests
-4. Use `docs/graph_id_audit.md` to systematically remove legacy references
+1. Remove graph_to_data_set conversion (no longer needed with edit replay complete)
+2. Add full DAG execution integration tests
+3. Use `docs/graph_id_audit.md` to systematically remove legacy references
 
 ---
 

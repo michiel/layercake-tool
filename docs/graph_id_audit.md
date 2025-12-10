@@ -232,15 +232,17 @@ data_sets::Entity::find_by_id(id)  // 3 occurrences
 
 **Critical Path Items**:
 1. ✅ GraphDataBuilder basic functionality (DONE)
-2. ❌ Edit replay for graph_data (BLOCKED)
-3. ❌ Remove graph_to_data_set conversion (DEPENDS ON #2)
-4. ❌ Migrate DagExecutor to prefer GraphDataBuilder (DEPENDS ON #2)
+2. ✅ Edit replay for graph_data (DONE 2025-12-10)
+3. ❌ Remove graph_to_data_set conversion (UNBLOCKED)
+4. ❌ Migrate DagExecutor to prefer GraphDataBuilder (UNBLOCKED)
 
-**Files to Modify**:
-- [ ] `services/graph_data_service.rs` - Add edit replay methods
+**Files Modified** (2025-12-10):
+- [x] `services/graph_data_service.rs` - Added edit replay methods (replay_edits, clear_edits, update_edit_metadata, etc.)
+- [x] `services/graph_data_edit_applicator.rs` - NEW: Applies edits to graph_data_nodes/edges
+- [x] `tests/graph_data_builder_test.rs` - Added 3 comprehensive edit replay tests
 - [ ] `pipeline/graph_builder.rs` - Remove graph_to_data_set
 - [ ] `pipeline/dag_executor.rs` - Use GraphDataBuilder by default
-- [ ] `graphql/mutations/graph_edit.rs` - Support graph_data
+- [ ] `graphql/mutations/graph_edit.rs` - Support graph_data (optional Phase 4)
 
 ### Phase 4 (GraphQL API - 3-4 days)
 
