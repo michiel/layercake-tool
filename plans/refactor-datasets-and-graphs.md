@@ -858,7 +858,7 @@ FROM dataset_graph_nodes;
 
 **Estimated Effort**: 4-5 days
 
-**Status**: Started by adding `GraphDataBuilder` scaffold that will replace legacy `GraphBuilder` once pipeline logic is migrated.
+**Status**: Basic `GraphDataBuilder` implemented and wired into `DagExecutor`; still using legacy `GraphBuilder` for execution paths until full migration.
 
 ---
 
