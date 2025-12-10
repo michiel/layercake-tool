@@ -254,6 +254,48 @@ impl MigrationTrait for Migration {
         ))
         .await?;
 
+        // FK: edges -> graph_data
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'edges_missing_graph_data',
+                   NULL,
+                   (SELECT COUNT(*) FROM graph_data_edges e
+                    WHERE NOT EXISTS (SELECT 1 FROM graph_data g WHERE g.id = e.graph_data_id)),
+                   NULL;
+            "#,
+        ))
+        .await?;
+
+        // FK: nodes -> graph_data
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'nodes_missing_graph_data',
+                   NULL,
+                   (SELECT COUNT(*) FROM graph_data_nodes n
+                    WHERE NOT EXISTS (SELECT 1 FROM graph_data g WHERE g.id = n.graph_data_id)),
+                   NULL;
+            "#,
+        ))
+        .await?;
+
+        // FK: graph_edits -> graph_data (after offset)
+        db.execute(Statement::from_string(
+            backend,
+            r#"
+            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
+            SELECT 'graph_edits_missing_graph_data',
+                   NULL,
+                   (SELECT COUNT(*) FROM graph_edits ge
+                    WHERE NOT EXISTS (SELECT 1 FROM graph_data g WHERE g.id = ge.graph_id)),
+                   NULL;
+            "#,
+        ))
+        .await?;
+
         // Plan config graphId offset check (number of configs still below offset)
         match backend {
             sea_orm::DatabaseBackend::Sqlite => {
