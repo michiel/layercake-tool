@@ -920,6 +920,34 @@ FROM dataset_graph_nodes;
 
 **Estimated Effort**: 3-4 days
 
+**Status** (Updated 2025-12-10 Evening):
+- ✅ **GraphData type created** (`layercake-core/src/graphql/types/graph_data.rs`):
+  - Unified type with source_type discriminator ("dataset" or "computed")
+  - All fields from legacy Graph and DataSet types included
+  - Lazy-loading resolvers for nodes/edges via graph_data_nodes/edges tables
+  - Helper resolvers: isDataset, isComputed, isReady, hasError, fileSizeFormatted
+  - From<graph_data::Model> conversion implemented
+- ✅ **GraphQL queries added**:
+  - `graphData(id: i32)`: Get by ID
+  - `graphDataList(projectId: i32, sourceType: Option<String>)`: List with optional filtering
+  - `graphDataByDagNode(dagNodeId: String)`: Get by DAG node ID
+- ✅ **GraphQL mutations added** (`layercake-core/src/graphql/mutations/graph_data.rs`):
+  - `updateGraphData(id: i32, input: UpdateGraphDataInput)`: Update name/metadata
+  - `replayGraphDataEdits(graphDataId: i32)`: Apply pending edits
+  - `clearGraphDataEdits(graphDataId: i32)`: Clear all edits
+  - Note: Create/delete mutations deferred (dataset creation still uses legacy AppContext)
+
+**Completion**: ~40%
+
+**Remaining Work**:
+- ❌ Create facade types (DataSet → GraphData, Graph → GraphData) for backward compatibility
+- ❌ Add deprecation warnings to old types
+- ❌ Frontend migration to use unified GraphData type (optional, can defer)
+
+**Next Actions**:
+1. Implement facade pattern for DataSet/Graph types (recommended next)
+2. Consider whether to add create dataset mutation now or defer to AppContext refactor
+
 ---
 
 ### 4.5 Phase 5: Remove Layer Storage from graph_data
