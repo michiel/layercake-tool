@@ -937,7 +937,7 @@ FROM dataset_graph_nodes;
   - `clearGraphDataEdits(graphDataId: i32)`: Clear all edits
   - Note: Create/delete mutations deferred (dataset creation still uses legacy AppContext)
 
-**Completion**: ~70%
+**Completion**: ~90%
 
 **Completed Work** (2025-12-10 Evening):
 - ✅ **Facade pattern implemented**:
@@ -950,16 +950,26 @@ FROM dataset_graph_nodes;
     - execution_state → mapped from status ("processing"→"running", "active"→"completed", etc.)
     - annotations → bidirectional JSON conversion
   - Both facades coexist with legacy From implementations for smooth migration
+- ✅ **Deprecation warnings added**:
+  - Doc comments on DataSet and Graph types
+  - Visible in IDE tooltips and generated documentation
+  - Clear migration path to GraphData
+- ✅ **Frontend migration guide created** (`docs/graphql-migration-guide.md`):
+  - Query migration examples (dataSet→graphData, dataSets→graphDataList, etc.)
+  - Field mapping tables documenting all legacy fields
+  - Breaking changes documented (graphJson removed, layers in palette)
+  - Gradual migration strategy with feature flag pattern
+  - Testing approach for parallel API validation
+  - FAQ and comprehensive examples
 
 **Remaining Work**:
-- ❌ Add deprecation warnings to old types
-- ❌ Update existing queries to optionally use graph_data table with facades
-- ❌ Frontend migration to use unified GraphData type (optional, can defer)
+- ❌ Update existing dataSet/graph queries to optionally delegate to graph_data (optional, can defer)
+- ❌ Frontend actual migration implementation (separate effort)
 
 **Next Actions**:
-1. Add deprecation warnings to DataSet/Graph GraphQL types
-2. Consider updating existing dataSet/graph queries to delegate to graph_data (optional)
-3. Document migration path for frontend
+1. Phase 4 is substantially complete - move to Phase 5 (Layer Storage Removal) or Phase 6 (Cleanup)
+2. Frontend team can begin gradual migration using the guide
+3. Consider whether to update legacy queries to use graph_data internally (optimization, not required)
 
 ---
 
