@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
+use std::collections::HashSet;
 
 use crate::database::entities::graph_data;
 use crate::services::{GraphDataService, LayerPaletteService};
@@ -31,11 +32,113 @@ impl GraphDataBuilder {
     /// Placeholder implementation until the DAG executor is migrated.
     pub async fn build_graph(
         &self,
-        _project_id: i32,
-        _dag_node_id: String,
-        _name: String,
-        _upstream_ids: Vec<i32>,
+        project_id: i32,
+        dag_node_id: String,
+        name: String,
+        upstream_ids: Vec<i32>,
     ) -> Result<graph_data::Model> {
-        bail!("GraphDataBuilder is not implemented yet (Phase 3 in progress)");
+        // Load upstream graph_data (datasets or computed)
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+        for id in upstream_ids {
+            let (_g, mut g_nodes, mut g_edges) = self.graph_data_service.load_full(id).await?;
+            nodes.append(&mut g_nodes);
+            edges.append(&mut g_edges);
+        }
+
+        // Validate layer references are present in project palette
+        let layer_ids: HashSet<String> = nodes
+            .iter()
+            .filter_map(|n| n.layer.clone())
+            .chain(edges.iter().filter_map(|e| e.layer.clone()))
+            .collect();
+
+        let validation = self
+            .layer_palette_service
+            .validate_layer_references(project_id, &layer_ids)
+            .await?;
+        if !validation.missing_layers.is_empty() {
+            bail!(
+                "Missing layers in project palette: {:?}",
+                validation.missing_layers
+            );
+        }
+
+        // Create the new computed graph_data shell
+        let created = self
+            .graph_data_service
+            .create(crate::services::GraphDataCreate {
+                project_id,
+                name,
+                source_type: "computed".into(),
+                dag_node_id: Some(dag_node_id),
+                file_format: None,
+                origin: None,
+                filename: None,
+                blob: None,
+                file_size: None,
+                processed_at: None,
+                source_hash: None,
+                computed_date: None,
+                last_edit_sequence: Some(0),
+                has_pending_edits: Some(false),
+                last_replay_at: None,
+                metadata: None,
+                annotations: Some(serde_json::json!([])),
+                status: Some(graph_data::GraphDataStatus::Processing),
+            })
+            .await?;
+
+        // Persist merged nodes/edges
+        self.graph_data_service
+            .replace_nodes(
+                created.id,
+                nodes
+                    .into_iter()
+                    .map(|n| crate::services::GraphDataNodeInput {
+                        external_id: n.external_id,
+                        label: n.label,
+                        layer: n.layer,
+                        weight: n.weight,
+                        is_partition: Some(n.is_partition),
+                        belongs_to: n.belongs_to,
+                        comment: n.comment,
+                        source_dataset_id: n.source_dataset_id,
+                        attributes: n.attributes,
+                        created_at: Some(n.created_at),
+                    })
+                    .collect(),
+            )
+            .await?;
+
+        self.graph_data_service
+            .replace_edges(
+                created.id,
+                edges
+                    .into_iter()
+                    .map(|e| crate::services::GraphDataEdgeInput {
+                        external_id: e.external_id,
+                        source: e.source,
+                        target: e.target,
+                        label: e.label,
+                        layer: e.layer,
+                        weight: e.weight,
+                        comment: e.comment,
+                        source_dataset_id: e.source_dataset_id,
+                        attributes: e.attributes,
+                        created_at: Some(e.created_at),
+                    })
+                    .collect(),
+            )
+            .await?;
+
+        // Mark complete with no hash (hashing to be added later)
+        self.graph_data_service
+            .mark_status(created.id, graph_data::GraphDataStatus::Active, None)
+            .await?;
+
+        // Reload full record with counts
+        let (graph, _, _) = self.graph_data_service.load_full(created.id).await?;
+        Ok(graph)
     }
 }
