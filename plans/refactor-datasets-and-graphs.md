@@ -877,18 +877,21 @@ FROM dataset_graph_nodes;
   - Integration tests for node/edge create/update/delete operations
   - Edit sequencing and metadata tracking validated
   - Skips layer edits (Phase 5 will remove layer storage)
+- ✅ **NEW**: Removed graph_to_data_set conversion (90 lines deleted):
+  - Legacy GraphBuilder now fails with clear migration error for chaining
+  - Directs users to migrate to graphDataIds config
+  - GraphDataBuilder handles chaining natively without conversion
 
-**Completion**: ~90% (was 75%)
+**Completion**: ~95% (was 90%)
 
 **Remaining Work**:
-- ❌ Remove `graph_to_data_set()` conversion (2 references)
 - ❌ Phase out legacy `GraphBuilder` paths and update GraphQL/MCP/console callers to use `graphDataId`
 - ❌ Full DAG execution tests with graph_data path
 
 **Next Actions** (Priority Order):
-1. Remove graph_to_data_set conversion (no longer needed with edit replay complete)
-2. Add full DAG execution integration tests
-3. Use `docs/graph_id_audit.md` to systematically remove legacy references
+1. Add full DAG execution integration tests
+2. Use `docs/graph_id_audit.md` to systematically remove legacy references
+3. Begin Phase 4 GraphQL API migration
 
 ---
 
