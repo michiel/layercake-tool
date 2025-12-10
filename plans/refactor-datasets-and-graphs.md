@@ -881,17 +881,21 @@ FROM dataset_graph_nodes;
   - Legacy GraphBuilder now fails with clear migration error for chaining
   - Directs users to migrate to graphDataIds config
   - GraphDataBuilder handles chaining natively without conversion
+- ✅ **NEW**: Comprehensive DAG execution integration tests (`tests/dag_executor_graph_data_test.rs`):
+  - Simple graph build from graph_data dataset
+  - Graph chaining (computed graph → computed graph)
+  - Change detection prevents unnecessary rebuilds
+  - Affected nodes execution (incremental updates)
+  - All tests use unified graphDataIds path (no legacy DataSetNode references)
 
-**Completion**: ~95% (was 90%)
+**Completion**: ~98% (was 95%)
 
 **Remaining Work**:
-- ❌ Phase out legacy `GraphBuilder` paths and update GraphQL/MCP/console callers to use `graphDataId`
-- ❌ Full DAG execution tests with graph_data path
+- ❌ Phase out legacy `GraphBuilder` paths and update GraphQL/MCP/console callers to use `graphDataId` (optional - dual path works)
 
 **Next Actions** (Priority Order):
-1. Add full DAG execution integration tests
-2. Use `docs/graph_id_audit.md` to systematically remove legacy references
-3. Begin Phase 4 GraphQL API migration
+1. Use `docs/graph_id_audit.md` to systematically remove legacy references (optional)
+2. Begin Phase 4 GraphQL API migration (recommended next step)
 
 ---
 

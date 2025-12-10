@@ -234,13 +234,15 @@ data_sets::Entity::find_by_id(id)  // 3 occurrences
 1. ✅ GraphDataBuilder basic functionality (DONE)
 2. ✅ Edit replay for graph_data (DONE 2025-12-10)
 3. ✅ Remove graph_to_data_set conversion (DONE 2025-12-10)
-4. ❌ Migrate DagExecutor to prefer GraphDataBuilder (OPTIONAL - dual path works)
+4. ✅ Full DAG execution integration tests (DONE 2025-12-10)
+5. ❌ Migrate DagExecutor to prefer GraphDataBuilder (OPTIONAL - dual path works)
 
 **Files Modified** (2025-12-10):
 - [x] `services/graph_data_service.rs` - Added edit replay methods (replay_edits, clear_edits, update_edit_metadata, etc.)
 - [x] `services/graph_data_edit_applicator.rs` - NEW: Applies edits to graph_data_nodes/edges
 - [x] `tests/graph_data_builder_test.rs` - Added 3 comprehensive edit replay tests
 - [x] `pipeline/graph_builder.rs` - Removed graph_to_data_set (90 lines), now fails with migration error for chaining
+- [x] `tests/dag_executor_graph_data_test.rs` - NEW: 4 comprehensive DAG execution tests (simple build, chaining, change detection, affected nodes)
 - [ ] `pipeline/dag_executor.rs` - Currently dual-path (uses graphDataIds when available, legacy otherwise)
 - [ ] `graphql/mutations/graph_edit.rs` - Support graph_data (optional Phase 4)
 
@@ -287,9 +289,9 @@ data_sets::Entity::find_by_id(id)  // 3 occurrences
 ### Integration Tests Needed
 
 **Phase 3**:
-- [ ] GraphDataBuilder full DAG execution test
-- [ ] Edit replay with graph_data
-- [ ] Change detection hash comparison
+- [x] GraphDataBuilder full DAG execution test (4 tests in dag_executor_graph_data_test.rs)
+- [x] Edit replay with graph_data (3 tests in graph_data_builder_test.rs)
+- [x] Change detection hash comparison (tested in both files)
 
 **Phase 4**:
 - [ ] GraphQL backwards compatibility (DataSet → GraphData facade)
