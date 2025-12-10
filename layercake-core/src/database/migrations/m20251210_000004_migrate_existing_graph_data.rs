@@ -1,3 +1,4 @@
+use sea_orm::Statement;
 use sea_orm_migration::prelude::*;
 
 /// Migration to copy existing datasets/graphs into unified graph_data tables.
@@ -19,13 +20,13 @@ impl MigrationTrait for Migration {
         // 0. Offset graph_edits references (only once)
         db.execute(Statement::from_string(
             backend,
-            r#"
-            UPDATE graph_edits
-            SET graph_id = graph_id + $1
-            WHERE graph_id < $1;
-            "#,
+            format!(
+                "UPDATE graph_edits
+                 SET graph_id = graph_id + {offset}
+                 WHERE graph_id < {offset};",
+                offset = GRAPH_ID_OFFSET
+            ),
         ))
-        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 1. Migrate datasets into graph_data (source_type = 'dataset')
@@ -84,7 +85,8 @@ impl MigrationTrait for Migration {
         // 4. Migrate computed graphs into graph_data (source_type = 'computed')
         db.execute(Statement::from_string(
             backend,
-            r#"
+            format!(
+                "
             INSERT OR IGNORE INTO graph_data (
                 id, project_id, name, source_type, dag_node_id,
                 file_format, origin, filename, blob, file_size, processed_at,
@@ -94,7 +96,7 @@ impl MigrationTrait for Migration {
                 created_at, updated_at
             )
             SELECT
-                (id + $1), project_id, name, 'computed', node_id,
+                (id + {offset}), project_id, name, 'computed', node_id,
                 NULL, NULL, NULL, NULL, NULL, NULL,
                 source_hash, computed_date,
                 last_edit_sequence, has_pending_edits, last_replay_at,
@@ -105,44 +107,46 @@ impl MigrationTrait for Migration {
                 END,
                 node_count, edge_count, error_message, annotations, metadata,
                 created_at, updated_at
-            FROM graphs;
-            "#,
+            FROM graphs;",
+                offset = GRAPH_ID_OFFSET
+            ),
         ))
-        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 5. Migrate computed graph nodes into graph_data_nodes
         db.execute(Statement::from_string(
             backend,
-            r#"
+            format!(
+                "
             INSERT OR IGNORE INTO graph_data_nodes (
                 graph_data_id, external_id, label, layer, weight, is_partition,
                 belongs_to, comment, source_dataset_id, attributes, created_at
             )
             SELECT
-                (graph_id + $1), id, label, layer, weight, is_partition,
+                (graph_id + {offset}), id, label, layer, weight, is_partition,
                 belongs_to, comment, dataset_id, attrs, COALESCE(created_at, CURRENT_TIMESTAMP)
-            FROM graph_nodes;
-            "#,
+            FROM graph_nodes;",
+                offset = GRAPH_ID_OFFSET
+            ),
         ))
-        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 6. Migrate computed graph edges into graph_data_edges
         db.execute(Statement::from_string(
             backend,
-            r#"
+            format!(
+                "
             INSERT OR IGNORE INTO graph_data_edges (
                 graph_data_id, external_id, source, target, label, layer, weight,
                 comment, source_dataset_id, attributes, created_at
             )
             SELECT
-                (graph_id + $1), id, source, target, label, layer, weight,
+                (graph_id + {offset}), id, source, target, label, layer, weight,
                 comment, dataset_id, attrs, COALESCE(created_at, CURRENT_TIMESTAMP)
-            FROM graph_edges;
-            "#,
+            FROM graph_edges;",
+                offset = GRAPH_ID_OFFSET
+            ),
         ))
-        .bind(GRAPH_ID_OFFSET)
         .await?;
 
         // 7. Recompute node/edge counts in graph_data
@@ -301,17 +305,18 @@ impl MigrationTrait for Migration {
             sea_orm::DatabaseBackend::Sqlite => {
                 db.execute(Statement::from_string(
                     backend,
-                    r#"
+                    format!(
+                        "
                     INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
                     SELECT 'plan_config_graphId_below_offset',
                            NULL,
                            (SELECT COUNT(*) FROM plan_dag_nodes
-                            WHERE config_json LIKE '%"graphId"%'
-                              AND CAST(json_extract(config_json, '$.graphId') AS INTEGER) < ?1),
-                           NULL;
-                    "#,
+                            WHERE config_json LIKE '%\"graphId\"%'
+                              AND CAST(json_extract(config_json, '$.graphId') AS INTEGER) < {offset}),
+                           NULL;",
+                        offset = GRAPH_ID_OFFSET
+                    ),
                 ))
-                .bind(GRAPH_ID_OFFSET)
                 .await?;
             }
             sea_orm::DatabaseBackend::Postgres => {

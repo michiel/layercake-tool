@@ -75,7 +75,7 @@ impl GraphDataBuilder {
             .await?
         {
             if existing.source_hash.as_deref() == Some(&source_hash)
-                && existing.status == graph_data::GraphDataStatus::Active.into()
+                && existing.status == graph_data::GraphDataStatus::Active.as_str()
             {
                 return Ok(existing);
             }

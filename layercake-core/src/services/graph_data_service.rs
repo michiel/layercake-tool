@@ -4,7 +4,7 @@ use crate::database::entities::{
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait,
 };
 use serde_json::Value;
 
