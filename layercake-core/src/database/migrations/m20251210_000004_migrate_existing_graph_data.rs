@@ -11,11 +11,57 @@ pub struct Migration;
 
 const GRAPH_ID_OFFSET: i64 = 1_000_000;
 
+async fn add_column_if_missing<C>(
+    db: &C,
+    backend: sea_orm::DatabaseBackend,
+    table: &str,
+    column: &str,
+    definition: &str,
+) -> Result<(), DbErr>
+where
+    C: sea_orm::ConnectionTrait,
+{
+    let stmt = match backend {
+        sea_orm::DatabaseBackend::Postgres => format!(
+            "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition};"
+        ),
+        _ => format!("ALTER TABLE {table} ADD COLUMN {column} {definition};"),
+    };
+
+    match db.execute(Statement::from_string(backend, stmt)).await {
+        Ok(_) => Ok(()),
+        Err(DbErr::Exec(sea_orm::RuntimeErr::SqlxError(err)))
+            if err.to_string().contains("duplicate column") =>
+        {
+            Ok(())
+        }
+        Err(e) => Err(e),
+    }
+}
+
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         let db = manager.get_connection();
         let backend = manager.get_database_backend();
+
+        // Legacy DBs may be missing metadata columns; add them if absent
+        add_column_if_missing(
+            db,
+            backend,
+            "data_sets",
+            "metadata",
+            "JSON DEFAULT '{}' NOT NULL",
+        )
+        .await?;
+        add_column_if_missing(
+            db,
+            backend,
+            "graphs",
+            "metadata",
+            "JSON DEFAULT '{}' NOT NULL",
+        )
+        .await?;
 
         // 0. Offset graph_edits references (only once)
         db.execute(Statement::from_string(
