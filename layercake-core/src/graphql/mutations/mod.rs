@@ -53,6 +53,6 @@ pub struct Mutation(
     pub layer::LayerMutation,
     pub project::ProjectMutation,
     pub sequence::SequenceMutation,
-    pub story::StoryMutation,
+    // pub story::StoryMutation,
     pub system::SystemMutation,
 );
