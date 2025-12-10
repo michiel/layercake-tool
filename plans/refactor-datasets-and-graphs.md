@@ -126,11 +126,12 @@ CREATE TABLE graph_data (
     file_format TEXT,           -- 'csv', 'tsv', 'json', NULL for computed
     origin TEXT,                -- 'file_upload', 'rag_agent', 'manual_edit', NULL
     filename TEXT,
-    blob BLOB,                  -- Raw file bytes (NULL for computed)
+    blob BLOB,                  -- Raw file bytes; must be NULL for computed/manual
+    file_size INTEGER,          -- Size in bytes; NULL for computed/manual
+    processed_at TIMESTAMP,     -- When dataset parsing finished
 
     -- Computed graph-specific
     source_hash TEXT,           -- Hash for change detection (NULL for datasets)
-    execution_state TEXT,       -- ExecutionState enum (NULL for datasets)
     computed_date TIMESTAMP,
 
     -- Edit tracking (for computed graphs only)
@@ -141,11 +142,10 @@ CREATE TABLE graph_data (
     -- Common metadata
     node_count INTEGER NOT NULL DEFAULT 0,
     edge_count INTEGER NOT NULL DEFAULT 0,
-    layer_count INTEGER NOT NULL DEFAULT 0,
     error_message TEXT,
     metadata JSON,              -- Flexible metadata
-    annotations TEXT,           -- Newline-separated or JSON array
-    status TEXT NOT NULL,       -- 'active', 'processing', 'error'
+    annotations JSON,           -- Ordered list of markdown strings
+    status TEXT NOT NULL,       -- 'active', 'processing', 'error' canonical status
 
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
@@ -154,8 +154,9 @@ CREATE TABLE graph_data (
 );
 
 CREATE TABLE graph_data_nodes (
-    id TEXT NOT NULL,
+    id INTEGER PRIMARY KEY,     -- surrogate key
     graph_data_id INTEGER NOT NULL,
+    external_id TEXT NOT NULL,  -- user-provided node ID, unique per graph_data
     label TEXT,                 -- Optional (required during import, but can be NULL in DB)
     layer TEXT,                 -- Optional (same reasoning)
     weight REAL,                -- Use REAL (f64) consistently
@@ -167,13 +168,15 @@ CREATE TABLE graph_data_nodes (
     created_at TIMESTAMP NOT NULL,
 
     PRIMARY KEY (id, graph_data_id),
-    FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE
+    FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE,
+    UNIQUE (graph_data_id, external_id)
 );
 
 CREATE TABLE graph_data_edges (
-    id TEXT NOT NULL,
+    id INTEGER PRIMARY KEY,     -- surrogate key
     graph_data_id INTEGER NOT NULL,
-    source TEXT NOT NULL,
+    external_id TEXT NOT NULL,  -- user-provided edge ID, unique per graph_data
+    source TEXT NOT NULL,       -- references node external_id
     target TEXT NOT NULL,
     label TEXT,
     layer TEXT,
@@ -183,13 +186,21 @@ CREATE TABLE graph_data_edges (
     attributes JSON,
     created_at TIMESTAMP NOT NULL,
 
-    PRIMARY KEY (id, graph_data_id),
-    FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE
+    FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE,
+    UNIQUE (graph_data_id, external_id)
 );
 
 -- Layers table REMOVED - layers only exist in project_layers
 -- graph_data nodes/edges reference layer IDs that must exist in project_layers
 ```
+
+**Consistency rules**:
+- `blob` must be populated only for `source_type = 'dataset'`; enforce NULL for computed/manual rows.
+- `annotations` is a JSON array of ordered markdown strings.
+- `node_count` and `edge_count` are authoritative and must stay in sync with child tables (no `layer_count` column).
+- `status` is the canonical lifecycle indicator; `execution_state` removed from schema (only derived in-memory if needed).
+- `weight` is always REAL/f64.
+- Surrogate INT PKs (`id`) exist for nodes/edges; externally meaningful IDs are stored in `external_id` and must be unique per `graph_data`.
 
 #### 3.1.2 Layer Handling
 
@@ -205,6 +216,7 @@ CREATE TABLE graph_data_edges (
 2. **Graph Build**: Validate that all node/edge layer IDs exist in `project_layers`
 3. **Rendering**: Resolve layer styling from `project_layers` only
 4. **Export**: Include layer definitions from `project_layers` in exported files
+5. **Validation Strictness**: Strict validation; missing layers fail the operation (no auto-create).
 
 #### 3.1.3 Unified In-Memory Model
 
@@ -218,6 +230,10 @@ pub struct GraphData {
     pub name: String,
     pub source_type: GraphDataSource,
     pub dag_node_id: Option<String>,
+
+    // Counts (kept in sync with child tables)
+    pub node_count: i32,
+    pub edge_count: i32,
 
     // Content
     pub nodes: Vec<GraphNode>,
@@ -249,14 +265,13 @@ pub struct DatasetInfo {
     pub origin: DatasetOrigin,
     pub filename: String,
     pub blob: Option<Vec<u8>>,  // May be None if not loaded
-    pub file_size: i64,
+    pub file_size: Option<i64>,
     pub processed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputedInfo {
-    pub source_hash: String,
-    pub execution_state: ExecutionState,
+    pub source_hash: Option<String>,
     pub computed_date: Option<DateTime<Utc>>,
     pub last_edit_sequence: i32,
     pub has_pending_edits: bool,
@@ -265,7 +280,8 @@ pub struct ComputedInfo {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphNode {
-    pub id: String,
+    pub db_id: Option<i32>,     // surrogate PK in DB (not exposed to clients)
+    pub id: String,             // external_id from dataset/graph files
     pub label: String,           // Required in struct, validated during creation
     pub layer: String,           // Required in struct, validated against project_layers
     pub weight: f64,             // Use f64 consistently
@@ -278,7 +294,8 @@ pub struct GraphNode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphEdge {
-    pub id: String,
+    pub db_id: Option<i32>,     // surrogate PK in DB (not exposed to clients)
+    pub id: String,             // external_id from dataset/graph files
     pub source: String,
     pub target: String,
     pub label: String,
@@ -480,7 +497,6 @@ pub struct GraphDataGql {
     pub processed_at: Option<DateTime<Utc>>,
 
     // Computed-specific (NULL for datasets)
-    pub execution_state: Option<String>,
     pub source_hash: Option<String>,
     pub computed_date: Option<DateTime<Utc>>,
     pub last_edit_sequence: Option<i32>,
@@ -509,7 +525,8 @@ impl GraphDataGql {
     async fn layers(&self, ctx: &Context<'_>) -> Result<Vec<LayerGql>> {
         let palette_service = ctx.data::<Arc<LayerPaletteService>>()?;
 
-        // Load nodes to get unique layer IDs
+        // Load nodes/edges to get unique layer IDs
+        // TODO: avoid double-fetch when nodes/edges are already requested (use DataLoader or cached context)
         let nodes = self.nodes(ctx).await?;
         let edges = self.edges(ctx).await?;
 
@@ -535,6 +552,9 @@ impl GraphDataGql {
         self.source_type == "computed"
     }
 }
+
+// Lifecycle mapping (canonical)
+// - status: 'active' | 'processing' | 'error' for all graph_data rows
 ```
 
 #### 3.3.2 Backwards Compatibility
@@ -589,15 +609,15 @@ impl GraphBuilder {
         // Merge nodes/edges (no type conversion needed!)
         let merged = self.merge_graphs(upstream_graphs)?;
 
-        // Validate layers exist in project palette
-        let missing_layers = self.palette_service
+        // Validate layers exist in project palette; strict failure on missing
+        let validation = self.palette_service
             .validate_layer_references(dag_node.project_id, &merged)
             .await?;
 
-        if !missing_layers.missing_layers.is_empty() {
+        if !validation.missing_layers.is_empty() {
             return Err(anyhow!(
                 "Missing layers in project palette: {:?}",
-                missing_layers.missing_layers
+                validation.missing_layers
             ));
         }
 
@@ -662,27 +682,29 @@ impl GraphBuilder {
 **Goal**: Copy data from old tables to new unified tables.
 
 **Tasks**:
-1. Write migration script to copy `data_sets` → `graph_data` (source_type='dataset')
-2. Write migration script to copy `dataset_graph_*` → `graph_data_*`
-3. Write migration script to copy `graphs` → `graph_data` (source_type='computed')
-4. Write migration script to copy `graph_*` → `graph_data_*`
-5. Add validation to ensure data integrity
-6. Run migration on test database
-7. Verify counts and sample records
+1. Confirm key types for node/edge IDs in existing tables (text vs integer) and map them to surrogate INT PKs plus `external_id` TEXT in unified tables.
+2. Write migration script to copy `data_sets` → `graph_data` (source_type='dataset'), enforcing NULL blobs for computed/manual rows and converting annotations to JSON arrays.
+3. Write migration script to copy `dataset_graph_*` → `graph_data_*`, converting weights to REAL.
+4. Write migration script to copy `graphs` → `graph_data` (source_type='computed'), mapping prior execution states into canonical `status`, and ensuring `blob`/dataset-only fields are NULL.
+5. Write migration script to copy `graph_*` → `graph_data_*` with `attrs` → `attributes`.
+6. Recompute and backfill `node_count`/`edge_count` and reseed autoincrement sequences to avoid ID collisions.
+7. Add validation queries to ensure data integrity (counts, spot checks, FK consistency).
+8. Run migration on test database and compare counts/hashes.
 
 **Migration Script Outline**:
 ```sql
 -- Copy datasets
 INSERT INTO graph_data (
     id, project_id, name, source_type, dag_node_id,
-    file_format, origin, filename, blob, status,
-    node_count, edge_count, error_message, metadata, annotations,
+    file_format, origin, filename, blob, file_size, processed_at,
+    status, node_count, edge_count, error_message, metadata, annotations,
     created_at, updated_at
 )
 SELECT
     id, project_id, name, 'dataset', NULL,
-    file_format, origin, filename, blob, status,
-    0, 0, error_message, metadata, annotations,
+    file_format, origin, filename, blob, file_size, processed_at,
+    status, 0, 0, error_message, metadata,
+    json(annotations),  -- normalize to JSON array
     created_at, updated_at
 FROM data_sets;
 
@@ -1070,73 +1092,16 @@ Each phase should be reversible:
 
 ## 11. Open Questions
 
-### 11.1 Weight Field Type
+### 11.1 Resolved Inputs
 
-**Question**: Should weight be `i32` or `f64` consistently?
+- Layer validation: strict failure on missing layers (no auto-create).
+- Node/edge external IDs: strings set by uploads; database identifiers are integers. Unified schema uses surrogate INT PKs and `external_id` TEXT per graph.
+- Lifecycle mapping: `status` is canonical; remove `execution_state` from schema and APIs.
+- GraphQL layers resolver: caching/dataloader can be deferred.
 
-**Current State**: Dataset tables use `i32`, graph tables use `f64`, in-memory uses `i32`.
+### 11.2 Remaining Clarification
 
-**Recommendation**: Use `f64` (REAL in SQLite) consistently.
-
-**Rationale**:
-- More flexible for algorithms (PageRank, centrality, etc.)
-- No precision loss during transformations
-- Standard for graph libraries
-
----
-
-### 11.2 Annotations Format
-
-**Question**: Should annotations be newline-separated text or JSON array?
-
-**Current State**: Mixed (some places use text, some use JSON array).
-
-**Recommendation**: Use JSON array consistently: `Vec<String>` in Rust, `JSON` in database.
-
-**Rationale**:
-- Structured and queryable
-- Type-safe in Rust
-- Easy to extend with metadata per annotation
-
----
-
-### 11.3 Layer Validation Strictness
-
-**Question**: Should layer references be strictly validated?
-
-**Options**:
-1. **Strict**: Reject import/build if layer not in project palette
-2. **Warning**: Allow unknown layers, warn user, use default styling
-3. **Auto-create**: Automatically add missing layers with default colours
-
-**Recommendation**: Option 3 (Auto-create) with notification.
-
-**Rationale**:
-- User-friendly (no failed imports)
-- Still notifies user of new layers
-- Allows review in project palette UI
-- Can be made stricter later via setting
-
----
-
-### 11.4 Edit Replay Scope
-
-**Question**: Should edit replay work for datasets too?
-
-**Current State**: Only computed graphs support edit replay.
-
-**Options**:
-1. Keep datasets immutable (current)
-2. Allow edits to datasets, replay on re-import
-3. Make all graph_data editable
-
-**Recommendation**: Option 1 (datasets immutable).
-
-**Rationale**:
-- Datasets are source data, should be pristine
-- Re-importing overwrites anyway
-- Edits belong to computed graphs
-- Simpler mental model
+- None.
 
 ---
 
@@ -1267,23 +1232,26 @@ impl From<graph_nodes::Model> for Node
 
 -- 1. Migrate datasets
 INSERT INTO graph_data (
-    id, project_id, name, source_type, file_format, origin,
-    filename, blob, status, error_message, annotations,
+    id, project_id, name, source_type, dag_node_id,
+    file_format, origin, filename, blob, file_size, processed_at,
+    status, node_count, edge_count, error_message, metadata, annotations,
     created_at, updated_at
 )
 SELECT
-    id, project_id, name, 'dataset', file_format, origin,
-    filename, blob, status, error_message, annotations,
+    id, project_id, name, 'dataset', NULL,
+    file_format, origin, filename, blob, file_size, processed_at,
+    status, 0, 0, error_message, metadata,
+    json(annotations),  -- normalize to JSON array
     created_at, updated_at
 FROM data_sets;
 
 -- 2. Migrate dataset nodes
 INSERT INTO graph_data_nodes (
-    id, graph_data_id, label, layer, weight, is_partition,
+    id, graph_data_id, external_id, label, layer, weight, is_partition,
     belongs_to, comment, source_dataset_id, attributes, created_at
 )
 SELECT
-    id, dataset_id, label, layer,
+    NULL, dataset_id, id, label, layer,
     CAST(weight AS REAL),  -- i32 → f64 conversion
     is_partition, belongs_to, comment, dataset_id, attributes,
     CURRENT_TIMESTAMP
@@ -1291,11 +1259,11 @@ FROM dataset_graph_nodes;
 
 -- 3. Migrate dataset edges
 INSERT INTO graph_data_edges (
-    id, graph_data_id, source, target, label, layer, weight,
+    id, graph_data_id, external_id, source, target, label, layer, weight,
     comment, source_dataset_id, attributes, created_at
 )
 SELECT
-    id, dataset_id, source, target, label, layer,
+    NULL, dataset_id, id, source, target, label, layer,
     CAST(weight AS REAL),  -- i32 → f64 conversion
     comment, dataset_id, attributes,
     CURRENT_TIMESTAMP
@@ -1304,40 +1272,40 @@ FROM dataset_graph_edges;
 -- 4. Migrate computed graphs
 INSERT INTO graph_data (
     id, project_id, name, source_type, dag_node_id,
-    source_hash, execution_state, computed_date,
+    file_format, origin, filename, blob, file_size, processed_at,
+    source_hash, computed_date,
     last_edit_sequence, has_pending_edits, last_replay_at,
-    status, error_message, annotations, metadata,
+    status, node_count, edge_count, error_message, annotations, metadata,
     created_at, updated_at
 )
 SELECT
     id, project_id, name, 'computed', node_id,
-    source_hash, execution_state, computed_date,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    source_hash, computed_date,
     last_edit_sequence, has_pending_edits, last_replay_at,
-    CASE WHEN execution_state = 'Completed' THEN 'active'
-         WHEN execution_state = 'Error' THEN 'error'
-         ELSE 'processing' END,
-    error_message, annotations, metadata,
+    status,  -- status is canonical; map prior pipeline states before migration
+    0, 0, error_message, json(annotations), metadata,
     created_at, updated_at
 FROM graphs;
 
 -- 5. Migrate graph nodes (already f64 weight, no conversion needed)
 INSERT INTO graph_data_nodes (
-    id, graph_data_id, label, layer, weight, is_partition,
+    id, graph_data_id, external_id, label, layer, weight, is_partition,
     belongs_to, comment, source_dataset_id, attributes, created_at
 )
 SELECT
-    id, graph_id, label, layer, weight, is_partition,
+    NULL, graph_id, id, label, layer, weight, is_partition,
     belongs_to, comment, dataset_id, attrs,  -- Rename attrs → attributes
     created_at
 FROM graph_nodes;
 
 -- 6. Migrate graph edges
 INSERT INTO graph_data_edges (
-    id, graph_data_id, source, target, label, layer, weight,
+    id, graph_data_id, external_id, source, target, label, layer, weight,
     comment, source_dataset_id, attributes, created_at
 )
 SELECT
-    id, graph_id, source, target, label, layer, weight,
+    NULL, graph_id, id, source, target, label, layer, weight,
     comment, dataset_id, attrs,  -- Rename attrs → attributes
     created_at
 FROM graph_edges;
@@ -1363,4 +1331,6 @@ SELECT 'Graph migration' AS check_name,
 SELECT 'Node migration' AS check_name,
        (SELECT COUNT(*) FROM dataset_graph_nodes) + (SELECT COUNT(*) FROM graph_nodes) AS old_count,
        (SELECT COUNT(*) FROM graph_data_nodes) AS new_count;
+
+-- 9. Reseed autoincrement sequences to max(id) in graph_data and child tables
 ```
