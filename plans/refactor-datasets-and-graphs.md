@@ -154,30 +154,29 @@ CREATE TABLE graph_data (
 );
 
 CREATE TABLE graph_data_nodes (
-    id INTEGER PRIMARY KEY,     -- surrogate key
+    id INTEGER PRIMARY KEY AUTOINCREMENT,  -- surrogate key, auto-assigned
     graph_data_id INTEGER NOT NULL,
     external_id TEXT NOT NULL,  -- user-provided node ID, unique per graph_data
     label TEXT,                 -- Optional (required during import, but can be NULL in DB)
     layer TEXT,                 -- Optional (same reasoning)
     weight REAL,                -- Use REAL (f64) consistently
     is_partition BOOLEAN NOT NULL DEFAULT FALSE,
-    belongs_to TEXT,
+    belongs_to TEXT,            -- references another node's external_id in same graph
     comment TEXT,
     source_dataset_id INTEGER,  -- Traceability to original dataset
     attributes JSON,            -- Consistent naming
     created_at TIMESTAMP NOT NULL,
 
-    PRIMARY KEY (id, graph_data_id),
     FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE,
     UNIQUE (graph_data_id, external_id)
 );
 
 CREATE TABLE graph_data_edges (
-    id INTEGER PRIMARY KEY,     -- surrogate key
+    id INTEGER PRIMARY KEY AUTOINCREMENT,  -- surrogate key, auto-assigned
     graph_data_id INTEGER NOT NULL,
     external_id TEXT NOT NULL,  -- user-provided edge ID, unique per graph_data
-    source TEXT NOT NULL,       -- references node external_id
-    target TEXT NOT NULL,
+    source TEXT NOT NULL,       -- references node external_id in same graph
+    target TEXT NOT NULL,       -- references node external_id in same graph
     label TEXT,
     layer TEXT,
     weight REAL,
@@ -187,22 +186,67 @@ CREATE TABLE graph_data_edges (
     created_at TIMESTAMP NOT NULL,
 
     FOREIGN KEY (graph_data_id) REFERENCES graph_data(id) ON DELETE CASCADE,
+    FOREIGN KEY (graph_data_id, source)
+        REFERENCES graph_data_nodes(graph_data_id, external_id) ON DELETE CASCADE,
+    FOREIGN KEY (graph_data_id, target)
+        REFERENCES graph_data_nodes(graph_data_id, external_id) ON DELETE CASCADE,
     UNIQUE (graph_data_id, external_id)
 );
 
 -- Layers table REMOVED - layers only exist in project_layers
 -- graph_data nodes/edges reference layer IDs that must exist in project_layers
+
+-- Indexes for performance (see Section 3.1.4 for rationale)
+CREATE INDEX idx_graph_data_project ON graph_data(project_id);
+CREATE INDEX idx_graph_data_dag_node ON graph_data(dag_node_id);
+CREATE INDEX idx_graph_data_source_type ON graph_data(project_id, source_type);
+CREATE INDEX idx_graph_data_status ON graph_data(status);
+
+CREATE INDEX idx_nodes_graph ON graph_data_nodes(graph_data_id);
+CREATE INDEX idx_nodes_external ON graph_data_nodes(graph_data_id, external_id);
+CREATE INDEX idx_nodes_layer ON graph_data_nodes(layer);
+CREATE INDEX idx_nodes_belongs_to ON graph_data_nodes(graph_data_id, belongs_to);
+
+CREATE INDEX idx_edges_graph ON graph_data_edges(graph_data_id);
+CREATE INDEX idx_edges_external ON graph_data_edges(graph_data_id, external_id);
+CREATE INDEX idx_edges_source ON graph_data_edges(graph_data_id, source);
+CREATE INDEX idx_edges_target ON graph_data_edges(graph_data_id, target);
+CREATE INDEX idx_edges_source_target ON graph_data_edges(source, target);
+CREATE INDEX idx_edges_layer ON graph_data_edges(layer);
 ```
 
 **Consistency rules**:
 - `blob` must be populated only for `source_type = 'dataset'`; enforce NULL for computed/manual rows.
 - `annotations` is a JSON array of ordered markdown strings.
 - `node_count` and `edge_count` are authoritative and must stay in sync with child tables (no `layer_count` column).
-- `status` is the canonical lifecycle indicator; `execution_state` removed from schema (only derived in-memory if needed).
+- `status` is the canonical lifecycle indicator with values: 'pending' | 'processing' | 'active' | 'error'
 - `weight` is always REAL/f64.
-- Surrogate INT PKs (`id`) exist for nodes/edges; externally meaningful IDs are stored in `external_id` and must be unique per `graph_data`.
+- Surrogate INT PKs (`id`) are auto-assigned; externally meaningful IDs stored in `external_id` must be unique per `graph_data`.
+- Edge foreign keys enforce referential integrity: source/target must reference valid node external_ids in same graph.
 
-#### 3.1.2 Layer Handling
+#### 3.1.2 Status Lifecycle Mapping
+
+**Canonical Status Values**: `'pending' | 'processing' | 'active' | 'error'`
+
+**Mapping from ExecutionState** (for migration):
+```rust
+fn map_execution_state_to_status(exec_state: &str) -> &str {
+    match exec_state {
+        "Completed" => "active",
+        "Processing" => "processing",
+        "NotStarted" | "Pending" => "pending",
+        "Error" => "error",
+        _ => "error"  // Unknown states treated as error
+    }
+}
+```
+
+**Usage**:
+- Datasets: 'processing' during import, 'active' when complete, 'error' on failure
+- Computed graphs: 'pending' when created, 'processing' during execution, 'active' when complete, 'error' on failure
+- Manual graphs: Created as 'active'
+
+#### 3.1.3 Layer Handling
 
 **Decision**: Remove `graph_layers` and `dataset_graph_layers` tables entirely.
 
@@ -218,7 +262,38 @@ CREATE TABLE graph_data_edges (
 4. **Export**: Include layer definitions from `project_layers` in exported files
 5. **Validation Strictness**: Strict validation; missing layers fail the operation (no auto-create).
 
-#### 3.1.3 Unified In-Memory Model
+#### 3.1.4 Index Strategy
+
+**Critical Indexes for Performance**:
+
+**graph_data table**:
+- `idx_graph_data_project`: Queries by project_id (list all graphs in project)
+- `idx_graph_data_dag_node`: Lookup graph by DAG node ID (pipeline execution)
+- `idx_graph_data_source_type`: Filter by source type within project (list datasets vs computed)
+- `idx_graph_data_status`: Filter by status (show active/error graphs)
+
+**graph_data_nodes table**:
+- `idx_nodes_graph`: Load all nodes for a graph (most common query)
+- `idx_nodes_external`: Unique constraint enforcement + lookup by external_id
+- `idx_nodes_layer`: Find all nodes using a layer (palette validation)
+- `idx_nodes_belongs_to`: Traverse hierarchy (find children of partition node)
+
+**graph_data_edges table**:
+- `idx_edges_graph`: Load all edges for a graph
+- `idx_edges_external`: Unique constraint enforcement + lookup by external_id
+- `idx_edges_source`: Find outgoing edges from node (graph algorithms)
+- `idx_edges_target`: Find incoming edges to node
+- `idx_edges_source_target`: Check if edge exists between two nodes
+- `idx_edges_layer`: Find all edges using a layer (palette validation)
+
+**Composite Index Rationale**:
+- `(graph_data_id, external_id)`: Enables efficient FK constraint checking for edges
+- `(graph_data_id, source/target)`: Localizes edge lookups within single graph
+- `(project_id, source_type)`: Common filter pattern in UI
+
+**Migration Note**: Create indexes AFTER bulk insert in Phase 2 for performance.
+
+#### 3.1.5 Unified In-Memory Model
 
 ```rust
 // layercake-core/src/graph_data.rs
@@ -682,14 +757,31 @@ impl GraphBuilder {
 **Goal**: Copy data from old tables to new unified tables.
 
 **Tasks**:
-1. Confirm key types for node/edge IDs in existing tables (text vs integer) and map them to surrogate INT PKs plus `external_id` TEXT in unified tables.
-2. Write migration script to copy `data_sets` → `graph_data` (source_type='dataset'), enforcing NULL blobs for computed/manual rows and converting annotations to JSON arrays.
-3. Write migration script to copy `dataset_graph_*` → `graph_data_*`, converting weights to REAL.
-4. Write migration script to copy `graphs` → `graph_data` (source_type='computed'), mapping prior execution states into canonical `status`, and ensuring `blob`/dataset-only fields are NULL.
-5. Write migration script to copy `graph_*` → `graph_data_*` with `attrs` → `attributes`.
-6. Recompute and backfill `node_count`/`edge_count` and reseed autoincrement sequences to avoid ID collisions.
-7. Add validation queries to ensure data integrity (counts, spot checks, FK consistency).
-8. Run migration on test database and compare counts/hashes.
+1. **Pre-migration validation**:
+   - Verify no dataset ID >= 1,000,000 (for collision prevention)
+   - Identify annotation format types (NULL/empty/JSON/text) for proper normalization
+   - Verify all edge source/target references exist in nodes
+2. **Migrate graph_data table** (datasets and graphs):
+   - Datasets: keep original IDs (< 1M)
+   - Graphs: offset IDs by +1,000,000
+   - Normalize annotations to JSON arrays
+   - Map execution_state to canonical status
+3. **Migrate graph_data_nodes** (from dataset_graph_nodes and graph_nodes):
+   - Let database auto-assign surrogate `id`
+   - Store original ID in `external_id`
+   - Convert i32 weight → f64 for datasets
+   - Rename `attrs` → `attributes` for graphs
+4. **Migrate graph_data_edges** (similar to nodes)
+5. **Migrate graph_edits table**:
+   - Update graph_id references (apply +1M offset for computed graphs)
+   - Verify all target_id references match external_id in new tables
+   - Test edit replay on sample migrated graph
+6. **Update foreign key references**:
+   - plan_dag_nodes.config_json (graphId field +1M for computed)
+   - Any other tables referencing graph IDs
+7. **Create indexes** (after bulk insert for performance)
+8. **Recompute counts**: Update node_count/edge_count in graph_data
+9. **Validation queries**: Verify integrity (counts, FK consistency, annotation format)
 
 **Migration Script Outline**:
 ```sql
@@ -724,10 +816,20 @@ FROM dataset_graph_nodes;
 **Success Criteria**:
 - All data copied to new tables
 - Counts match between old and new tables
-- Sample validation queries pass
+- All annotations properly normalized to JSON arrays
+- graph_edits references updated and validated
+- All edge source/target FKs valid
+- Sample edit replay succeeds
 - Rollback plan tested
 
-**Estimated Effort**: 2-3 days
+**Validation Queries** (see Appendix C for full set):
+- Row count equality (old vs new)
+- Node/edge count consistency
+- Foreign key integrity
+- Annotation format verification
+- Edit replay test on sample graphs
+
+**Estimated Effort**: 3-4 days (increased from 2-3 due to graph_edits + annotation handling)
 
 ---
 
@@ -1090,18 +1192,124 @@ Each phase should be reversible:
 
 ---
 
-## 11. Open Questions
+## 11. Open Questions and Decisions
 
-### 11.1 Resolved Inputs
+### 11.1 Resolved Items
 
-- Layer validation: strict failure on missing layers (no auto-create).
-- Node/edge external IDs: strings set by uploads; database identifiers are integers. Unified schema uses surrogate INT PKs and `external_id` TEXT per graph.
-- Lifecycle mapping: `status` is canonical; remove `execution_state` from schema and APIs.
-- GraphQL layers resolver: caching/dataloader can be deferred.
+✅ **Layer validation**: Strict failure on missing layers (no auto-create).
+✅ **Node/edge IDs**: Surrogate INT PKs with `external_id` TEXT for user-facing IDs.
+✅ **Lifecycle mapping**: `status` is canonical with 4 values: pending/processing/active/error.
+✅ **Primary keys**: AUTOINCREMENT surrogate keys, not composite.
+✅ **Edge integrity**: Foreign keys enforce source/target reference valid nodes.
+✅ **ID collision**: Offset graph IDs by +1M, validate datasets < 1M.
+✅ **Annotations**: JSON array normalization with proper NULL/empty/JSON/text handling.
+✅ **Indexes**: 15 indexes defined across 3 tables.
+✅ **GraphEdit migration**: Explicit migration task in Phase 2.
 
-### 11.2 Remaining Clarification
+### 11.2 High Priority Decisions (Required Before Phase 2)
 
-- None.
+#### Decision 1: Migration Downtime Strategy
+
+**Options**:
+- A) Full downtime (2-6 hours) - Simplest, safest
+- B) Dual-write (no downtime) - Complex, double storage
+- C) Read-only during migration - Users can view but not edit
+
+**Recommendation**: Option A (Full downtime)
+
+**Status**: ⏳ Pending decision
+
+---
+
+#### Decision 2: Test Data Volume Requirements
+
+**Proposed Tiers**:
+- **Minimal** (Phase 2): 5 projects, 25 graphs, 100-1k nodes/edges, 50 edits
+- **Realistic** (Phase 3): 50 projects, 250 graphs, 1k-10k nodes/edges, 500 edits
+- **Stress** (Optional): 500 projects, 2.5k graphs, up to 1M nodes in largest
+
+**Recommendation**: Require Minimal for Phase 2, Realistic for Phase 3
+
+**Status**: ⏳ Pending decision
+
+---
+
+#### Decision 3: Rollback Safety (Dual-Write in Phase 3)
+
+**Question**: Implement dual-write to both old and new tables during Phase 3-5?
+
+**Recommendation**: Yes, maintain for 2 weeks post-Phase 5
+
+**Rollback Windows**:
+- Phase 1-2: Full rollback (drop new tables)
+- Phase 3-5: Rollback via dual-write (if enabled)
+- Phase 6: Point of no return (old tables dropped)
+
+**Status**: ⏳ Pending decision
+
+---
+
+### 11.3 Medium Priority Decisions (Required Before Phase 3)
+
+#### Decision 4: Maximum Graph Size
+
+**Question**: What's the supported maximum graph size?
+
+**Options**:
+- Document recommended limit (e.g., 100k nodes)
+- Enforce hard limit with error
+- Add pagination for large graphs
+
+**Recommendation**: Document + enforce 100k node limit, add pagination later if needed
+
+**Status**: ⏳ Pending decision
+
+---
+
+#### Decision 5: GraphQL Facade Deprecation Timeline
+
+**Question**: When to remove old DataSet/Graph types?
+
+**Options**:
+- Remove after frontend migration (2-3 months)
+- Keep until v2.0 (major version)
+- Feature flag with gradual deprecation
+
+**Recommendation**: Remove after frontend fully migrated (2-3 months post-Phase 4)
+
+**Status**: ⏳ Pending decision
+
+---
+
+### 11.4 Low Priority Decisions (Can Defer)
+
+#### Decision 6: Foreign Key Cascade for source_dataset_id
+
+**Question**: What happens when source dataset is deleted?
+
+**Options**:
+- CASCADE: Delete dependent graphs
+- SET NULL: Preserve graphs, lose traceability
+- RESTRICT: Prevent deletion if in use
+- No FK: Current state
+
+**Recommendation**: SET NULL (preserve computed graphs)
+
+**Status**: ⏳ Pending decision
+
+---
+
+### 11.5 Implementation Decisions
+
+For the initial implementation, we will proceed with **recommended defaults** for all pending decisions. These can be changed before production deployment based on stakeholder feedback.
+
+**Proceeding with**:
+1. Full downtime migration (simplest for v1)
+2. Minimal + Realistic test data tiers
+3. Dual-write enabled in Phase 3
+4. 100k node recommended limit (soft)
+5. 3-month facade deprecation period
+6. SET NULL for source_dataset_id FK
 
 ---
 
@@ -1332,5 +1540,78 @@ SELECT 'Node migration' AS check_name,
        (SELECT COUNT(*) FROM dataset_graph_nodes) + (SELECT COUNT(*) FROM graph_nodes) AS old_count,
        (SELECT COUNT(*) FROM graph_data_nodes) AS new_count;
 
--- 9. Reseed autoincrement sequences to max(id) in graph_data and child tables
+-- 9. Create indexes (after bulk insert for performance)
+CREATE INDEX idx_graph_data_project ON graph_data(project_id);
+CREATE INDEX idx_graph_data_dag_node ON graph_data(dag_node_id);
+CREATE INDEX idx_graph_data_source_type ON graph_data(project_id, source_type);
+CREATE INDEX idx_graph_data_status ON graph_data(status);
+
+CREATE INDEX idx_nodes_graph ON graph_data_nodes(graph_data_id);
+CREATE INDEX idx_nodes_external ON graph_data_nodes(graph_data_id, external_id);
+CREATE INDEX idx_nodes_layer ON graph_data_nodes(layer);
+CREATE INDEX idx_nodes_belongs_to ON graph_data_nodes(graph_data_id, belongs_to);
+
+CREATE INDEX idx_edges_graph ON graph_data_edges(graph_data_id);
+CREATE INDEX idx_edges_external ON graph_data_edges(graph_data_id, external_id);
+CREATE INDEX idx_edges_source ON graph_data_edges(graph_data_id, source);
+CREATE INDEX idx_edges_target ON graph_data_edges(graph_data_id, target);
+CREATE INDEX idx_edges_source_target ON graph_data_edges(source, target);
+CREATE INDEX idx_edges_layer ON graph_data_edges(layer);
+
+-- 10. Update node_count/edge_count in graph_data
+UPDATE graph_data
+SET node_count = (
+    SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_id = graph_data.id
+),
+edge_count = (
+    SELECT COUNT(*) FROM graph_data_edges WHERE graph_data_id = graph_data.id
+);
+
+-- 11. Validation queries (see full set in validation section below)
+SELECT 'Dataset migration' AS check_name,
+       (SELECT COUNT(*) FROM data_sets) AS old_count,
+       (SELECT COUNT(*) FROM graph_data WHERE source_type = 'dataset') AS new_count;
+
+SELECT 'Graph migration' AS check_name,
+       (SELECT COUNT(*) FROM graphs) AS old_count,
+       (SELECT COUNT(*) FROM graph_data WHERE source_type = 'computed') AS new_count;
+
+SELECT 'Node migration' AS check_name,
+       (SELECT COUNT(*) FROM dataset_graph_nodes) + (SELECT COUNT(*) FROM graph_nodes) AS old_count,
+       (SELECT COUNT(*) FROM graph_data_nodes) AS new_count;
+
+SELECT 'Edge migration' AS check_name,
+       (SELECT COUNT(*) FROM dataset_graph_edges) + (SELECT COUNT(*) FROM graph_edges) AS old_count,
+       (SELECT COUNT(*) FROM graph_data_edges) AS new_count;
+
+-- Verify no orphaned edges
+SELECT COUNT(*) AS orphaned_edges
+FROM graph_data_edges e
+WHERE NOT EXISTS (
+    SELECT 1 FROM graph_data_nodes n
+    WHERE n.graph_data_id = e.graph_data_id
+      AND n.external_id = e.source
+)
+OR NOT EXISTS (
+    SELECT 1 FROM graph_data_nodes n
+    WHERE n.graph_data_id = e.graph_data_id
+      AND n.external_id = e.target
+);
+-- Should return 0
+
+-- Verify all edits reference valid graphs
+SELECT COUNT(*) AS invalid_edit_references
+FROM graph_edits ge
+WHERE NOT EXISTS (
+    SELECT 1 FROM graph_data gd
+    WHERE gd.id = ge.graph_id
+      AND gd.source_type = 'computed'
+);
+-- Should return 0
+
+-- Verify annotation formats
+SELECT annotation_type, COUNT(*) AS count
+FROM annotation_analysis
+GROUP BY annotation_type;
+-- All should be 'null' or 'json' after migration
 ```
