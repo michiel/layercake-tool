@@ -322,17 +322,18 @@ impl MigrationTrait for Migration {
             sea_orm::DatabaseBackend::Postgres => {
                 db.execute(Statement::from_string(
                     backend,
-                    r#"
+                    format!(
+                        "
                     INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
                     SELECT 'plan_config_graphId_below_offset',
                            NULL,
                            (SELECT COUNT(*) FROM plan_dag_nodes
                             WHERE config_json::jsonb ? 'graphId'
-                              AND (config_json::jsonb ->> 'graphId')::bigint < $1),
-                           NULL;
-                    "#,
+                              AND (config_json::jsonb ->> 'graphId')::bigint < {offset}),
+                           NULL;",
+                        offset = GRAPH_ID_OFFSET
+                    ),
                 ))
-                .bind(GRAPH_ID_OFFSET)
                 .await?;
             }
             _ => {}
