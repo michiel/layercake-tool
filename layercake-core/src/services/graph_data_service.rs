@@ -1,12 +1,16 @@
 use crate::database::entities::{
     graph_data, graph_data::GraphDataStatus, graph_data_edges, graph_data_nodes,
+    graph_edits::{self, Entity as GraphEdits},
 };
+use crate::services::graph_data_edit_applicator::{ApplyResult, GraphDataEditApplicator};
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+    TransactionTrait,
 };
 use serde_json::Value;
+use tracing::{debug, info, warn};
 
 pub struct GraphDataService {
     db: DatabaseConnection,
@@ -337,6 +341,278 @@ impl GraphDataService {
         })
         .await
     }
+
+    /// Update graph_data metadata after creating an edit
+    ///
+    /// Sets last_edit_sequence and optionally marks has_pending_edits
+    pub async fn update_edit_metadata(
+        &self,
+        graph_data_id: i32,
+        sequence_number: i32,
+        applied: bool,
+    ) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.last_edit_sequence = Set(sequence_number);
+        // Only mark as pending if the edit is not yet applied
+        if !applied {
+            model.has_pending_edits = Set(true);
+        }
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Set the pending edits state for a graph_data
+    pub async fn set_pending_state(
+        &self,
+        graph_data_id: i32,
+        has_pending: bool,
+    ) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.has_pending_edits = Set(has_pending);
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Update last_replay_at timestamp for a graph_data
+    pub async fn mark_replayed(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.last_replay_at = Set(Some(Utc::now()));
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Reset edit metadata for a graph_data (used when clearing edits)
+    pub async fn reset_edit_metadata(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+        let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_data_id
+            )))?
+            .into();
+
+        model.last_edit_sequence = Set(0);
+        model.has_pending_edits = Set(false);
+        model.last_replay_at = Set(None);
+        model.updated_at = Set(Utc::now());
+        model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Get all edits for a graph_data in sequence order
+    ///
+    /// # Arguments
+    /// * `graph_data_id` - ID of the graph_data
+    /// * `unapplied_only` - If true, only return edits where applied=false
+    pub async fn get_edits(
+        &self,
+        graph_data_id: i32,
+        unapplied_only: bool,
+    ) -> Result<Vec<graph_edits::Model>, sea_orm::DbErr> {
+        let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_data_id));
+
+        if unapplied_only {
+            query = query.filter(graph_edits::Column::Applied.eq(false));
+        }
+
+        query
+            .order_by_asc(graph_edits::Column::SequenceNumber)
+            .all(&self.db)
+            .await
+    }
+
+    /// Mark an edit as applied
+    pub async fn mark_edit_applied(&self, edit_id: i32) -> Result<(), sea_orm::DbErr> {
+        let edit = GraphEdits::find_by_id(edit_id)
+            .one(&self.db)
+            .await?
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
+                "Edit {}",
+                edit_id
+            )))?;
+
+        let mut active_model: graph_edits::ActiveModel = edit.into();
+        active_model.applied = Set(true);
+        active_model.update(&self.db).await.map(|_| ())
+    }
+
+    /// Get edit count for a graph_data
+    pub async fn get_edit_count(
+        &self,
+        graph_data_id: i32,
+        unapplied_only: bool,
+    ) -> Result<u64, sea_orm::DbErr> {
+        use sea_orm::PaginatorTrait;
+
+        let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_data_id));
+
+        if unapplied_only {
+            query = query.filter(graph_edits::Column::Applied.eq(false));
+        }
+
+        query.count(&self.db).await
+    }
+
+    /// Replay all unapplied edits for a graph_data
+    ///
+    /// Returns a summary of the replay operation
+    pub async fn replay_edits(&self, graph_data_id: i32) -> Result<ReplaySummary, sea_orm::DbErr> {
+        info!("Starting replay of edits for graph_data {}", graph_data_id);
+
+        // Get all unapplied edits in sequence order
+        let edits = self.get_edits(graph_data_id, true).await?;
+        let total_edits = edits.len();
+
+        info!("Found {} unapplied edits to replay", total_edits);
+
+        let mut summary = ReplaySummary {
+            total: total_edits,
+            applied: 0,
+            skipped: 0,
+            failed: 0,
+            details: Vec::new(),
+        };
+
+        // Create applicator
+        let applicator = GraphDataEditApplicator::new(self.db.clone());
+
+        // Apply each edit in sequence
+        for edit in edits {
+            debug!(
+                "Replaying edit #{}: {} {} {}",
+                edit.sequence_number, edit.operation, edit.target_type, edit.target_id
+            );
+
+            match applicator.apply_edit(&edit).await {
+                Ok(ApplyResult::Success { message }) => {
+                    summary.applied += 1;
+                    summary.details.push(GraphDataEditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "success".to_string(),
+                        message,
+                    });
+
+                    // Mark as applied
+                    if let Err(e) = self.mark_edit_applied(edit.id).await {
+                        warn!("Failed to mark edit {} as applied: {}", edit.id, e);
+                    }
+                }
+                Ok(ApplyResult::Skipped { reason }) => {
+                    summary.skipped += 1;
+                    summary.details.push(GraphDataEditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "skipped".to_string(),
+                        message: reason,
+                    });
+                }
+                Ok(ApplyResult::Error { reason }) => {
+                    summary.failed += 1;
+                    summary.details.push(GraphDataEditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "failed".to_string(),
+                        message: reason.clone(),
+                    });
+
+                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, reason);
+                }
+                Err(e) => {
+                    summary.failed += 1;
+                    summary.details.push(GraphDataEditResult {
+                        sequence_number: edit.sequence_number,
+                        target_type: edit.target_type.clone(),
+                        target_id: edit.target_id.clone(),
+                        operation: edit.operation.clone(),
+                        result: "failed".to_string(),
+                        message: e.to_string(),
+                    });
+
+                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, e);
+                }
+            }
+        }
+
+        // Update last_replay_at
+        self.mark_replayed(graph_data_id).await?;
+
+        if self.get_edit_count(graph_data_id, true).await? == 0 {
+            self.set_pending_state(graph_data_id, false).await?;
+        }
+
+        info!(
+            "Replay complete for graph_data {}: {} applied, {} skipped, {} failed",
+            graph_data_id, summary.applied, summary.skipped, summary.failed
+        );
+
+        Ok(summary)
+    }
+
+    /// Clear all edits for a graph_data
+    pub async fn clear_edits(&self, graph_data_id: i32) -> Result<u64, sea_orm::DbErr> {
+        // Delete all edits
+        let result = GraphEdits::delete_many()
+            .filter(graph_edits::Column::GraphId.eq(graph_data_id))
+            .exec(&self.db)
+            .await?;
+
+        // Reset metadata
+        self.reset_edit_metadata(graph_data_id).await?;
+
+        Ok(result.rows_affected)
+    }
+}
+
+/// Summary of a replay operation
+#[derive(Debug, Clone)]
+pub struct ReplaySummary {
+    pub total: usize,
+    pub applied: usize,
+    pub skipped: usize,
+    pub failed: usize,
+    pub details: Vec<GraphDataEditResult>,
+}
+
+/// Result of applying a single edit during replay (graph_data variant)
+#[derive(Debug, Clone)]
+pub struct GraphDataEditResult {
+    pub sequence_number: i32,
+    pub target_type: String,
+    pub target_id: String,
+    pub operation: String,
+    pub result: String, // "success", "skipped", "failed"
+    pub message: String,
 }
 
 pub struct GraphDataCreate {

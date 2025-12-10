@@ -12,6 +12,7 @@ pub mod graph_edit_applicator;
 pub mod graph_edit_service;
 pub mod graph_service;
 pub mod graph_data_service;
+pub mod graph_data_edit_applicator;
 pub mod import_service;
 pub mod layer_palette_service;
 pub mod library_item_service;
