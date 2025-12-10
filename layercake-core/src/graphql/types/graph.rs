@@ -8,6 +8,10 @@ use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;
 use crate::graphql::types::{Layer, Project};
 
+/// DEPRECATED: Use GraphData type instead.
+/// This type is maintained for backward compatibility but will be removed in a future version.
+///
+/// Migration: Replace `graph` queries with `graphData` queries and filter by `sourceType: "computed"`.
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct Graph {

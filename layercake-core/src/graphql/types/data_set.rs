@@ -16,6 +16,10 @@ pub struct DataSetAnnotationGql {
     pub body: String,
 }
 
+/// DEPRECATED: Use GraphData type instead.
+/// This type is maintained for backward compatibility but will be removed in a future version.
+///
+/// Migration: Replace `dataSet` queries with `graphData` queries and filter by `sourceType: "dataset"`.
 #[derive(SimpleObject)]
 #[graphql(complex)]
 pub struct DataSet {
