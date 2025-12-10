@@ -94,12 +94,13 @@ impl GraphBuilder {
                     data_sets_list.push(data_set);
                 }
                 "GraphNode" | "MergeNode" | "TransformNode" | "FilterNode" => {
-                    // Read from graphs table and convert to data_set-like structure
-                    let graph = self.get_upstream_graph(project_id, upstream_id).await?;
-
-                    // Convert graph data to data_set format
-                    let graph_as_data_set = self.graph_to_data_set(&graph).await?;
-                    data_sets_list.push(graph_as_data_set);
+                    // Legacy path does not support chaining computed graphs
+                    return Err(anyhow!(
+                        "Cannot chain computed graphs in legacy GraphBuilder. \
+                         Please migrate this node to use 'graphDataIds' in config instead of legacy upstream IDs. \
+                         GraphDataBuilder natively supports chaining graph_data without conversion. \
+                         See Phase 3 migration docs for details."
+                    ));
                 }
                 _ => {
                     return Err(anyhow!(
@@ -277,73 +278,6 @@ impl GraphBuilder {
             .ok_or_else(|| anyhow!("Graph not found for node: {}", node_id))
     }
 
-    /// Convert a graph to data_set format for consistent processing
-    async fn graph_to_data_set(&self, graph: &graphs::Model) -> Result<data_sets::Model> {
-        use sea_orm::{ColumnTrait, QueryFilter};
-
-        // Read graph nodes, edges, and graph_layers from database
-        let nodes = graph_nodes::Entity::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph.id))
-            .all(&self.db)
-            .await?;
-
-        let edges = graph_edges::Entity::find()
-            .filter(graph_edges::Column::GraphId.eq(graph.id))
-            .all(&self.db)
-            .await?;
-
-        // Load from project-wide layers, including aliases
-        // This uses get_all_resolved_layers which returns both direct layers and aliases
-        let graph_service = crate::services::graph_service::GraphService::new(self.db.clone());
-        let all_layers = graph_service
-            .get_all_resolved_layers(graph.project_id)
-            .await?;
-
-        // Convert to graph_json format
-        let graph_json = serde_json::json!({
-            "nodes": nodes
-                .iter()
-                .map(|n| node_model_to_graph_json(n))
-                .collect::<Vec<_>>(),
-            "edges": edges
-                .iter()
-                .map(|e| edge_model_to_graph_json(e))
-                .collect::<Vec<_>>(),
-            "graph_layers": all_layers.iter().map(|l| {
-                // Layers already have # stripped by get_all_resolved_layers
-                // (templates add # themselves)
-                serde_json::json!({
-                    "id": l.id.clone(),
-                    "label": l.label.clone(),
-                    "background_color": &l.background_color,
-                    "text_color": &l.text_color,
-                    "border_color": &l.border_color,
-                })
-            }).collect::<Vec<_>>()
-        });
-
-        // Create a virtual data_set
-        Ok(data_sets::Model {
-            id: graph.id, // Use graph id as virtual data source id
-            project_id: graph.project_id,
-            name: graph.name.clone(),
-            description: Some(format!("Graph from {}", graph.node_id)),
-
-            file_format: "json".to_string(),
-            data_type: "graph".to_string(),
-            origin: "manual_edit".to_string(), // Virtual data set from graph node
-            filename: format!("graph_{}", graph.node_id),
-            blob: vec![], // Empty blob for virtual data source
-            graph_json: serde_json::to_string(&graph_json)?,
-            status: "active".to_string(),
-            error_message: None,
-            file_size: 0,
-            processed_at: Some(chrono::Utc::now()),
-            created_at: graph.created_at,
-            updated_at: graph.updated_at,
-            annotations: Some("[]".to_string()),
-        })
-    }
 
     /// Compute hash of upstream data_sets for change detection
     fn compute_data_set_hash(&self, data_sets: &[data_sets::Model]) -> Result<String> {
@@ -779,31 +713,6 @@ impl GraphBuilder {
     }
 }
 
-fn node_model_to_graph_json(node: &graph_nodes::Model) -> serde_json::Value {
-    serde_json::json!({
-        "id": node.id.clone(),
-        "label": node.label.clone(),
-        "layer": node.layer.clone(),
-        "weight": node.weight,
-        "is_partition": node.is_partition,
-        "belongs_to": node.belongs_to.clone(),
-        "comment": node.comment.clone(),
-        "attrs": node.attrs.clone()
-    })
-}
-
-fn edge_model_to_graph_json(edge: &graph_edges::Model) -> serde_json::Value {
-    serde_json::json!({
-        "id": edge.id.clone(),
-        "source": edge.source.clone(),
-        "target": edge.target.clone(),
-        "label": edge.label.clone(),
-        "layer": edge.layer.clone(),
-        "weight": edge.weight,
-        "comment": edge.comment.clone(),
-        "attrs": edge.attrs.clone()
-    })
-}
 
 #[cfg(test)]
 mod tests {
