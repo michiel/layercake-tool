@@ -145,7 +145,8 @@ export const ProjectionsPage = () => {
   }
 
   const handleOpen = async (id: string) => {
-    const url = `/projections/viewer/${id}`
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || window.location.origin
+    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${id}`
     if ((window as any).__TAURI__) {
       try {
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')

@@ -34,6 +34,7 @@ BACKEND_PORT=3001
 FRONTEND_PORT=1422
 BACKEND_DIR="."
 FRONTEND_DIR="frontend"
+PROJECTIONS_DIR="projections-frontend"
 TAURI_DIR="src-tauri"
 LOG_LEVEL="${LOG_LEVEL:-debug}"
 
@@ -118,6 +119,33 @@ if [[ "$TAURI_MODE" == "false" ]]; then
         sleep 2
     fi
 fi
+
+# Build projection viewer assets if missing so backend can serve /projections/viewer/*
+ensure_projection_viewer_build() {
+    if [[ ! -d "$PROJECTIONS_DIR" ]]; then
+        print_warning "Projection viewer directory '$PROJECTIONS_DIR' not found; skipping build"
+        return
+    fi
+
+    if [[ -d "$PROJECTIONS_DIR/dist" ]]; then
+        print_status "Projection viewer build already present (skipping)"
+        return
+    fi
+
+    print_status "Building projection viewer assets..."
+    pushd "$PROJECTIONS_DIR" > /dev/null
+
+    if [[ ! -d "node_modules" ]]; then
+        print_status "Installing projection viewer dependencies..."
+        npm install
+    fi
+
+    echo "VITE_API_BASE_URL=http://localhost:$BACKEND_PORT" > .env.local
+    npm run build
+
+    popd > /dev/null
+    print_success "Projection viewer build ready"
+}
 
 if [[ "$TAURI_MODE" == "true" ]]; then
     print_status "Starting Layercake in Tauri desktop mode..."
@@ -233,6 +261,9 @@ else
             exit 1
         fi
     done
+
+    # Ensure projection viewer assets are available for static serving
+    ensure_projection_viewer_build
 
     # Start frontend server
     print_status "Starting frontend server..."
