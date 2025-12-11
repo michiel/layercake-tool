@@ -16,17 +16,17 @@ const PROJECTION_QUERY = gql`
     projection(id: $id) {
       id
       name
-      projectionType
-      graphId
+      projection_type
+      graph_id
     }
     projectionGraph(id: $id) {
       nodes { id label layer }
       edges { id source target }
     }
     projectionState(id: $id) {
-      projectionId
-      projectionType
-      stateJson
+      projection_id
+      projection_type
+      state_json
     }
   }
 `
@@ -49,9 +49,9 @@ const GRAPH_SUB = gql`
 const STATE_SUB = gql`
   subscription ProjectionStateUpdated($id: ID!) {
     projectionStateUpdated(id: $id) {
-      projectionId
-      projectionType
-      stateJson
+      projection_id
+      projection_type
+      state_json
     }
   }
 `
@@ -140,7 +140,7 @@ export const ProjectionViewerPage = () => {
   const handleSaveState = async () => {
     try {
       await saveState({
-        variables: { id, state: state?.stateJson ?? {} },
+        variables: { id, state: state?.state_json ?? {} },
       })
       showSuccessNotification('State saved', '')
     } catch (err: any) {
@@ -154,7 +154,7 @@ export const ProjectionViewerPage = () => {
         <div>
           <h1 className="text-3xl font-bold">{projection.name}</h1>
           <p className="text-muted-foreground">
-            Projection type: {projection.projectionType} · Graph {projection.graphId}
+            Projection type: {projection.projection_type} · Graph {projection.graph_id}
           </p>
         </div>
         <Group gap="sm">

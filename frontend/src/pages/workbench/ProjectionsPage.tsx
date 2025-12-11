@@ -15,13 +15,13 @@ import { showErrorNotification, showSuccessNotification } from '@/utils/notifica
 import { createApolloClientForEndpoint } from '@/graphql/client'
 
 const LIST_PROJECTIONS = gql`
-  query ListProjections($projectId: Int!) {
+  query ListProjections($projectId: ID!) {
     projections(projectId: $projectId) {
       id
       name
-      projectionType
-      graphId
-      updatedAt
+      projection_type
+      graph_id
+      updated_at
     }
   }
 `
@@ -40,8 +40,8 @@ const CREATE_PROJECTION = gql`
     createProjection(input: $input) {
       id
       name
-      projectionType
-      graphId
+      projection_type
+      graph_id
     }
   }
 `
@@ -118,10 +118,10 @@ export const ProjectionsPage = () => {
       await createProjection({
         variables: {
           input: {
-            projectId: projectIdNum,
-            graphId: Number(newGraphId),
+            project_id: projectIdNum,
+            graph_id: Number(newGraphId),
             name: newName.trim(),
-            projectionType: newType,
+            projection_type: newType,
           },
         },
       })
@@ -289,9 +289,9 @@ export const ProjectionsPage = () => {
                   <Group gap="sm" align="center" className="flex-wrap">
                     <IconAffiliate className="h-4 w-4 text-muted-foreground" />
                     <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs uppercase text-muted-foreground">{p.projectionType}</div>
+                    <div className="text-xs uppercase text-muted-foreground">{p.projection_type}</div>
                   </Group>
-                  <div className="text-xs text-muted-foreground">Graph #{p.graphId}</div>
+                  <div className="text-xs text-muted-foreground">Graph #{p.graph_id}</div>
                 </div>
                 <Group gap="sm" className="flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => handleOpen(p.id)}>
