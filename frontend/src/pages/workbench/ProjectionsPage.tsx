@@ -145,7 +145,7 @@ export const ProjectionsPage = () => {
   }
 
   const handleOpen = async (id: string) => {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || window.location.origin
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
     const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${id}`
     if ((window as any).__TAURI__) {
       try {
