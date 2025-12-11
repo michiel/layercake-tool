@@ -5,10 +5,12 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use axum::routing::get_service;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::app_context::AppContext;
 #[cfg(feature = "graphql")]
@@ -250,6 +252,20 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             get(library::download_library_item),
         )
         .route("/api/library/upload", post(library::upload_library_item));
+
+    // Serve projections build assets if available
+    let projections_static = get_service(
+        ServeDir::new("projections-frontend/dist").fallback(ServeFile::new(
+            "projections-frontend/dist/index.html",
+        )),
+    )
+    .handle_error(|error: std::io::Error| async move {
+        (
+            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
+            format!("Projections static file error: {}", error),
+        )
+    });
+    app = app.nest_service("/projections", projections_static);
 
     // Add GraphQL routes if feature is enabled
     #[cfg(feature = "graphql")]

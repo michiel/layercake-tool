@@ -143,8 +143,25 @@ export const ProjectionsPage = () => {
     }
   }
 
-  const handleOpen = (id: string) => {
-    window.open(`/projections/${id}`, '_blank', 'noreferrer')
+  const handleOpen = async (id: string) => {
+    const url = `/projections/${id}`
+    if ((window as any).__TAURI__) {
+      try {
+        const { WebviewWindow } = await import('@tauri-apps/api/window')
+        const label = `projection-${id}-${Date.now()}`
+        const win = new WebviewWindow(label, { url })
+        win.once('tauri://created', () => {
+          showSuccessNotification('Projection opened', 'New window created.')
+        })
+        win.once('tauri://error', (e) => {
+          showErrorNotification('Open failed', String(e))
+        })
+        return
+      } catch (err: any) {
+        showErrorNotification('Open failed', err?.message || 'Unable to open projection window')
+      }
+    }
+    window.open(url, '_blank', 'noreferrer')
   }
 
   const handleExport = async (id: string, name: string) => {
