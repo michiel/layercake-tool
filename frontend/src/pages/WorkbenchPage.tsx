@@ -10,7 +10,16 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
-import { IconGraph, IconDatabase, IconArrowRight, IconAdjustments, IconBooks, IconHierarchy2, IconAffiliate } from '@tabler/icons-react'
+import {
+  IconGraph,
+  IconDatabase,
+  IconArrowRight,
+  IconAdjustments,
+  IconBooks,
+  IconHierarchy2,
+  IconAffiliate,
+  IconTool,
+} from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
@@ -187,6 +196,18 @@ export const WorkbenchPage = () => {
             {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconAdjustments className="mr-2 h-4 w-4" />
             Validate &amp; migrate plan
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              showErrorNotification(
+                'Migration required',
+                "Service 'DagExecutor::execute_dag' error: Cannot chain computed graphs in legacy GraphBuilder. Please migrate this node to use 'graphDataIds' in config instead of legacy upstream IDs. GraphDataBuilder natively supports chaining graph_data without conversion. See Phase 3 migration docs for details."
+              )
+            }
+          >
+            <IconTool className="mr-2 h-4 w-4" />
+            Migrate project
           </Button>
           <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/workbench/layers`)}>
             Layers
