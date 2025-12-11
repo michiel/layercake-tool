@@ -5,12 +5,13 @@ use async_graphql::{
     futures_util::Stream, Context, Error, InputObject, Json, Object, Result, Schema, SimpleObject,
     Subscription, ID,
 };
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
 use crate::services::{
-    ProjectionCreateInput, ProjectionGraphEvent, ProjectionGraphView, ProjectionService,
-    ProjectionStateEvent, ProjectionUpdateInput,
+    ProjectionCreateInput, ProjectionExportBundle, ProjectionGraphEvent, ProjectionGraphView,
+    ProjectionService, ProjectionStateEvent, ProjectionUpdateInput,
 };
 
 pub type ProjectionsSchema = Schema<ProjectionQuery, ProjectionMutation, ProjectionSubscription>;
@@ -167,13 +168,13 @@ impl ProjectionMutation {
         Ok(ProjectionGraph::from(graph))
     }
 
-    async fn export_projection(&self, ctx: &Context<'_>, id: ID) -> Result<Json<serde_json::Value>> {
+    async fn export_projection(&self, ctx: &Context<'_>, id: ID) -> Result<ProjectionExport> {
         let service = ctx.data::<ProjectionSchemaContext>()?;
         let id: i32 = id
             .parse()
             .map_err(|_| Error::new("invalid projection id"))?;
-        let payload = service.projections.export_payload(id).await?;
-        Ok(Json(payload))
+        let bundle = service.projections.export_bundle(id).await?;
+        Ok(ProjectionExport::from(bundle))
     }
 }
 
@@ -340,6 +341,30 @@ pub struct ProjectionState {
     pub projection_id: ID,
     pub projection_type: String,
     pub state_json: Option<Json<serde_json::Value>>,
+}
+
+#[derive(SimpleObject, Clone)]
+pub struct ProjectionExport {
+    pub filename: String,
+    pub content_base64: String,
+}
+
+impl ProjectionExport {
+    fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "filename": self.filename,
+            "contentBase64": self.content_base64,
+        })
+    }
+}
+
+impl From<ProjectionExportBundle> for ProjectionExport {
+    fn from(bundle: ProjectionExportBundle) -> Self {
+        Self {
+            filename: bundle.filename,
+            content_base64: STANDARD.encode(bundle.bytes),
+        }
+    }
 }
 
 #[derive(InputObject)]

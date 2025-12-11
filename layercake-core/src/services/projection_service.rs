@@ -1,9 +1,11 @@
 use std::collections::HashMap;
+use std::io::Write;
 use std::sync::Arc;
 
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use tokio::sync::{broadcast, RwLock};
+use zip::write::FileOptions;
 
 use crate::database::entities::{
     graph_data, graph_data_edges, graph_data_nodes,
@@ -29,6 +31,12 @@ pub struct ProjectionStateEvent {
 pub struct ProjectionGraphEvent {
     pub projection_id: i32,
     pub graph: ProjectionGraphView,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProjectionExportBundle {
+    pub filename: String,
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Clone, Debug)]
@@ -306,10 +314,9 @@ impl ProjectionService {
         &self,
         projection_id: i32,
     ) -> Result<serde_json::Value, sea_orm::DbErr> {
-        let projection = self
-            .get(projection_id)
-            .await?
-            .ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("projection {}", projection_id)))?;
+        let projection = self.get(projection_id).await?.ok_or_else(|| {
+            sea_orm::DbErr::RecordNotFound(format!("projection {}", projection_id))
+        })?;
 
         let graph = self.load_graph(projection_id).await?;
         let state = self
@@ -354,6 +361,89 @@ impl ProjectionService {
         });
 
         Ok(payload)
+    }
+
+    pub async fn export_bundle(
+        &self,
+        projection_id: i32,
+    ) -> Result<ProjectionExportBundle, sea_orm::DbErr> {
+        let payload = self.export_payload(projection_id).await?;
+        let projection = self.get(projection_id).await?.ok_or_else(|| {
+            sea_orm::DbErr::RecordNotFound(format!("projection {}", projection_id))
+        })?;
+
+        let mut buffer: Vec<u8> = Vec::new();
+        {
+            let cursor = std::io::Cursor::new(&mut buffer);
+            let mut zip = zip::ZipWriter::new(cursor);
+            let options = FileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated)
+                .unix_permissions(0o644);
+
+            let index_html = r#"<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Projection Viewer</title>
+    <style>
+      html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; background: #0b1021; color: #e9edf7; font-family: sans-serif; }
+      .fallback { padding: 16px; white-space: pre-wrap; overflow: auto; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="./data.js"></script>
+    <script src="./projection.js"></script>
+  </body>
+</html>
+"#;
+
+            zip.start_file("index.html", options)?;
+            zip.write_all(index_html.as_bytes())?;
+
+            let data_js = format!(
+                "window.PROJECTION_EXPORT = {};\n",
+                serde_json::to_string(&payload)
+                    .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))?
+            );
+            zip.start_file("data.js", options)?;
+            zip.write_all(data_js.as_bytes())?;
+
+            let projection_js = r#"(() => {
+  const data = window.PROJECTION_EXPORT || {};
+  const root = document.getElementById('root');
+  if (window.initProjection) {
+    window.initProjection(data);
+    return;
+  }
+  if (root) {
+    const pre = document.createElement('pre');
+    pre.className = 'fallback';
+    pre.textContent = JSON.stringify(data, null, 2);
+    root.appendChild(pre);
+  }
+})();
+"#;
+            zip.start_file("projection.js", options)?;
+            zip.write_all(projection_js.as_bytes())?;
+
+            zip.finish()?;
+        }
+
+        let filename = format!(
+            "{}-projection.zip",
+            projection
+                .name
+                .to_lowercase()
+                .replace(' ', "-")
+                .replace('/', "-")
+        );
+
+        Ok(ProjectionExportBundle {
+            filename,
+            bytes: buffer,
+        })
     }
 
     async fn ensure_graph_in_project(

@@ -53,7 +53,10 @@ const DELETE_PROJECTION = gql`
 
 const EXPORT_PROJECTION = gql`
   mutation ExportProjection($id: ID!) {
-    exportProjection(id: $id)
+    exportProjection(id: $id) {
+      filename
+      contentBase64
+    }
   }
 `
 
@@ -148,20 +151,26 @@ export const ProjectionsPage = () => {
     try {
       const { data } = await exportProjection({ variables: { id } })
       const payload = data?.exportProjection
-      if (!payload) {
+      if (!payload?.contentBase64) {
         showErrorNotification('Export failed', 'No export payload returned')
         return
       }
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const binary = atob(payload.contentBase64)
+      const len = binary.length
+      const bytes = new Uint8Array(len)
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' })
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `${name || 'projection'}-export.json`
+      link.download = payload.filename || `${name || 'projection'}-export.zip`
       document.body.appendChild(link)
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
-      showSuccessNotification('Export ready', 'Downloaded projection payload.')
+      showSuccessNotification('Export ready', 'Downloaded projection bundle.')
     } catch (err: any) {
       showErrorNotification('Export failed', err?.message || 'Unable to export projection')
     }
