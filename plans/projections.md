@@ -169,7 +169,7 @@
 - **Phase 2: Workbench UI**
   - 🚧 Projections nav added; Workbench page now links to Projections view.
   - 🚧 Projections page lists/creates/deletes projections via `/projections/graphql`; uses graph picker (project-scoped).
-  - TODO: Wire Export action to backend exportProjection, add Open behavior for Tauri window.
+  - 🚧 Export wiring returns JSON payload of graph+state (zip pipeline still pending); Open still uses web tab (Tauri window TODO).
 - **Phase 3: Projection frontend build**
   - Create separate Vite build (shared GraphQL client) served at `/projections`.
   - Implement `force3d` renderer (3d-force-graph) with controls bound to ProjectionState; subscribe to graph/state updates.

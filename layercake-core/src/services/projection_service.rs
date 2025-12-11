@@ -302,6 +302,60 @@ impl ProjectionService {
         self.graph_tx.subscribe()
     }
 
+    pub async fn export_payload(
+        &self,
+        projection_id: i32,
+    ) -> Result<serde_json::Value, sea_orm::DbErr> {
+        let projection = self
+            .get(projection_id)
+            .await?
+            .ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("projection {}", projection_id)))?;
+
+        let graph = self.load_graph(projection_id).await?;
+        let state = self
+            .get_state(projection_id)
+            .await
+            .or(projection.settings_json.clone());
+
+        let payload = serde_json::json!({
+            "projection": {
+                "id": projection.id,
+                "projectId": projection.project_id,
+                "graphId": projection.graph_id,
+                "name": projection.name,
+                "projectionType": projection.projection_type,
+                "updatedAt": projection.updated_at,
+            },
+            "state": state,
+            "graph": {
+                "nodes": graph.nodes
+                    .into_iter()
+                    .map(|n| serde_json::json!({
+                        "id": n.id,
+                        "label": n.label,
+                        "layer": n.layer,
+                        "weight": n.weight,
+                        "attributes": n.attributes,
+                    }))
+                    .collect::<Vec<_>>(),
+                "edges": graph.edges
+                    .into_iter()
+                    .map(|e| serde_json::json!({
+                        "id": e.id,
+                        "source": e.source,
+                        "target": e.target,
+                        "label": e.label,
+                        "layer": e.layer,
+                        "weight": e.weight,
+                        "attributes": e.attributes,
+                    }))
+                    .collect::<Vec<_>>(),
+            }
+        });
+
+        Ok(payload)
+    }
+
     async fn ensure_graph_in_project(
         &self,
         project_id: i32,

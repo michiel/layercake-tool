@@ -51,6 +51,12 @@ const DELETE_PROJECTION = gql`
   }
 `
 
+const EXPORT_PROJECTION = gql`
+  mutation ExportProjection($id: ID!) {
+    exportProjection(id: $id)
+  }
+`
+
 export const ProjectionsPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
@@ -88,6 +94,9 @@ export const ProjectionsPage = () => {
     client: projectionsClient,
   })
   const [deleteProjection, { loading: deleting }] = useMutation(DELETE_PROJECTION, {
+    client: projectionsClient,
+  })
+  const [exportProjection, { loading: exporting }] = useMutation(EXPORT_PROJECTION, {
     client: projectionsClient,
   })
 
@@ -135,9 +144,27 @@ export const ProjectionsPage = () => {
     window.open(`/projections/${id}`, '_blank', 'noreferrer')
   }
 
-  const handleExport = (id: string) => {
-    // Placeholder wiring to backend export (to be added)
-    showErrorNotification('Not implemented', 'Export service will be added soon.')
+  const handleExport = async (id: string, name: string) => {
+    try {
+      const { data } = await exportProjection({ variables: { id } })
+      const payload = data?.exportProjection
+      if (!payload) {
+        showErrorNotification('Export failed', 'No export payload returned')
+        return
+      }
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `${name || 'projection'}-export.json`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      showSuccessNotification('Export ready', 'Downloaded projection payload.')
+    } catch (err: any) {
+      showErrorNotification('Export failed', err?.message || 'Unable to export projection')
+    }
   }
 
   if (loading) {
@@ -244,7 +271,7 @@ export const ProjectionsPage = () => {
                     <IconExternalLink className="mr-2 h-4 w-4" />
                     Open
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => handleExport(p.id)}>
+                  <Button size="sm" variant="outline" onClick={() => handleExport(p.id, p.name)} disabled={exporting}>
                     <IconUpload className="mr-2 h-4 w-4" />
                     Export
                   </Button>

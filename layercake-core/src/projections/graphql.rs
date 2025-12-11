@@ -166,6 +166,15 @@ impl ProjectionMutation {
         let graph = service.projections.load_graph(id).await?;
         Ok(ProjectionGraph::from(graph))
     }
+
+    async fn export_projection(&self, ctx: &Context<'_>, id: ID) -> Result<Json<serde_json::Value>> {
+        let service = ctx.data::<ProjectionSchemaContext>()?;
+        let id: i32 = id
+            .parse()
+            .map_err(|_| Error::new("invalid projection id"))?;
+        let payload = service.projections.export_payload(id).await?;
+        Ok(Json(payload))
+    }
 }
 
 pub struct ProjectionSubscription;
