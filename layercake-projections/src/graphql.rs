@@ -348,8 +348,7 @@ pub struct ProjectionExport {
     pub content_base64: String,
 }
 
-impl ProjectionExport {
-}
+impl ProjectionExport {}
 
 impl From<ProjectionExportBundle> for ProjectionExport {
     fn from(bundle: ProjectionExportBundle) -> Self {
@@ -361,6 +360,7 @@ impl From<ProjectionExportBundle> for ProjectionExport {
 }
 
 #[derive(InputObject)]
+#[graphql(rename_fields = "camelCase")]
 pub struct CreateProjectionInput {
     pub project_id: i32,
     pub graph_id: i32,
@@ -370,6 +370,7 @@ pub struct CreateProjectionInput {
 }
 
 #[derive(InputObject)]
+#[graphql(rename_fields = "camelCase")]
 pub struct UpdateProjectionInput {
     pub name: Option<String>,
     pub projection_type: Option<String>,

@@ -1,6 +1,8 @@
 use chrono::Utc;
 use layercake_core::database::migrations::Migrator;
-use layercake_projections::entities::{graph_data, graph_data_edges, graph_data_nodes, projections};
+use layercake_projections::entities::{
+    graph_data, graph_data_edges, graph_data_nodes, projections,
+};
 use layercake_projections::service::{
     ProjectionCreateInput, ProjectionService, ProjectionUpdateInput,
 };

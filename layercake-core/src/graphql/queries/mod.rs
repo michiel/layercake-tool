@@ -1,5 +1,8 @@
 use async_graphql::*;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection, DbErr, EntityTrait,
+    QueryFilter, QueryOrder, Statement,
+};
 
 use crate::database::entities::{
     data_sets, graph_data, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases,
@@ -740,6 +743,12 @@ impl Query {
     ) -> Result<Vec<GraphData>> {
         let context = ctx.data::<GraphQLContext>()?;
 
+        // Legacy rows may contain non-JSON annotation blobs that break deserialization.
+        // Repair invalid entries to keep the listing query resilient for projections and other consumers.
+        repair_invalid_graph_data_annotations(&context.db, project_id)
+            .await
+            .map_err(|e| StructuredError::database("repair_invalid_graph_data_annotations", e))?;
+
         use sea_orm::{EntityTrait, QueryFilter};
         let mut query =
             graph_data::Entity::find().filter(graph_data::Column::ProjectId.eq(project_id));
@@ -1361,4 +1370,34 @@ impl Query {
             })
             .collect())
     }
+}
+
+/// Normalize legacy annotation payloads to valid JSON arrays so queries don't fail deserializing
+async fn repair_invalid_graph_data_annotations(
+    db: &DatabaseConnection,
+    project_id: i32,
+) -> Result<(), DbErr> {
+    let backend = db.get_database_backend();
+
+    // Use backend-specific JSON helpers to coerce invalid annotation payloads into valid arrays.
+    // This avoids deserialization errors when legacy markdown strings were stored directly.
+    let (update_sql, values) = match backend {
+        DatabaseBackend::Postgres => {
+            // Postgres enforces JSON validity at write time; nothing to repair.
+            return Ok(());
+        }
+        DatabaseBackend::MySql => (
+            "update graph_data set annotations = JSON_ARRAY(annotations) where project_id = ? and annotations is not null and JSON_VALID(annotations) = 0",
+            vec![project_id.into()],
+        ),
+        DatabaseBackend::Sqlite => (
+            "update graph_data set annotations = json_array(annotations) where project_id = ? and annotations is not null and json_valid(annotations) = 0",
+            vec![project_id.into()],
+        ),
+    };
+
+    db.execute(Statement::from_sql_and_values(backend, update_sql, values))
+        .await?;
+
+    Ok(())
 }

@@ -19,16 +19,16 @@ const LIST_PROJECTIONS = gql`
     projections(projectId: $projectId) {
       id
       name
-      projectionType: projection_type
-      graphId: graph_id
-      updatedAt: updated_at
+      projectionType
+      graphId
+      updatedAt
     }
   }
 `
 
 const LIST_GRAPHS = gql`
   query ListGraphsForProjections($projectId: Int!) {
-    graphDataList(projectId: $projectId) {
+    graphs(projectId: $projectId) {
       id
       name
     }
@@ -40,8 +40,8 @@ const CREATE_PROJECTION = gql`
     createProjection(input: $input) {
       id
       name
-      projectionType: projection_type
-      graphId: graph_id
+      projectionType
+      graphId
     }
   }
 `
@@ -105,7 +105,7 @@ export const ProjectionsPage = () => {
   })
 
   const projections = (projectionsData as any)?.projections ?? []
-  const graphs = (graphsData as any)?.graphDataList ?? []
+  const graphs = (graphsData as any)?.graphs ?? []
 
   const projectName = ''
 
@@ -118,10 +118,10 @@ export const ProjectionsPage = () => {
       await createProjection({
         variables: {
           input: {
-            project_id: projectIdNum,
-            graph_id: Number(newGraphId),
+            projectId: projectIdNum,
+            graphId: Number(newGraphId),
             name: newName.trim(),
-            projection_type: newType,
+            projectionType: newType,
           },
         },
       })

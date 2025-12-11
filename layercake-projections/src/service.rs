@@ -566,18 +566,33 @@ impl ProjectionService {
         project_id: i32,
         graph_id: i32,
     ) -> Result<(), sea_orm::DbErr> {
+        // Try to find in graph_data first
         let graph = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?;
 
-        let Some(graph) = graph else {
+        if let Some(graph) = graph {
+            if graph.project_id != project_id {
+                return Err(sea_orm::DbErr::Custom(
+                    "graph does not belong to project".to_string(),
+                ));
+            }
+            return Ok(());
+        }
+
+        // Fallback: Check if this ID exists in the old graphs table (pre-migration)
+        // This allows projections to work before migration runs
+        use crate::entities::graphs;
+        let old_graph = graphs::Entity::find_by_id(graph_id).one(&self.db).await?;
+
+        let Some(old_graph) = old_graph else {
             return Err(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
+                "graph_data or graphs {}",
                 graph_id
             )));
         };
 
-        if graph.project_id != project_id {
+        if old_graph.project_id != project_id {
             return Err(sea_orm::DbErr::Custom(
                 "graph does not belong to project".to_string(),
             ));
