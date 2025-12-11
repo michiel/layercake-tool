@@ -19,9 +19,9 @@ const LIST_PROJECTIONS = gql`
     projections(projectId: $projectId) {
       id
       name
-      projection_type
-      graph_id
-      updated_at
+      projectionType: projection_type
+      graphId: graph_id
+      updatedAt: updated_at
     }
   }
 `
@@ -40,8 +40,8 @@ const CREATE_PROJECTION = gql`
     createProjection(input: $input) {
       id
       name
-      projection_type
-      graph_id
+      projectionType: projection_type
+      graphId: graph_id
     }
   }
 `
@@ -289,9 +289,9 @@ export const ProjectionsPage = () => {
                   <Group gap="sm" align="center" className="flex-wrap">
                     <IconAffiliate className="h-4 w-4 text-muted-foreground" />
                     <div className="font-semibold">{p.name}</div>
-                    <div className="text-xs uppercase text-muted-foreground">{p.projection_type}</div>
+                    <div className="text-xs uppercase text-muted-foreground">{p.projectionType}</div>
                   </Group>
-                  <div className="text-xs text-muted-foreground">Graph #{p.graph_id}</div>
+                  <div className="text-xs text-muted-foreground">Graph #{p.graphId}</div>
                 </div>
                 <Group gap="sm" className="flex-wrap">
                   <Button size="sm" variant="outline" onClick={() => handleOpen(p.id)}>

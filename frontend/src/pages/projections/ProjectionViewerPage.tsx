@@ -16,17 +16,17 @@ const PROJECTION_QUERY = gql`
     projection(id: $id) {
       id
       name
-      projection_type
-      graph_id
+      projectionType: projection_type
+      graphId: graph_id
     }
     projectionGraph(id: $id) {
       nodes { id label layer }
       edges { id source target }
     }
     projectionState(id: $id) {
-      projection_id
-      projection_type
-      state_json
+      projectionId: projection_id
+      projectionType: projection_type
+      stateJson: state_json
     }
   }
 `
@@ -140,7 +140,7 @@ export const ProjectionViewerPage = () => {
   const handleSaveState = async () => {
     try {
       await saveState({
-        variables: { id, state: state?.state_json ?? {} },
+        variables: { id, state: state?.stateJson ?? {} },
       })
       showSuccessNotification('State saved', '')
     } catch (err: any) {
@@ -152,10 +152,10 @@ export const ProjectionViewerPage = () => {
     <PageContainer>
       <Group justify="between" className="mb-4">
         <div>
-          <h1 className="text-3xl font-bold">{projection.name}</h1>
-          <p className="text-muted-foreground">
-            Projection type: {projection.projection_type} · Graph {projection.graph_id}
-          </p>
+        <h1 className="text-3xl font-bold">{projection.name}</h1>
+        <p className="text-muted-foreground">
+            Projection type: {projection.projectionType} · Graph {projection.graphId}
+        </p>
         </div>
         <Group gap="sm">
           <Button onClick={handleSaveState} disabled={saving}>
