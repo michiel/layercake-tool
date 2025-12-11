@@ -346,12 +346,6 @@ pub struct ProjectionExport {
 }
 
 impl ProjectionExport {
-    fn to_json(&self) -> serde_json::Value {
-        serde_json::json!({
-            "filename": self.filename,
-            "contentBase64": self.content_base64,
-        })
-    }
 }
 
 impl From<ProjectionExportBundle> for ProjectionExport {

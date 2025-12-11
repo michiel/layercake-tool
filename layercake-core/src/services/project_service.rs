@@ -234,6 +234,7 @@ impl ProjectService {
 
 #[cfg(test)]
 mod tests {
+    #[allow(unused_imports)]
     use super::*;
 
     // Note: These would be integration tests requiring a test database

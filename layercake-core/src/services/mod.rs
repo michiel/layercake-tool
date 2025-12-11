@@ -1,3 +1,5 @@
+#![allow(ambiguous_glob_reexports)]
+
 pub mod auth_service;
 pub mod authorization;
 pub mod chat_history_service;

@@ -17,7 +17,7 @@ pub struct EventSourceMapping {
 pub fn detect_event_sources(infra: &InfrastructureGraph) -> Vec<EventSourceMapping> {
     let mut mappings = Vec::new();
 
-    for (resource_id, resource) in &infra.resources {
+    for (_resource_id, resource) in &infra.resources {
         let resource_type_str = format!("{:?}", resource.resource_type).to_lowercase();
 
         // AWS Lambda Event Source Mapping

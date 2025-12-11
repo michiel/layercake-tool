@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use super::graph::InfrastructureGraph;
-use super::model::{EdgeType, GraphEdge, ResourceNode, ResourceType};
+use super::model::{EdgeType, GraphEdge, ResourceNode};
 
 /// API Gateway route definition
 #[derive(Debug, Clone, Serialize, Deserialize)]
