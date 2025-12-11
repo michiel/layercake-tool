@@ -87,7 +87,10 @@ export default function App() {
   const state =
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
+  const isLayer3d = projection?.projectionType === 'layer3d'
+
   useEffect(() => {
+    if (isLayer3d) return // Don't render 3D graph for layer3d stub
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
@@ -106,7 +109,7 @@ export default function App() {
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }
-  }, [graph, linkColor, nodeColor, nodeRelSize, showLinks])
+  }, [graph, linkColor, nodeColor, nodeRelSize, showLinks, isLayer3d])
 
   const handleSaveState = () => {
     if (!projectionId) return
@@ -134,6 +137,29 @@ export default function App() {
     return (
       <div className="flex h-full items-center justify-center text-slate-100 bg-slate-900">
         Projection not found
+      </div>
+    )
+  }
+
+  if (isLayer3d) {
+    return (
+      <div className="h-screen w-screen bg-slate-900 text-slate-100">
+        <div className="flex items-center justify-between p-3 border-b border-slate-700">
+          <div>
+            <div className="font-semibold">{projection.name}</div>
+            <div className="text-xs text-slate-400">
+              Type: {projection.projectionType} · Graph {projection.graphId}
+            </div>
+          </div>
+        </div>
+        <div className="flex h-full items-center justify-center flex-col gap-4 pb-20">
+          <div className="text-6xl">🏗️</div>
+          <div className="text-2xl font-bold">Layer 3D Coming Soon</div>
+          <div className="text-slate-400 max-w-md text-center">
+            The Layer 3D visualization type is currently under development.
+            Please use Force 3D for now, or check back later for updates.
+          </div>
+        </div>
       </div>
     )
   }

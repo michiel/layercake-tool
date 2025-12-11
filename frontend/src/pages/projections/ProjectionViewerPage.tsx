@@ -92,14 +92,17 @@ export const ProjectionViewerPage = () => {
   const graph = (graphUpdates as any)?.projectionGraphUpdated ?? (data as any)?.projectionGraph
   const state = (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
+  const isLayer3d = projection?.projectionType === 'layer3d'
+
   useEffect(() => {
+    if (isLayer3d) return // Don't render 3D graph for layer3d stub
     if (graphUpdates) {
       showSuccessNotification('Projection updated', 'Graph changes received')
     }
-  }, [graphUpdates])
+  }, [graphUpdates, isLayer3d])
 
   useEffect(() => {
-    if (!graph || !containerRef.current) return
+    if (isLayer3d || !graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
     const fg = ForceGraph3D()(elem)
@@ -133,6 +136,34 @@ export const ProjectionViewerPage = () => {
     return (
       <PageContainer>
         <h1 className="text-2xl font-bold">Projection not found</h1>
+      </PageContainer>
+    )
+  }
+
+  if (isLayer3d) {
+    return (
+      <PageContainer>
+        <Group justify="between" className="mb-4">
+          <div>
+            <h1 className="text-3xl font-bold">{projection.name}</h1>
+            <p className="text-muted-foreground">
+              Projection type: {projection.projectionType} · Graph {projection.graphId}
+            </p>
+          </div>
+        </Group>
+
+        <Card className="mb-4">
+          <CardContent className="py-12">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="text-6xl">🏗️</div>
+              <h2 className="text-2xl font-bold">Layer 3D Coming Soon</h2>
+              <p className="text-muted-foreground max-w-md">
+                The Layer 3D visualization type is currently under development.
+                Please use Force 3D for now, or check back later for updates.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       </PageContainer>
     )
   }
