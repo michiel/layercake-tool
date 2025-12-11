@@ -5,6 +5,7 @@ use std::{fs, path::Path};
 
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use serde_json;
 use tokio::sync::{broadcast, RwLock};
 use zip::write::FileOptions;
 
@@ -119,14 +120,17 @@ impl ProjectionService {
         &self,
         input: ProjectionCreateInput,
     ) -> Result<projections::Model, sea_orm::DbErr> {
-        self.ensure_graph_in_project(input.project_id, input.graph_id)
+        let resolved_graph_id = self
+            .resolve_graph_id(input.project_id, input.graph_id)
+            .await?;
+        self.ensure_graph_in_project(input.project_id, resolved_graph_id)
             .await?;
 
         let now = Utc::now();
         let model = projections::ActiveModel {
             id: sea_orm::ActiveValue::NotSet,
             project_id: Set(input.project_id),
-            graph_id: Set(input.graph_id),
+            graph_id: Set(resolved_graph_id),
             name: Set(input.name),
             projection_type: Set(input.projection_type),
             settings_json: Set(input.settings_json),
@@ -559,6 +563,96 @@ impl ProjectionService {
             index_html: rewritten,
             assets,
         })
+    }
+
+    async fn resolve_graph_id(
+        &self,
+        project_id: i32,
+        graph_id: i32,
+    ) -> Result<i32, sea_orm::DbErr> {
+        // Happy path: graph_data already exists with this ID
+        if let Some(graph) = graph_data::Entity::find_by_id(graph_id)
+            .one(&self.db)
+            .await?
+        {
+            if graph.project_id != project_id {
+                return Err(sea_orm::DbErr::Custom(
+                    "graph does not belong to project".to_string(),
+                ));
+            }
+            return Ok(graph.id);
+        }
+
+        // Legacy path: lookup in old graphs table
+        use crate::entities::graphs;
+        let old_graph = graphs::Entity::find_by_id(graph_id).one(&self.db).await?;
+
+        let Some(old_graph) = old_graph else {
+            return Err(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data or graphs {}",
+                graph_id
+            )));
+        };
+
+        if old_graph.project_id != project_id {
+            return Err(sea_orm::DbErr::Custom(
+                "graph does not belong to project".to_string(),
+            ));
+        }
+
+        // If there is already a graph_data row for the same DAG node, reuse it
+        if let Some(existing) = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .filter(graph_data::Column::DagNodeId.eq(old_graph.node_id.clone()))
+            .one(&self.db)
+            .await?
+        {
+            return Ok(existing.id);
+        }
+
+        // Otherwise, materialize a minimal graph_data record so the FK insert succeeds
+        let status = match old_graph.execution_state.as_str() {
+            "ERROR" => "error",
+            "COMPLETED" => "active",
+            _ => "processing",
+        };
+
+        let annotations = if let Some(text) = old_graph.annotations.clone() {
+            serde_json::from_str::<serde_json::Value>(&text)
+                .unwrap_or_else(|_| serde_json::json!([text]))
+        } else {
+            serde_json::json!([])
+        };
+
+        let model = graph_data::ActiveModel {
+            id: Set(old_graph.id),
+            project_id: Set(old_graph.project_id),
+            name: Set(old_graph.name.clone()),
+            source_type: Set("computed".to_string()),
+            dag_node_id: Set(Some(old_graph.node_id.clone())),
+            file_format: Set(None),
+            origin: Set(None),
+            filename: Set(None),
+            blob: Set(None),
+            file_size: Set(None),
+            processed_at: Set(old_graph.computed_date),
+            source_hash: Set(old_graph.source_hash.clone()),
+            computed_date: Set(old_graph.computed_date),
+            last_edit_sequence: Set(old_graph.last_edit_sequence),
+            has_pending_edits: Set(old_graph.has_pending_edits),
+            last_replay_at: Set(old_graph.last_replay_at),
+            node_count: Set(old_graph.node_count),
+            edge_count: Set(old_graph.edge_count),
+            error_message: Set(old_graph.error_message.clone()),
+            metadata: Set(old_graph.metadata.clone()),
+            annotations: Set(Some(annotations)),
+            status: Set(status.to_string()),
+            created_at: Set(old_graph.created_at),
+            updated_at: Set(old_graph.updated_at),
+        };
+
+        let inserted = model.insert(&self.db).await?;
+        Ok(inserted.id)
     }
 
     async fn ensure_graph_in_project(
