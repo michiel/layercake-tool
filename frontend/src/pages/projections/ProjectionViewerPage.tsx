@@ -105,7 +105,7 @@ export const ProjectionViewerPage = () => {
     if (isLayer3d || !graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = ForceGraph3D()(elem)
+    const fg = ForceGraph3D(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
@@ -119,7 +119,7 @@ export const ProjectionViewerPage = () => {
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }
-  }, [graph])
+  }, [graph, isLayer3d])
 
   if (loading) {
     return (
