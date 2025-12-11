@@ -71,13 +71,9 @@ export const WorkbenchPage = () => {
     if (!Number.isFinite(projectIdNum)) {
       return
     }
-    if (!selectedPlanId) {
-      showErrorNotification('Select a plan', 'Choose a plan to validate before running checks.')
-      return
-    }
     try {
       const { data } = await validatePlanDagMutation({
-        variables: { projectId: projectIdNum, planId: selectedPlanId },
+        variables: { projectId: projectIdNum },
       })
       const result = (data as any)?.validateAndMigratePlanDag
       const migratedCount = result?.updatedNodes?.length || 0
@@ -85,24 +81,18 @@ export const WorkbenchPage = () => {
       const errors: string[] = result?.errors || []
 
       if (errors.length > 0) {
-        showErrorNotification(
-          'Plan DAG validation failed',
-          `Found ${errors.length} error(s). First: ${errors[0]}`
-        )
+        showErrorNotification('Migration failed', `Found ${errors.length} error(s). First: ${errors[0]}`)
         console.error('Plan DAG validation errors', errors)
         return
       }
 
       showSuccessNotification(
-        'Plan DAG validated',
+        'Project migration complete',
         `Migrated ${migratedCount} legacy node(s). Warnings: ${warningCount}.`
       )
     } catch (error: any) {
       console.error('Failed to validate/migrate plan DAG', error)
-      showErrorNotification(
-        'Plan validation failed',
-        error?.message || 'Unable to validate or migrate the plan DAG.'
-      )
+      showErrorNotification('Migration failed', error?.message || 'Unable to migrate the plan DAG.')
     }
   }
 
@@ -191,7 +181,7 @@ export const WorkbenchPage = () => {
           <Button
             variant="secondary"
             onClick={handleValidateAndMigratePlan}
-            disabled={validatePlanDagLoading || !selectedPlanId}
+            disabled={validatePlanDagLoading}
           >
             {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconAdjustments className="mr-2 h-4 w-4" />
@@ -200,7 +190,7 @@ export const WorkbenchPage = () => {
           <Button
             variant="outline"
             onClick={handleValidateAndMigratePlan}
-            disabled={validatePlanDagLoading || !selectedPlanId}
+            disabled={validatePlanDagLoading}
           >
             {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconTool className="mr-2 h-4 w-4" />
