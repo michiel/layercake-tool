@@ -44,6 +44,7 @@ import { LIST_PLANS, GET_PLAN } from './graphql/plans'
 import { LIST_STORIES, type Story } from './graphql/stories'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 import { PlansPage } from './components/plans/PlansPage'
+import { ProjectionsPage } from './pages/workbench/ProjectionsPage'
 import type { Plan } from './types/plan'
 
 // Collaboration Context for providing project-level collaboration to all pages
@@ -277,6 +278,12 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Graphs',
         route: `/projects/${projectId}/graphs`,
         isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
+      },
+      {
+        key: 'projections',
+        label: 'Projections',
+        route: `/projects/${projectId}/workbench/projections`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/projections`, { prefix: true }),
       },
     ]
 
@@ -2072,6 +2079,11 @@ function App() {
           <Route path="/projects/:projectId/graphs" element={
             <ErrorBoundary>
               <GraphsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/workbench/projections" element={
+            <ErrorBoundary>
+              <ProjectionsPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/artefacts" element={

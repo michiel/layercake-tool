@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
-import { IconGraph, IconDatabase, IconArrowRight, IconAdjustments, IconBooks, IconHierarchy2 } from '@tabler/icons-react'
+import { IconGraph, IconDatabase, IconArrowRight, IconAdjustments, IconBooks, IconHierarchy2, IconAffiliate } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
@@ -198,6 +198,10 @@ export const WorkbenchPage = () => {
           <Button variant="secondary" onClick={handleOpenGraphs}>
             <IconDatabase className="mr-2 h-4 w-4" />
             Graphs
+          </Button>
+          <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/workbench/projections${planQuerySuffix}`)}>
+            <IconAffiliate className="mr-2 h-4 w-4" />
+            Projections
           </Button>
         </Group>
       </Group>

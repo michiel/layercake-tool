@@ -49,14 +49,22 @@ export async function initializeTauriServer(): Promise<void> {
   }
 }
 
+export type GraphQLEndpointOverride = {
+  httpPath?: string;
+  wsPath?: string;
+};
+
 // GraphQL endpoints - configurable for different environments
-const getGraphQLEndpoints = () => {
+export const getGraphQLEndpoints = (override?: GraphQLEndpointOverride) => {
+  const httpPath = override?.httpPath || '/graphql';
+  const wsPath = override?.wsPath || '/graphql/ws';
+
   // Use Tauri server if configured
   if (serverConfig) {
     console.log('[GraphQL] Using Tauri server config:', serverConfig.url)
     return {
-      httpUrl: `${serverConfig.url}/graphql`,
-      wsUrl: `${serverConfig.wsUrl}/graphql/ws`,
+      httpUrl: `${serverConfig.url}${httpPath}`,
+      wsUrl: `${serverConfig.wsUrl}${wsPath}`,
       secret: serverConfig.secret,
     }
   }
@@ -64,9 +72,10 @@ const getGraphQLEndpoints = () => {
   // Otherwise use environment variables (web mode)
   const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
   console.log('[GraphQL] Using web mode config:', baseUrl)
+  const wsBase = baseUrl.replace('http', 'ws')
   return {
-    httpUrl: `${baseUrl}/graphql`,
-    wsUrl: `${baseUrl.replace('http', 'ws')}/graphql/ws`,
+    httpUrl: `${baseUrl}${httpPath}`,
+    wsUrl: `${wsBase}${wsPath}`,
     secret: null,
   }
 }
@@ -74,12 +83,12 @@ const getGraphQLEndpoints = () => {
 // Create Apollo Client - must be called after initializeTauriServer() in Tauri mode
 let apolloClientInstance: ApolloClient | null = null
 
-function createApolloClient(): ApolloClient {
-  console.log('[GraphQL] Creating Apollo Client with endpoints:', getGraphQLEndpoints())
+function createApolloClient(override?: GraphQLEndpointOverride): ApolloClient {
+  console.log('[GraphQL] Creating Apollo Client with endpoints:', getGraphQLEndpoints(override))
 
   // Create authentication link for Tauri secret
   const authLink = setContext((_, { headers }) => {
-    const { secret } = getGraphQLEndpoints()
+    const { secret } = getGraphQLEndpoints(override)
     const sessionId = getOrCreateSessionId()
 
     // Add secret header if available (Tauri mode)
@@ -105,7 +114,7 @@ function createApolloClient(): ApolloClient {
   // Use a function to get the current endpoint (supports dynamic reconfiguration)
   const httpLink = new UploadHttpLink({
     uri: () => {
-      const { httpUrl } = getGraphQLEndpoints()
+      const { httpUrl } = getGraphQLEndpoints(override)
       console.log('[GraphQL HTTP] Using endpoint:', httpUrl)
       return httpUrl
     },
@@ -128,7 +137,7 @@ function createApolloClient(): ApolloClient {
   })
 
   // WebSocket Link for subscriptions (real-time collaboration)
-  const { wsUrl: currentWsUrl } = getGraphQLEndpoints()
+  const { wsUrl: currentWsUrl } = getGraphQLEndpoints(override)
   console.log('[GraphQL WebSocket] Creating client with URL:', currentWsUrl)
 
   console.log('[GraphQL WebSocket] Creating WebSocket client for:', currentWsUrl)
@@ -136,7 +145,7 @@ function createApolloClient(): ApolloClient {
   const wsClient = createClient({
     url: currentWsUrl,
     connectionParams: () => {
-      const { secret } = getGraphQLEndpoints()
+      const { secret } = getGraphQLEndpoints(override)
       const sessionId = getOrCreateSessionId()
       console.log('[GraphQL WebSocket] Getting connection params, secret:', secret ? 'present' : 'none')
       // Include secret in WebSocket connection params if available (Tauri mode)
@@ -304,6 +313,11 @@ export const apolloClient = new Proxy({} as ApolloClient, {
     return Reflect.get(apolloClientInstance, prop, receiver)
   },
 }) as ApolloClient
+
+// Create an Apollo client for an alternate endpoint (e.g., projections)
+export const createApolloClientForEndpoint = (
+  override?: GraphQLEndpointOverride
+): ApolloClient => createApolloClient(override)
 
 // Helper function to handle connection state
 export const getConnectionState = () => {

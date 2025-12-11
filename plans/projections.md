@@ -167,9 +167,9 @@
   - ✅ Implement ProjectionService (state store, graph cloning, broadcast channels).
   - ✅ Wire Axum + async-graphql schema at `/projections/graphql` with queries/mutations/subscriptions; add websocket route.
 - **Phase 2: Workbench UI**
-  - Add Projections nav under Workbench; list/create/delete/export actions using new GraphQL API.
-  - Ensure graph picker filters to graphs in the same project; default type `force3d`.
-  - Open/Export buttons calling respective endpoints.
+  - 🚧 Projections nav added; Workbench page now links to Projections view.
+  - 🚧 Projections page lists/creates/deletes projections via `/projections/graphql`; uses graph picker (project-scoped).
+  - TODO: Wire Export action to backend exportProjection, add Open behavior for Tauri window.
 - **Phase 3: Projection frontend build**
   - Create separate Vite build (shared GraphQL client) served at `/projections`.
   - Implement `force3d` renderer (3d-force-graph) with controls bound to ProjectionState; subscribe to graph/state updates.
