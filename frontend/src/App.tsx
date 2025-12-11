@@ -45,6 +45,7 @@ import { LIST_STORIES, type Story } from './graphql/stories'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 import { PlansPage } from './components/plans/PlansPage'
 import { ProjectionsPage } from './pages/workbench/ProjectionsPage'
+import { ProjectionViewerPage } from './pages/projections/ProjectionViewerPage'
 import type { Plan } from './types/plan'
 
 // Collaboration Context for providing project-level collaboration to all pages
@@ -2084,6 +2085,11 @@ function App() {
           <Route path="/projects/:projectId/workbench/projections" element={
             <ErrorBoundary>
               <ProjectionsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projections/:projectionId" element={
+            <ErrorBoundary>
+              <ProjectionViewerPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/artefacts" element={
