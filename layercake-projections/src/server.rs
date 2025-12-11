@@ -1,12 +1,18 @@
-use axum::{extract::State, routing::{get, get_service}, Router};
 use async_graphql::Schema;
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
+use axum::{
+    extract::State,
+    routing::{get, get_service},
+    Router,
+};
+use futures_util::{SinkExt, StreamExt};
+use tokio::sync::mpsc;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{debug, info, warn};
-use futures_util::{StreamExt, SinkExt};
-use tokio::sync::mpsc;
 
-use crate::graphql::{ProjectionsSchema, ProjectionMutation, ProjectionQuery, ProjectionSubscription};
+use crate::graphql::{
+    ProjectionMutation, ProjectionQuery, ProjectionSubscription, ProjectionsSchema,
+};
 
 #[derive(Clone)]
 pub struct ProjectionsRouterState {
@@ -59,10 +65,8 @@ async fn graphql_ws_handler(
         })
 }
 
-async fn handle_graphql_ws<Q, M, S>(
-    socket: axum::extract::ws::WebSocket,
-    schema: Schema<Q, M, S>,
-) where
+async fn handle_graphql_ws<Q, M, S>(socket: axum::extract::ws::WebSocket, schema: Schema<Q, M, S>)
+where
     Q: async_graphql::ObjectType + Send + Sync + 'static,
     M: async_graphql::ObjectType + Send + Sync + 'static,
     S: async_graphql::SubscriptionType + Send + Sync + 'static,
@@ -157,9 +161,7 @@ async fn handle_graphql_ws<Q, M, S>(
     }
 }
 
-pub fn build_schema(
-    context: crate::graphql::ProjectionSchemaContext,
-) -> ProjectionsSchema {
+pub fn build_schema(context: crate::graphql::ProjectionSchemaContext) -> ProjectionsSchema {
     Schema::build(
         ProjectionQuery::default(),
         ProjectionMutation,

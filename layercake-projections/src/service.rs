@@ -4,13 +4,14 @@ use std::sync::Arc;
 use std::{fs, path::Path};
 
 use chrono::Utc;
-use layercake_core::database::entities::{
-    graph_data, graph_data_edges, graph_data_nodes,
-    projections::{self, Entity as Projections},
-};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use tokio::sync::{broadcast, RwLock};
 use zip::write::FileOptions;
+
+use crate::entities::{
+    graph_data, graph_data_edges, graph_data_nodes,
+    projections::{self, Entity as Projections},
+};
 
 #[derive(Clone)]
 pub struct ProjectionService {

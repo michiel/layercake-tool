@@ -192,20 +192,21 @@ impl ProjectionSubscription {
             .parse()
             .map_err(|_| Error::new("invalid projection id"))?;
         let id_filter = id;
-        let stream = BroadcastStream::new(service.projections.subscribe_state()).filter_map(
-            move |msg| match msg {
-                Ok(ProjectionStateEvent {
-                    projection_id,
-                    projection_type,
-                    state,
-                }) if projection_id == id_filter => Some(ProjectionState {
-                    projection_id: ID::from(projection_id.to_string()),
-                    projection_type,
-                    state_json: Some(Json(state)),
-                }),
-                _ => None,
-            },
-        );
+        let stream =
+            BroadcastStream::new(service.projections.subscribe_state()).filter_map(move |msg| {
+                match msg {
+                    Ok(ProjectionStateEvent {
+                        projection_id,
+                        projection_type,
+                        state,
+                    }) if projection_id == id_filter => Some(ProjectionState {
+                        projection_id: ID::from(projection_id.to_string()),
+                        projection_type,
+                        state_json: Some(Json(state)),
+                    }),
+                    _ => None,
+                }
+            });
 
         Ok(Box::pin(stream))
     }
@@ -220,15 +221,16 @@ impl ProjectionSubscription {
             .parse()
             .map_err(|_| Error::new("invalid projection id"))?;
         let id_filter = id;
-        let stream = BroadcastStream::new(service.projections.subscribe_graph()).filter_map(
-            move |msg| match msg {
-                Ok(ProjectionGraphEvent {
-                    projection_id,
-                    graph,
-                }) if projection_id == id_filter => Some(ProjectionGraph::from(graph)),
-                _ => None,
-            },
-        );
+        let stream =
+            BroadcastStream::new(service.projections.subscribe_graph()).filter_map(move |msg| {
+                match msg {
+                    Ok(ProjectionGraphEvent {
+                        projection_id,
+                        graph,
+                    }) if projection_id == id_filter => Some(ProjectionGraph::from(graph)),
+                    _ => None,
+                }
+            });
 
         Ok(Box::pin(stream))
     }
@@ -246,8 +248,8 @@ pub struct Projection {
     pub settings_json: Option<Json<serde_json::Value>>,
 }
 
-impl From<layercake_core::database::entities::projections::Model> for Projection {
-    fn from(model: layercake_core::database::entities::projections::Model) -> Self {
+impl From<crate::entities::projections::Model> for Projection {
+    fn from(model: crate::entities::projections::Model) -> Self {
         Self {
             id: ID::from(model.id.to_string()),
             project_id: ID::from(model.project_id.to_string()),

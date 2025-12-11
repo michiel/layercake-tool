@@ -21,8 +21,6 @@ pub mod server;
 pub mod services;
 pub mod utils;
 
-pub mod projections;
-
 #[cfg(debug_assertions)]
 pub mod dev_utils;
 

@@ -99,6 +99,7 @@ zip = { workspace = true }
 # Data acquisition
 layercake-genai = { path = "../layercake-genai" }
 layercake-code-analysis = { path = "../layercake-code-analysis" }
+layercake-projections = { path = "../layercake-projections" }
 
 [dev-dependencies]
 # Test dependencies for E2E tests

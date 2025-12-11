@@ -29,8 +29,6 @@ mod graphql;
 
 mod collaboration;
 
-mod projections;
-
 #[cfg(feature = "mcp")]
 mod mcp;
 

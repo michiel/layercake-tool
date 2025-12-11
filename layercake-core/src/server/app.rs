@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
+use axum::routing::get_service;
 use axum::{
     extract::State,
     response::IntoResponse,
     routing::{get, post},
     Router,
 };
-use axum::routing::get_service;
 use sea_orm::DatabaseConnection;
 use std::sync::Arc;
 use tower::ServiceBuilder;
@@ -17,14 +17,9 @@ use crate::collaboration::{CollaborationCoordinator, CoordinatorHandle};
 use crate::graphql::{
     mutations::Mutation, queries::Query, subscriptions::Subscription, GraphQLContext, GraphQLSchema,
 };
-use crate::projections::graphql::{
-    ProjectionMutation as ProjectionsMutation, ProjectionQuery as ProjectionsQuery,
-    ProjectionSchemaContext, ProjectionSubscription as ProjectionsSubscription, ProjectionsSchema,
-};
 use crate::server::websocket::websocket_handler;
 use crate::{
-    graphql::chat_manager::ChatManager, services::projection_service::ProjectionService,
-    services::system_settings_service::SystemSettingsService,
+    graphql::chat_manager::ChatManager, services::system_settings_service::SystemSettingsService,
 };
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
@@ -34,6 +29,11 @@ use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse}
 
 use super::handlers::{health, library};
 use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
+use layercake_projections::graphql::{
+    ProjectionMutation as ProjectionsMutation, ProjectionQuery as ProjectionsQuery,
+    ProjectionSchemaContext, ProjectionSubscription as ProjectionsSubscription, ProjectionsSchema,
+};
+use layercake_projections::service::ProjectionService;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -42,6 +42,7 @@ pub struct AppState {
     pub graphql_schema: GraphQLSchema,
     pub coordinator_handle: CoordinatorHandle,
     pub projections_schema: ProjectionsSchema,
+    #[allow(dead_code)] // Exposed for future REST handlers or tests
     pub projection_service: Arc<ProjectionService>,
 }
 
@@ -229,9 +230,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     // Serve projections build assets if available
     let projections_static = get_service(
-        ServeDir::new("projections-frontend/dist").fallback(ServeFile::new(
-            "projections-frontend/dist/index.html",
-        )),
+        ServeDir::new("projections-frontend/dist")
+            .fallback(ServeFile::new("projections-frontend/dist/index.html")),
     );
     app = app.nest_service("/projections", projections_static);
 

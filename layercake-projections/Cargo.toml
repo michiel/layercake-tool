@@ -4,11 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-layercake-core = { path = "../layercake-core", package = "layercake-core" }
 async-graphql = { workspace = true }
 async-graphql-axum = { workspace = true }
 tokio = { workspace = true }
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 sea-orm = { workspace = true }
 serde_json = { workspace = true }
 zip = { workspace = true }
@@ -18,3 +17,4 @@ futures-util = { workspace = true }
 chrono = { workspace = true }
 base64 = "0.22"
 tracing = { workspace = true }
+serde = { workspace = true }
