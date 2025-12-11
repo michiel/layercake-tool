@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph from 'force-graph'
@@ -60,6 +60,10 @@ const getProjectionId = () => {
 export default function App() {
   const projectionId = getProjectionId()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [showLinks, setShowLinks] = useState(true)
+  const [nodeColor, setNodeColor] = useState('#ffd166')
+  const [linkColor, setLinkColor] = useState('#6ddcff')
+  const [nodeRelSize, setNodeRelSize] = useState(4)
 
   const { data, loading } = useQuery(PROJECTION_QUERY, {
     variables: { id: projectionId },
@@ -89,22 +93,32 @@ export default function App() {
     elem.innerHTML = ''
     const fg = (ForceGraph as any)(elem)
       .graphData({
-        nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
-        links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
+        nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id, layer: n.layer })) ?? [],
+        links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
       })
       .nodeLabel('name')
       .linkDirectionalParticles(0)
-      .linkColor(() => '#6ddcff')
-      .nodeColor(() => '#ffd166')
+      .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
+      .nodeColor((n: any) => (n.layer ? nodeColor : '#9ae6b4'))
+      .nodeRelSize(nodeRelSize)
       .backgroundColor('#0b1021')
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }
-  }, [graph])
+  }, [graph, linkColor, nodeColor, nodeRelSize, showLinks])
 
   const handleSaveState = () => {
     if (!projectionId) return
-    saveState({ variables: { id: projectionId, state: state?.stateJson ?? {} } })
+    const nextState = {
+      ...(state?.stateJson ?? {}),
+      ui: {
+        showLinks,
+        nodeColor,
+        linkColor,
+        nodeRelSize,
+      },
+    }
+    saveState({ variables: { id: projectionId, state: nextState } })
   }
 
   if (loading) {
@@ -133,6 +147,42 @@ export default function App() {
           </div>
         </div>
         <div className="flex gap-2">
+          <label className="flex items-center gap-2 text-xs">
+            <span>Nodes</span>
+            <input
+              type="color"
+              value={nodeColor}
+              onChange={(e) => setNodeColor(e.target.value)}
+              className="h-6 w-10 bg-transparent"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <span>Links</span>
+            <input
+              type="color"
+              value={linkColor}
+              onChange={(e) => setLinkColor(e.target.value)}
+              className="h-6 w-10 bg-transparent"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <span>Size</span>
+            <input
+              type="range"
+              min={2}
+              max={10}
+              value={nodeRelSize}
+              onChange={(e) => setNodeRelSize(Number(e.target.value))}
+            />
+          </label>
+          <label className="flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={showLinks}
+              onChange={(e) => setShowLinks(e.target.checked)}
+            />
+            <span>Links</span>
+          </label>
           <button
             className="rounded bg-slate-100 px-3 py-1 text-slate-900 text-sm"
             onClick={handleSaveState}
