@@ -302,7 +302,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     );
 
     let app = app
-        .route_service("/projections/viewer/*path", projections_viewer.clone())
+        .route_service("/projections/viewer/{*path}", projections_viewer.clone())
         .route_service("/projections/viewer", projections_viewer);
 
     Ok(app)
