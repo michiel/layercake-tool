@@ -295,6 +295,16 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         .layer(ServiceBuilder::new().layer(cors))
         .with_state(state);
 
+    // Serve standalone projection viewer build at /projections/viewer/*
+    let projections_viewer = get_service(
+        ServeDir::new("projections-frontend/dist")
+            .fallback(ServeFile::new("projections-frontend/dist/index.html")),
+    );
+
+    let app = app
+        .route_service("/projections/viewer/*path", projections_viewer.clone())
+        .route_service("/projections/viewer", projections_viewer);
+
     Ok(app)
 }
 

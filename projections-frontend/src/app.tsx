@@ -50,8 +50,13 @@ const SAVE_STATE = gql`
 
 const getProjectionId = () => {
   const url = new URL(window.location.href)
-  const match = url.pathname.match(/\/projections\/(\d+)/)
+  // New canonical path: /projections/viewer/:id
+  const match = url.pathname.match(/\/projections\/viewer\/(\d+)/)
   if (match) return match[1]
+  // Legacy direct route: /projections/:id
+  const legacy = url.pathname.match(/\/projections\/(\d+)/)
+  if (legacy) return legacy[1]
+  // Fallback to hash param
   const hash = url.hash.match(/projectionId=(\d+)/)
   if (hash) return hash[1]
   return null
@@ -94,7 +99,7 @@ export default function App() {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = ForceGraph3D()(elem)
+    const fg = (ForceGraph3D as any)()(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id, layer: n.layer })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],

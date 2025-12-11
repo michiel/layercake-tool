@@ -145,7 +145,7 @@ export const ProjectionsPage = () => {
   }
 
   const handleOpen = async (id: string) => {
-    const url = `/projections/${id}`
+    const url = `/projections/viewer/${id}`
     if ((window as any).__TAURI__) {
       try {
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
