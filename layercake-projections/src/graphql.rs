@@ -237,6 +237,7 @@ impl ProjectionSubscription {
 }
 
 #[derive(SimpleObject, Clone)]
+#[graphql(rename_fields = "camelCase")]
 pub struct Projection {
     pub id: ID,
     pub project_id: ID,
@@ -333,6 +334,7 @@ impl From<crate::service::ProjectionGraphEdge> for ProjectionGraphEdge {
 }
 
 #[derive(SimpleObject, Clone)]
+#[graphql(rename_fields = "camelCase")]
 pub struct ProjectionState {
     pub projection_id: ID,
     pub projection_type: String,
@@ -340,6 +342,7 @@ pub struct ProjectionState {
 }
 
 #[derive(SimpleObject, Clone)]
+#[graphql(rename_fields = "camelCase")]
 pub struct ProjectionExport {
     pub filename: String,
     pub content_base64: String,

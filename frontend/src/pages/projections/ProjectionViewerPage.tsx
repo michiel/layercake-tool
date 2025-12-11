@@ -16,17 +16,17 @@ const PROJECTION_QUERY = gql`
     projection(id: $id) {
       id
       name
-      projectionType: projection_type
-      graphId: graph_id
+      projectionType
+      graphId
     }
     projectionGraph(id: $id) {
       nodes { id label layer }
       edges { id source target }
     }
     projectionState(id: $id) {
-      projectionId: projection_id
-      projectionType: projection_type
-      stateJson: state_json
+      projectionId
+      projectionType
+      stateJson
     }
   }
 `
@@ -49,9 +49,9 @@ const GRAPH_SUB = gql`
 const STATE_SUB = gql`
   subscription ProjectionStateUpdated($id: ID!) {
     projectionStateUpdated(id: $id) {
-      projection_id
-      projection_type
-      state_json
+      projectionId
+      projectionType
+      stateJson
     }
   }
 `
