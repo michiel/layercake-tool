@@ -1,6 +1,6 @@
+pub mod code_analysis_enhanced_solution_graph;
 pub mod code_analysis_graph;
 pub mod code_analysis_solution_graph;
-pub mod code_analysis_enhanced_solution_graph;
 pub mod common;
 pub mod data_loader;
 pub mod errors;
@@ -20,6 +20,9 @@ pub mod database;
 pub mod server;
 pub mod services;
 pub mod utils;
+
+#[cfg(feature = "graphql")]
+pub mod projections;
 
 #[cfg(debug_assertions)]
 pub mod dev_utils;

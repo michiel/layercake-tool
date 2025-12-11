@@ -18,10 +18,16 @@ use crate::graphql::{
     mutations::Mutation, queries::Query, subscriptions::Subscription, GraphQLContext, GraphQLSchema,
 };
 #[cfg(feature = "graphql")]
+use crate::projections::graphql::{
+    ProjectionMutation as ProjectionsMutation, ProjectionQuery as ProjectionsQuery,
+    ProjectionSchemaContext, ProjectionSubscription as ProjectionsSubscription, ProjectionsSchema,
+};
+#[cfg(feature = "graphql")]
 use crate::server::websocket::websocket_handler;
 #[cfg(feature = "graphql")]
 use crate::{
-    graphql::chat_manager::ChatManager, services::system_settings_service::SystemSettingsService,
+    graphql::chat_manager::ChatManager, services::projection_service::ProjectionService,
+    services::system_settings_service::SystemSettingsService,
 };
 #[cfg(feature = "graphql")]
 use async_graphql::{
@@ -42,6 +48,10 @@ pub struct AppState {
     pub graphql_schema: GraphQLSchema,
     #[cfg(feature = "graphql")]
     pub coordinator_handle: CoordinatorHandle,
+    #[cfg(feature = "graphql")]
+    pub projections_schema: ProjectionsSchema,
+    #[cfg(feature = "graphql")]
+    pub projection_service: Arc<ProjectionService>,
 }
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
@@ -122,6 +132,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     ));
 
     #[cfg(feature = "graphql")]
+    let projection_service = Arc::new(ProjectionService::new(db.clone()));
+
+    #[cfg(feature = "graphql")]
     let (graphql_schema, coordinator_handle) = {
         // Initialize actor-based collaboration coordinator
         let coordinator_handle = CollaborationCoordinator::spawn();
@@ -183,12 +196,25 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         (schema, coordinator_handle)
     };
 
+    #[cfg(feature = "graphql")]
+    let projections_schema = Schema::build(
+        ProjectionsQuery::default(),
+        ProjectionsMutation,
+        ProjectionsSubscription,
+    )
+    .data(ProjectionSchemaContext::new(projection_service.clone()))
+    .finish();
+
     let state = AppState {
         db: db.clone(),
         #[cfg(feature = "graphql")]
         graphql_schema,
         #[cfg(feature = "graphql")]
         coordinator_handle,
+        #[cfg(feature = "graphql")]
+        projections_schema,
+        #[cfg(feature = "graphql")]
+        projection_service,
     };
 
     let cors = match cors_origin {
@@ -236,6 +262,16 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
                     .options(|| async { axum::http::StatusCode::OK }),
             )
             .route("/graphql/ws", get(graphql_ws_handler))
+            .route(
+                "/projections/graphql",
+                get(projections_graphql_playground)
+                    .post(projections_graphql_handler)
+                    .options(|| async { axum::http::StatusCode::OK }),
+            )
+            .route(
+                "/projections/graphql/ws",
+                get(projections_graphql_ws_handler),
+            )
             .route("/ws/collaboration", get(websocket_handler));
     }
 
@@ -335,9 +371,28 @@ async fn graphql_handler(
 }
 
 #[cfg(feature = "graphql")]
+async fn projections_graphql_handler(
+    State(state): State<AppState>,
+    request: GraphQLRequest,
+) -> AxumGraphQLResponse {
+    tracing::debug!("Projections GraphQL request received");
+    let req = request.into_inner();
+    let response = state.projections_schema.execute(req).await;
+    AxumGraphQLResponse(response.into())
+}
+
+#[cfg(feature = "graphql")]
 async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
+    ))
+}
+
+#[cfg(feature = "graphql")]
+async fn projections_graphql_playground() -> impl axum::response::IntoResponse {
+    axum::response::Html(async_graphql::http::playground_source(
+        async_graphql::http::GraphQLPlaygroundConfig::new("/projections/graphql")
+            .subscription_endpoint("/projections/graphql/ws"),
     ))
 }
 
@@ -400,10 +455,25 @@ async fn graphql_ws_handler(
 }
 
 #[cfg(feature = "graphql")]
-async fn handle_graphql_ws(
+async fn projections_graphql_ws_handler(
+    ws: axum::extract::WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl axum::response::IntoResponse {
+    ws.protocols(["graphql-transport-ws", "graphql-ws"])
+        .on_upgrade(move |socket| async move {
+            handle_graphql_ws(socket, state.projections_schema).await;
+        })
+}
+
+#[cfg(feature = "graphql")]
+async fn handle_graphql_ws<Q, M, S>(
     socket: axum::extract::ws::WebSocket,
-    schema: crate::graphql::GraphQLSchema,
-) {
+    schema: async_graphql::Schema<Q, M, S>,
+) where
+    Q: async_graphql::ObjectType + Send + Sync + 'static,
+    M: async_graphql::ObjectType + Send + Sync + 'static,
+    S: async_graphql::SubscriptionType + Send + Sync + 'static,
+{
     use futures_util::{SinkExt, StreamExt};
     use tokio::sync::mpsc;
 

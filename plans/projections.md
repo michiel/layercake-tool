@@ -163,9 +163,9 @@
 
 ## Implementation Plan (phased)
 - **Phase 1: Backend foundation**
-  - Add `projections` table migration (project_id + graph_id FK with same-project constraint).
-  - Implement ProjectionService (state store, graph cloning, broadcast channels).
-  - Wire Axum + async-graphql schema at `/projections/graphql` with queries/mutations/subscriptions; add websocket route.
+  - ✅ Add `projections` table migration (project_id + graph_id FK; service-level check keeps graph/project aligned).
+  - ✅ Implement ProjectionService (state store, graph cloning, broadcast channels).
+  - ✅ Wire Axum + async-graphql schema at `/projections/graphql` with queries/mutations/subscriptions; add websocket route.
 - **Phase 2: Workbench UI**
   - Add Projections nav under Workbench; list/create/delete/export actions using new GraphQL API.
   - Ensure graph picker filters to graphs in the same project; default type `force3d`.

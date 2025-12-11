@@ -10,6 +10,7 @@ pub mod plan_dag_nodes;
 pub mod plans;
 pub mod project_collaborators;
 pub mod project_layers;
+pub mod projections;
 pub mod projects;
 pub mod sequence_contexts;
 pub mod sequences;
