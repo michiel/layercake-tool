@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
+use std::{fs, path::Path};
 
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
@@ -380,6 +381,8 @@ impl ProjectionService {
                 .compression_method(zip::CompressionMethod::Deflated)
                 .unix_permissions(0o644);
 
+            let force_graph_js = Self::read_force_graph_bundle();
+
             let index_html = r#"<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -389,10 +392,12 @@ impl ProjectionService {
     <style>
       html, body, #root { margin: 0; padding: 0; width: 100%; height: 100%; background: #0b1021; color: #e9edf7; font-family: sans-serif; }
       .fallback { padding: 16px; white-space: pre-wrap; overflow: auto; }
+      canvas { outline: none; }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    <script src="./force-graph.min.js"></script>
     <script src="./data.js"></script>
     <script src="./projection.js"></script>
   </body>
@@ -413,20 +418,38 @@ impl ProjectionService {
             let projection_js = r#"(() => {
   const data = window.PROJECTION_EXPORT || {};
   const root = document.getElementById('root');
-  if (window.initProjection) {
-    window.initProjection(data);
+  const graphData = data.graph || { nodes: [], edges: [] };
+  if (window.ForceGraph) {
+    const elem = document.createElement('div');
+    elem.style.width = '100%';
+    elem.style.height = '100%';
+    root.appendChild(elem);
+    const fg = ForceGraph()(elem)
+      .graphData({
+        nodes: graphData.nodes.map(n => ({ id: n.id, name: n.label || n.id, layer: n.layer })),
+        links: graphData.edges.map(e => ({ id: e.id, source: e.source, target: e.target, label: e.label, layer: e.layer })),
+      })
+      .nodeLabel('name')
+      .linkDirectionalParticles(0)
+      .linkColor(() => '#6ddcff')
+      .nodeColor(node => node.layer ? '#ffd166' : '#6ddcff');
+    window.initProjection = () => fg; // allow override
     return;
   }
-  if (root) {
-    const pre = document.createElement('pre');
-    pre.className = 'fallback';
-    pre.textContent = JSON.stringify(data, null, 2);
-    root.appendChild(pre);
-  }
+  // Fallback render as JSON
+  const pre = document.createElement('pre');
+  pre.className = 'fallback';
+  pre.textContent = JSON.stringify(data, null, 2);
+  root.appendChild(pre);
 })();
 "#;
             zip.start_file("projection.js", options)?;
             zip.write_all(projection_js.as_bytes())?;
+
+            if let Some(force_src) = force_graph_js {
+                zip.start_file("force-graph.min.js", options)?;
+                zip.write_all(force_src.as_bytes())?;
+            }
 
             zip.finish()?;
         }
@@ -444,6 +467,25 @@ impl ProjectionService {
             filename,
             bytes: buffer,
         })
+    }
+
+    fn read_force_graph_bundle() -> Option<String> {
+        // Attempt to embed force-graph bundle for offline export; fallback to None if missing.
+        let candidates = [
+            "frontend/node_modules/force-graph/dist/force-graph.min.js",
+            "node_modules/force-graph/dist/force-graph.min.js",
+        ];
+
+        for path in candidates {
+            let p = Path::new(path);
+            if p.exists() {
+                if let Ok(contents) = fs::read_to_string(p) {
+                    return Some(contents);
+                }
+            }
+        }
+
+        None
     }
 
     async fn ensure_graph_in_project(

@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { gql, useMutation, useQuery, useSubscription } from '@apollo/client'
 import PageContainer from '@/components/layout/PageContainer'
@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { createApolloClientForEndpoint } from '@/graphql/client'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
+import ForceGraph from 'force-graph'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -62,6 +63,7 @@ const projectionsClient = createApolloClientForEndpoint({
 export const ProjectionViewerPage = () => {
   const { projectionId } = useParams<{ projectionId: string }>()
   const id = projectionId ?? ''
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   const { data, loading, refetch } = useQuery(PROJECTION_QUERY, {
     variables: { id },
@@ -94,6 +96,25 @@ export const ProjectionViewerPage = () => {
       showSuccessNotification('Projection updated', 'Graph changes received')
     }
   }, [graphUpdates])
+
+  useEffect(() => {
+    if (!graph || !containerRef.current) return
+    const elem = containerRef.current
+    elem.innerHTML = ''
+    const fg = ForceGraph()(elem)
+      .graphData({
+        nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
+        links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
+      })
+      .nodeLabel('name')
+      .linkDirectionalParticles(0)
+      .linkColor(() => '#6ddcff')
+      .nodeColor(() => '#ffd166')
+      .backgroundColor('#0b1021')
+    return () => {
+      fg.graphData({ nodes: [], links: [] })
+    }
+  }, [graph])
 
   if (loading) {
     return (
@@ -149,9 +170,7 @@ export const ProjectionViewerPage = () => {
           <CardTitle>Graph</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="max-h-[240px] overflow-auto rounded bg-muted p-3 text-xs">
-            {JSON.stringify(graph, null, 2)}
-          </pre>
+          <div ref={containerRef} className="h-[380px] w-full rounded border bg-black" />
         </CardContent>
       </Card>
 
