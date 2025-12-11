@@ -28,7 +28,7 @@ const LIST_PROJECTIONS = gql`
 
 const LIST_GRAPHS = gql`
   query ListGraphsForProjections($projectId: Int!) {
-    graphs(projectId: $projectId) {
+    graphDataList(projectId: $projectId, sourceTypes: ["computed", "manual", "dataset"]) {
       id
       name
     }
@@ -105,7 +105,7 @@ export const ProjectionsPage = () => {
   })
 
   const projections = (projectionsData as any)?.projections ?? []
-  const graphs = (graphsData as any)?.graphs ?? []
+  const graphs = (graphsData as any)?.graphDataList ?? []
 
   const projectName = ''
 
