@@ -1,12 +1,14 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import { ApolloClient, ApolloProvider, InMemoryCache, split } from '@apollo/client'
+import { ApolloClient, InMemoryCache, split } from '@apollo/client/core'
+import { ApolloProvider } from '@apollo/client/react'
+import { HttpLink } from '@apollo/client/link/http'
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions'
 import { getMainDefinition } from '@apollo/client/utilities'
 import { createClient } from 'graphql-ws'
 import App from './app'
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3001'
 const httpUrl = `${baseUrl}/projections/graphql`
 const wsUrl = `${baseUrl.replace('http', 'ws')}/projections/graphql/ws`
 
@@ -16,9 +18,8 @@ const wsLink = new GraphQLWsLink(
   })
 )
 
-const httpLink = new ApolloClient({
+const httpLink = new HttpLink({
   uri: httpUrl,
-  cache: new InMemoryCache(),
 })
 
 const splitLink = split(

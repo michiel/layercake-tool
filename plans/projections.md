@@ -171,9 +171,9 @@
   - 🚧 Projections page lists/creates/deletes projections via `/projections/graphql`; uses graph picker (project-scoped).
   - 🚧 Export now returns base64 zip with `index.html`, `data.js` assigning `window.PROJECTION_EXPORT`, and `projection.js` fallback; Open still uses web tab (Tauri window TODO).
 - **Phase 3: Projection frontend build**
-  - Create separate Vite build (shared GraphQL client) served at `/projections`.
-  - Implement `force3d` renderer (3d-force-graph) with controls bound to ProjectionState; subscribe to graph/state updates.
-  - Stub `layer3d` component and defaults.
+  - 🚧 Separate Vite build scaffolded under `projections-frontend` with projections GraphQL client and force-graph render baseline.
+  - TODO: Implement `force3d` renderer (3d-force-graph) with controls bound to ProjectionState; subscribe to graph/state updates.
+  - TODO: Stub `layer3d` component and defaults.
 - **Phase 4: Export pipeline**
   - Backend `exportProjection` mutation to bundle projection build + payload into ZIP; reuse standalone-pack pattern.
   - Frontend download flow with progress/toasts.

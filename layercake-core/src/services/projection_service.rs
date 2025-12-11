@@ -41,6 +41,12 @@ pub struct ProjectionExportBundle {
 }
 
 #[derive(Clone, Debug)]
+struct ProjectionBuildAssets {
+    index_html: String,
+    assets: Vec<(String, Vec<u8>)>,
+}
+
+#[derive(Clone, Debug)]
 pub struct ProjectionGraphView {
     pub nodes: Vec<ProjectionGraphNode>,
     pub edges: Vec<ProjectionGraphEdge>,
@@ -373,6 +379,7 @@ impl ProjectionService {
             sea_orm::DbErr::RecordNotFound(format!("projection {}", projection_id))
         })?;
 
+        let build_assets = Self::read_projection_build();
         let mut buffer: Vec<u8> = Vec::new();
         {
             let cursor = std::io::Cursor::new(&mut buffer);
@@ -383,7 +390,17 @@ impl ProjectionService {
 
             let force_graph_js = Self::read_force_graph_bundle();
 
-            let index_html = r#"<!DOCTYPE html>
+            // Prefer built projection frontend if available
+            if let Some(build) = build_assets.clone() {
+                zip.start_file("index.html", options)?;
+                zip.write_all(build.index_html.as_bytes())?;
+                for (name, bytes) in build.assets {
+                    let asset_path = format!("assets/{}", name);
+                    zip.start_file(asset_path, options)?;
+                    zip.write_all(&bytes)?;
+                }
+            } else {
+                let index_html = r#"<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -404,8 +421,9 @@ impl ProjectionService {
 </html>
 "#;
 
-            zip.start_file("index.html", options)?;
-            zip.write_all(index_html.as_bytes())?;
+                zip.start_file("index.html", options)?;
+                zip.write_all(index_html.as_bytes())?;
+            }
 
             let data_js = format!(
                 "window.PROJECTION_EXPORT = {};\n",
@@ -486,6 +504,45 @@ impl ProjectionService {
         }
 
         None
+    }
+
+    fn read_projection_build() -> Option<ProjectionBuildAssets> {
+        let base = Path::new("projections-frontend/dist");
+        if !base.exists() {
+            return None;
+        }
+
+        let index_path = base.join("index.html");
+        let index_html = fs::read_to_string(&index_path).ok()?;
+        let mut rewritten = index_html.replace("src=\"/assets/", "src=\"./assets/");
+        rewritten = rewritten.replace(
+            "</body>",
+            r#"  <script src="./data.js"></script>
+    <script src="./projection.js"></script>
+  </body>"#,
+        );
+
+        let assets_dir = base.join("assets");
+        let mut assets = Vec::new();
+        if assets_dir.exists() {
+            if let Ok(entries) = fs::read_dir(&assets_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() {
+                        if let Ok(bytes) = fs::read(&path) {
+                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                assets.push((name.to_string(), bytes));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Some(ProjectionBuildAssets {
+            index_html: rewritten,
+            assets,
+        })
     }
 
     async fn ensure_graph_in_project(

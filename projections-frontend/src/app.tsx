@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { gql, useMutation, useQuery, useSubscription } from '@apollo/client'
+import { useEffect, useRef } from 'react'
+import { gql } from '@apollo/client/core'
+import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph from 'force-graph'
 
 const PROJECTION_QUERY = gql`
@@ -77,15 +78,16 @@ export default function App() {
 
   const [saveState] = useMutation(SAVE_STATE)
 
-  const projection = data?.projection
-  const graph = graphUpdates?.projectionGraphUpdated ?? data?.projectionGraph
-  const state = stateUpdates?.projectionStateUpdated ?? data?.projectionState
+  const projection = (data as any)?.projection
+  const graph = (graphUpdates as any)?.projectionGraphUpdated ?? (data as any)?.projectionGraph
+  const state =
+    (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
   useEffect(() => {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = ForceGraph()(elem)
+    const fg = (ForceGraph as any)(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
