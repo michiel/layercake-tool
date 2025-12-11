@@ -1,5 +1,7 @@
 use crate::database::entities::{
-    graph_data, graph_data::GraphDataStatus, graph_data_edges, graph_data_nodes,
+    graph_data,
+    graph_data::GraphDataStatus,
+    graph_data_edges, graph_data_nodes,
     graph_edits::{self, Entity as GraphEdits},
 };
 use crate::services::graph_data_edit_applicator::{ApplyResult, GraphDataEditApplicator};
@@ -21,7 +23,10 @@ impl GraphDataService {
         Self { db }
     }
 
-    pub async fn create(&self, input: GraphDataCreate) -> Result<graph_data::Model, sea_orm::DbErr> {
+    pub async fn create(
+        &self,
+        input: GraphDataCreate,
+    ) -> Result<graph_data::Model, sea_orm::DbErr> {
         let now = Utc::now();
         let active = graph_data::ActiveModel {
             project_id: Set(input.project_id),
@@ -50,7 +55,9 @@ impl GraphDataService {
             ..Default::default()
         };
 
-        graph_data::Entity::insert(active).exec_with_returning(&self.db).await
+        graph_data::Entity::insert(active)
+            .exec_with_returning(&self.db)
+            .await
     }
 
     pub async fn get_by_id(&self, id: i32) -> Result<Option<graph_data::Model>, sea_orm::DbErr> {
@@ -232,8 +239,14 @@ impl GraphDataService {
     pub async fn load_full(
         &self,
         graph_data_id: i32,
-    ) -> Result<(graph_data::Model, Vec<graph_data_nodes::Model>, Vec<graph_data_edges::Model>), sea_orm::DbErr>
-    {
+    ) -> Result<
+        (
+            graph_data::Model,
+            Vec<graph_data_nodes::Model>,
+            Vec<graph_data_edges::Model>,
+        ),
+        sea_orm::DbErr,
+    > {
         let graph = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await?;
@@ -251,22 +264,34 @@ impl GraphDataService {
     }
 
     /// Convenience method for listing datasets in a project
-    pub async fn list_datasets(&self, project_id: i32) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+    pub async fn list_datasets(
+        &self,
+        project_id: i32,
+    ) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
         self.list_by_project_and_source(project_id, "dataset").await
     }
 
     /// Convenience method for listing computed graphs in a project
-    pub async fn list_computed(&self, project_id: i32) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
-        self.list_by_project_and_source(project_id, "computed").await
+    pub async fn list_computed(
+        &self,
+        project_id: i32,
+    ) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+        self.list_by_project_and_source(project_id, "computed")
+            .await
     }
 
     /// Mark a graph_data as processing (transitional status)
     pub async fn mark_processing(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
-        self.mark_status(graph_data_id, GraphDataStatus::Processing, None).await
+        self.mark_status(graph_data_id, GraphDataStatus::Processing, None)
+            .await
     }
 
     /// Mark a graph_data as error with an error message
-    pub async fn mark_error(&self, graph_data_id: i32, error: String) -> Result<(), sea_orm::DbErr> {
+    pub async fn mark_error(
+        &self,
+        graph_data_id: i32,
+        error: String,
+    ) -> Result<(), sea_orm::DbErr> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await?
@@ -450,10 +475,7 @@ impl GraphDataService {
         let edit = GraphEdits::find_by_id(edit_id)
             .one(&self.db)
             .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "Edit {}",
-                edit_id
-            )))?;
+            .ok_or(sea_orm::DbErr::RecordNotFound(format!("Edit {}", edit_id)))?;
 
         let mut active_model: graph_edits::ActiveModel = edit.into();
         active_model.applied = Set(true);

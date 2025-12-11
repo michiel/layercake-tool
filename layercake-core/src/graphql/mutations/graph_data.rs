@@ -47,7 +47,11 @@ impl GraphDataMutation {
     }
 
     /// Replay edits for a graph_data item
-    async fn replay_graph_data_edits(&self, ctx: &Context<'_>, graph_data_id: i32) -> Result<GraphData> {
+    async fn replay_graph_data_edits(
+        &self,
+        ctx: &Context<'_>,
+        graph_data_id: i32,
+    ) -> Result<GraphData> {
         let context = ctx.data::<GraphQLContext>()?;
         let service = GraphDataService::new(context.db.clone());
 

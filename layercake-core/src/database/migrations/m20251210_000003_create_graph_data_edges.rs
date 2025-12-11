@@ -28,16 +28,8 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(
-                        ColumnDef::new(GraphDataEdges::Source)
-                            .string()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(GraphDataEdges::Target)
-                            .string()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(GraphDataEdges::Source).string().not_null())
+                    .col(ColumnDef::new(GraphDataEdges::Target).string().not_null())
                     .col(ColumnDef::new(GraphDataEdges::Label).string().null())
                     .col(ColumnDef::new(GraphDataEdges::Layer).string().null())
                     .col(ColumnDef::new(GraphDataEdges::Weight).double().null())

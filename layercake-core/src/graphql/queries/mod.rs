@@ -741,8 +741,8 @@ impl Query {
         let context = ctx.data::<GraphQLContext>()?;
 
         use sea_orm::{EntityTrait, QueryFilter};
-        let mut query = graph_data::Entity::find()
-            .filter(graph_data::Column::ProjectId.eq(project_id));
+        let mut query =
+            graph_data::Entity::find().filter(graph_data::Column::ProjectId.eq(project_id));
 
         // Optionally filter by source_type ("dataset" or "computed")
         if let Some(st) = source_type {

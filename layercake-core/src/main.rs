@@ -1,7 +1,7 @@
 mod app_context;
+mod code_analysis_enhanced_solution_graph;
 mod code_analysis_graph;
 mod code_analysis_solution_graph;
-mod code_analysis_enhanced_solution_graph;
 mod common;
 mod data_loader;
 mod errors;
@@ -25,11 +25,11 @@ mod utils;
 #[cfg(feature = "console")]
 mod console;
 
-#[cfg(feature = "graphql")]
 mod graphql;
 
-#[cfg(feature = "graphql")]
 mod collaboration;
+
+mod projections;
 
 #[cfg(feature = "mcp")]
 mod mcp;

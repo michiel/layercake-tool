@@ -13,30 +13,23 @@ use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
 use crate::app_context::AppContext;
-#[cfg(feature = "graphql")]
 use crate::collaboration::{CollaborationCoordinator, CoordinatorHandle};
-#[cfg(feature = "graphql")]
 use crate::graphql::{
     mutations::Mutation, queries::Query, subscriptions::Subscription, GraphQLContext, GraphQLSchema,
 };
-#[cfg(feature = "graphql")]
 use crate::projections::graphql::{
     ProjectionMutation as ProjectionsMutation, ProjectionQuery as ProjectionsQuery,
     ProjectionSchemaContext, ProjectionSubscription as ProjectionsSubscription, ProjectionsSchema,
 };
-#[cfg(feature = "graphql")]
 use crate::server::websocket::websocket_handler;
-#[cfg(feature = "graphql")]
 use crate::{
     graphql::chat_manager::ChatManager, services::projection_service::ProjectionService,
     services::system_settings_service::SystemSettingsService,
 };
-#[cfg(feature = "graphql")]
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
     Request, Schema,
 };
-#[cfg(feature = "graphql")]
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
 
 use super::handlers::{health, library};
@@ -46,21 +39,15 @@ use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisition
 pub struct AppState {
     #[allow(dead_code)] // Reserved for future REST endpoints or middleware
     pub db: DatabaseConnection,
-    #[cfg(feature = "graphql")]
     pub graphql_schema: GraphQLSchema,
-    #[cfg(feature = "graphql")]
     pub coordinator_handle: CoordinatorHandle,
-    #[cfg(feature = "graphql")]
     pub projections_schema: ProjectionsSchema,
-    #[cfg(feature = "graphql")]
     pub projection_service: Arc<ProjectionService>,
 }
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
-    #[cfg(feature = "graphql")]
     let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
 
-    #[cfg(feature = "graphql")]
     let provider_hint = {
         let explicit = system_settings
             .raw_value("LAYERCAKE_EMBEDDING_PROVIDER")
@@ -76,14 +63,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         }
     };
 
-    #[cfg(not(feature = "graphql"))]
-    let provider_hint = std::env::var("LAYERCAKE_EMBEDDING_PROVIDER")
-        .ok()
-        .or_else(|| std::env::var("LAYERCAKE_CHAT_PROVIDER").ok());
-
     let mut embedding_config = EmbeddingProviderConfig::from_env();
 
-    #[cfg(feature = "graphql")]
     {
         if let Some(value) = system_settings.raw_value("OPENAI_API_KEY").await {
             if !value.is_empty() {
@@ -133,10 +114,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         data_acquisition_service.clone(),
     ));
 
-    #[cfg(feature = "graphql")]
     let projection_service = Arc::new(ProjectionService::new(db.clone()));
 
-    #[cfg(feature = "graphql")]
     let (graphql_schema, coordinator_handle) = {
         // Initialize actor-based collaboration coordinator
         let coordinator_handle = CollaborationCoordinator::spawn();
@@ -198,7 +177,6 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         (schema, coordinator_handle)
     };
 
-    #[cfg(feature = "graphql")]
     let projections_schema = Schema::build(
         ProjectionsQuery::default(),
         ProjectionsMutation,
@@ -209,13 +187,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     let state = AppState {
         db: db.clone(),
-        #[cfg(feature = "graphql")]
         graphql_schema,
-        #[cfg(feature = "graphql")]
         coordinator_handle,
-        #[cfg(feature = "graphql")]
         projections_schema,
-        #[cfg(feature = "graphql")]
         projection_service,
     };
 
@@ -258,17 +232,10 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         ServeDir::new("projections-frontend/dist").fallback(ServeFile::new(
             "projections-frontend/dist/index.html",
         )),
-    )
-    .handle_error(|error: std::io::Error| async move {
-        (
-            axum::http::StatusCode::INTERNAL_SERVER_ERROR,
-            format!("Projections static file error: {}", error),
-        )
-    });
+    );
     app = app.nest_service("/projections", projections_static);
 
     // Add GraphQL routes if feature is enabled
-    #[cfg(feature = "graphql")]
     {
         app = app
             .route(
@@ -331,7 +298,6 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
     Ok(app)
 }
 
-#[cfg(feature = "graphql")]
 async fn graphql_handler(
     State(state): State<AppState>,
     headers: axum::http::HeaderMap,
@@ -386,7 +352,6 @@ async fn graphql_handler(
     AxumGraphQLResponse(response.into())
 }
 
-#[cfg(feature = "graphql")]
 async fn projections_graphql_handler(
     State(state): State<AppState>,
     request: GraphQLRequest,
@@ -397,14 +362,12 @@ async fn projections_graphql_handler(
     AxumGraphQLResponse(response.into())
 }
 
-#[cfg(feature = "graphql")]
 async fn graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/graphql"),
     ))
 }
 
-#[cfg(feature = "graphql")]
 async fn projections_graphql_playground() -> impl axum::response::IntoResponse {
     axum::response::Html(async_graphql::http::playground_source(
         async_graphql::http::GraphQLPlaygroundConfig::new("/projections/graphql")
@@ -412,13 +375,11 @@ async fn projections_graphql_playground() -> impl axum::response::IntoResponse {
     ))
 }
 
-#[cfg(feature = "graphql")]
 struct MutationLogInfo {
     field_name: String,
     params_json: String,
 }
 
-#[cfg(feature = "graphql")]
 fn capture_mutation_log_info(req: &mut Request) -> Option<MutationLogInfo> {
     let operation_name_owned = req.operation_name.clone();
     let doc = req.parsed_query().ok()?;
@@ -459,7 +420,6 @@ fn capture_mutation_log_info(req: &mut Request) -> Option<MutationLogInfo> {
     })
 }
 
-#[cfg(feature = "graphql")]
 async fn graphql_ws_handler(
     ws: axum::extract::WebSocketUpgrade,
     State(state): State<AppState>,
@@ -470,7 +430,6 @@ async fn graphql_ws_handler(
         })
 }
 
-#[cfg(feature = "graphql")]
 async fn projections_graphql_ws_handler(
     ws: axum::extract::WebSocketUpgrade,
     State(state): State<AppState>,
@@ -481,7 +440,6 @@ async fn projections_graphql_ws_handler(
         })
 }
 
-#[cfg(feature = "graphql")]
 async fn handle_graphql_ws<Q, M, S>(
     socket: axum::extract::ws::WebSocket,
     schema: async_graphql::Schema<Q, M, S>,

@@ -120,15 +120,18 @@ impl From<crate::database::entities::graph_data::Model> for Graph {
         };
 
         // Serialize annotations back to JSON string for legacy compatibility
-        let annotations = model.annotations.as_ref().and_then(|val| {
-            serde_json::to_string(val).ok()
-        });
+        let annotations = model
+            .annotations
+            .as_ref()
+            .and_then(|val| serde_json::to_string(val).ok());
 
         Self {
             id: model.id,
             project_id: model.project_id,
             name: model.name,
-            node_id: model.dag_node_id.unwrap_or_else(|| format!("graph-{}", model.id)),
+            node_id: model
+                .dag_node_id
+                .unwrap_or_else(|| format!("graph-{}", model.id)),
             execution_state,
             computed_date: model.computed_date,
             source_hash: model.source_hash,

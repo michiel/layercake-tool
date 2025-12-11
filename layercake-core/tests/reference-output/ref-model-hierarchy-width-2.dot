@@ -50,27 +50,27 @@ digraph G {
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
 
-      root -> mgmt_a;
-      mgmt_a -> mgmt_a_a;
-      mgmt_a -> mgmt_a_b;
-      root -> mgmt_b;
-      mgmt_b -> mgmt_b_a;
-      mgmt_b_a -> mgmt_b_a_b;
-      mgmt_b -> mgmt_b_b;
-      mgmt_b_b -> mgmt_b_b_a;
-      mgmt_a -> drone_01;
-      mgmt_a_a -> drone_02;
-      mgmt_a_b -> drone_03;
-      mgmt_b_a -> drone_06;
-      mgmt_b_b -> drone_13;
-      mgmt_b -> drone_25;
-      mgmt_b_a_b -> drone_31;
-      mgmt_b_b_a -> drone_37;
-      mgmt_a_b -> agg_mgmt_a_b_1;
-      mgmt_a -> agg_mgmt_a_1;
-      mgmt_b_a_b -> agg_mgmt_b_a_b_1;
-      mgmt_b_a -> agg_mgmt_b_a_1;
-      mgmt_b_b_a -> agg_mgmt_b_b_a_1;
-      mgmt_b_b -> agg_mgmt_b_b_1;
-      mgmt_b -> agg_mgmt_b_1;
+      root -> mgmt_a [penwidth=1.0];
+      mgmt_a -> mgmt_a_a [penwidth=1.0];
+      mgmt_a -> mgmt_a_b [penwidth=1.0];
+      root -> mgmt_b [penwidth=1.0];
+      mgmt_b -> mgmt_b_a [penwidth=1.0];
+      mgmt_b_a -> mgmt_b_a_b [penwidth=1.0];
+      mgmt_b -> mgmt_b_b [penwidth=1.0];
+      mgmt_b_b -> mgmt_b_b_a [penwidth=1.0];
+      mgmt_a -> drone_01 [penwidth=1.0];
+      mgmt_a_a -> drone_02 [penwidth=1.0];
+      mgmt_a_b -> drone_03 [penwidth=1.0];
+      mgmt_b_a -> drone_06 [penwidth=1.0];
+      mgmt_b_b -> drone_13 [penwidth=1.0];
+      mgmt_b -> drone_25 [penwidth=1.0];
+      mgmt_b_a_b -> drone_31 [penwidth=1.0];
+      mgmt_b_b_a -> drone_37 [penwidth=1.0];
+      mgmt_a_b -> agg_mgmt_a_b_1 [penwidth=1.0];
+      mgmt_a -> agg_mgmt_a_1 [penwidth=1.0];
+      mgmt_b_a_b -> agg_mgmt_b_a_b_1 [penwidth=1.0];
+      mgmt_b_a -> agg_mgmt_b_a_1 [penwidth=1.0];
+      mgmt_b_b_a -> agg_mgmt_b_b_a_1 [penwidth=1.0];
+      mgmt_b_b -> agg_mgmt_b_b_1 [penwidth=1.0];
+      mgmt_b -> agg_mgmt_b_1 [penwidth=1.0];
 }

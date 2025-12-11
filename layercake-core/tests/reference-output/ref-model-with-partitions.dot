@@ -143,8 +143,8 @@ subgraph cluster_root {
       drone_23 -> drone_15 [label="link"  penwidth=1.0];
       drone_23 -> drone_25 [label="link"  penwidth=1.0];
       drone_25 -> drone_24 [label="link"  penwidth=1.0];
-      drone_26 -> drone_13 [label="link"  penwidth=2.0];
-      drone_26 -> drone_21 [label="link"  penwidth=2.0];
+      drone_26 -> drone_13 [label="link"  penwidth=6.0];
+      drone_26 -> drone_21 [label="link"  penwidth=6.0];
       drone_26 -> drone_32 [label="link"  penwidth=1.0];
       drone_27 -> drone_06 [label="link"  penwidth=1.0];
       drone_28 -> drone_40 [label="link"  penwidth=1.0];
@@ -161,7 +161,7 @@ subgraph cluster_root {
       drone_37 -> drone_12 [label="link"  penwidth=1.0];
       drone_38 -> drone_16 [label="link"  penwidth=1.0];
       drone_38 -> drone_36 [label="link"  penwidth=1.0];
-      drone_40 -> drone_19 [label="link"  penwidth=2.0];
+      drone_40 -> drone_19 [label="link"  penwidth=6.0];
       drone_40 -> drone_33 [label="link"  penwidth=1.0];
       drone_40 -> drone_38 [label="link"  penwidth=1.0];
 }

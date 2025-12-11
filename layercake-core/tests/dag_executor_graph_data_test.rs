@@ -1,8 +1,6 @@
 use chrono::Utc;
 use layercake as layercake_core;
-use layercake_core::database::entities::{
-    graph_data, plan_dag_nodes, project_layers, projects,
-};
+use layercake_core::database::entities::{graph_data, plan_dag_nodes, project_layers, projects};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::DagExecutor;
 use layercake_core::services::{GraphDataCreate, GraphDataNodeInput, GraphDataService};
@@ -154,9 +152,7 @@ async fn test_dag_executor_simple_graph_build() {
 
     // Execute DAG
     let executor = DagExecutor::new(db.clone());
-    let result = executor
-        .execute_dag(project_id, 1, &nodes, &edges)
-        .await;
+    let result = executor.execute_dag(project_id, 1, &nodes, &edges).await;
 
     assert!(result.is_ok(), "DAG execution should succeed");
 
@@ -171,7 +167,10 @@ async fn test_dag_executor_simple_graph_build() {
     let graph = &computed_graphs[0];
     assert_eq!(graph.dag_node_id, Some("graph-node".to_string()));
     assert_eq!(graph.source_type, "computed");
-    assert_eq!(graph.node_count, 2, "Should have merged 2 nodes from dataset");
+    assert_eq!(
+        graph.node_count, 2,
+        "Should have merged 2 nodes from dataset"
+    );
 
     // Verify nodes were copied
     let nodes = service.load_nodes(graph.id).await.unwrap();
@@ -232,7 +231,10 @@ async fn test_dag_executor_graph_chaining() {
     let graph1 = service.get_by_dag_node("graph1-node").await.unwrap();
     assert!(graph1.is_some(), "Graph1 should be created");
     let graph1 = graph1.unwrap();
-    assert_eq!(graph1.node_count, 4, "Graph1 should merge 4 nodes (2 from each dataset)");
+    assert_eq!(
+        graph1.node_count, 4,
+        "Graph1 should merge 4 nodes (2 from each dataset)"
+    );
 
     // Update graph2 config to chain from graph1
     let mut nodes_with_chain = nodes.clone();
@@ -246,11 +248,7 @@ async fn test_dag_executor_graph_chaining() {
 
     // Verify both graphs exist
     let computed_graphs = service.list_computed(project_id).await.unwrap();
-    assert_eq!(
-        computed_graphs.len(),
-        2,
-        "Should have two computed graphs"
-    );
+    assert_eq!(computed_graphs.len(), 2, "Should have two computed graphs");
 
     // Verify graph2 was built from graph1
     let graph2 = service.get_by_dag_node("graph2-node").await.unwrap();
@@ -298,7 +296,11 @@ async fn test_dag_executor_change_detection() {
         .await
         .unwrap();
 
-    let graph1 = service.get_by_dag_node("graph-node").await.unwrap().unwrap();
+    let graph1 = service
+        .get_by_dag_node("graph-node")
+        .await
+        .unwrap()
+        .unwrap();
     let hash1 = graph1.source_hash.clone();
     let updated1 = graph1.updated_at;
 
@@ -311,7 +313,11 @@ async fn test_dag_executor_change_detection() {
         .await
         .unwrap();
 
-    let graph2 = service.get_by_dag_node("graph-node").await.unwrap().unwrap();
+    let graph2 = service
+        .get_by_dag_node("graph-node")
+        .await
+        .unwrap()
+        .unwrap();
     let hash2 = graph2.source_hash.clone();
     let updated2 = graph2.updated_at;
 
@@ -374,7 +380,11 @@ async fn test_dag_executor_affected_nodes() {
         .await
         .unwrap();
 
-    let graph1 = service.get_by_dag_node("graph1-node").await.unwrap().unwrap();
+    let graph1 = service
+        .get_by_dag_node("graph1-node")
+        .await
+        .unwrap()
+        .unwrap();
 
     // Update graph2 to depend on graph1
     let mut updated_nodes = nodes.clone();
@@ -387,8 +397,16 @@ async fn test_dag_executor_affected_nodes() {
         .unwrap();
 
     // Both graphs should exist
-    assert!(service.get_by_dag_node("graph1-node").await.unwrap().is_some());
-    assert!(service.get_by_dag_node("graph2-node").await.unwrap().is_some());
+    assert!(service
+        .get_by_dag_node("graph1-node")
+        .await
+        .unwrap()
+        .is_some());
+    assert!(service
+        .get_by_dag_node("graph2-node")
+        .await
+        .unwrap()
+        .is_some());
 
     // Now execute only affected nodes downstream of graph1
     // This should rebuild graph2 (graph1 itself won't rebuild unless inputs changed)
@@ -399,8 +417,16 @@ async fn test_dag_executor_affected_nodes() {
     assert!(result.is_ok(), "Affected nodes execution should succeed");
 
     // Verify graphs still exist and were processed
-    let final_graph1 = service.get_by_dag_node("graph1-node").await.unwrap().unwrap();
-    let final_graph2 = service.get_by_dag_node("graph2-node").await.unwrap().unwrap();
+    let final_graph1 = service
+        .get_by_dag_node("graph1-node")
+        .await
+        .unwrap()
+        .unwrap();
+    let final_graph2 = service
+        .get_by_dag_node("graph2-node")
+        .await
+        .unwrap()
+        .unwrap();
 
     assert_eq!(final_graph1.dag_node_id, Some("graph1-node".to_string()));
     assert_eq!(final_graph2.dag_node_id, Some("graph2-node".to_string()));

@@ -9,7 +9,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt;
 
-use crate::services::{
+use crate::service::{
     ProjectionCreateInput, ProjectionExportBundle, ProjectionGraphEvent, ProjectionGraphView,
     ProjectionService, ProjectionStateEvent, ProjectionUpdateInput,
 };
@@ -246,8 +246,8 @@ pub struct Projection {
     pub settings_json: Option<Json<serde_json::Value>>,
 }
 
-impl From<crate::database::entities::projections::Model> for Projection {
-    fn from(model: crate::database::entities::projections::Model) -> Self {
+impl From<layercake_core::database::entities::projections::Model> for Projection {
+    fn from(model: layercake_core::database::entities::projections::Model) -> Self {
         Self {
             id: ID::from(model.id.to_string()),
             project_id: ID::from(model.project_id.to_string()),
@@ -293,8 +293,8 @@ pub struct ProjectionGraphNode {
     pub attributes: Option<Json<serde_json::Value>>,
 }
 
-impl From<crate::services::ProjectionGraphNode> for ProjectionGraphNode {
-    fn from(node: crate::services::ProjectionGraphNode) -> Self {
+impl From<crate::service::ProjectionGraphNode> for ProjectionGraphNode {
+    fn from(node: crate::service::ProjectionGraphNode) -> Self {
         Self {
             id: node.id,
             label: node.label,
@@ -316,8 +316,8 @@ pub struct ProjectionGraphEdge {
     pub attributes: Option<Json<serde_json::Value>>,
 }
 
-impl From<crate::services::ProjectionGraphEdge> for ProjectionGraphEdge {
-    fn from(edge: crate::services::ProjectionGraphEdge) -> Self {
+impl From<crate::service::ProjectionGraphEdge> for ProjectionGraphEdge {
+    fn from(edge: crate::service::ProjectionGraphEdge) -> Self {
         Self {
             id: edge.id,
             source: edge.source,

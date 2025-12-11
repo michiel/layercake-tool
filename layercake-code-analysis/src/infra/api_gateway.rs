@@ -162,10 +162,7 @@ fn extract_function_name_from_uri(uri: &str) -> String {
     uri.to_string()
 }
 
-fn parse_sam_definition(
-    _definition_body: &str,
-    _api_id: &str,
-) -> Vec<(ApiRoute, Vec<GraphEdge>)> {
+fn parse_sam_definition(_definition_body: &str, _api_id: &str) -> Vec<(ApiRoute, Vec<GraphEdge>)> {
     // Placeholder for SAM template parsing
     // Would parse OpenAPI/Swagger definition from SAM template
     // and extract routes with x-amazon-apigateway-integration
@@ -173,9 +170,7 @@ fn parse_sam_definition(
 }
 
 /// Add API Gateway routes to infrastructure graph
-pub fn enrich_with_api_routes(
-    infra: &mut InfrastructureGraph,
-) -> Vec<(String, ApiRoute)> {
+pub fn enrich_with_api_routes(infra: &mut InfrastructureGraph) -> Vec<(String, ApiRoute)> {
     let routes_with_edges = detect_api_routes(infra);
     let mut enriched_routes = Vec::new();
 
@@ -206,6 +201,9 @@ mod tests {
             extract_function_name_from_uri("${MyFunction.Arn}"),
             "MyFunction"
         );
-        assert_eq!(extract_function_name_from_uri("${MyFunctionArn}"), "MyFunctionArn");
+        assert_eq!(
+            extract_function_name_from_uri("${MyFunctionArn}"),
+            "MyFunctionArn"
+        );
     }
 }

@@ -21,13 +21,11 @@ pub mod server;
 pub mod services;
 pub mod utils;
 
-#[cfg(feature = "graphql")]
 pub mod projections;
 
 #[cfg(debug_assertions)]
 pub mod dev_utils;
 
-#[cfg(feature = "graphql")]
 pub mod graphql;
 
 #[cfg(feature = "mcp")]

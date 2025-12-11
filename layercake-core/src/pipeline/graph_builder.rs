@@ -278,7 +278,6 @@ impl GraphBuilder {
             .ok_or_else(|| anyhow!("Graph not found for node: {}", node_id))
     }
 
-
     /// Compute hash of upstream data_sets for change detection
     fn compute_data_set_hash(&self, data_sets: &[data_sets::Model]) -> Result<String> {
         use sha2::{Digest, Sha256};
@@ -713,6 +712,33 @@ impl GraphBuilder {
     }
 }
 
+fn node_model_to_graph_json(node: &graph_nodes::Model) -> Value {
+    serde_json::json!({
+        "id": node.id,
+        "label": node.label,
+        "layer": node.layer,
+        "weight": node.weight,
+        "is_partition": node.is_partition,
+        "belongs_to": node.belongs_to,
+        "comment": node.comment,
+        "attrs": node.attrs,
+        "dataset_id": node.dataset_id,
+    })
+}
+
+fn edge_model_to_graph_json(edge: &graph_edges::Model) -> Value {
+    serde_json::json!({
+        "id": edge.id,
+        "source": edge.source,
+        "target": edge.target,
+        "label": edge.label,
+        "layer": edge.layer,
+        "weight": edge.weight,
+        "comment": edge.comment,
+        "dataset_id": edge.dataset_id,
+        "attrs": edge.attrs,
+    })
+}
 
 #[cfg(test)]
 mod tests {

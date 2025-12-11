@@ -4,6 +4,8 @@ members = [
     "layercake-core",
     "layercake-genai",
     "src-tauri",
+    "layercake-projections",
+    "layercake-integration-tests",
 ]
 resolver = "2"
 

@@ -158,12 +158,7 @@ impl DagExecutor {
                         .collect();
                     let _graph_data = self
                         .graph_data_builder
-                        .build_graph(
-                            project_id,
-                            node_id.to_string(),
-                            node_name,
-                            upstream_ids,
-                        )
+                        .build_graph(project_id, node_id.to_string(), node_name, upstream_ids)
                         .await?;
                 } else {
                     // Legacy path: build via data_sets/graphs tables

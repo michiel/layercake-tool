@@ -408,9 +408,7 @@ impl<'a> JsVisitor<'a> {
                                 if let PropName::Ident(id) = &kv.key {
                                     if id.sym.as_ref() == "method" {
                                         if let Expr::Lit(swc_ecma_ast::Lit::Str(s)) = &*kv.value {
-                                            return Some(
-                                                s.value.to_string_lossy().to_uppercase(),
-                                            );
+                                            return Some(s.value.to_string_lossy().to_uppercase());
                                         }
                                     }
                                 }

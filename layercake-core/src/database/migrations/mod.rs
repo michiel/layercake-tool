@@ -40,7 +40,7 @@ mod m20251209_000005_add_dataset_annotations;
 mod m20251210_000001_create_graph_data;
 mod m20251210_000002_create_graph_data_nodes;
 mod m20251210_000003_create_graph_data_edges;
-mod m20251210_000004_migrate_existing_graph_data;
+pub mod m20251210_000004_migrate_existing_graph_data;
 mod m20251210_000005_create_projections;
 
 pub struct Migrator;

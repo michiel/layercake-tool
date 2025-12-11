@@ -1,11 +1,11 @@
 use chrono::Utc;
 use layercake as layercake_core;
-use layercake_core::database::entities::{
-    graph_data, graph_edits, project_layers, projects,
-};
+use layercake_core::database::entities::{graph_data, graph_edits, project_layers, projects};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::GraphDataBuilder;
-use layercake_core::services::{GraphDataCreate, GraphDataEdgeInput, GraphDataNodeInput, GraphDataService, LayerPaletteService};
+use layercake_core::services::{
+    GraphDataCreate, GraphDataEdgeInput, GraphDataNodeInput, GraphDataService, LayerPaletteService,
+};
 use sea_orm::prelude::*;
 use sea_orm::{ActiveModelTrait, Database, Set};
 use sea_orm_migration::MigratorTrait;
@@ -286,13 +286,20 @@ async fn test_graph_data_convenience_methods() {
 
     // Test create_computed
     let computed = service
-        .create_computed(project_id, "dag-node-1".to_string(), "Computed Graph".to_string())
+        .create_computed(
+            project_id,
+            "dag-node-1".to_string(),
+            "Computed Graph".to_string(),
+        )
         .await
         .unwrap();
 
     assert_eq!(computed.source_type, "computed");
     assert_eq!(computed.dag_node_id, Some("dag-node-1".to_string()));
-    assert_eq!(computed.status, graph_data::GraphDataStatus::Processing.as_str());
+    assert_eq!(
+        computed.status,
+        graph_data::GraphDataStatus::Processing.as_str()
+    );
 
     // Test create_from_json
     let dataset = service
@@ -319,7 +326,10 @@ async fn test_graph_data_convenience_methods() {
     // Test status transitions
     service.mark_processing(computed.id).await.unwrap();
     let processing = service.get_by_id(computed.id).await.unwrap().unwrap();
-    assert_eq!(processing.status, graph_data::GraphDataStatus::Processing.as_str());
+    assert_eq!(
+        processing.status,
+        graph_data::GraphDataStatus::Processing.as_str()
+    );
 
     service
         .mark_complete(computed.id, "test-hash".to_string())
@@ -537,7 +547,10 @@ async fn test_graph_data_edit_replay() {
     edit3.insert(&db).await.unwrap();
 
     // Update graph metadata to show pending edits
-    service.update_edit_metadata(graph.id, 3, false).await.unwrap();
+    service
+        .update_edit_metadata(graph.id, 3, false)
+        .await
+        .unwrap();
 
     // Verify edits are pending
     let edit_count = service.get_edit_count(graph.id, true).await.unwrap();
@@ -576,7 +589,10 @@ async fn test_graph_data_edit_replay() {
 
     // Verify no more pending edits
     let remaining_edits = service.get_edit_count(graph.id, true).await.unwrap();
-    assert_eq!(remaining_edits, 0, "Should have no unapplied edits after replay");
+    assert_eq!(
+        remaining_edits, 0,
+        "Should have no unapplied edits after replay"
+    );
 }
 
 #[tokio::test]
@@ -696,7 +712,10 @@ async fn test_graph_data_clear_edits() {
         edit.insert(&db).await.unwrap();
     }
 
-    service.update_edit_metadata(graph.id, 5, false).await.unwrap();
+    service
+        .update_edit_metadata(graph.id, 5, false)
+        .await
+        .unwrap();
 
     // Verify edits exist
     let count_before = service.get_edit_count(graph.id, false).await.unwrap();

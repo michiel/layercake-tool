@@ -44,23 +44,23 @@ digraph G {
   node [style="filled, dashed" fillcolor="#222222" fontcolor="#ffffff" penwidth=1 color="#dddddd"]; {
     }
 
-      root -> mgmt_a;
-      mgmt_a -> mgmt_a_a;
-      mgmt_a -> mgmt_a_b;
-      root -> mgmt_b;
-      mgmt_b -> mgmt_b_a;
-      mgmt_b -> mgmt_b_b;
-      mgmt_a -> drone_01;
-      mgmt_a -> drone_19;
-      mgmt_a -> drone_20;
-      mgmt_a -> drone_21;
-      mgmt_a -> drone_22;
-      mgmt_a -> drone_23;
-      mgmt_a -> drone_24;
-      mgmt_b -> drone_25;
-      mgmt_b -> drone_26;
-      mgmt_b -> drone_27;
-      mgmt_b -> drone_28;
-      mgmt_b -> drone_29;
-      mgmt_b -> drone_30;
+      root -> mgmt_a [penwidth=1.0];
+      mgmt_a -> mgmt_a_a [penwidth=1.0];
+      mgmt_a -> mgmt_a_b [penwidth=1.0];
+      root -> mgmt_b [penwidth=1.0];
+      mgmt_b -> mgmt_b_a [penwidth=1.0];
+      mgmt_b -> mgmt_b_b [penwidth=1.0];
+      mgmt_a -> drone_01 [penwidth=1.0];
+      mgmt_a -> drone_19 [penwidth=1.0];
+      mgmt_a -> drone_20 [penwidth=1.0];
+      mgmt_a -> drone_21 [penwidth=1.0];
+      mgmt_a -> drone_22 [penwidth=1.0];
+      mgmt_a -> drone_23 [penwidth=1.0];
+      mgmt_a -> drone_24 [penwidth=1.0];
+      mgmt_b -> drone_25 [penwidth=1.0];
+      mgmt_b -> drone_26 [penwidth=1.0];
+      mgmt_b -> drone_27 [penwidth=1.0];
+      mgmt_b -> drone_28 [penwidth=1.0];
+      mgmt_b -> drone_29 [penwidth=1.0];
+      mgmt_b -> drone_30 [penwidth=1.0];
 }

@@ -47,7 +47,9 @@ impl GraphDataEditApplicator {
             "layer" => {
                 // Layer edits are skipped for graph_data - Phase 5 will remove layer storage
                 ApplyResult::Skipped {
-                    reason: "Layer edits not supported for graph_data (use project palette instead)".to_string(),
+                    reason:
+                        "Layer edits not supported for graph_data (use project palette instead)"
+                            .to_string(),
                 }
             }
             _ => {
@@ -101,9 +103,7 @@ impl GraphDataEditApplicator {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let weight = new_value
-            .get("weight")
-            .and_then(|v| v.as_f64());
+        let weight = new_value.get("weight").and_then(|v| v.as_f64());
 
         let is_partition = new_value
             .get("isPartition")
@@ -299,9 +299,7 @@ impl GraphDataEditApplicator {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let weight = new_value
-            .get("weight")
-            .and_then(|v| v.as_f64());
+        let weight = new_value.get("weight").and_then(|v| v.as_f64());
 
         let attributes = new_value.get("attributes").cloned();
 

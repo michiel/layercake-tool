@@ -29,9 +29,9 @@ where
         _ => sql_type,
     };
     let stmt = match backend {
-        sea_orm::DatabaseBackend::Postgres => format!(
-            "ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition};"
-        ),
+        sea_orm::DatabaseBackend::Postgres => {
+            format!("ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition};")
+        }
         _ => format!("ALTER TABLE {table} ADD COLUMN {column} {definition};"),
     };
 
@@ -64,8 +64,22 @@ impl MigrationTrait for Migration {
         let _ = add_column_if_missing(db, backend, "data_sets", "updated_at", "TIMESTAMP").await;
         let _ = add_column_if_missing(db, backend, "graphs", "created_at", "TIMESTAMP").await;
         let _ = add_column_if_missing(db, backend, "graphs", "updated_at", "TIMESTAMP").await;
-        let _ = add_column_if_missing(db, backend, "dataset_graph_nodes", "created_at", "TIMESTAMP").await;
-        let _ = add_column_if_missing(db, backend, "dataset_graph_edges", "created_at", "TIMESTAMP").await;
+        let _ = add_column_if_missing(
+            db,
+            backend,
+            "dataset_graph_nodes",
+            "created_at",
+            "TIMESTAMP",
+        )
+        .await;
+        let _ = add_column_if_missing(
+            db,
+            backend,
+            "dataset_graph_edges",
+            "created_at",
+            "TIMESTAMP",
+        )
+        .await;
         let _ = add_column_if_missing(db, backend, "graph_nodes", "created_at", "TIMESTAMP").await;
         let _ = add_column_if_missing(db, backend, "graph_edges", "created_at", "TIMESTAMP").await;
 
@@ -216,133 +230,7 @@ impl MigrationTrait for Migration {
         ))
         .await?;
 
-        // 8. Remap graph_edits to point at graph_data (computed graphs use offset IDs)
-        match backend {
-            sea_orm::DatabaseBackend::Sqlite => {
-                // SQLite cannot drop foreign keys in-place; rebuild the table with the new FK target.
-                db.execute(Statement::from_string(backend, "PRAGMA foreign_keys=OFF;"))
-                    .await?;
-
-                db.execute(Statement::from_string(
-                    backend,
-                    r#"
-                    CREATE TABLE IF NOT EXISTS graph_edits_new (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                        graph_id INTEGER NOT NULL,
-                        target_type TEXT NOT NULL,
-                        target_id TEXT NOT NULL,
-                        operation TEXT NOT NULL,
-                        field_name TEXT,
-                        old_value JSON,
-                        new_value JSON,
-                        sequence_number INTEGER NOT NULL,
-                        applied BOOLEAN NOT NULL DEFAULT 0,
-                        created_at TIMESTAMP NOT NULL,
-                        created_by INTEGER,
-                        FOREIGN KEY (graph_id) REFERENCES graph_data(id) ON DELETE CASCADE
-                    );
-                    "#,
-                ))
-                .await?;
-
-                db.execute(Statement::from_string(
-                    backend,
-                    format!(
-                        "
-                    INSERT OR REPLACE INTO graph_edits_new (
-                        id, graph_id, target_type, target_id, operation,
-                        field_name, old_value, new_value, sequence_number,
-                        applied, created_at, created_by
-                    )
-                    SELECT
-                        id,
-                        CASE WHEN graph_id < {offset} THEN graph_id + {offset} ELSE graph_id END,
-                        target_type, target_id, operation,
-                        field_name, old_value, new_value, sequence_number,
-                        applied, created_at, created_by
-                    FROM graph_edits;",
-                        offset = GRAPH_ID_OFFSET
-                    ),
-                ))
-                .await?;
-
-                db.execute(Statement::from_string(backend, "DROP TABLE graph_edits;"))
-                    .await?;
-                db.execute(Statement::from_string(
-                    backend,
-                    "ALTER TABLE graph_edits_new RENAME TO graph_edits;",
-                ))
-                .await?;
-
-                // Recreate indexes/unique constraints lost during the rebuild
-                db.execute(Statement::from_string(
-                    backend,
-                    "CREATE INDEX IF NOT EXISTS idx_graph_edits_graph_id ON graph_edits(graph_id);",
-                ))
-                .await?;
-                db.execute(Statement::from_string(
-                    backend,
-                    "CREATE INDEX IF NOT EXISTS idx_graph_edits_target ON graph_edits(graph_id, target_type, target_id);",
-                ))
-                .await?;
-                db.execute(Statement::from_string(
-                    backend,
-                    "CREATE INDEX IF NOT EXISTS idx_graph_edits_sequence ON graph_edits(graph_id, sequence_number);",
-                ))
-                .await?;
-                db.execute(Statement::from_string(
-                    backend,
-                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_graph_edits_graph_sequence ON graph_edits(graph_id, sequence_number);",
-                ))
-                .await?;
-
-                db.execute(Statement::from_string(backend, "PRAGMA foreign_keys=ON;"))
-                    .await?;
-
-                db.execute(Statement::from_string(
-                    backend,
-                    "UPDATE sqlite_sequence SET seq = (SELECT IFNULL(MAX(id), 0) FROM graph_edits) WHERE name = 'graph_edits';",
-                ))
-                .await?;
-            }
-            sea_orm::DatabaseBackend::Postgres => {
-                db.execute(Statement::from_string(
-                    backend,
-                    "ALTER TABLE graph_edits DROP CONSTRAINT IF EXISTS fk_graph_edits_graph_id;",
-                ))
-                .await?;
-
-                db.execute(Statement::from_string(
-                    backend,
-                    format!(
-                        "UPDATE graph_edits
-                         SET graph_id = graph_id + {offset}
-                         WHERE graph_id < {offset};",
-                        offset = GRAPH_ID_OFFSET
-                    ),
-                ))
-                .await?;
-
-                db.execute(Statement::from_string(
-                    backend,
-                    "ALTER TABLE graph_edits ADD CONSTRAINT fk_graph_edits_graph_data FOREIGN KEY (graph_id) REFERENCES graph_data(id) ON DELETE CASCADE;",
-                ))
-                .await?;
-            }
-            _ => {
-                // Best-effort fallback for other backends; no FK updates performed.
-                db.execute(Statement::from_string(
-                    backend,
-                    format!(
-                        "UPDATE graph_edits
-                         SET graph_id = graph_id + {offset}
-                         WHERE graph_id < {offset};",
-                        offset = GRAPH_ID_OFFSET
-                    ),
-                ))
-                .await?;
-            }
-        }
+        // 8. Preserve existing graph_edits foreign key to graphs for backward compatibility.
 
         // 9. Capture validation counts
         db.execute(Statement::from_string(
@@ -466,20 +354,6 @@ impl MigrationTrait for Migration {
         ))
         .await?;
 
-        // FK: graph_edits -> graph_data (after offset)
-        db.execute(Statement::from_string(
-            backend,
-            r#"
-            INSERT INTO graph_data_migration_validation (check_name, old_count, new_count, delta)
-            SELECT 'graph_edits_missing_graph_data',
-                   NULL,
-                   (SELECT COUNT(*) FROM graph_edits ge
-                    WHERE NOT EXISTS (SELECT 1 FROM graph_data g WHERE g.id = ge.graph_id)),
-                   NULL;
-            "#,
-        ))
-        .await?;
-
         // Plan config graphId offset check (number of configs still below offset)
         match backend {
             sea_orm::DatabaseBackend::Sqlite => {
@@ -595,11 +469,8 @@ impl MigrationTrait for Migration {
             "DELETE FROM graph_data_nodes;",
         ))
         .await?;
-        db.execute(Statement::from_string(
-            backend,
-            "DELETE FROM graph_data;",
-        ))
-        .await?;
+        db.execute(Statement::from_string(backend, "DELETE FROM graph_data;"))
+            .await?;
         Ok(())
     }
 }

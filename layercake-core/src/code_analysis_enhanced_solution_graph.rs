@@ -326,10 +326,9 @@ pub fn analysis_to_enhanced_solution_graph(
 
         // Add infrastructure-to-infrastructure edges
         for edge in &infra.edges {
-            if let (Some(from_id), Some(to_id)) = (
-                infra_node_map.get(&edge.from),
-                infra_node_map.get(&edge.to),
-            ) {
+            if let (Some(from_id), Some(to_id)) =
+                (infra_node_map.get(&edge.from), infra_node_map.get(&edge.to))
+            {
                 edges.push(Edge {
                     id: next_edge_id(),
                     source: from_id.clone(),
@@ -359,7 +358,10 @@ pub fn analysis_to_enhanced_solution_graph(
                     id: next_edge_id(),
                     source: call_node_id.clone(),
                     target: infra_node_id.clone(),
-                    label: ext_match.operation.clone().unwrap_or_else(|| "accesses".to_string()),
+                    label: ext_match
+                        .operation
+                        .clone()
+                        .unwrap_or_else(|| "accesses".to_string()),
                     layer: "code-to-infra".to_string(),
                     weight: ext_match.confidence.max(10) as i32,
                     comment: Some(format!(
@@ -406,9 +408,7 @@ pub fn analysis_to_enhanced_solution_graph(
 
         // Add data flow edges (infra → code and code → infra)
         for data_flow in &enhanced_corr.data_flow_matches {
-            if let (Some(from_infra), Some(to_code)) =
-                (&data_flow.from_infra, &data_flow.to_code)
-            {
+            if let (Some(from_infra), Some(to_code)) = (&data_flow.from_infra, &data_flow.to_code) {
                 // Infra → Code (e.g., reading from S3)
                 if let (Some(infra_id), Some(code_file_id)) = (
                     infra_node_map.get(from_infra),
@@ -435,9 +435,7 @@ pub fn analysis_to_enhanced_solution_graph(
                 }
             }
 
-            if let (Some(from_code), Some(to_infra)) =
-                (&data_flow.from_code, &data_flow.to_infra)
-            {
+            if let (Some(from_code), Some(to_infra)) = (&data_flow.from_code, &data_flow.to_infra) {
                 // Code → Infra (e.g., writing to DynamoDB)
                 if let (Some(code_file_id), Some(infra_id)) = (
                     file_nodes.get(from_code.split("::").next().unwrap_or(from_code)),

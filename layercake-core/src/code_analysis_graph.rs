@@ -318,7 +318,10 @@ pub fn analysis_to_graph(
             label: flow.variable.clone().unwrap_or_default(),
             layer: "dataflow".to_string(),
             weight: 1,
-            comment: Some(format!("Data flow: {}", flow.variable.clone().unwrap_or_else(|| "value".to_string()))),
+            comment: Some(format!(
+                "Data flow: {}",
+                flow.variable.clone().unwrap_or_else(|| "value".to_string())
+            )),
             dataset: None,
             attributes: Some(json!({
                 "edge_type": "data_flow",

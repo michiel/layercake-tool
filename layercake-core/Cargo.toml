@@ -15,36 +15,13 @@ name = "layercake"
 path = "src/main.rs"
 
 [features]
-default = ["server", "mcp", "graphql", "console", "rmcp"]
+default = ["server", "graphql", "mcp", "console", "rmcp"]
 cli = []
-server = [
-    "dep:axum",
-    "dep:tower",
-    "dep:tower-http",
-    "dep:sea-orm",
-    "dep:sea-orm-migration",
-    "dep:chrono",
-    "dep:uuid",
-]
-graphql = [
-    "server",
-    "dep:async-graphql",
-    "dep:async-graphql-axum",
-    "dep:async-stream",
-    "dep:lazy_static",
-    "dep:tokio-tungstenite",
-    "dep:futures-util",
-    "dep:dashmap",
-    "dep:json-patch",
-]
-mcp = [
-    "server",
-    "dep:axum-mcp",
-    "dep:tokio-tungstenite",
-    "dep:futures-util",
-]
-all-apis = ["server", "graphql", "mcp"]
-console = ["dep:clap-repl", "dep:rig", "dep:nu-ansi-term", "mcp", "dep:chrono"]
+server = []
+graphql = []
+mcp = ["dep:axum-mcp", "dep:tokio-tungstenite"]
+all-apis = ["server", "mcp", "graphql"]
+console = ["dep:clap-repl", "dep:rig", "dep:nu-ansi-term", "mcp"]
 rmcp = ["dep:rmcp"]
 
 [dependencies]
@@ -76,23 +53,24 @@ thiserror = { workspace = true }
 strum = { workspace = true }
 colored = { workspace = true }
 tokio = { workspace = true }
+tokio-stream = "0.1"
 base64 = "0.22"
 
 # Server dependencies (optional)
-axum = { workspace = true, optional = true }
-tower = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
-sea-orm = { workspace = true, optional = true }
-sea-orm-migration = { workspace = true, optional = true }
-chrono = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true }
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
 
-# GraphQL dependencies (optional)
-async-graphql = { workspace = true, optional = true }
-async-graphql-axum = { workspace = true, optional = true }
-async-stream = { workspace = true, optional = true }
-lazy_static = { workspace = true, optional = true }
-json-patch = { version = "2.0", optional = true }
+# GraphQL dependencies
+async-graphql = { workspace = true }
+async-graphql-axum = { workspace = true }
+async-stream = { workspace = true }
+lazy_static = { workspace = true }
+json-patch = { version = "2.0" }
 
 # Authentication dependencies
 bcrypt = { workspace = true }
@@ -100,7 +78,7 @@ bcrypt = { workspace = true }
 # MCP dependencies (optional)
 axum-mcp = { workspace = true, optional = true }
 tokio-tungstenite = { workspace = true, optional = true }
-futures-util = { workspace = true, optional = true }
+futures-util = { workspace = true }
 
 # Console dependencies (optional)
 clap-repl = { version = "0.3.2", optional = true }
@@ -109,7 +87,7 @@ nu-ansi-term = { version = "0.49.0", optional = true }
 rmcp = { version = "0.9.1", optional = true, features = ["client", "transport-streamable-http-client-reqwest"] }
 
 # WebSocket collaboration dependencies (optional)
-dashmap = { workspace = true, optional = true }
+dashmap = { workspace = true }
 
 # Spreadsheet dependencies
 calamine = { workspace = true }

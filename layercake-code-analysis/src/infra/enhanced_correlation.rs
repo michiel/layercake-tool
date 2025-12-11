@@ -55,14 +55,15 @@ pub fn enhanced_correlate(
     let mut report = EnhancedCorrelationReport::default();
 
     // Build lookup maps for fast correlation
-    let resource_by_type: HashMap<String, Vec<String>> = infra
-        .resources
-        .iter()
-        .fold(HashMap::new(), |mut acc, (id, resource)| {
-            let type_key = format!("{:?}", resource.resource_type).to_lowercase();
-            acc.entry(type_key).or_default().push(id.clone());
-            acc
-        });
+    let resource_by_type: HashMap<String, Vec<String>> =
+        infra
+            .resources
+            .iter()
+            .fold(HashMap::new(), |mut acc, (id, resource)| {
+                let type_key = format!("{:?}", resource.resource_type).to_lowercase();
+                acc.entry(type_key).or_default().push(id.clone());
+                acc
+            });
 
     let _resource_by_name: HashMap<String, String> = infra
         .resources
@@ -366,7 +367,8 @@ pub fn enhanced_correlate(
             }
 
             // Write operations
-            if call_lc.contains("dynamodb") && (call_lc.contains("put") || call_lc.contains("update"))
+            if call_lc.contains("dynamodb")
+                && (call_lc.contains("put") || call_lc.contains("update"))
             {
                 if let Some(tables) = resource_by_type.get("aws(\"aws_dynamodb_table\")") {
                     for table_id in tables {

@@ -32,7 +32,7 @@ pub struct Model {
 
     // Dataset-specific fields
     pub file_format: Option<String>, // 'csv', 'tsv', 'json', etc.
-    pub origin: Option<String>, // 'file_upload', 'rag_agent', 'manual_edit'
+    pub origin: Option<String>,      // 'file_upload', 'rag_agent', 'manual_edit'
     pub filename: Option<String>,
     #[sea_orm(column_type = "Binary(BlobSize::Long)")]
     pub blob: Option<Vec<u8>>,

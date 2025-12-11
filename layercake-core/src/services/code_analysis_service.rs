@@ -12,9 +12,9 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::code_analysis_enhanced_solution_graph::analysis_to_enhanced_solution_graph;
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::code_analysis_solution_graph::analysis_to_solution_graph;
-use crate::code_analysis_enhanced_solution_graph::analysis_to_enhanced_solution_graph;
 use crate::database::entities::code_analysis_profiles;
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;

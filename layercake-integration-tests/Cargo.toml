@@ -1,0 +1,13 @@
+[package]
+name = "layercake-integration-tests"
+version = "0.1.0"
+edition = "2021"
+
+[dev-dependencies]
+layercake = { path = "../layercake-core", package = "layercake-core" }
+layercake-projections = { path = "../layercake-projections" }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+sea-orm = { workspace = true }
+async-graphql = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

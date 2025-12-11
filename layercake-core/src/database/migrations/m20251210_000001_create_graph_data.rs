@@ -29,18 +29,10 @@ impl MigrationTrait for Migration {
                     .col(ColumnDef::new(GraphData::Filename).string().null())
                     .col(ColumnDef::new(GraphData::Blob).binary().null())
                     .col(ColumnDef::new(GraphData::FileSize).integer().null())
-                    .col(
-                        ColumnDef::new(GraphData::ProcessedAt)
-                            .timestamp()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(GraphData::ProcessedAt).timestamp().null())
                     // Computed graph-specific fields
                     .col(ColumnDef::new(GraphData::SourceHash).string().null())
-                    .col(
-                        ColumnDef::new(GraphData::ComputedDate)
-                            .timestamp()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(GraphData::ComputedDate).timestamp().null())
                     // Edit tracking (for computed graphs only)
                     .col(
                         ColumnDef::new(GraphData::LastEditSequence)
@@ -52,11 +44,7 @@ impl MigrationTrait for Migration {
                             .boolean()
                             .default(false),
                     )
-                    .col(
-                        ColumnDef::new(GraphData::LastReplayAt)
-                            .timestamp()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(GraphData::LastReplayAt).timestamp().null())
                     // Common metadata
                     .col(
                         ColumnDef::new(GraphData::NodeCount)
@@ -72,23 +60,11 @@ impl MigrationTrait for Migration {
                     )
                     .col(ColumnDef::new(GraphData::ErrorMessage).string().null())
                     .col(ColumnDef::new(GraphData::Metadata).json_binary().null())
-                    .col(
-                        ColumnDef::new(GraphData::Annotations)
-                            .json_binary()
-                            .null(),
-                    )
+                    .col(ColumnDef::new(GraphData::Annotations).json_binary().null())
                     .col(ColumnDef::new(GraphData::Status).string().not_null())
                     // Timestamps
-                    .col(
-                        ColumnDef::new(GraphData::CreatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
-                    .col(
-                        ColumnDef::new(GraphData::UpdatedAt)
-                            .timestamp()
-                            .not_null(),
-                    )
+                    .col(ColumnDef::new(GraphData::CreatedAt).timestamp().not_null())
+                    .col(ColumnDef::new(GraphData::UpdatedAt).timestamp().not_null())
                     .foreign_key(
                         ForeignKey::create()
                             .name("fk_graph_data_project")
