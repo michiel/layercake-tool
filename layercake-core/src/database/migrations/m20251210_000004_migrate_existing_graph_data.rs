@@ -121,7 +121,7 @@ impl MigrationTrait for Migration {
         .await?;
 
         // 3. Migrate dataset edges into graph_data_edges (external_id = original id)
-        // Filter out orphaned edges whose dataset doesn't exist
+        // Filter out orphaned edges: check parent exists AND both source/target nodes exist
         db.execute(Statement::from_string(
             backend,
             r#"
@@ -133,7 +133,9 @@ impl MigrationTrait for Migration {
                 dge.dataset_id, dge.id, dge.source, dge.target, dge.label, dge.layer, CAST(dge.weight AS REAL),
                 dge.comment, dge.dataset_id, dge.attributes, COALESCE(dge.created_at, CURRENT_TIMESTAMP)
             FROM dataset_graph_edges dge
-            WHERE EXISTS (SELECT 1 FROM graph_data gd WHERE gd.id = dge.dataset_id AND gd.source_type = 'dataset');
+            WHERE EXISTS (SELECT 1 FROM graph_data gd WHERE gd.id = dge.dataset_id AND gd.source_type = 'dataset')
+              AND EXISTS (SELECT 1 FROM graph_data_nodes n WHERE n.graph_data_id = dge.dataset_id AND n.external_id = dge.source)
+              AND EXISTS (SELECT 1 FROM graph_data_nodes n WHERE n.graph_data_id = dge.dataset_id AND n.external_id = dge.target);
             "#,
         ))
         .await?;
@@ -190,7 +192,7 @@ impl MigrationTrait for Migration {
         .await?;
 
         // 6. Migrate computed graph edges into graph_data_edges
-        // Filter out orphaned edges whose graph doesn't exist
+        // Filter out orphaned edges: check parent exists AND both source/target nodes exist
         db.execute(Statement::from_string(
             backend,
             format!(
@@ -203,7 +205,9 @@ impl MigrationTrait for Migration {
                 (ge.graph_id + {offset}), ge.id, ge.source, ge.target, ge.label, ge.layer, ge.weight,
                 ge.comment, ge.dataset_id, ge.attrs, COALESCE(ge.created_at, CURRENT_TIMESTAMP)
             FROM graph_edges ge
-            WHERE EXISTS (SELECT 1 FROM graph_data gd WHERE gd.id = (ge.graph_id + {offset}) AND gd.source_type = 'computed');",
+            WHERE EXISTS (SELECT 1 FROM graph_data gd WHERE gd.id = (ge.graph_id + {offset}) AND gd.source_type = 'computed')
+              AND EXISTS (SELECT 1 FROM graph_data_nodes n WHERE n.graph_data_id = (ge.graph_id + {offset}) AND n.external_id = ge.source)
+              AND EXISTS (SELECT 1 FROM graph_data_nodes n WHERE n.graph_data_id = (ge.graph_id + {offset}) AND n.external_id = ge.target);",
                 offset = GRAPH_ID_OFFSET
             ),
         ))
