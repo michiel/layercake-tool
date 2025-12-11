@@ -6,7 +6,7 @@
 - Each Projection materializes a `ProjectionGraph` (shallow copy/clone of the source graph held in memory) and a `ProjectionState` (projection-type-specific, in-memory, mutable settings).
 - Projection UI runs as a separately built frontend served at `/projections` with its own GraphQL endpoint `/projections/graphql` (plus websocket subscriptions). The main app launches it via an **Open** button (new tab/window; Tauri opens new window).
 - Interactions (viewing, variable changes, render settings) flow through GraphQL subscriptions that stream graph and state updates.
-- Add **Export** action to produce a standalone ZIP (HTML + JS + embedded graph/state JSON) for offline viewing (similar to https://github.com/michiel/standalone-pack).
+- Add **Export** action to produce a standalone ZIP (HTML + JS + embedded graph/state JSON) for offline viewing (similar to https://github.com/michiel/standalone-pack). The data format should not change, but the loading of the data into the projection should come from a JSON object on window scope that has the exact same structure and is a static export, with the exported data being assigned to the window scope in a separate JS file that is loaded via a script tag as in the example repository at https://github.com/michiel/standalone-pack
 - First projection type to ship: `force3d` using https://github.com/vasturiano/3d-force-graph; `layer3d` scaffolding only.
 
 ## Backend (API + DB + Services)
@@ -169,7 +169,7 @@
 - **Phase 2: Workbench UI**
   - 🚧 Projections nav added; Workbench page now links to Projections view.
   - 🚧 Projections page lists/creates/deletes projections via `/projections/graphql`; uses graph picker (project-scoped).
-  - 🚧 Export wiring returns JSON payload of graph+state (zip pipeline still pending); Open still uses web tab (Tauri window TODO).
+  - 🚧 Export now returns base64 zip with `index.html`, `data.js` assigning `window.PROJECTION_EXPORT`, and `projection.js` fallback; Open still uses web tab (Tauri window TODO).
 - **Phase 3: Projection frontend build**
   - Create separate Vite build (shared GraphQL client) served at `/projections`.
   - Implement `force3d` renderer (3d-force-graph) with controls bound to ProjectionState; subscribe to graph/state updates.
