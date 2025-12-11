@@ -35,15 +35,6 @@ const LIST_GRAPHS = gql`
   }
 `
 
-const LIST_GRAPHS_LEGACY = gql`
-  query ListLegacyGraphs($projectId: Int!) {
-    graphs(projectId: $projectId) {
-      id
-      name
-    }
-  }
-`
-
 const CREATE_PROJECTION = gql`
   mutation CreateProjection($input: CreateProjectionInput!) {
     createProjection(input: $input) {
@@ -102,11 +93,6 @@ export const ProjectionsPage = () => {
     skip: !projectIdNum,
     fetchPolicy: 'cache-and-network',
   })
-  const { data: legacyGraphsData } = useQuery(LIST_GRAPHS_LEGACY, {
-    variables: { projectId: projectIdNum },
-    skip: !projectIdNum,
-    fetchPolicy: 'cache-and-network',
-  })
 
   const [createProjection, { loading: creating }] = useMutation(CREATE_PROJECTION, {
     client: projectionsClient,
@@ -119,10 +105,7 @@ export const ProjectionsPage = () => {
   })
 
   const projections = (projectionsData as any)?.projections ?? []
-  const graphs = [
-    ...(((graphsData as any)?.graphDataList as any[]) ?? []),
-    ...(((legacyGraphsData as any)?.graphs as any[]) ?? []),
-  ]
+  const graphs = (graphsData as any)?.graphDataList ?? []
 
   const projectName = ''
 

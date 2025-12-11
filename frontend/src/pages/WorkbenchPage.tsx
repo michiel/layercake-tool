@@ -199,13 +199,10 @@ export const WorkbenchPage = () => {
           </Button>
           <Button
             variant="outline"
-            onClick={() =>
-              showErrorNotification(
-                'Migration required',
-                "Service 'DagExecutor::execute_dag' error: Cannot chain computed graphs in legacy GraphBuilder. Please migrate this node to use 'graphDataIds' in config instead of legacy upstream IDs. GraphDataBuilder natively supports chaining graph_data without conversion. See Phase 3 migration docs for details."
-              )
-            }
+            onClick={handleValidateAndMigratePlan}
+            disabled={validatePlanDagLoading || !selectedPlanId}
           >
+            {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconTool className="mr-2 h-4 w-4" />
             Migrate project
           </Button>
