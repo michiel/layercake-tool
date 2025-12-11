@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { gql, useMutation, useQuery, useSubscription } from '@apollo/client'
+import { gql } from '@apollo/client'
+import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group } from '@/components/layout-primitives'
 import { Button } from '@/components/ui/button'
@@ -87,9 +88,9 @@ export const ProjectionViewerPage = () => {
     client: projectionsClient,
   })
 
-  const projection = data?.projection
-  const graph = graphUpdates?.projectionGraphUpdated ?? data?.projectionGraph
-  const state = stateUpdates?.projectionStateUpdated ?? data?.projectionState
+  const projection = (data as any)?.projection
+  const graph = (graphUpdates as any)?.projectionGraphUpdated ?? (data as any)?.projectionGraph
+  const state = (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
   useEffect(() => {
     if (graphUpdates) {
@@ -101,7 +102,8 @@ export const ProjectionViewerPage = () => {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = ForceGraph()(elem)
+    const fgFactory = (ForceGraph as any)()
+    const fg = fgFactory(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],

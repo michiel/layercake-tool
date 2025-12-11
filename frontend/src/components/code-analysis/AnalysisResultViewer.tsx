@@ -9,6 +9,8 @@ type AnalysisResult = {
   data_flows?: any[]
   call_edges?: any[]
   entry_points?: any[]
+  exits?: any[]
+  external_calls?: any[]
   env_vars?: any[]
   files?: string[]
   directories?: string[]

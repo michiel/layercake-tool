@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { gql, useApolloClient, useMutation, useQuery } from '@apollo/client'
+import { gql } from '@apollo/client'
+import { useMutation, useQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group } from '@/components/layout-primitives'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { IconAffiliate, IconDatabase, IconExternalLink, IconPlayerPlay, IconUpload } from '@tabler/icons-react'
+import { IconAffiliate, IconDatabase, IconExternalLink, IconUpload } from '@tabler/icons-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
@@ -87,7 +88,7 @@ export const ProjectionsPage = () => {
     client: projectionsClient,
   })
 
-  const { data: graphsData, loading: graphsLoading } = useQuery(LIST_GRAPHS, {
+  const { data: graphsData } = useQuery(LIST_GRAPHS, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
     fetchPolicy: 'cache-and-network',
@@ -103,8 +104,8 @@ export const ProjectionsPage = () => {
     client: projectionsClient,
   })
 
-  const projections = projectionsData?.projections ?? []
-  const graphs = graphsData?.graphs ?? []
+  const projections = (projectionsData as any)?.projections ?? []
+  const graphs = (graphsData as any)?.graphs ?? []
 
   const projectName = ''
 
@@ -147,13 +148,13 @@ export const ProjectionsPage = () => {
     const url = `/projections/${id}`
     if ((window as any).__TAURI__) {
       try {
-        const { WebviewWindow } = await import('@tauri-apps/api/window')
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
         const label = `projection-${id}-${Date.now()}`
         const win = new WebviewWindow(label, { url })
         win.once('tauri://created', () => {
           showSuccessNotification('Projection opened', 'New window created.')
         })
-        win.once('tauri://error', (e) => {
+        win.once('tauri://error', (e: unknown) => {
           showErrorNotification('Open failed', String(e))
         })
         return
@@ -167,7 +168,7 @@ export const ProjectionsPage = () => {
   const handleExport = async (id: string, name: string) => {
     try {
       const { data } = await exportProjection({ variables: { id } })
-      const payload = data?.exportProjection
+      const payload = (data as any)?.exportProjection
       if (!payload?.contentBase64) {
         showErrorNotification('Export failed', 'No export payload returned')
         return
