@@ -28,7 +28,7 @@ const LIST_PROJECTIONS = gql`
 
 const LIST_GRAPHS = gql`
   query ListGraphsForProjections($projectId: Int!) {
-    graphDataList(projectId: $projectId) {
+    graphDataList(project_id: $projectId) {
       id
       name
     }

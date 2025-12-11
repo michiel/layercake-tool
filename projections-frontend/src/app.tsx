@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
-import ForceGraph from 'force-graph'
+import ForceGraph3D from '3d-force-graph'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -91,7 +91,7 @@ export default function App() {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = (ForceGraph as any)(elem)
+    const fg = ForceGraph3D()(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id, layer: n.layer })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
@@ -102,6 +102,7 @@ export default function App() {
       .nodeColor((n: any) => (n.layer ? nodeColor : '#9ae6b4'))
       .nodeRelSize(nodeRelSize)
       .backgroundColor('#0b1021')
+      .showNavInfo(false)
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }

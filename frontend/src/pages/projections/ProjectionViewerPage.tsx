@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { createApolloClientForEndpoint } from '@/graphql/client'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
-import ForceGraph from 'force-graph'
+import ForceGraph3D from '3d-force-graph'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -102,8 +102,7 @@ export const ProjectionViewerPage = () => {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fgFactory = (ForceGraph as any)()
-    const fg = fgFactory(elem)
+    const fg = ForceGraph3D()(elem)
       .graphData({
         nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
@@ -113,6 +112,7 @@ export const ProjectionViewerPage = () => {
       .linkColor(() => '#6ddcff')
       .nodeColor(() => '#ffd166')
       .backgroundColor('#0b1021')
+      .showNavInfo(false)
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }

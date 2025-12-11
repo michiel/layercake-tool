@@ -418,7 +418,7 @@ impl ProjectionService {
   </head>
   <body>
     <div id="root"></div>
-    <script src="./force-graph.min.js"></script>
+    <script src="./3d-force-graph.min.js"></script>
     <script src="./data.js"></script>
     <script src="./projection.js"></script>
   </body>
@@ -445,12 +445,12 @@ impl ProjectionService {
   const data = window.PROJECTION_EXPORT || {};
   const root = document.getElementById('root');
   const graphData = data.graph || { nodes: [], edges: [] };
-  if (window.ForceGraph) {
+  if (window.ForceGraph3D) {
     const elem = document.createElement('div');
     elem.style.width = '100%';
     elem.style.height = '100%';
     root.appendChild(elem);
-    const fg = ForceGraph()(elem)
+    const fg = ForceGraph3D()(elem)
       .graphData({
         nodes: graphData.nodes.map(n => ({ id: n.id, name: n.label || n.id, layer: n.layer })),
         links: graphData.edges.map(e => ({ id: e.id, source: e.source, target: e.target, label: e.label, layer: e.layer })),
@@ -458,7 +458,9 @@ impl ProjectionService {
       .nodeLabel('name')
       .linkDirectionalParticles(0)
       .linkColor(() => '#6ddcff')
-      .nodeColor(node => node.layer ? '#ffd166' : '#6ddcff');
+      .nodeColor(node => node.layer ? '#ffd166' : '#6ddcff')
+      .backgroundColor('#0b1021')
+      .showNavInfo(false);
     window.initProjection = () => fg; // allow override
     return;
   }
@@ -475,7 +477,7 @@ impl ProjectionService {
                 .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))?;
 
             if let Some(force_src) = force_graph_js {
-                zip.start_file("force-graph.min.js", options)
+                zip.start_file("3d-force-graph.min.js", options)
                     .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))?;
                 zip.write_all(force_src.as_bytes())
                     .map_err(|e| sea_orm::DbErr::Custom(e.to_string()))?;
@@ -501,10 +503,11 @@ impl ProjectionService {
     }
 
     fn read_force_graph_bundle() -> Option<String> {
-        // Attempt to embed force-graph bundle for offline export; fallback to None if missing.
+        // Attempt to embed 3d-force-graph bundle for offline export; fallback to None if missing.
         let candidates = [
-            "frontend/node_modules/force-graph/dist/force-graph.min.js",
-            "node_modules/force-graph/dist/force-graph.min.js",
+            "frontend/node_modules/3d-force-graph/dist/3d-force-graph.min.js",
+            "node_modules/3d-force-graph/dist/3d-force-graph.min.js",
+            "projections-frontend/node_modules/3d-force-graph/dist/3d-force-graph.min.js",
         ];
 
         for path in candidates {
