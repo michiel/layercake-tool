@@ -112,8 +112,16 @@ export default function App() {
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
       })
       .nodeLabel((n: any) => n.name || n.id)
-      .nodeThreeObjectExtend(true)
       .nodeThreeObject((n: any) => {
+        const group = new (window as any).THREE.Group()
+
+        const sphereGeom = new (window as any).THREE.SphereGeometry(nodeRelSize * 0.8, 12, 12)
+        const sphereMat = new (window as any).THREE.MeshBasicMaterial({
+          color: n.color || nodeColor,
+        })
+        const sphere = new (window as any).THREE.Mesh(sphereGeom, sphereMat)
+        group.add(sphere)
+
         const label = n.name || n.id
         const canvas = document.createElement('canvas')
         const width = 256
@@ -138,7 +146,10 @@ export default function App() {
         const sprite = new (window as any).THREE.Sprite(material)
         const scale = Math.max(6, nodeRelSize * 2)
         sprite.scale.set(scale * 0.8, scale * 0.4, 1)
-        return sprite
+        sprite.position.set(0, nodeRelSize * 1.2, 0)
+        group.add(sprite)
+
+        return group
       })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
