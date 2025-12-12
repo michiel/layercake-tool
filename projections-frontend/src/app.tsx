@@ -283,13 +283,16 @@ export default function App() {
       return
     }
 
-    console.log(`[ForceGraph] UPDATING with ${graphData.nodes.length} nodes.`)
+    console.log(
+      `[ForceGraph] UPDATING with ${graphData.nodes.length} nodes.`,
+      { showLinks, showLabels, links: graphData.links.length }
+    )
 
     fg.graphData(graphData)
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-    fg.linkOpacity(showLinks ? 0.85 : 0)
-    fg.linkWidth(showLinks ? 1.2 : 0)
+    fg.linkOpacity(showLinks ? 0.9 : 0)
+    fg.linkWidth(showLinks ? 1.8 : 0)
     // Disable the built-in tooltip when labels are visible to avoid a black background
     fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
 
@@ -349,6 +352,8 @@ export default function App() {
         }
         return group
       })
+
+    fg.refresh()
 
     if (typeof fg.d3ReheatSimulation === 'function') {
       // Defer reheat to next frame so internal layout is ready
