@@ -4,7 +4,9 @@ use std::sync::Arc;
 use std::{fs, path::Path};
 
 use chrono::Utc;
-use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+};
 use serde_json;
 use tokio::sync::{broadcast, RwLock};
 use zip::write::FileOptions;
@@ -51,6 +53,7 @@ struct ProjectionBuildAssets {
 pub struct ProjectionGraphView {
     pub nodes: Vec<ProjectionGraphNode>,
     pub edges: Vec<ProjectionGraphEdge>,
+    pub layers: Vec<ProjectionLayer>,
 }
 
 #[derive(Clone, Debug)]
@@ -60,6 +63,8 @@ pub struct ProjectionGraphNode {
     pub layer: Option<String>,
     pub weight: Option<f64>,
     pub attributes: Option<serde_json::Value>,
+    pub color: Option<String>,
+    pub label_color: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -71,6 +76,15 @@ pub struct ProjectionGraphEdge {
     pub layer: Option<String>,
     pub weight: Option<f64>,
     pub attributes: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProjectionLayer {
+    pub layer_id: String,
+    pub name: String,
+    pub background_color: Option<String>,
+    pub text_color: Option<String>,
+    pub border_color: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -223,6 +237,30 @@ impl ProjectionService {
         Ok(result.rows_affected)
     }
 
+    async fn load_layer_palette(
+        &self,
+        project_id: i32,
+    ) -> Result<Vec<ProjectionLayer>, sea_orm::DbErr> {
+        use crate::entities::project_layers;
+
+        let rows = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .order_by_asc(project_layers::Column::LayerId)
+            .all(&self.db)
+            .await?;
+
+        Ok(rows
+            .into_iter()
+            .map(|row| ProjectionLayer {
+                layer_id: row.layer_id,
+                name: row.name,
+                background_color: Some(row.background_color),
+                text_color: Some(row.text_color),
+                border_color: Some(row.border_color),
+            })
+            .collect())
+    }
+
     pub async fn load_graph(
         &self,
         projection_id: i32,
@@ -236,23 +274,45 @@ impl ProjectionService {
 
         let nodes = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(projection.graph_id))
+            .order_by_asc(graph_data_nodes::Column::Id)
             .all(&self.db)
             .await?;
 
         let edges = graph_data_edges::Entity::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(projection.graph_id))
+            .order_by_asc(graph_data_edges::Column::Id)
             .all(&self.db)
             .await?;
+
+        let layers = self
+            .load_layer_palette(projection.project_id)
+            .await
+            .unwrap_or_default();
+        let layer_lookup: HashMap<String, ProjectionLayer> = layers
+            .iter()
+            .map(|l| (l.layer_id.clone(), l.clone()))
+            .collect();
 
         let view = ProjectionGraphView {
             nodes: nodes
                 .into_iter()
-                .map(|n| ProjectionGraphNode {
-                    id: n.external_id,
-                    label: n.label,
-                    layer: n.layer,
-                    weight: n.weight,
-                    attributes: n.attributes,
+                .map(|n| {
+                    let layer_key = n.layer.clone();
+                    let layer_colors = layer_key
+                        .as_ref()
+                        .and_then(|l| layer_lookup.get(l))
+                        .cloned();
+                    ProjectionGraphNode {
+                        id: n.external_id,
+                        label: n.label,
+                        layer: layer_key,
+                        weight: n.weight,
+                        attributes: n.attributes,
+                        color: layer_colors
+                            .as_ref()
+                            .and_then(|l| l.background_color.clone()),
+                        label_color: layer_colors.as_ref().and_then(|l| l.text_color.clone()),
+                    }
                 })
                 .collect(),
             edges: edges
@@ -267,6 +327,7 @@ impl ProjectionService {
                     attributes: e.attributes,
                 })
                 .collect(),
+            layers,
         };
 
         let _ = self.graph_tx.send(ProjectionGraphEvent {

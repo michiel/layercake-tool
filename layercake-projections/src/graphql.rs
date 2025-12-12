@@ -11,7 +11,7 @@ use tokio_stream::StreamExt;
 
 use crate::service::{
     ProjectionCreateInput, ProjectionExportBundle, ProjectionGraphEvent, ProjectionGraphView,
-    ProjectionService, ProjectionStateEvent, ProjectionUpdateInput,
+    ProjectionLayer, ProjectionService, ProjectionStateEvent, ProjectionUpdateInput,
 };
 
 pub type ProjectionsSchema = Schema<ProjectionQuery, ProjectionMutation, ProjectionSubscription>;
@@ -268,6 +268,7 @@ impl From<crate::entities::projections::Model> for Projection {
 pub struct ProjectionGraph {
     pub nodes: Vec<ProjectionGraphNode>,
     pub edges: Vec<ProjectionGraphEdge>,
+    pub layers: Vec<ProjectionLayerGql>,
 }
 
 impl From<ProjectionGraphView> for ProjectionGraph {
@@ -283,6 +284,11 @@ impl From<ProjectionGraphView> for ProjectionGraph {
                 .into_iter()
                 .map(ProjectionGraphEdge::from)
                 .collect(),
+            layers: view
+                .layers
+                .into_iter()
+                .map(ProjectionLayerGql::from)
+                .collect(),
         }
     }
 }
@@ -294,6 +300,8 @@ pub struct ProjectionGraphNode {
     pub layer: Option<String>,
     pub weight: Option<f64>,
     pub attributes: Option<Json<serde_json::Value>>,
+    pub color: Option<String>,
+    pub label_color: Option<String>,
 }
 
 impl From<crate::service::ProjectionGraphNode> for ProjectionGraphNode {
@@ -304,6 +312,8 @@ impl From<crate::service::ProjectionGraphNode> for ProjectionGraphNode {
             layer: node.layer,
             weight: node.weight,
             attributes: node.attributes.map(Json),
+            color: node.color,
+            label_color: node.label_color,
         }
     }
 }
@@ -329,6 +339,27 @@ impl From<crate::service::ProjectionGraphEdge> for ProjectionGraphEdge {
             layer: edge.layer,
             weight: edge.weight,
             attributes: edge.attributes.map(Json),
+        }
+    }
+}
+
+#[derive(SimpleObject, Clone)]
+pub struct ProjectionLayerGql {
+    pub layer_id: String,
+    pub name: String,
+    pub background_color: Option<String>,
+    pub text_color: Option<String>,
+    pub border_color: Option<String>,
+}
+
+impl From<ProjectionLayer> for ProjectionLayerGql {
+    fn from(layer: ProjectionLayer) -> Self {
+        Self {
+            layer_id: layer.layer_id,
+            name: layer.name,
+            background_color: layer.background_color,
+            text_color: layer.text_color,
+            border_color: layer.border_color,
         }
     }
 }

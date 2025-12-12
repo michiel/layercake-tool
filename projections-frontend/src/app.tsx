@@ -101,13 +101,51 @@ export default function App() {
     elem.innerHTML = ''
     const fg = (ForceGraph3D as any)()(elem)
       .graphData({
-        nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id, layer: n.layer })) ?? [],
+        nodes:
+          graph.nodes?.map((n: any) => ({
+            id: n.id,
+            name: n.label || n.id,
+            layer: n.layer,
+            color: n.color,
+            textColor: n.labelColor,
+          })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
       })
-      .nodeLabel('name')
+      .nodeLabel((n: any) => n.name || n.id)
+      .nodeThreeObject((n: any) => {
+        const group = document.createElement('div')
+        group.style.display = 'flex'
+        group.style.alignItems = 'center'
+        group.style.justifyContent = 'center'
+        group.style.transform = 'translate(-50%, -50%)'
+
+        const bubble = document.createElement('div')
+        bubble.style.width = `${nodeRelSize * 4}px`
+        bubble.style.height = `${nodeRelSize * 4}px`
+        bubble.style.borderRadius = '50%'
+        bubble.style.background = n.color || nodeColor
+        bubble.style.border = '1px solid rgba(0,0,0,0.3)'
+        group.appendChild(bubble)
+
+        const label = document.createElement('div')
+        label.textContent = n.name || n.id
+        label.style.position = 'absolute'
+        label.style.top = '50%'
+        label.style.left = '50%'
+        label.style.transform = 'translate(-50%, -50%)'
+        label.style.whiteSpace = 'nowrap'
+        label.style.pointerEvents = 'none'
+        label.style.color = n.textColor || '#0f172a'
+        label.style.fontSize = '10px'
+        label.style.fontWeight = '600'
+        group.appendChild(label)
+
+        // ForceGraph3D expects a THREE object; CSS2DObject is available when using 3d-force-graph-bundle
+        return new (window as any).THREE.CSS2DObject(group)
+      })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-      .nodeColor((n: any) => (n.layer ? nodeColor : '#9ae6b4'))
+      .nodeColor((n: any) => n.color || nodeColor)
       .nodeRelSize(nodeRelSize)
       .backgroundColor('#0b1021')
       .showNavInfo(false)
