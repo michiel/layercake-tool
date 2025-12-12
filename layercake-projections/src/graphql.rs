@@ -301,6 +301,7 @@ pub struct ProjectionGraphNode {
     pub weight: Option<f64>,
     pub attributes: Option<Json<serde_json::Value>>,
     pub color: Option<String>,
+    #[graphql(name = "labelColor")]
     pub label_color: Option<String>,
 }
 
@@ -345,10 +346,14 @@ impl From<crate::service::ProjectionGraphEdge> for ProjectionGraphEdge {
 
 #[derive(SimpleObject, Clone)]
 pub struct ProjectionLayerGql {
+    #[graphql(name = "layerId")]
     pub layer_id: String,
     pub name: String,
+    #[graphql(name = "backgroundColor")]
     pub background_color: Option<String>,
+    #[graphql(name = "textColor")]
     pub text_color: Option<String>,
+    #[graphql(name = "borderColor")]
     pub border_color: Option<String>,
 }
 

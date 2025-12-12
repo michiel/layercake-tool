@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph3D from '3d-force-graph'
+import { Leva, useControls, folder } from 'leva'
 import {
   CanvasTexture,
   Group,
@@ -21,8 +22,9 @@ const PROJECTION_QUERY = gql`
       graphId
     }
     projectionGraph(id: $id) {
-      nodes { id label layer }
+      nodes { id label layer color labelColor }
       edges { id source target }
+      layers { layerId name backgroundColor textColor borderColor }
     }
     projectionState(id: $id) {
       projectionId
@@ -35,8 +37,9 @@ const PROJECTION_QUERY = gql`
 const GRAPH_SUB = gql`
   subscription ProjectionGraphUpdated($id: ID!) {
     projectionGraphUpdated(id: $id) {
-      nodes { id label layer }
+      nodes { id label layer color labelColor }
       edges { id source target }
+      layers { layerId name backgroundColor textColor borderColor }
     }
   }
 `
@@ -74,10 +77,30 @@ const getProjectionId = () => {
 export default function App() {
   const projectionId = getProjectionId()
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [showLinks, setShowLinks] = useState(true)
-  const [nodeColor, setNodeColor] = useState('#ffd166')
-  const [linkColor, setLinkColor] = useState('#6ddcff')
-  const [nodeRelSize, setNodeRelSize] = useState(4)
+
+  const controls = useControls(() => ({
+    Forces: folder({
+      linkDistance: { value: 60, min: 10, max: 300, step: 5 },
+      chargeStrength: { value: -120, min: -2000, max: 0, step: 10 },
+    }),
+    Display: folder({
+      showLinks: true,
+      showLabels: true,
+      nodeRelSize: { value: 4, min: 1, max: 12, step: 0.5 },
+      linkColor: '#6ddcff',
+      defaultNodeColor: '#ffd166',
+    }),
+  }))
+
+  const {
+    showLinks,
+    showLabels,
+    nodeRelSize,
+    linkColor,
+    defaultNodeColor,
+    linkDistance,
+    chargeStrength,
+  } = controls as any
 
   const { data, loading } = useQuery(PROJECTION_QUERY, {
     variables: { id: projectionId },
@@ -101,6 +124,40 @@ export default function App() {
   const state =
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
+  const layers = graph?.layers ?? []
+  const layersKey = useMemo(
+    () => JSON.stringify(layers.map((l: any) => [l.layerId, l.backgroundColor, l.textColor])),
+    [layers]
+  )
+
+  const layerControls = useControls(
+    'Layers',
+    () => {
+      const schema: Record<string, any> = {}
+      layers.forEach((layer: any) => {
+        const bodyKey = `${layer.layerId || layer.name || 'layer'} body`
+        const labelKey = `${layer.layerId || layer.name || 'layer'} label`
+        schema[bodyKey] = { value: layer.backgroundColor || defaultNodeColor }
+        schema[labelKey] = { value: layer.textColor || '#0f172a' }
+      })
+      return schema
+    },
+    [layersKey, defaultNodeColor]
+  )
+
+  const layerColors = useMemo(() => {
+    const map = new Map<string, { body: string; label: string }>()
+    layers.forEach((layer: any) => {
+      const bodyKey = `${layer.layerId || layer.name || 'layer'} body`
+      const labelKey = `${layer.layerId || layer.name || 'layer'} label`
+      map.set(layer.layerId, {
+        body: (layerControls as any)[bodyKey] || layer.backgroundColor || defaultNodeColor,
+        label: (layerControls as any)[labelKey] || layer.textColor || '#0f172a',
+      })
+    })
+    return map
+  }, [layers, layerControls, defaultNodeColor])
+
   const isLayer3d = projection?.projectionType === 'layer3d'
 
   useEffect(() => {
@@ -115,8 +172,14 @@ export default function App() {
             id: n.id,
             name: n.label || n.id,
             layer: n.layer,
-            color: n.color,
-            textColor: n.labelColor,
+            color:
+              (n.layer && layerColors.get(n.layer)?.body) ||
+              n.color ||
+              defaultNodeColor,
+            textColor:
+              (n.layer && layerColors.get(n.layer)?.label) ||
+              n.labelColor ||
+              '#0f172a',
           })) ?? [],
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
       })
@@ -126,50 +189,75 @@ export default function App() {
 
         const sphereGeom = new SphereGeometry(nodeRelSize * 0.8, 12, 12)
         const sphereMat = new MeshBasicMaterial({
-          color: n.color || nodeColor,
+          color: n.color || defaultNodeColor,
         })
         const sphere = new Mesh(sphereGeom, sphereMat)
         group.add(sphere)
 
-        const label = n.name || n.id
-        const canvas = document.createElement('canvas')
-        const width = 256
-        const height = 64
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.fillStyle = 'rgba(0,0,0,0)'
-          ctx.fillRect(0, 0, width, height)
-          ctx.fillStyle = n.textColor || '#0f172a'
-          ctx.font = '24px sans-serif'
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(label, width / 2, height / 2, width - 16)
+        if (showLabels) {
+          const label = n.name || n.id
+          const canvas = document.createElement('canvas')
+          const width = 256
+          const height = 64
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.fillStyle = 'rgba(0,0,0,0)'
+            ctx.fillRect(0, 0, width, height)
+            ctx.fillStyle = n.textColor || '#0f172a'
+            ctx.font = '24px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(label, width / 2, height / 2, width - 16)
+          }
+          const texture = new CanvasTexture(canvas)
+          const material = new SpriteMaterial({
+            map: texture,
+            transparent: true,
+          })
+          const sprite = new Sprite(material)
+          const scale = Math.max(6, nodeRelSize * 2)
+          sprite.scale.set(scale * 0.8, scale * 0.4, 1)
+          sprite.position.set(0, nodeRelSize * 1.2, 0)
+          group.add(sprite)
         }
-        const texture = new CanvasTexture(canvas)
-        const material = new SpriteMaterial({
-          map: texture,
-          transparent: true,
-        })
-        const sprite = new Sprite(material)
-        const scale = Math.max(6, nodeRelSize * 2)
-        sprite.scale.set(scale * 0.8, scale * 0.4, 1)
-        sprite.position.set(0, nodeRelSize * 1.2, 0)
-        group.add(sprite)
 
         return group
       })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-      .nodeColor((n: any) => n.color || nodeColor)
+      .nodeColor((n: any) => n.color || defaultNodeColor)
       .nodeRelSize(nodeRelSize)
       .backgroundColor('#0b1021')
       .showNavInfo(false)
+
+    const linkForce = fg.d3Force('link')
+    if (linkForce && typeof linkForce.distance === 'function') {
+      linkForce.distance(linkDistance)
+    }
+    const chargeForce = fg.d3Force('charge')
+    if (chargeForce && typeof chargeForce.strength === 'function') {
+      chargeForce.strength(chargeStrength)
+    }
+    if (typeof fg.d3ReheatSimulation === 'function') {
+      fg.d3ReheatSimulation()
+    }
     return () => {
       fg.graphData({ nodes: [], links: [] })
     }
-  }, [graph, linkColor, nodeColor, nodeRelSize, showLinks, isLayer3d])
+  }, [
+    graph,
+    linkColor,
+    defaultNodeColor,
+    nodeRelSize,
+    showLinks,
+    showLabels,
+    isLayer3d,
+    layerColors,
+    linkDistance,
+    chargeStrength,
+  ])
 
   const handleSaveState = () => {
     if (!projectionId) return
@@ -177,9 +265,18 @@ export default function App() {
       ...(state?.stateJson ?? {}),
       ui: {
         showLinks,
-        nodeColor,
+        showLabels,
         linkColor,
+        defaultNodeColor,
         nodeRelSize,
+        linkDistance,
+        chargeStrength,
+        layers: Object.fromEntries(
+          Array.from(layerColors.entries()).map(([layerId, colors]) => [
+            layerId,
+            { body: colors.body, label: colors.label },
+          ])
+        ),
       },
     }
     saveState({ variables: { id: projectionId, state: nextState } })
@@ -226,6 +323,7 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen bg-slate-900 text-slate-100">
+      <Leva collapsed />
       <div className="flex items-center justify-between p-3 border-b border-slate-700">
         <div>
           <div className="font-semibold">{projection.name}</div>
@@ -234,42 +332,6 @@ export default function App() {
           </div>
         </div>
         <div className="flex gap-2">
-          <label className="flex items-center gap-2 text-xs">
-            <span>Nodes</span>
-            <input
-              type="color"
-              value={nodeColor}
-              onChange={(e) => setNodeColor(e.target.value)}
-              className="h-6 w-10 bg-transparent"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs">
-            <span>Links</span>
-            <input
-              type="color"
-              value={linkColor}
-              onChange={(e) => setLinkColor(e.target.value)}
-              className="h-6 w-10 bg-transparent"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs">
-            <span>Size</span>
-            <input
-              type="range"
-              min={2}
-              max={10}
-              value={nodeRelSize}
-              onChange={(e) => setNodeRelSize(Number(e.target.value))}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs">
-            <input
-              type="checkbox"
-              checked={showLinks}
-              onChange={(e) => setShowLinks(e.target.checked)}
-            />
-            <span>Links</span>
-          </label>
           <button
             className="rounded bg-slate-100 px-3 py-1 text-slate-900 text-sm"
             onClick={handleSaveState}
