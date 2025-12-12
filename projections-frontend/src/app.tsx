@@ -170,6 +170,7 @@ export default function App() {
     const elem = containerRef.current
     elem.innerHTML = ''
     const fg = (ForceGraph3D as any)()(elem)
+      .forceEngine('d3')
       .graphData({
         nodes:
           graph.nodes?.map((n: any) => ({
@@ -237,11 +238,11 @@ export default function App() {
       .showNavInfo(false)
 
     const linkForce = fg.d3Force('link')
-    if (linkForce && typeof linkForce.distance === 'function') {
+    if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
       linkForce.distance(safeLinkDistance)
     }
     const chargeForce = fg.d3Force('charge')
-    if (chargeForce && typeof chargeForce.strength === 'function') {
+    if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
       chargeForce.strength(safeChargeStrength)
     }
     if (typeof fg.d3ReheatSimulation === 'function') {
