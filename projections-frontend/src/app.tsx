@@ -288,6 +288,9 @@ export default function App() {
     fg.graphData(graphData)
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
+    fg.linkOpacity(showLinks ? 0.75 : 0)
+    // Disable the built-in tooltip when labels are visible to avoid a black background
+    fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
 
     const linkForce = fg.d3Force('link')
     if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
@@ -322,8 +325,7 @@ export default function App() {
           canvas.height = height
           const ctx = canvas.getContext('2d')
           if (ctx) {
-            ctx.fillStyle = 'rgba(0,0,0,0)'
-            ctx.fillRect(0, 0, width, height)
+            ctx.clearRect(0, 0, width, height)
             ctx.fillStyle = n.textColor || '#ffffff'
             ctx.font = '24px sans-serif'
             ctx.textAlign = 'center'
@@ -336,6 +338,7 @@ export default function App() {
             transparent: true,
           })
           const sprite = new Sprite(material)
+          sprite.renderOrder = 1
           const scale = Math.max(6, safeNodeSize * 2)
           sprite.scale.set(scale * 0.8, scale * 0.4, 1)
           sprite.position.set(0, safeNodeSize * 1.2, 0)
