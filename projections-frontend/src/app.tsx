@@ -102,6 +102,10 @@ export default function App() {
     chargeStrength,
   } = controls as any
 
+  const safeNodeSize = useMemo(() => Number(nodeRelSize) || 4, [nodeRelSize])
+  const safeLinkDistance = useMemo(() => Number(linkDistance) || 60, [linkDistance])
+  const safeChargeStrength = useMemo(() => Number(chargeStrength) || -120, [chargeStrength])
+
   const { data, loading } = useQuery(PROJECTION_QUERY, {
     variables: { id: projectionId },
     skip: !projectionId,
@@ -187,7 +191,7 @@ export default function App() {
       .nodeThreeObject((n: any) => {
         const group = new Group()
 
-        const sphereGeom = new SphereGeometry(nodeRelSize * 0.8, 12, 12)
+        const sphereGeom = new SphereGeometry(safeNodeSize * 0.8, 12, 12)
         const sphereMat = new MeshBasicMaterial({
           color: n.color || defaultNodeColor,
         })
@@ -217,9 +221,9 @@ export default function App() {
             transparent: true,
           })
           const sprite = new Sprite(material)
-          const scale = Math.max(6, nodeRelSize * 2)
+          const scale = Math.max(6, safeNodeSize * 2)
           sprite.scale.set(scale * 0.8, scale * 0.4, 1)
-          sprite.position.set(0, nodeRelSize * 1.2, 0)
+          sprite.position.set(0, safeNodeSize * 1.2, 0)
           group.add(sprite)
         }
 
@@ -228,17 +232,17 @@ export default function App() {
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
       .nodeColor((n: any) => n.color || defaultNodeColor)
-      .nodeRelSize(nodeRelSize)
+      .nodeRelSize(safeNodeSize)
       .backgroundColor('#0b1021')
       .showNavInfo(false)
 
     const linkForce = fg.d3Force('link')
     if (linkForce && typeof linkForce.distance === 'function') {
-      linkForce.distance(linkDistance)
+      linkForce.distance(safeLinkDistance)
     }
     const chargeForce = fg.d3Force('charge')
     if (chargeForce && typeof chargeForce.strength === 'function') {
-      chargeForce.strength(chargeStrength)
+      chargeForce.strength(safeChargeStrength)
     }
     if (typeof fg.d3ReheatSimulation === 'function') {
       fg.d3ReheatSimulation()
