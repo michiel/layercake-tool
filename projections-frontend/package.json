@@ -15,7 +15,8 @@
     "graphql-ws": "^6.0.6",
     "leva": "^0.10.1",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "three-spritetext": "^1.10.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.1",

@@ -3,15 +3,8 @@ import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph3D from '3d-force-graph'
 import { Leva, useControls, folder } from 'leva'
-import {
-  CanvasTexture,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  SphereGeometry,
-  Sprite,
-  SpriteMaterial,
-} from 'three'
+import { Group, Mesh, MeshBasicMaterial, SphereGeometry } from 'three'
+import SpriteText from 'three-spritetext'
 
 // --- GraphQL Queries and Mutations (Unchanged) ---
 const PROJECTION_QUERY = gql`
@@ -296,8 +289,28 @@ export default function App() {
     }
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-    fg.linkOpacity(showLinks ? 0.9 : 0)
-    fg.linkWidth(showLinks ? 0.6 : 0)
+    fg.linkOpacity(showLinks ? 0.6 : 0)
+    fg.linkWidth(showLinks ? 0.3 : 0)
+    fg.linkThreeObjectExtend(true)
+    fg.linkThreeObject((link: any) => {
+      if (!showLabels || !showLinks) return null
+      const text = link.name || `${link.source} → ${link.target}`
+      if (!text) return null
+      const sprite = new SpriteText(text)
+      sprite.color = '#ffffff'
+      sprite.textHeight = Math.max(6, safeNodeSize * 1.4)
+      sprite.backgroundColor = 'rgba(0,0,0,0)'
+      return sprite
+    })
+    fg.linkPositionUpdate((sprite: any, { start, end }: any) => {
+      if (!sprite) return
+      const middle = {
+        x: start.x + (end.x - start.x) / 2,
+        y: start.y + (end.y - start.y) / 2,
+        z: start.z + (end.z - start.z) / 2,
+      }
+      sprite.position.set(middle.x, middle.y, middle.z)
+    })
     // Disable the built-in tooltip when labels are visible to avoid a black background
     fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
 
@@ -327,36 +340,13 @@ export default function App() {
 
         if (showLabels) {
           const label = n.name || n.id
-          const padding = 32
-          const fontSize = Math.max(18, safeNodeSize * 5)
-          const canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.font = `${fontSize}px sans-serif`
-            const textWidth = ctx.measureText(label).width
-            const width = Math.min(1024, Math.max(256, textWidth + padding * 2))
-            const height = Math.max(96, fontSize * 2.2)
-            canvas.width = width
-            canvas.height = height
-            ctx.font = `${fontSize}px sans-serif`
-            ctx.clearRect(0, 0, width, height)
-            ctx.fillStyle = n.textColor || '#ffffff'
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText(label, width / 2, height / 2, width - padding)
-          }
-          const texture = new CanvasTexture(canvas)
-          const material = new SpriteMaterial({
-            map: texture,
-            transparent: true,
-            depthWrite: false,
-            depthTest: false,
-          })
-          const sprite = new Sprite(material)
-          sprite.renderOrder = 10
-          const scale = Math.max(12, safeNodeSize * 3.5)
-          sprite.scale.set(scale, scale * 0.45, 1)
+          const sprite = new SpriteText(label)
+          sprite.color = n.textColor || '#ffffff'
+          sprite.backgroundColor = 'rgba(0,0,0,0)'
+          sprite.textHeight = Math.max(8, safeNodeSize * 2.2)
+          sprite.center.set(0.5, 0)
           sprite.position.set(0, safeNodeSize * 1.6, 0)
+          sprite.renderOrder = 10
           group.add(sprite)
         }
         return group
