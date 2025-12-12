@@ -288,7 +288,8 @@ export default function App() {
     fg.graphData(graphData)
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-    fg.linkOpacity(showLinks ? 0.75 : 0)
+    fg.linkOpacity(showLinks ? 0.85 : 0)
+    fg.linkWidth(showLinks ? 1.2 : 0)
     // Disable the built-in tooltip when labels are visible to avoid a black background
     fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
 
@@ -336,9 +337,11 @@ export default function App() {
           const material = new SpriteMaterial({
             map: texture,
             transparent: true,
+            depthWrite: false,
+            depthTest: false,
           })
           const sprite = new Sprite(material)
-          sprite.renderOrder = 1
+          sprite.renderOrder = 10
           const scale = Math.max(6, safeNodeSize * 2)
           sprite.scale.set(scale * 0.8, scale * 0.4, 1)
           sprite.position.set(0, safeNodeSize * 1.2, 0)
