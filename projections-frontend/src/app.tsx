@@ -77,6 +77,7 @@ const getProjectionId = () => {
 export default function App() {
   const projectionId = getProjectionId()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const fgRef = useRef<any>(null)
 
   const controls = useControls(() => ({
     Forces: folder({
@@ -172,23 +173,10 @@ export default function App() {
     return map
   }, [layers, layerControls, defaultNodeColor])
 
-  const isLayer3d = projection?.projectionType === 'layer3d'
+  const graphData = useMemo(() => {
+    if (!graph) return { nodes: [], links: [] }
 
-  useEffect(() => {
-    console.log('[ForceGraph] Effect triggered', {
-      isLayer3d,
-      hasGraph: !!graph,
-      hasContainer: !!containerRef.current,
-      nodeCount: graph?.nodes?.length,
-      edgeCount: graph?.edges?.length,
-    })
-
-    if (isLayer3d) return // Don't render 3D graph for layer3d stub
-    if (!graph || !containerRef.current) return
-    const elem = containerRef.current
-    elem.innerHTML = ''
-
-    const graphData = {
+    return {
       nodes:
         graph.nodes?.map((n: any) => ({
           id: n.id,
@@ -203,20 +191,77 @@ export default function App() {
             n.labelColor ||
             '#0f172a',
         })) ?? [],
-      links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
+      links:
+        graph.edges?.map((e: any) => ({
+          id: e.id,
+          source: e.source,
+          target: e.target,
+          name: e.label,
+          layer: e.layer,
+        })) ?? [],
     }
+  }, [graph, layerColors, defaultNodeColor])
 
-    console.log('[ForceGraph] Graph data prepared', {
-      nodes: graphData.nodes.length,
-      links: graphData.links.length,
-      sampleNode: graphData.nodes[0],
-      sampleLink: graphData.links[0],
-    })
+  const isLayer3d = projection?.projectionType === 'layer3d'
 
-    console.log('[ForceGraph] Creating ForceGraph3D instance')
+  // Effect 1: Initialize the ForceGraph3D instance (runs once on mount)
+  useEffect(() => {
+    console.log('[ForceGraph] Initializing graph instance')
+    if (isLayer3d) return
+    if (!containerRef.current) return
+
+    const elem = containerRef.current
+
     const fg = (ForceGraph3D as any)()(elem)
       .forceEngine('d3')
-      .nodeLabel((n: any) => n.name || n.id)
+      .backgroundColor('#0b1021')
+      .showNavInfo(false)
+      .graphData({ nodes: [], links: [] })
+
+    fgRef.current = fg
+
+    console.log('[ForceGraph] Instance created and stored')
+
+    return () => {
+      console.log('[ForceGraph] Cleanup: Destroying instance')
+      const instance = fgRef.current
+      if (instance) {
+        if (typeof instance.pauseAnimation === 'function') {
+          instance.pauseAnimation()
+        }
+        if (typeof instance.graphData === 'function') {
+          instance.graphData({ nodes: [], links: [] })
+        }
+      }
+      fgRef.current = null
+      elem.innerHTML = ''
+      console.log('[ForceGraph] Cleanup completed')
+    }
+  }, [isLayer3d])
+
+  // Effect 2: Update graph data and configuration (runs on prop changes)
+  useEffect(() => {
+    const fg = fgRef.current
+    if (isLayer3d || !fg) {
+      console.log('[ForceGraph] Update skipped (layer3d or not initialized)')
+      return
+    }
+
+    console.log('[ForceGraph] Updating graph properties and data', {
+      nodes: graphData.nodes.length,
+      links: graphData.links.length,
+    })
+
+    // Update graph data
+    fg.graphData(graphData)
+
+    // Update link properties
+    fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
+
+    // Update node properties and rendering
+    fg.nodeLabel((n: any) => n.name || n.id)
+      .nodeRelSize(safeNodeSize)
+      .nodeColor((n: any) => n.color || defaultNodeColor)
       .nodeThreeObject((n: any) => {
         const group = new Group()
 
@@ -258,85 +303,34 @@ export default function App() {
 
         return group
       })
-      .linkDirectionalParticles(0)
-      .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-      .nodeColor((n: any) => n.color || defaultNodeColor)
-      .nodeRelSize(safeNodeSize)
-      .backgroundColor('#0b1021')
-      .showNavInfo(false)
 
-    console.log('[ForceGraph] Instance created, setting graph data')
-
-    // Set graph data and configure forces after initialization
-    fg.graphData(graphData)
-
-    console.log('[ForceGraph] Graph data set, configuring forces')
-
-    // Configure forces after graph data is set
-    try {
-      const linkForce = fg.d3Force('link')
-      console.log('[ForceGraph] Link force retrieved:', {
-        exists: !!linkForce,
-        hasDistance: linkForce && typeof linkForce.distance === 'function',
-        safeLinkDistance,
-      })
-
-      if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
-        linkForce.distance(safeLinkDistance)
-        console.log('[ForceGraph] Link force distance configured')
-      }
-
-      const chargeForce = fg.d3Force('charge')
-      console.log('[ForceGraph] Charge force retrieved:', {
-        exists: !!chargeForce,
-        hasStrength: chargeForce && typeof chargeForce.strength === 'function',
-        safeChargeStrength,
-      })
-
-      if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
-        chargeForce.strength(safeChargeStrength)
-        console.log('[ForceGraph] Charge force strength configured')
-      }
-
-      if (typeof fg.d3ReheatSimulation === 'function') {
-        fg.d3ReheatSimulation()
-        console.log('[ForceGraph] Simulation reheated')
-      }
-
-      console.log('[ForceGraph] All forces configured successfully')
-    } catch (error) {
-      console.error('[ForceGraph] Error configuring forces:', error)
+    // Update forces
+    const linkForce = fg.d3Force('link')
+    if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
+      linkForce.distance(safeLinkDistance)
+      console.log('[ForceGraph] Link force distance configured:', safeLinkDistance)
     }
 
-    return () => {
-      console.log('[ForceGraph] Cleanup started')
-      try {
-        // Stop the simulation
-        if (typeof fg.pauseAnimation === 'function') {
-          fg.pauseAnimation()
-        }
-        // Clear graph data
-        if (typeof fg.graphData === 'function') {
-          fg.graphData({ nodes: [], links: [] })
-        }
-        // Dispose of renderer and scene if available
-        if (fg._destructor && typeof fg._destructor === 'function') {
-          fg._destructor()
-        }
-        console.log('[ForceGraph] Cleanup completed')
-      } catch (error) {
-        console.error('[ForceGraph] Error cleaning up graph:', error)
-      }
+    const chargeForce = fg.d3Force('charge')
+    if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
+      chargeForce.strength(safeChargeStrength)
+      console.log('[ForceGraph] Charge force strength configured:', safeChargeStrength)
     }
+
+    // Reheat simulation after changes
+    if (typeof fg.d3ReheatSimulation === 'function') {
+      fg.d3ReheatSimulation()
+    }
+
+    console.log('[ForceGraph] Properties and data updated, simulation reheated')
   }, [
-    graph,
+    graphData,
+    showLinks,
     linkColor,
     defaultNodeColor,
     safeNodeSize,
-    showLinks,
     showLabels,
     isLayer3d,
-    layersKey,
     safeLinkDistance,
     safeChargeStrength,
   ])
