@@ -93,8 +93,8 @@ export default function App() {
     }),
   }))
 
-  const showLinks = Boolean((controls as any).showLinks ?? true)
-  const showLabels = Boolean((controls as any).showLabels ?? true)
+  const showLinks = (controls as any).showLinks ?? true
+  const showLabels = (controls as any).showLabels ?? true
   const nodeRelSize = Number((controls as any).nodeRelSize ?? 4)
   const linkColor = (controls as any).linkColor ?? '#9ad8ff'
   const defaultNodeColor = (controls as any).defaultNodeColor ?? '#ffd166'
@@ -290,7 +290,7 @@ export default function App() {
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
     fg.linkOpacity(showLinks ? 0.9 : 0)
-    fg.linkWidth(showLinks ? 1.8 : 0)
+    fg.linkWidth(showLinks ? 0.6 : 0)
     // Disable the built-in tooltip when labels are visible to avoid a black background
     fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
 
@@ -321,15 +321,15 @@ export default function App() {
         if (showLabels) {
           const label = n.name || n.id
           const canvas = document.createElement('canvas')
-          const width = 256
-          const height = 64
+          const width = 512
+          const height = 128
           canvas.width = width
           canvas.height = height
           const ctx = canvas.getContext('2d')
           if (ctx) {
             ctx.clearRect(0, 0, width, height)
             ctx.fillStyle = n.textColor || '#ffffff'
-            ctx.font = '24px sans-serif'
+            ctx.font = '32px sans-serif'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
             ctx.fillText(label, width / 2, height / 2, width - 16)
@@ -343,9 +343,9 @@ export default function App() {
           })
           const sprite = new Sprite(material)
           sprite.renderOrder = 10
-          const scale = Math.max(6, safeNodeSize * 2)
-          sprite.scale.set(scale * 0.8, scale * 0.4, 1)
-          sprite.position.set(0, safeNodeSize * 1.2, 0)
+          const scale = Math.max(8, safeNodeSize * 2.5)
+          sprite.scale.set(scale, scale * 0.45, 1)
+          sprite.position.set(0, safeNodeSize * 1.6, 0)
           group.add(sprite)
         }
         return group
