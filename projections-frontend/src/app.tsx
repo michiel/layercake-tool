@@ -189,6 +189,14 @@ export default function App() {
     }
   }, [graph, layerColors, defaultNodeColor])
 
+  const nodeColorMap = useMemo(() => {
+    const map = new Map<string, string>()
+    graphData.nodes.forEach((n: any) => {
+      map.set(n.id, n.color || defaultNodeColor)
+    })
+    return map
+  }, [graphData, defaultNodeColor])
+
   const isLayer3d = projection?.projectionType === 'layer3d'
   
   console.log('[App] Data state:', {
@@ -297,7 +305,7 @@ export default function App() {
       const text = link.name || `${link.source} → ${link.target}`
       if (!text) return null
       const sprite = new SpriteText(text)
-      sprite.color = '#ffffff'
+      sprite.color = nodeColorMap.get(link.source) || defaultNodeColor
       sprite.textHeight = Math.max(6, safeNodeSize * 1.4)
       sprite.backgroundColor = 'rgba(0,0,0,0)'
       return sprite
@@ -341,7 +349,7 @@ export default function App() {
         if (showLabels) {
           const label = n.name || n.id
           const sprite = new SpriteText(label)
-          sprite.color = n.textColor || '#ffffff'
+          sprite.color = n.color || defaultNodeColor
           sprite.backgroundColor = 'rgba(0,0,0,0)'
           sprite.textHeight = Math.max(8, safeNodeSize * 2.2)
           sprite.center.set(0.5, 0)
