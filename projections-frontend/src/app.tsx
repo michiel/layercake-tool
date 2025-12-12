@@ -206,16 +206,38 @@ export default function App() {
 
   // Effect 1: Initialize the ForceGraph3D instance (runs once on mount)
   useEffect(() => {
-    console.log('[ForceGraph] Initializing graph instance')
-    if (isLayer3d) return
-    if (!containerRef.current) return
+    console.log('[ForceGraph] Initializing graph instance', {
+      isLayer3d,
+      hasContainer: !!containerRef.current,
+      hasExistingInstance: !!fgRef.current,
+    })
+
+    if (isLayer3d) {
+      console.log('[ForceGraph] Skipping initialization: isLayer3d')
+      return
+    }
+
+    if (!containerRef.current) {
+      console.log('[ForceGraph] Skipping initialization: no container')
+      return
+    }
+
+    if (fgRef.current) {
+      console.log('[ForceGraph] Instance already exists, skipping initialization')
+      return
+    }
 
     const elem = containerRef.current
 
+    console.log('[ForceGraph] Creating ForceGraph3D instance')
     const fg = (ForceGraph3D as any)()(elem)
       .forceEngine('d3')
       .backgroundColor('#0b1021')
       .showNavInfo(false)
+      .nodeThreeObject(() => {
+        // Return a placeholder group - will be updated in effect 2
+        return new Group()
+      })
       .graphData({ nodes: [], links: [] })
 
     fgRef.current = fg
@@ -237,7 +259,7 @@ export default function App() {
       elem.innerHTML = ''
       console.log('[ForceGraph] Cleanup completed')
     }
-  }, [isLayer3d])
+  }, [isLayer3d, containerRef.current])
 
   // Effect 2: Update graph data and configuration (runs on prop changes)
   useEffect(() => {
