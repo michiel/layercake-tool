@@ -332,6 +332,16 @@ export default function App() {
       chargeForce.strength(safeChargeStrength)
     }
 
+    fg.onNodeClick((node: any) => {
+      const distance = 40
+      const distRatio = 1 + distance / Math.max(Math.hypot(node.x || 0, node.y || 0, node.z || 0), 0.001)
+      const newPos =
+        node.x || node.y || node.z
+          ? { x: (node.x || 0) * distRatio, y: (node.y || 0) * distRatio, z: (node.z || 0) * distRatio }
+          : { x: 0, y: 0, z: distance }
+      fg.cameraPosition(newPos, node, 3000)
+    })
+
     fg
       .nodeLabel((n: any) => (showLabels ? '' : n.name || n.id))
       .nodeRelSize(safeNodeSize)
