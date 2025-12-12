@@ -88,7 +88,7 @@ export default function App() {
       showLinks: true,
       showLabels: true,
       nodeRelSize: { value: 4, min: 1, max: 12, step: 0.5 },
-      linkColor: '#6ddcff',
+      linkColor: '#9ad8ff',
       defaultNodeColor: '#ffd166',
     }),
   }))
@@ -145,7 +145,7 @@ export default function App() {
         const bodyKey = `${layer.layerId || layer.name || 'layer'} body`
         const labelKey = `${layer.layerId || layer.name || 'layer'} label`
         schema[bodyKey] = { value: layer.backgroundColor || defaultNodeColor }
-        schema[labelKey] = { value: layer.textColor || '#0f172a' }
+        schema[labelKey] = { value: layer.textColor || '#ffffff' }
       })
       return schema
     },
@@ -159,7 +159,7 @@ export default function App() {
       const labelKey = `${layer.layerId || layer.name || 'layer'} label`
       map.set(layer.layerId, {
         body: (layerControls as any)[bodyKey] || layer.backgroundColor || defaultNodeColor,
-        label: (layerControls as any)[labelKey] || layer.textColor || '#0f172a',
+        label: (layerControls as any)[labelKey] || layer.textColor || '#ffffff',
       })
     })
     return map
@@ -182,7 +182,7 @@ export default function App() {
           textColor:
             (n.layer && layerColors.get(n.layer)?.label) ||
             n.labelColor ||
-            '#0f172a',
+            '#ffffff',
         })) ?? [],
       links:
         graph.edges?.map((e: any) => ({
@@ -286,6 +286,7 @@ export default function App() {
     console.log(`[ForceGraph] UPDATING with ${graphData.nodes.length} nodes.`)
 
     fg.graphData(graphData)
+    fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
 
     const linkForce = fg.d3Force('link')
@@ -323,7 +324,7 @@ export default function App() {
           if (ctx) {
             ctx.fillStyle = 'rgba(0,0,0,0)'
             ctx.fillRect(0, 0, width, height)
-            ctx.fillStyle = n.textColor || '#0f172a'
+            ctx.fillStyle = n.textColor || '#ffffff'
             ctx.font = '24px sans-serif'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
