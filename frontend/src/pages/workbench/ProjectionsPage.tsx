@@ -195,6 +195,10 @@ export const ProjectionsPage = () => {
     }
   }
 
+  const handleEdit = (id: string) => {
+    navigate(`/projects/${projectIdNum}/workbench/projections/${id}/edit`)
+  }
+
   if (loading) {
     return (
       <PageContainer>
@@ -298,6 +302,9 @@ export const ProjectionsPage = () => {
                   <Button size="sm" variant="outline" onClick={() => handleOpen(p.id)}>
                     <IconExternalLink className="mr-2 h-4 w-4" />
                     Open
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => handleEdit(p.id)}>
+                    Edit
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => handleExport(p.id, p.name)} disabled={exporting}>
                     <IconUpload className="mr-2 h-4 w-4" />

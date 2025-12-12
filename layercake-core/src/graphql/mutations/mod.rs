@@ -24,6 +24,7 @@ mod plan_dag;
 mod plan_dag_edges;
 mod plan_dag_nodes;
 mod project;
+mod projection;
 mod sequence;
 mod story;
 mod system;
@@ -52,6 +53,7 @@ pub struct Mutation(
     pub plan_dag_nodes::PlanDagNodesMutation,
     pub layer::LayerMutation,
     pub project::ProjectMutation,
+    pub projection::ProjectionMutation,
     pub sequence::SequenceMutation,
     // pub story::StoryMutation,
     pub system::SystemMutation,

@@ -46,6 +46,7 @@ import { showErrorNotification, showSuccessNotification } from './utils/notifica
 import { PlansPage } from './components/plans/PlansPage'
 import { ProjectionsPage } from './pages/workbench/ProjectionsPage'
 import { ProjectionViewerPage } from './pages/projections/ProjectionViewerPage'
+import { ProjectionEditPage } from './pages/projections/ProjectionEditPage'
 import type { Plan } from './types/plan'
 
 // Collaboration Context for providing project-level collaboration to all pages
@@ -2085,6 +2086,11 @@ function App() {
           <Route path="/projects/:projectId/workbench/projections" element={
             <ErrorBoundary>
               <ProjectionsPage />
+            </ErrorBoundary>
+          } />
+          <Route path="/projects/:projectId/workbench/projections/:projectionId/edit" element={
+            <ErrorBoundary>
+              <ProjectionEditPage />
             </ErrorBoundary>
           } />
           <Route path="/projections/:projectionId" element={
