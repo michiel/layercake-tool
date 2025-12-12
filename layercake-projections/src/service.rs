@@ -534,7 +534,14 @@ impl ProjectionService {
 
         let index_path = base.join("index.html");
         let index_html = fs::read_to_string(&index_path).ok()?;
-        let mut rewritten = index_html.replace("src=\"/assets/", "src=\"./assets/");
+        // Make asset URLs relative so exported bundle works offline
+        let mut rewritten = index_html
+            .replace("src=\"/assets/", "src=\"./assets/")
+            .replace("src=\"/projections/viewer/assets/", "src=\"./assets/")
+            .replace("href=\"/assets/", "href=\"./assets/")
+            .replace("href=\"/projections/viewer/assets/", "href=\"./assets/")
+            .replace("base href=\"/projections/viewer/\"", ""); // drop base to keep relative navigation
+
         rewritten = rewritten.replace(
             "</body>",
             r#"  <script src="./data.js"></script>
