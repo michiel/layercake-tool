@@ -112,36 +112,33 @@ export default function App() {
         links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
       })
       .nodeLabel((n: any) => n.name || n.id)
+      .nodeThreeObjectExtend(true)
       .nodeThreeObject((n: any) => {
-        const group = document.createElement('div')
-        group.style.display = 'flex'
-        group.style.alignItems = 'center'
-        group.style.justifyContent = 'center'
-        group.style.transform = 'translate(-50%, -50%)'
-
-        const bubble = document.createElement('div')
-        bubble.style.width = `${nodeRelSize * 4}px`
-        bubble.style.height = `${nodeRelSize * 4}px`
-        bubble.style.borderRadius = '50%'
-        bubble.style.background = n.color || nodeColor
-        bubble.style.border = '1px solid rgba(0,0,0,0.3)'
-        group.appendChild(bubble)
-
-        const label = document.createElement('div')
-        label.textContent = n.name || n.id
-        label.style.position = 'absolute'
-        label.style.top = '50%'
-        label.style.left = '50%'
-        label.style.transform = 'translate(-50%, -50%)'
-        label.style.whiteSpace = 'nowrap'
-        label.style.pointerEvents = 'none'
-        label.style.color = n.textColor || '#0f172a'
-        label.style.fontSize = '10px'
-        label.style.fontWeight = '600'
-        group.appendChild(label)
-
-        // ForceGraph3D expects a THREE object; CSS2DObject is available when using 3d-force-graph-bundle
-        return new (window as any).THREE.CSS2DObject(group)
+        const label = n.name || n.id
+        const canvas = document.createElement('canvas')
+        const width = 256
+        const height = 64
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.fillStyle = 'rgba(0,0,0,0)'
+          ctx.fillRect(0, 0, width, height)
+          ctx.fillStyle = n.textColor || '#0f172a'
+          ctx.font = '24px sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(label, width / 2, height / 2, width - 16)
+        }
+        const texture = new (window as any).THREE.CanvasTexture(canvas)
+        const material = new (window as any).THREE.SpriteMaterial({
+          map: texture,
+          transparent: true,
+        })
+        const sprite = new (window as any).THREE.Sprite(material)
+        const scale = Math.max(6, nodeRelSize * 2)
+        sprite.scale.set(scale * 0.8, scale * 0.4, 1)
+        return sprite
       })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
