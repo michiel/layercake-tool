@@ -3,15 +3,6 @@ import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph3D from '3d-force-graph'
 import { Leva, useControls, folder } from 'leva'
-import {
-  CanvasTexture,
-  Group,
-  Mesh,
-  MeshBasicMaterial,
-  SphereGeometry,
-  Sprite,
-  SpriteMaterial,
-} from 'three'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -169,67 +160,28 @@ export default function App() {
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
+
+    const graphData = {
+      nodes:
+        graph.nodes?.map((n: any) => ({
+          id: n.id,
+          name: n.label || n.id,
+          layer: n.layer,
+          color:
+            (n.layer && layerColors.get(n.layer)?.body) ||
+            n.color ||
+            defaultNodeColor,
+          textColor:
+            (n.layer && layerColors.get(n.layer)?.label) ||
+            n.labelColor ||
+            '#0f172a',
+        })) ?? [],
+      links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
+    }
+
     const fg = (ForceGraph3D as any)()(elem)
       .forceEngine('d3')
-      .graphData({
-        nodes:
-          graph.nodes?.map((n: any) => ({
-            id: n.id,
-            name: n.label || n.id,
-            layer: n.layer,
-            color:
-              (n.layer && layerColors.get(n.layer)?.body) ||
-              n.color ||
-              defaultNodeColor,
-            textColor:
-              (n.layer && layerColors.get(n.layer)?.label) ||
-              n.labelColor ||
-              '#0f172a',
-          })) ?? [],
-        links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
-      })
       .nodeLabel((n: any) => n.name || n.id)
-      .nodeThreeObject((n: any) => {
-        const group = new Group()
-
-        const sphereGeom = new SphereGeometry(safeNodeSize * 0.8, 12, 12)
-        const sphereMat = new MeshBasicMaterial({
-          color: n.color || defaultNodeColor,
-        })
-        const sphere = new Mesh(sphereGeom, sphereMat)
-        group.add(sphere)
-
-        if (showLabels) {
-          const label = n.name || n.id
-          const canvas = document.createElement('canvas')
-          const width = 256
-          const height = 64
-          canvas.width = width
-          canvas.height = height
-          const ctx = canvas.getContext('2d')
-          if (ctx) {
-            ctx.fillStyle = 'rgba(0,0,0,0)'
-            ctx.fillRect(0, 0, width, height)
-            ctx.fillStyle = n.textColor || '#0f172a'
-            ctx.font = '24px sans-serif'
-            ctx.textAlign = 'center'
-            ctx.textBaseline = 'middle'
-            ctx.fillText(label, width / 2, height / 2, width - 16)
-          }
-          const texture = new CanvasTexture(canvas)
-          const material = new SpriteMaterial({
-            map: texture,
-            transparent: true,
-          })
-          const sprite = new Sprite(material)
-          const scale = Math.max(6, safeNodeSize * 2)
-          sprite.scale.set(scale * 0.8, scale * 0.4, 1)
-          sprite.position.set(0, safeNodeSize * 1.2, 0)
-          group.add(sprite)
-        }
-
-        return group
-      })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
       .nodeColor((n: any) => n.color || defaultNodeColor)
@@ -237,19 +189,32 @@ export default function App() {
       .backgroundColor('#0b1021')
       .showNavInfo(false)
 
-    const linkForce = fg.d3Force('link')
-    if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
-      linkForce.distance(safeLinkDistance)
+    // Set graph data and configure forces after initialization
+    fg.graphData(graphData)
+
+    // Configure forces after graph data is set
+    try {
+      const linkForce = fg.d3Force('link')
+      if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
+        linkForce.distance(safeLinkDistance)
+      }
+      const chargeForce = fg.d3Force('charge')
+      if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
+        chargeForce.strength(safeChargeStrength)
+      }
+      if (typeof fg.d3ReheatSimulation === 'function') {
+        fg.d3ReheatSimulation()
+      }
+    } catch (error) {
+      console.error('Error configuring forces:', error)
     }
-    const chargeForce = fg.d3Force('charge')
-    if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
-      chargeForce.strength(safeChargeStrength)
-    }
-    if (typeof fg.d3ReheatSimulation === 'function') {
-      fg.d3ReheatSimulation()
-    }
+
     return () => {
-      fg.graphData({ nodes: [], links: [] })
+      try {
+        fg.graphData({ nodes: [], links: [] })
+      } catch (error) {
+        console.error('Error cleaning up graph:', error)
+      }
     }
   }, [
     graph,
