@@ -93,15 +93,13 @@ export default function App() {
     }),
   }))
 
-  const {
-    showLinks,
-    showLabels,
-    nodeRelSize,
-    linkColor,
-    defaultNodeColor,
-    linkDistance,
-    chargeStrength,
-  } = controls as any
+  const showLinks = Boolean((controls as any).showLinks ?? true)
+  const showLabels = Boolean((controls as any).showLabels ?? true)
+  const nodeRelSize = Number((controls as any).nodeRelSize ?? 4)
+  const linkColor = (controls as any).linkColor ?? '#9ad8ff'
+  const defaultNodeColor = (controls as any).defaultNodeColor ?? '#ffd166'
+  const linkDistance = (controls as any).linkDistance ?? 60
+  const chargeStrength = (controls as any).chargeStrength ?? -120
 
   const safeNodeSize = useMemo(() => Number(nodeRelSize) || 4, [nodeRelSize])
   const safeLinkDistance = useMemo(() => Number(linkDistance) || 60, [linkDistance])
