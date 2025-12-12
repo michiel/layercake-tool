@@ -120,15 +120,10 @@ if [[ "$TAURI_MODE" == "false" ]]; then
     fi
 fi
 
-# Build projection viewer assets if missing so backend can serve /projections/viewer/*
+# Build projection viewer assets so backend can serve /projections/viewer/*
 ensure_projection_viewer_build() {
     if [[ ! -d "$PROJECTIONS_DIR" ]]; then
         print_warning "Projection viewer directory '$PROJECTIONS_DIR' not found; skipping build"
-        return
-    fi
-
-    if [[ -d "$PROJECTIONS_DIR/dist" ]]; then
-        print_status "Projection viewer build already present (skipping)"
         return
     fi
 
@@ -145,6 +140,28 @@ ensure_projection_viewer_build() {
 
     popd > /dev/null
     print_success "Projection viewer build ready"
+}
+
+# Build main frontend assets
+ensure_frontend_build() {
+    if [[ ! -d "$FRONTEND_DIR" ]]; then
+        print_warning "Frontend directory '$FRONTEND_DIR' not found; skipping build"
+        return
+    fi
+
+    print_status "Building main frontend assets..."
+    pushd "$FRONTEND_DIR" > /dev/null
+
+    if [[ ! -d "node_modules" ]]; then
+        print_status "Installing frontend dependencies..."
+        npm install
+    fi
+
+    echo "VITE_API_BASE_URL=http://localhost:$BACKEND_PORT" > .env.development.local
+    npm run build
+
+    popd > /dev/null
+    print_success "Main frontend build ready"
 }
 
 if [[ "$TAURI_MODE" == "true" ]]; then
@@ -227,6 +244,10 @@ else
     # WEB MODE: Run separate backend and frontend
     # ============================================
 
+    # Build frontend assets before starting servers
+    ensure_frontend_build
+    ensure_projection_viewer_build
+
     # Start backend server
     print_status "Starting backend server (this may take a moment to compile)..."
     cd "$BACKEND_DIR"
@@ -261,9 +282,6 @@ else
             exit 1
         fi
     done
-
-    # Ensure projection viewer assets are available for static serving
-    ensure_projection_viewer_build
 
     # Start frontend server
     print_status "Starting frontend server..."

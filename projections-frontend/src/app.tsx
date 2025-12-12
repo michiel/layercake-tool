@@ -3,6 +3,15 @@ import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph3D from '3d-force-graph'
 import { Leva, useControls, folder } from 'leva'
+import {
+  CanvasTexture,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+} from 'three'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -119,6 +128,16 @@ export default function App() {
   const state =
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
+  console.log('[App] Data state:', {
+    loading,
+    hasData: !!data,
+    hasProjection: !!projection,
+    hasGraph: !!graph,
+    graphNodes: graph?.nodes?.length,
+    graphEdges: graph?.edges?.length,
+    graphLayers: graph?.layers?.length,
+  })
+
   const layers = graph?.layers ?? []
   const layersKey = useMemo(
     () => JSON.stringify(layers.map((l: any) => [l.layerId, l.backgroundColor, l.textColor])),
@@ -156,6 +175,14 @@ export default function App() {
   const isLayer3d = projection?.projectionType === 'layer3d'
 
   useEffect(() => {
+    console.log('[ForceGraph] Effect triggered', {
+      isLayer3d,
+      hasGraph: !!graph,
+      hasContainer: !!containerRef.current,
+      nodeCount: graph?.nodes?.length,
+      edgeCount: graph?.edges?.length,
+    })
+
     if (isLayer3d) return // Don't render 3D graph for layer3d stub
     if (!graph || !containerRef.current) return
     const elem = containerRef.current
@@ -179,9 +206,58 @@ export default function App() {
       links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label, layer: e.layer })) ?? [],
     }
 
+    console.log('[ForceGraph] Graph data prepared', {
+      nodes: graphData.nodes.length,
+      links: graphData.links.length,
+      sampleNode: graphData.nodes[0],
+      sampleLink: graphData.links[0],
+    })
+
+    console.log('[ForceGraph] Creating ForceGraph3D instance')
     const fg = (ForceGraph3D as any)()(elem)
       .forceEngine('d3')
       .nodeLabel((n: any) => n.name || n.id)
+      .nodeThreeObject((n: any) => {
+        const group = new Group()
+
+        const sphereGeom = new SphereGeometry(safeNodeSize * 0.8, 12, 12)
+        const sphereMat = new MeshBasicMaterial({
+          color: n.color || defaultNodeColor,
+        })
+        const sphere = new Mesh(sphereGeom, sphereMat)
+        group.add(sphere)
+
+        if (showLabels) {
+          const label = n.name || n.id
+          const canvas = document.createElement('canvas')
+          const width = 256
+          const height = 64
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          if (ctx) {
+            ctx.fillStyle = 'rgba(0,0,0,0)'
+            ctx.fillRect(0, 0, width, height)
+            ctx.fillStyle = n.textColor || '#0f172a'
+            ctx.font = '24px sans-serif'
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(label, width / 2, height / 2, width - 16)
+          }
+          const texture = new CanvasTexture(canvas)
+          const material = new SpriteMaterial({
+            map: texture,
+            transparent: true,
+          })
+          const sprite = new Sprite(material)
+          const scale = Math.max(6, safeNodeSize * 2)
+          sprite.scale.set(scale * 0.8, scale * 0.4, 1)
+          sprite.position.set(0, safeNodeSize * 1.2, 0)
+          group.add(sprite)
+        }
+
+        return group
+      })
       .linkDirectionalParticles(0)
       .linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
       .nodeColor((n: any) => n.color || defaultNodeColor)
@@ -189,44 +265,80 @@ export default function App() {
       .backgroundColor('#0b1021')
       .showNavInfo(false)
 
+    console.log('[ForceGraph] Instance created, setting graph data')
+
     // Set graph data and configure forces after initialization
     fg.graphData(graphData)
+
+    console.log('[ForceGraph] Graph data set, configuring forces')
 
     // Configure forces after graph data is set
     try {
       const linkForce = fg.d3Force('link')
+      console.log('[ForceGraph] Link force retrieved:', {
+        exists: !!linkForce,
+        hasDistance: linkForce && typeof linkForce.distance === 'function',
+        safeLinkDistance,
+      })
+
       if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
         linkForce.distance(safeLinkDistance)
+        console.log('[ForceGraph] Link force distance configured')
       }
+
       const chargeForce = fg.d3Force('charge')
+      console.log('[ForceGraph] Charge force retrieved:', {
+        exists: !!chargeForce,
+        hasStrength: chargeForce && typeof chargeForce.strength === 'function',
+        safeChargeStrength,
+      })
+
       if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
         chargeForce.strength(safeChargeStrength)
+        console.log('[ForceGraph] Charge force strength configured')
       }
+
       if (typeof fg.d3ReheatSimulation === 'function') {
         fg.d3ReheatSimulation()
+        console.log('[ForceGraph] Simulation reheated')
       }
+
+      console.log('[ForceGraph] All forces configured successfully')
     } catch (error) {
-      console.error('Error configuring forces:', error)
+      console.error('[ForceGraph] Error configuring forces:', error)
     }
 
     return () => {
+      console.log('[ForceGraph] Cleanup started')
       try {
-        fg.graphData({ nodes: [], links: [] })
+        // Stop the simulation
+        if (typeof fg.pauseAnimation === 'function') {
+          fg.pauseAnimation()
+        }
+        // Clear graph data
+        if (typeof fg.graphData === 'function') {
+          fg.graphData({ nodes: [], links: [] })
+        }
+        // Dispose of renderer and scene if available
+        if (fg._destructor && typeof fg._destructor === 'function') {
+          fg._destructor()
+        }
+        console.log('[ForceGraph] Cleanup completed')
       } catch (error) {
-        console.error('Error cleaning up graph:', error)
+        console.error('[ForceGraph] Error cleaning up graph:', error)
       }
     }
   }, [
     graph,
     linkColor,
     defaultNodeColor,
-    nodeRelSize,
+    safeNodeSize,
     showLinks,
     showLabels,
     isLayer3d,
-    layerColors,
-    linkDistance,
-    chargeStrength,
+    layersKey,
+    safeLinkDistance,
+    safeChargeStrength,
   ])
 
   const handleSaveState = () => {
