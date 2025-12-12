@@ -128,6 +128,9 @@ export default function App() {
   const state =
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
 
+  // Track last graphData reference so toggles don't reapply data and flicker
+  const lastGraphDataRef = useRef<{ nodes: any[]; links: any[] } | null>(null)
+
   // --- Layer Controls (Unchanged) ---
   const layers = graph?.layers ?? []
   const layersKey = useMemo(
@@ -281,12 +284,16 @@ export default function App() {
       return
     }
 
+    const hasGraphChanged = lastGraphDataRef.current !== graphData
     console.log(
       `[ForceGraph] UPDATING with ${graphData.nodes.length} nodes.`,
-      { showLinks, showLabels, links: graphData.links.length }
+      { showLinks, showLabels, links: graphData.links.length, rebindData: hasGraphChanged }
     )
 
-    fg.graphData(graphData)
+    if (hasGraphChanged) {
+      fg.graphData(graphData)
+      lastGraphDataRef.current = graphData
+    }
     fg.linkVisibility(() => showLinks)
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
     fg.linkOpacity(showLinks ? 0.9 : 0)
@@ -305,7 +312,7 @@ export default function App() {
     }
 
     fg
-      .nodeLabel((n: any) => n.name || n.id)
+      .nodeLabel((n: any) => (showLabels ? '' : n.name || n.id))
       .nodeRelSize(safeNodeSize)
       .nodeColor((n: any) => n.color || defaultNodeColor)
       .nodeThreeObject((n: any) => {
@@ -320,19 +327,23 @@ export default function App() {
 
         if (showLabels) {
           const label = n.name || n.id
+          const padding = 32
+          const fontSize = Math.max(18, safeNodeSize * 5)
           const canvas = document.createElement('canvas')
-          const width = 512
-          const height = 128
-          canvas.width = width
-          canvas.height = height
           const ctx = canvas.getContext('2d')
           if (ctx) {
+            ctx.font = `${fontSize}px sans-serif`
+            const textWidth = ctx.measureText(label).width
+            const width = Math.min(1024, Math.max(256, textWidth + padding * 2))
+            const height = Math.max(96, fontSize * 2.2)
+            canvas.width = width
+            canvas.height = height
+            ctx.font = `${fontSize}px sans-serif`
             ctx.clearRect(0, 0, width, height)
             ctx.fillStyle = n.textColor || '#ffffff'
-            ctx.font = '32px sans-serif'
             ctx.textAlign = 'center'
             ctx.textBaseline = 'middle'
-            ctx.fillText(label, width / 2, height / 2, width - 16)
+            ctx.fillText(label, width / 2, height / 2, width - padding)
           }
           const texture = new CanvasTexture(canvas)
           const material = new SpriteMaterial({
@@ -343,15 +354,13 @@ export default function App() {
           })
           const sprite = new Sprite(material)
           sprite.renderOrder = 10
-          const scale = Math.max(8, safeNodeSize * 2.5)
+          const scale = Math.max(12, safeNodeSize * 3.5)
           sprite.scale.set(scale, scale * 0.45, 1)
           sprite.position.set(0, safeNodeSize * 1.6, 0)
           group.add(sprite)
         }
         return group
       })
-
-    fg.refresh()
 
     if (typeof fg.d3ReheatSimulation === 'function') {
       // Defer reheat to next frame so internal layout is ready
