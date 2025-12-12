@@ -1,3 +1,49 @@
-window.graphData = {{{graphData}}};
-window.graphConfig = {{{graphConfig}}};
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Graph Export</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: #0b1021;
+      color: #e2e8f0;
+      font-family: system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+    }
+    #graph {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="graph"></div>
+  <script type="module">
+    import ForceGraph3D from 'https://unpkg.com/3d-force-graph/dist/3d-force-graph.module.js';
 
+    const graphData = {{{graphData}}};
+    const graphConfig = {{{graphConfig}}};
+
+    const elem = document.getElementById('graph');
+    const graph = ForceGraph3D({ controlType: 'orbit' })(elem)
+      .showNavInfo(false)
+      .backgroundColor('#0b1021')
+      .nodeLabel(node => node.name || node.id)
+      .nodeColor(node => node.layer && graphConfig.layers[node.layer]?.color || node.color || '#6ddcff')
+      .linkColor(() => '#9ad8ff')
+      .linkOpacity(0.35)
+      .graphData(graphData);
+
+    // Spread nodes a little wider
+    const chargeForce = graph.d3Force('charge');
+    if (chargeForce && typeof chargeForce.strength === 'function') {
+      chargeForce.strength(-120);
+    }
+  </script>
+</body>
+</html>
