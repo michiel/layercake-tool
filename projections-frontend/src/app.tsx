@@ -302,7 +302,7 @@ export default function App() {
     fg.linkThreeObjectExtend(true)
     fg.linkThreeObject((link: any) => {
       if (!showLabels || !showLinks) return null
-      const text = link.name || `${link.source} → ${link.target}`
+      const text = link.name
       if (!text) return null
       const sprite = new SpriteText(text)
       sprite.color = nodeColorMap.get(link.source) || defaultNodeColor
@@ -333,7 +333,7 @@ export default function App() {
     }
 
     fg.onNodeClick((node: any) => {
-      const distance = 40
+      const distance = 90
       const distRatio = 1 + distance / Math.max(Math.hypot(node.x || 0, node.y || 0, node.z || 0), 0.001)
       const newPos =
         node.x || node.y || node.z
