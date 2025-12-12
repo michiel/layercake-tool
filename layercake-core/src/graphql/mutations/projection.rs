@@ -103,10 +103,13 @@ impl ProjectionMutation {
             .iter()
             .any(|s| s.project_id != projection.project_id)
         {
-            return Err(StructuredError::validation(
-                "All stories must belong to the projection's project",
-            )
-            .into());
+            return Err(
+                StructuredError::validation(
+                    "storyIds",
+                    "All stories must belong to the projection's project",
+                )
+                .into(),
+            );
         }
 
         let sequence_models = sequences::Entity::find()

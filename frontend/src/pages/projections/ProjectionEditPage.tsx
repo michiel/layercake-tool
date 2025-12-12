@@ -61,6 +61,7 @@ type StorySelection = {
 }
 
 type SequenceInfo = { id: number; name: string }
+type SequencesQueryResult = { sequences: SequenceInfo[] }
 
 const buildSelectionPayload = (selections: Record<number, StorySelection>) =>
   Object.entries(selections)
@@ -99,9 +100,12 @@ export const ProjectionEditPage = () => {
     skip: !projectIdNum,
   })
 
-  const [loadSequences, { loading: loadingSeq }] = useLazyQuery(LIST_SEQUENCES, {
-    fetchPolicy: 'cache-first',
-  })
+  const [loadSequences, { loading: loadingSeq }] = useLazyQuery<SequencesQueryResult, { storyId: number }>(
+    LIST_SEQUENCES,
+    {
+      fetchPolicy: 'cache-first',
+    }
+  )
 
   const [saveState, { loading: saving }] = useMutation(SAVE_PROJECTION_STATE, {
     client: projectionsClient,
@@ -272,11 +276,12 @@ export const ProjectionEditPage = () => {
   return (
     <PageContainer>
       <Breadcrumbs
-        items={[
-          { label: 'Projects', href: '/projects' },
-          { label: `Project ${projectId}`, href: `/projects/${projectId}/workbench/projections` },
-          { label: projection.name, href: `/projects/${projectId}/workbench/projections/${projectionId}/edit` },
+        projectId={projectIdNum}
+        projectName={`Project ${projectId}`}
+        sections={[
+          { title: 'Projections', href: `/projects/${projectId}/workbench/projections` },
         ]}
+        currentPage={projection.name}
       />
       <Group justify="between" className="mb-4">
         <div>
