@@ -2,6 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
 import ForceGraph3D from '3d-force-graph'
+import {
+  CanvasTexture,
+  Group,
+  Mesh,
+  MeshBasicMaterial,
+  SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+} from 'three'
 
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
@@ -113,13 +122,13 @@ export default function App() {
       })
       .nodeLabel((n: any) => n.name || n.id)
       .nodeThreeObject((n: any) => {
-        const group = new (window as any).THREE.Group()
+        const group = new Group()
 
-        const sphereGeom = new (window as any).THREE.SphereGeometry(nodeRelSize * 0.8, 12, 12)
-        const sphereMat = new (window as any).THREE.MeshBasicMaterial({
+        const sphereGeom = new SphereGeometry(nodeRelSize * 0.8, 12, 12)
+        const sphereMat = new MeshBasicMaterial({
           color: n.color || nodeColor,
         })
-        const sphere = new (window as any).THREE.Mesh(sphereGeom, sphereMat)
+        const sphere = new Mesh(sphereGeom, sphereMat)
         group.add(sphere)
 
         const label = n.name || n.id
@@ -138,12 +147,12 @@ export default function App() {
           ctx.textBaseline = 'middle'
           ctx.fillText(label, width / 2, height / 2, width - 16)
         }
-        const texture = new (window as any).THREE.CanvasTexture(canvas)
-        const material = new (window as any).THREE.SpriteMaterial({
+        const texture = new CanvasTexture(canvas)
+        const material = new SpriteMaterial({
           map: texture,
           transparent: true,
         })
-        const sprite = new (window as any).THREE.Sprite(material)
+        const sprite = new Sprite(material)
         const scale = Math.max(6, nodeRelSize * 2)
         sprite.scale.set(scale * 0.8, scale * 0.4, 1)
         sprite.position.set(0, nodeRelSize * 1.2, 0)
