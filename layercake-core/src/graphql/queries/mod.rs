@@ -6,7 +6,7 @@ use sea_orm::{
 
 use crate::database::entities::{
     data_sets, graph_data, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases,
-    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, sequences, stories,
+    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projections, sequences, stories,
     user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
@@ -1369,6 +1369,92 @@ impl Query {
                 color: model.color,
             })
             .collect())
+    }
+
+    // Projection Queries
+
+    /// Get all projections for a project
+    async fn projections(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: ID,
+    ) -> Result<Vec<crate::graphql::types::Projection>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let project_id_int = project_id
+            .parse::<i32>()
+            .map_err(|_| StructuredError::validation("projectId", "Invalid project ID"))?;
+
+        let projections_list = projections::Entity::find()
+            .filter(projections::Column::ProjectId.eq(project_id_int))
+            .order_by_desc(projections::Column::UpdatedAt)
+            .all(&context.db)
+            .await?;
+
+        Ok(projections_list
+            .into_iter()
+            .map(crate::graphql::types::Projection::from)
+            .collect())
+    }
+
+    /// Get a specific projection by ID
+    async fn projection(&self, ctx: &Context<'_>, id: ID) -> Result<Option<crate::graphql::types::Projection>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let projection_id = id
+            .parse::<i32>()
+            .map_err(|_| StructuredError::validation("id", "Invalid projection ID"))?;
+
+        let projection = projections::Entity::find_by_id(projection_id)
+            .one(&context.db)
+            .await?;
+
+        Ok(projection.map(crate::graphql::types::Projection::from))
+    }
+
+    /// Get projection graph data (nodes, edges, layers)
+    #[graphql(name = "projectionGraph")]
+    async fn projection_graph(
+        &self,
+        ctx: &Context<'_>,
+        id: ID,
+    ) -> Result<crate::graphql::types::ProjectionGraph> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let projection_id = id
+            .parse::<i32>()
+            .map_err(|_| StructuredError::validation("id", "Invalid projection ID"))?;
+
+        // Get the projection
+        let projection = projections::Entity::find_by_id(projection_id)
+            .one(&context.db)
+            .await?
+            .ok_or_else(|| StructuredError::not_found("Projection", projection_id))?;
+
+        // Build and return the projection graph using the helper
+        crate::graphql::types::projection::build_projection_graph(&context.db, projection.graph_id).await
+    }
+
+    /// Get projection state for the 3D viewer
+    #[graphql(name = "projectionState")]
+    async fn projection_state(
+        &self,
+        ctx: &Context<'_>,
+        id: ID,
+    ) -> Result<Option<crate::graphql::types::ProjectionState>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let projection_id_str = id.to_string();
+        let projection_id = id
+            .parse::<i32>()
+            .map_err(|_| StructuredError::validation("id", "Invalid projection ID"))?;
+
+        // Get the projection
+        let projection = projections::Entity::find_by_id(projection_id)
+            .one(&context.db)
+            .await?;
+
+        Ok(projection.map(|p| crate::graphql::types::ProjectionState {
+            projection_id: projection_id_str,
+            projection_type: p.projection_type,
+            state_json: p.settings_json.unwrap_or_else(|| serde_json::json!({})),
+        }))
     }
 }
 

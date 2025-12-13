@@ -1,6 +1,7 @@
 pub mod plan;
 pub mod plan_dag;
 pub mod project;
+pub mod projection;
 pub mod sequence;
 pub mod story;
 // REMOVED: node, edge - dead code, GraphQL types not used
@@ -37,6 +38,7 @@ pub use plan::*;
 pub use plan_dag::*;
 pub use preview::*;
 pub use project::*;
+pub use projection::*;
 #[allow(unused_imports)]
 pub use sequence::{
     CreateSequenceInput, NotePosition as SequenceNotePosition, Sequence, SequenceEdgeRef,
