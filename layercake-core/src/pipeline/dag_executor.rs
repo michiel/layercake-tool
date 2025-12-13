@@ -124,8 +124,8 @@ impl DagExecutor {
                 // Get upstream node IDs (can be DataSet, Graph, or Merge nodes)
                 let upstream_ids = self.get_upstream_nodes(node_id, edges);
 
-                // Merge data from upstream sources
-                let graph_record = self
+                // Merge data from upstream sources using in-memory graph_data-first resolution
+                let graph = self
                     .merge_builder
                     .merge_sources(
                         project_id,
@@ -137,8 +137,8 @@ impl DagExecutor {
                     .await?;
 
                 let graph_service = GraphService::new(self.db.clone());
-                let graph = graph_service
-                    .build_graph_from_dag_graph(graph_record.id)
+                let graph_struct = graph_service
+                    .build_graph_from_dag_graph(graph.id)
                     .await
                     .with_context(|| {
                         format!("Failed to materialize merged graph for node {}", node_id)
@@ -147,15 +147,17 @@ impl DagExecutor {
                 info!(
                     "MergeNode {} produced nodes:{}, edges:{}, layers:{}",
                     node_id,
-                    graph.nodes.len(),
-                    graph.edges.len(),
-                    graph.layers.len()
+                    graph_struct.nodes.len(),
+                    graph_struct.edges.len(),
+                    graph_struct.layers.len()
                 );
 
                 // Mirror merge output into unified graph_data schema
+                let merge_hash = self.compute_merge_hash(node_id, &upstream_ids, &graph_struct)?;
                 let metadata = Some(json!({
                     "upstreamNodes": upstream_ids,
-                    "mergeSourceHash": graph_record.source_hash,
+                    "mergeSourceHash": merge_hash,
+                    "legacyMergeSourceHash": graph.source_hash,
                 }));
 
                 // Create or update graph_data record for the merge node
@@ -182,29 +184,27 @@ impl DagExecutor {
                     .await?;
 
                 // Persist merge output to graph_data tables
-                self.persist_graph_contents(graph_data_record.id, &graph)
+                self.persist_graph_contents(graph_data_record.id, &graph_struct)
                     .await?;
 
                 // Update metadata, annotations, and completion state
-                let graph_annotations_json = graph.annotations.as_ref().map(|s| {
+                let graph_annotations_json = graph_struct.annotations.as_ref().map(|s| {
                     serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
                 });
                 let mut active: crate::database::entities::graph_data::ActiveModel =
                     graph_data_record.into();
                 active.metadata = Set(metadata);
                 active.annotations = Set(graph_annotations_json);
-                active.source_hash = Set(graph_record.source_hash.clone());
-                active.computed_date = Set(graph_record.computed_date);
-                active.node_count = Set(graph.nodes.len() as i32);
-                active.edge_count = Set(graph.edges.len() as i32);
+                active.source_hash = Set(Some(merge_hash));
+                active.computed_date = Set(Some(Utc::now()));
+                active.node_count = Set(graph_struct.nodes.len() as i32);
+                active.edge_count = Set(graph_struct.edges.len() as i32);
                 active.status = Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
                 active.updated_at = Set(Utc::now());
-                graph_data_record = active.update(&self.db).await?;
-
-                // TODO: publish graph_data status events for merge nodes when graph_data execution events are wired
+                let _updated = active.update(&self.db).await?;
 
                 if let Some(ctx) = context.as_deref_mut() {
-                    ctx.set_graph(node_id.to_string(), graph.clone());
+                    ctx.set_graph(node_id.to_string(), graph_struct.clone());
                 }
             }
             "GraphNode" => {
@@ -1050,6 +1050,33 @@ impl DagExecutor {
         }
         let serialized = serde_json::to_vec(config)?;
         hasher.update(&serialized);
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+
+    fn compute_merge_hash(
+        &self,
+        node_id: &str,
+        upstream_nodes: &[String],
+        graph: &crate::graph::Graph,
+    ) -> Result<String> {
+        let mut hasher = Sha256::new();
+        hasher.update(node_id.as_bytes());
+        for id in upstream_nodes {
+            hasher.update(id.as_bytes());
+        }
+        hasher.update(graph.nodes.len().to_le_bytes());
+        hasher.update(graph.edges.len().to_le_bytes());
+        for node in &graph.nodes {
+            hasher.update(node.id.as_bytes());
+            hasher.update(node.layer.as_bytes());
+            hasher.update(node.weight.to_le_bytes());
+        }
+        for edge in &graph.edges {
+            hasher.update(edge.id.as_bytes());
+            hasher.update(edge.source.as_bytes());
+            hasher.update(edge.target.as_bytes());
+            hasher.update(edge.weight.to_le_bytes());
+        }
         Ok(format!("{:x}", hasher.finalize()))
     }
 
