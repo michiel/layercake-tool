@@ -363,36 +363,46 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 
 **Status:** ✅ Complete
 
-### Stage 3: Read Path Migration ⏳ IN PROGRESS
+### Stage 3: Read Path Migration ✅ PARTIALLY COMPLETE (2025-12-13)
 
 **Goal:** Migrate all queries to new schema
 
-**Critical Issue Identified:**
-Stage 2 creates graphs in `graph_data`, but TransformNode/FilterNode still query legacy `graphs` table (dag_executor.rs:275, 382). This breaks the pipeline for new graphs.
+**Completed:**
+- [x] **CRITICAL**: Update TransformNode to read from `graph_data`
+  - Added `load_graph_by_dag_node()` helper that tries graph_data first, falls back to legacy
+  - Converts graph_data entities to Graph struct with proper type handling
+  - Extracts layers from node attributes instead of separate tables
+- [x] **CRITICAL**: Update FilterNode to read from `graph_data`
+  - Same unified approach as TransformNode
+- [x] Update persist_transformed_graph() to query both schemas for upstream metadata
+- [x] Update persist_filtered_graph() to query both schemas for upstream metadata
+- [x] Code compiles successfully (0 errors, 34 warnings)
 
-**Priority Tasks:**
-- [ ] **CRITICAL**: Update TransformNode to read from `graph_data` (dag_executor.rs:275-285)
-  - Replace `GraphEntity::find()` with `graph_data_service.get_by_dag_node()`
-  - Load graph via `GraphDataService.load_full()` instead of `GraphService.build_graph_from_dag_graph()`
-  - Update persist_transformed_graph() signature from `graphs::Model` → `graph_data::Model`
-- [ ] **CRITICAL**: Update FilterNode to read from `graph_data` (dag_executor.rs:382-390)
-  - Same changes as TransformNode
-  - Update persist_filtered_graph() signature
-- [ ] Update `get_or_create_graph_record()` to use graph_data
-- [ ] Update hash computation functions to work with graph_data
-- [ ] Update `persist_graph_contents()` to write to graph_data_nodes/edges
+**Remaining Tasks:**
+- [ ] Update `get_or_create_graph_record()` to write to graph_data instead of graphs
+- [ ] Update hash computation functions if needed for graph_data
+- [ ] Update `persist_graph_contents()` to write to graph_data_nodes/edges instead of graph_nodes/edges
+- [ ] Update DataSetNode to create graph_data entries
+- [ ] Update MergeNode to read from graph_data
 - [ ] Update `GraphService` to read from `graph_data_*` (lower priority)
 - [ ] Update GraphQL query resolvers (lower priority)
 - [ ] Update MCP resources and console context (lower priority)
 
-**Files Requiring Changes:**
-1. `src/pipeline/dag_executor.rs` - TransformNode, FilterNode (CRITICAL)
+**Files Changed:**
+1. ✅ `src/pipeline/dag_executor.rs` - TransformNode, FilterNode (CRITICAL - DONE)
+   - Added load_graph_by_dag_node() helper (lines 1177-1323)
+   - Updated TransformNode (lines 275-298)
+   - Updated FilterNode (lines 370-393)
+   - Updated persist methods (lines 614-767)
+
+**Files Still Requiring Changes:**
+1. `src/pipeline/dag_executor.rs` - persist methods (write path)
 2. `src/services/graph_service.rs` - migrate to GraphDataService
 3. `src/graphql/queries/mod.rs` - query resolvers
 4. `src/graphql/mutations/graph.rs` - graph mutations
 5. Plus 12 other files from original analysis
 
-**Implementation Details (for next session):**
+**Implementation Notes:**
 
 Helper function needed in dag_executor.rs:
 ```rust
