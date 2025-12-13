@@ -261,7 +261,7 @@ impl DagExecutor {
             .ok_or_else(|| anyhow!("Upstream node {} not found", upstream_node_id))?;
 
         match upstream_node.node_type.as_str() {
-            "GraphNode" | "MergeNode" | "TransformNode" | "DataSetNode" => {}
+            "GraphNode" | "MergeNode" | "TransformNode" | "DataSetNode" | "FilterNode" => {}
             other => {
                 return Err(anyhow!(
                     "TransformNode {} cannot consume from node type {} (node {})",
@@ -272,32 +272,20 @@ impl DagExecutor {
             }
         }
 
-        let upstream_graph = GraphEntity::find()
-            .filter(GraphColumn::ProjectId.eq(project_id))
-            .filter(GraphColumn::NodeId.eq(upstream_node_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "No graph output found for upstream node {}",
-                    upstream_node_id
-                )
-            })?;
-
+        // Check cache first
         let cached_graph = context
             .as_deref_mut()
             .and_then(|ctx| ctx.graph(upstream_node_id));
 
-        let mut graph = match cached_graph {
-            Some(graph) => graph,
+        let (mut graph, (_upstream_id, _is_from_graph_data)) = match cached_graph {
+            Some(graph) => (graph, (0, false)), // Cached graph, metadata not needed for transforms
             None => {
-                let graph_service = GraphService::new(self.db.clone());
-                let graph = graph_service
-                    .build_graph_from_dag_graph(upstream_graph.id)
+                let (graph, metadata) = self
+                    .load_graph_by_dag_node(project_id, upstream_node_id)
                     .await
                     .with_context(|| {
                         format!(
-                            "Failed to materialize graph for upstream node {}",
+                            "Failed to load graph for upstream node {}",
                             upstream_node_id
                         )
                     })?;
@@ -305,7 +293,7 @@ impl DagExecutor {
                 if let Some(ctx) = context.as_deref_mut() {
                     ctx.set_graph(upstream_node_id.clone(), graph.clone());
                 }
-                graph
+                (graph, metadata)
             }
         };
 
@@ -327,7 +315,7 @@ impl DagExecutor {
             node_id,
             node_name,
             &config,
-            &upstream_graph,
+            upstream_node_id,
             &graph,
         )
         .await?;
@@ -379,32 +367,20 @@ impl DagExecutor {
             }
         }
 
-        let upstream_graph = GraphEntity::find()
-            .filter(GraphColumn::ProjectId.eq(project_id))
-            .filter(GraphColumn::NodeId.eq(upstream_node_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "No graph output found for upstream node {}",
-                    upstream_node_id
-                )
-            })?;
-
+        // Check cache first
         let cached_graph = context
             .as_deref_mut()
             .and_then(|ctx| ctx.graph(upstream_node_id));
 
-        let mut graph = match cached_graph {
-            Some(graph) => graph,
+        let (mut graph, (upstream_id, _is_from_graph_data)) = match cached_graph {
+            Some(graph) => (graph, (0, false)), // Cached graph, metadata not needed for filters
             None => {
-                let graph_service = GraphService::new(self.db.clone());
-                let graph = graph_service
-                    .build_graph_from_dag_graph(upstream_graph.id)
+                let (graph, metadata) = self
+                    .load_graph_by_dag_node(project_id, upstream_node_id)
                     .await
                     .with_context(|| {
                         format!(
-                            "Failed to materialize graph for upstream node {}",
+                            "Failed to load graph for upstream node {}",
                             upstream_node_id
                         )
                     })?;
@@ -412,7 +388,7 @@ impl DagExecutor {
                 if let Some(ctx) = context.as_deref_mut() {
                     ctx.set_graph(upstream_node_id.clone(), graph.clone());
                 }
-                graph
+                (graph, metadata)
             }
         };
 
@@ -421,7 +397,7 @@ impl DagExecutor {
                 &mut graph,
                 &FilterEvaluationContext {
                     db: &self.db,
-                    graph_id: upstream_graph.id,
+                    graph_id: upstream_id,
                 },
             )
             .await
@@ -441,7 +417,7 @@ impl DagExecutor {
             node_id,
             node_name,
             &config,
-            &upstream_graph,
+            upstream_node_id,
             &graph,
         )
         .await?;
@@ -629,19 +605,65 @@ impl DagExecutor {
         node_id: &str,
         node_name: &str,
         config: &TransformNodeConfig,
-        upstream_graph: &graphs::Model,
+        upstream_node_id: &str,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
+        // Try to load upstream graph metadata to include in hash computation
+        // Try graph_data first, then fall back to legacy
+        let upstream_graph_for_hash = if let Some(gd) = self
+            .graph_data_builder
+            .graph_data_service
+            .get_by_dag_node(upstream_node_id)
+            .await?
+        {
+            // Create a minimal graphs::Model compatible structure for hash computation
+            // Note: This is a temporary solution during migration
+            // graph_data doesn't have execution_state, but for hash computation we assume "completed"
+            graphs::Model {
+                id: gd.id,
+                project_id,
+                node_id: upstream_node_id.to_string(),
+                name: gd.name,
+                execution_state: "completed".to_string(),
+                computed_date: gd.computed_date,
+                source_hash: gd.source_hash,
+                node_count: gd.node_count,
+                edge_count: gd.edge_count,
+                error_message: None, // graph_data doesn't track error_message separately
+                metadata: gd.metadata,
+                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                last_edit_sequence: gd.last_edit_sequence,
+                has_pending_edits: gd.has_pending_edits,
+                last_replay_at: gd.last_replay_at,
+                created_at: gd.created_at,
+                updated_at: gd.updated_at,
+            }
+        } else {
+            // Fall back to legacy graphs table
+            GraphEntity::find()
+                .filter(GraphColumn::ProjectId.eq(project_id))
+                .filter(GraphColumn::NodeId.eq(upstream_node_id))
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| {
+                    anyhow!(
+                        "No graph metadata found for upstream node {} in either schema",
+                        upstream_node_id
+                    )
+                })?
+        };
+
         let metadata = Some(json!({
             "transforms": config.transforms,
-            "upstreamGraphId": upstream_graph.id,
+            "upstreamGraphId": upstream_graph_for_hash.id,
+            "upstreamNodeId": upstream_node_id,
         }));
 
         let mut graph_record = self
             .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
             .await?;
 
-        let transform_hash = self.compute_transform_hash(node_id, upstream_graph, config)?;
+        let transform_hash = self.compute_transform_hash(node_id, &upstream_graph_for_hash, config)?;
 
         let annotations_changed = graph_record.annotations != graph.annotations;
         let hash_matches = graph_record.source_hash.as_deref() == Some(&transform_hash);
@@ -691,19 +713,64 @@ impl DagExecutor {
         node_id: &str,
         node_name: &str,
         config: &FilterNodeConfig,
-        upstream_graph: &graphs::Model,
+        upstream_node_id: &str,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
+        // Try to load upstream graph metadata to include in hash computation
+        // Try graph_data first, then fall back to legacy
+        let upstream_graph_for_hash = if let Some(gd) = self
+            .graph_data_builder
+            .graph_data_service
+            .get_by_dag_node(upstream_node_id)
+            .await?
+        {
+            // Create a minimal graphs::Model compatible structure for hash computation
+            // graph_data doesn't have execution_state, but for hash computation we assume "completed"
+            graphs::Model {
+                id: gd.id,
+                project_id,
+                node_id: upstream_node_id.to_string(),
+                name: gd.name,
+                execution_state: "completed".to_string(),
+                computed_date: gd.computed_date,
+                source_hash: gd.source_hash,
+                node_count: gd.node_count,
+                edge_count: gd.edge_count,
+                error_message: None, // graph_data doesn't track error_message separately
+                metadata: gd.metadata,
+                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                last_edit_sequence: gd.last_edit_sequence,
+                has_pending_edits: gd.has_pending_edits,
+                last_replay_at: gd.last_replay_at,
+                created_at: gd.created_at,
+                updated_at: gd.updated_at,
+            }
+        } else {
+            // Fall back to legacy graphs table
+            GraphEntity::find()
+                .filter(GraphColumn::ProjectId.eq(project_id))
+                .filter(GraphColumn::NodeId.eq(upstream_node_id))
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| {
+                    anyhow!(
+                        "No graph metadata found for upstream node {} in either schema",
+                        upstream_node_id
+                    )
+                })?
+        };
+
         let metadata = Some(json!({
             "query": config.query,
-            "upstreamGraphId": upstream_graph.id,
+            "upstreamGraphId": upstream_graph_for_hash.id,
+            "upstreamNodeId": upstream_node_id,
         }));
 
         let mut graph_record = self
             .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
             .await?;
 
-        let filter_hash = self.compute_filter_hash(node_id, upstream_graph, config)?;
+        let filter_hash = self.compute_filter_hash(node_id, &upstream_graph_for_hash, config)?;
 
         if graph_record.source_hash.as_deref() == Some(&filter_hash) {
             return Ok(());
@@ -1172,6 +1239,158 @@ impl DagExecutor {
 }
 
 impl DagExecutor {
+    /// Load a graph by DAG node ID, trying graph_data first, then falling back to legacy graphs table.
+    /// Returns the Graph struct and a metadata tuple (graph_data_id OR legacy_graph_id, is_from_graph_data)
+    async fn load_graph_by_dag_node(
+        &self,
+        project_id: i32,
+        dag_node_id: &str,
+    ) -> Result<(crate::graph::Graph, (i32, bool))> {
+        // Try graph_data first (new schema)
+        if let Some(graph_data) = self
+            .graph_data_builder
+            .graph_data_service
+            .get_by_dag_node(dag_node_id)
+            .await?
+        {
+            tracing::debug!(
+                "Loading graph for node {} from graph_data (id: {})",
+                dag_node_id,
+                graph_data.id
+            );
+
+            let (gd, nodes, edges) = self
+                .graph_data_builder
+                .graph_data_service
+                .load_full(graph_data.id)
+                .await
+                .with_context(|| {
+                    format!("Failed to load graph_data {} for node {}", graph_data.id, dag_node_id)
+                })?;
+
+            // Convert graph_data entities to Graph struct
+            use crate::graph::{Edge, Layer, Node};
+            use std::collections::HashMap;
+
+            let graph_nodes: Vec<Node> = nodes
+                .into_iter()
+                .map(|n| Node {
+                    id: n.external_id,
+                    label: n.label.unwrap_or_default(),
+                    layer: n.layer.unwrap_or_default(),
+                    is_partition: n.is_partition,
+                    belongs_to: n.belongs_to,
+                    weight: n.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: n.comment,
+                    dataset: n.source_dataset_id,
+                    attributes: n.attributes,
+                })
+                .collect();
+
+            let graph_edges: Vec<Edge> = edges
+                .into_iter()
+                .map(|e| Edge {
+                    id: e.external_id,
+                    source: e.source,
+                    target: e.target,
+                    label: e.label.unwrap_or_default(),
+                    layer: e.layer.unwrap_or_default(),
+                    weight: e.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: e.comment,
+                    dataset: e.source_dataset_id,
+                    attributes: e.attributes,
+                })
+                .collect();
+
+            // Extract layers from nodes (similar to projection.rs:144-194)
+            let mut layer_map: HashMap<String, Layer> = HashMap::new();
+            for node in &graph_nodes {
+                if !layer_map.contains_key(&node.layer) {
+                    // Extract layer styling from node attributes
+                    let (bg_color, text_color, border_color) = node
+                        .attributes
+                        .as_ref()
+                        .and_then(|attrs| attrs.as_object())
+                        .map(|obj| {
+                            let bg = obj
+                                .get("backgroundColor")
+                                .or_else(|| obj.get("color"))
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                            let text = obj
+                                .get("textColor")
+                                .or_else(|| obj.get("labelColor"))
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                            let border = obj
+                                .get("borderColor")
+                                .and_then(|v| v.as_str())
+                                .map(|s| s.to_string());
+                            (bg, text, border)
+                        })
+                        .unwrap_or((None, None, None));
+
+                    layer_map.insert(
+                        node.layer.clone(),
+                        Layer {
+                            id: node.layer.clone(),
+                            label: node.layer.clone(), // Use layer ID as label by default
+                            background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
+                            text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
+                            border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+                            alias: None,
+                            dataset: node.dataset,
+                            attributes: node.attributes.clone(),
+                        },
+                    );
+                }
+            }
+
+            let layers: Vec<Layer> = layer_map.into_values().collect();
+
+            let graph = crate::graph::Graph {
+                name: gd.name.clone(),
+                nodes: graph_nodes,
+                edges: graph_edges,
+                layers,
+                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+            };
+
+            return Ok((graph, (gd.id, true)));
+        }
+
+        // Fall back to legacy graphs table
+        tracing::debug!(
+            "Graph for node {} not found in graph_data, trying legacy graphs table",
+            dag_node_id
+        );
+
+        let legacy_graph = GraphEntity::find()
+            .filter(GraphColumn::ProjectId.eq(project_id))
+            .filter(GraphColumn::NodeId.eq(dag_node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph output found for node {} in either graph_data or legacy graphs table",
+                    dag_node_id
+                )
+            })?;
+
+        let graph_service = GraphService::new(self.db.clone());
+        let graph = graph_service
+            .build_graph_from_dag_graph(legacy_graph.id)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to materialize graph from legacy table for node {}",
+                    dag_node_id
+                )
+            })?;
+
+        Ok((graph, (legacy_graph.id, false)))
+    }
+
     async fn persist_story_context(
         &self,
         project_id: i32,
