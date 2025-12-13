@@ -374,6 +374,10 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Commits:**
 - `4ce70be9` - feat: migrate TransformNode and FilterNode to read from graph_data schema
 - `ddc85a70` - docs: update single-schema plan with Stage 3 partial completion
+- (working tree) - Migrate FilterNode write path to graph_data (processing/complete + JSON annotations)
+- (working tree) - DataSetNode graph_data records use source_type `dataset` and capture dataset file metadata
+- (working tree) - DataSetNode filePath importer writes graph_data entries, hashes file blob, and persists nodes/edges for CSV/TSV/JSON
+- (next) - MergeNode read migration planned using unified graph loader
 
 **Critical Read Path (COMPLETE):**
 - [x] **CRITICAL**: Update TransformNode to read from `graph_data` (dag_executor.rs:275-298)
@@ -405,20 +409,18 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Remaining Work - Write Path Migration:**
 
 **High Priority (Blocks full pipeline):**
-- [ ] **P0**: Update `get_or_create_graph_record()` to write to graph_data instead of graphs
-  - Currently writes transformed/filtered graph metadata to legacy graphs table
-  - Need to write to graph_data with appropriate source_type ("computed")
-  - Maintain dag_node_id reference
+- [x] **P0**: Update `get_or_create_graph_record()` to write to graph_data instead of graphs
+  - Uses GraphDataService with source_type "computed" and dag_node_id to ensure unified writes
 
-- [ ] **P0**: Update `persist_graph_contents()` to write nodes/edges to graph_data schema
-  - Currently writes to graph_nodes/graph_edges (legacy)
-  - Need to write to graph_data_nodes/graph_data_edges
-  - Handle weight type conversion (i32 → Option<f64>)
+- [x] **P0**: Update `persist_graph_contents()` to write nodes/edges to graph_data schema
+  - Uses GraphDataService replace helpers for graph_data_nodes/graph_data_edges with weight conversion
 
-- [ ] **P1**: Update DataSetNode execution
-  - Currently uses legacy DatasourceImporter which writes to data_sets table
-  - Need to create graph_data entries with source_type = "dataset"
-  - Maintain file metadata (blob, filename, file_format, etc.)
+- [x] **P1**: Update DataSetNode execution (referenced data_sets path)
+  - DataSetNode now creates/updates graph_data entries with source_type `dataset`, dag_node_id, metadata, and dataset file metadata (format/origin/filename/size)
+  - Nodes/edges persisted via GraphDataService; source_hash computed from dataset graph_json
+
+- [x] **P1**: Update DataSetNode filePath importer path
+  - DatasourceImporter now creates graph_data entries (source_type `dataset`) with blob/file metadata, hashes file content, and persists nodes/edges for CSV/TSV/JSON graph inputs
 
 **Medium Priority (Important for consistency):**
 - [ ] **P2**: Update MergeNode to read from graph_data
@@ -447,44 +449,33 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
    - ✅ Updated FilterNode (lines 370-393)
    - ✅ Updated persist_transformed_graph() read logic (lines 614-673)
    - ✅ Updated persist_filtered_graph() read logic (lines 705-767)
-   - ⏳ TODO: Update get_or_create_graph_record() (write path)
-   - ⏳ TODO: Update persist_graph_contents() (write path)
+   - ✅ get_or_create_graph_record() now writes/updates graph_data entries (source_type, dag_node_id, dataset metadata)
+   - ✅ persist_graph_contents() writes graph_data_nodes/graph_data_edges via GraphDataService
+   - ✅ FilterNode write path uses graph_data mark_processing/mark_complete and JSON annotations
+   - ✅ DataSetNode creates graph_data entries with source_type `dataset` when referencing data_sets
+   - ✅ DataSetNode filePath importer creates graph_data entries with blob + metadata and persists nodes/edges (CSV/TSV/JSON)
 
 **Files Still Requiring Changes:**
-1. ⏳ `src/pipeline/dag_executor.rs` - Write path for persist methods
-2. ⏳ `src/pipeline/datasource_importer.rs` or equivalent - DataSetNode
-3. 🔜 `src/services/graph_service.rs` - Migrate to GraphDataService (P4)
-4. 🔜 `src/graphql/queries/mod.rs` - Query resolvers (P4)
-5. 🔜 `src/graphql/mutations/graph.rs` - Graph mutations (P4)
-6. 🔜 Plus 10 other lower priority files
+1. ⏳ `src/pipeline/merge_builder.rs` - migrate merge read path to graph_data (use load_graph_by_dag_node-style helper)
+2. ⏳ `src/pipeline/dag_executor.rs` - remaining legacy reads (GraphBuilder) and potential removal of unused graph_builder field
+3. ⏳ `src/pipeline/dataset_importer.rs` - revisit CSV nodes/edges fidelity (attributes/weight mapping) if needed
+4. 🔜 `src/services/graph_service.rs` - Migrate to GraphDataService (P4)
+5. 🔜 `src/graphql/queries/mod.rs` - Query resolvers (P4)
+6. 🔜 `src/graphql/mutations/graph.rs` - Graph mutations (P4)
+7. 🔜 Plus 10 other lower priority files
 
 **Next Immediate Steps:**
 
-1. **Update get_or_create_graph_record()** (dag_executor.rs):
-   ```rust
-   // Change from querying/creating in graphs table to graph_data table
-   // Use GraphDataService.create() or similar
-   // Set source_type = "computed"
-   // Set dag_node_id = node_id
-   ```
+1. **End-to-end DAG smoke test**: DataSet (filePath + data_set reference) → Graph → Transform/Filter to confirm all writes land in graph_data tables and hashes/annotations behave as expected.
 
-2. **Update persist_graph_contents()** (dag_executor.rs):
-   ```rust
-   // Change from writing to graph_nodes/graph_edges
-   // Write to graph_data_nodes/graph_data_edges instead
-   // Convert i32 weights to Option<f64>
-   // Use GraphDataService methods
-   ```
-
-3. **Test end-to-end pipeline:**
-   - Create a simple DAG: DataSet → Graph → Transform
-   - Verify all nodes execute successfully
-   - Verify data written to graph_data schema only
+2. **Plan MergeNode read migration** using load_graph_by_dag_node helper (P2) once DataSetNode is on graph_data.
+   - Replace legacy graph lookups in merge_builder with GraphDataService calls (graph_data + nodes/edges)
+   - Build merged graph_data output via GraphDataBuilder or direct replace_nodes/replace_edges; ensure source_hash and annotations handled
 
 **Success Criteria for Stage 3 Completion:**
 - ✅ TransformNode and FilterNode work with graphs created via GraphDataBuilder
-- ⏳ New transformed/filtered graphs written to graph_data schema only
-- ⏳ DataSetNode creates graph_data entries
+- ✅ New transformed/filtered graphs written to graph_data schema only
+- ✅ DataSetNode creates graph_data entries (data_set references + filePath importer)
 - ⏳ Full DAG pipeline executes end-to-end with new schema
 - ✅ Cargo check passes (already passing)
 - ⏳ Integration tests pass (to be implemented)
