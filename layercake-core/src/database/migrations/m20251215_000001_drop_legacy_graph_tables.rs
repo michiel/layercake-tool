@@ -1,0 +1,223 @@
+use sea_orm_migration::prelude::*;
+
+/// Drop legacy graph tables after full graph_data cutover.
+#[derive(DeriveMigrationName)]
+pub struct Migration;
+
+#[async_trait::async_trait]
+impl MigrationTrait for Migration {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Drop computed graph legacy tables
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("graph_layers"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("graph_edges"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("graph_nodes"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("graphs"))
+                    .to_owned(),
+            )
+            .await?;
+
+        // Drop dataset graph legacy tables (metadata in data_sets is retained)
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("dataset_graph_layers"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("dataset_graph_edges"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .drop_table(
+                Table::drop()
+                    .if_exists()
+                    .table(Alias::new("dataset_graph_nodes"))
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Recreate minimal legacy tables to allow rollback; schemas match prior entities where practical.
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("graphs"))
+                    .col(ColumnDef::new(Alias::new("id")).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Alias::new("project_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("node_id")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("name")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("execution_state")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("computed_date")).date_time())
+                    .col(ColumnDef::new(Alias::new("source_hash")).string())
+                    .col(ColumnDef::new(Alias::new("node_count")).integer().not_null().default(0))
+                    .col(ColumnDef::new(Alias::new("edge_count")).integer().not_null().default(0))
+                    .col(ColumnDef::new(Alias::new("error_message")).string())
+                    .col(ColumnDef::new(Alias::new("metadata")).json_binary())
+                    .col(ColumnDef::new(Alias::new("annotations")).text())
+                    .col(ColumnDef::new(Alias::new("last_edit_sequence")).integer().not_null().default(0))
+                    .col(ColumnDef::new(Alias::new("has_pending_edits")).boolean().not_null().default(false))
+                    .col(ColumnDef::new(Alias::new("last_replay_at")).date_time())
+                    .col(ColumnDef::new(Alias::new("created_at")).date_time().not_null())
+                    .col(ColumnDef::new(Alias::new("updated_at")).date_time().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("graph_nodes"))
+                    .col(ColumnDef::new(Alias::new("id")).string().not_null().primary_key())
+                    .col(ColumnDef::new(Alias::new("graph_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("label")).string())
+                    .col(ColumnDef::new(Alias::new("layer")).string())
+                    .col(ColumnDef::new(Alias::new("weight")).double())
+                    .col(ColumnDef::new(Alias::new("is_partition")).boolean().not_null().default(false))
+                    .col(ColumnDef::new(Alias::new("belongs_to")).string())
+                    .col(ColumnDef::new(Alias::new("attrs")).json_binary())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("created_at")).date_time().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("graph_edges"))
+                    .col(ColumnDef::new(Alias::new("id")).string().not_null().primary_key())
+                    .col(ColumnDef::new(Alias::new("graph_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("source")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("target")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("label")).string())
+                    .col(ColumnDef::new(Alias::new("layer")).string())
+                    .col(ColumnDef::new(Alias::new("weight")).double())
+                    .col(ColumnDef::new(Alias::new("attrs")).json_binary())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("created_at")).date_time().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("graph_layers"))
+                    .col(ColumnDef::new(Alias::new("id")).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Alias::new("graph_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("layer_id")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("name")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("background_color")).string())
+                    .col(ColumnDef::new(Alias::new("text_color")).string())
+                    .col(ColumnDef::new(Alias::new("border_color")).string())
+                    .col(ColumnDef::new(Alias::new("alias")).string())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("properties")).text())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer())
+                    .to_owned(),
+            )
+            .await?;
+
+        // Dataset graph tables (minimal)
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("dataset_graph_nodes"))
+                    .col(ColumnDef::new(Alias::new("id")).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("external_id")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("label")).string())
+                    .col(ColumnDef::new(Alias::new("layer")).string())
+                    .col(ColumnDef::new(Alias::new("weight")).double())
+                    .col(ColumnDef::new(Alias::new("is_partition")).boolean().not_null().default(false))
+                    .col(ColumnDef::new(Alias::new("belongs_to")).string())
+                    .col(ColumnDef::new(Alias::new("attrs")).json_binary())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("created_at")).date_time().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("dataset_graph_edges"))
+                    .col(ColumnDef::new(Alias::new("id")).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("external_id")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("source")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("target")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("label")).string())
+                    .col(ColumnDef::new(Alias::new("layer")).string())
+                    .col(ColumnDef::new(Alias::new("weight")).double())
+                    .col(ColumnDef::new(Alias::new("attrs")).json_binary())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("created_at")).date_time().not_null())
+                    .to_owned(),
+            )
+            .await?;
+
+        manager
+            .create_table(
+                Table::create()
+                    .if_not_exists()
+                    .table(Alias::new("dataset_graph_layers"))
+                    .col(ColumnDef::new(Alias::new("id")).integer().not_null().auto_increment().primary_key())
+                    .col(ColumnDef::new(Alias::new("dataset_id")).integer().not_null())
+                    .col(ColumnDef::new(Alias::new("layer_id")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("name")).string().not_null())
+                    .col(ColumnDef::new(Alias::new("background_color")).string())
+                    .col(ColumnDef::new(Alias::new("text_color")).string())
+                    .col(ColumnDef::new(Alias::new("border_color")).string())
+                    .col(ColumnDef::new(Alias::new("alias")).string())
+                    .col(ColumnDef::new(Alias::new("comment")).text())
+                    .col(ColumnDef::new(Alias::new("properties")).text())
+                    .to_owned(),
+            )
+            .await?;
+
+        Ok(())
+    }
+}

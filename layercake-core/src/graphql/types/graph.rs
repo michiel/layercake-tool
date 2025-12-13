@@ -20,6 +20,12 @@ pub struct Graph {
     pub id: i32,
     #[graphql(name = "projectId")]
     pub project_id: i32,
+    /// Unified graph_data id when available
+    #[graphql(name = "graphDataId")]
+    pub graph_data_id: Option<i32>,
+    /// Legacy graphs.id when a legacy record exists
+    #[graphql(name = "legacyGraphId")]
+    pub legacy_graph_id: Option<i32>,
     pub name: String,
     pub node_id: String,
     pub execution_state: String,
@@ -147,6 +153,8 @@ impl From<crate::database::entities::graphs::Model> for Graph {
         Self {
             id: model.id,
             project_id: model.project_id,
+            graph_data_id: None,
+            legacy_graph_id: Some(model.id),
             name: model.name,
             node_id: model.node_id,
             execution_state: model.execution_state,
@@ -185,6 +193,8 @@ impl From<crate::database::entities::graph_data::Model> for Graph {
         Self {
             id: model.id,
             project_id: model.project_id,
+            graph_data_id: Some(model.id),
+            legacy_graph_id: None,
             name: model.name,
             node_id: model
                 .dag_node_id
