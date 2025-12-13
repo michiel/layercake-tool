@@ -255,6 +255,7 @@ fn node_type_storage_name(
         PlanDagNodeType::Merge => "MergeNode",
         PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
         PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
+        PlanDagNodeType::Projection => "ProjectionNode",
         PlanDagNodeType::Story => "StoryNode",
         PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
     }

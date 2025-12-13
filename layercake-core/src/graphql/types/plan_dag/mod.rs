@@ -48,6 +48,9 @@ pub enum PlanDagNodeType {
     #[graphql(name = "TreeArtefactNode")]
     #[serde(rename = "TreeArtefactNode")]
     TreeArtefact,
+    #[graphql(name = "ProjectionNode")]
+    #[serde(rename = "ProjectionNode")]
+    Projection,
     #[graphql(name = "StoryNode")]
     #[serde(rename = "StoryNode")]
     Story,

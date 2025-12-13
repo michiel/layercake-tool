@@ -286,6 +286,7 @@ impl ValidationService {
             "MergeNode",
             "GraphArtefactNode",
             "TreeArtefactNode",
+            "ProjectionNode",
             "StoryNode",
             "SequenceArtefactNode",
         ];

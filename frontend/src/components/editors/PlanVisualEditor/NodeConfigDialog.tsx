@@ -14,6 +14,7 @@ import { FilterNodeConfigForm } from './forms/FilterNodeConfigForm';
 import { MergeNodeConfigForm } from './forms/MergeNodeConfigForm';
 import { GraphArtefactNodeConfigForm } from './forms/GraphArtefactNodeConfigForm';
 import { TreeArtefactNodeConfigForm } from './forms/TreeArtefactNodeConfigForm';
+import { ProjectionNodeConfigForm } from './forms/ProjectionNodeConfigForm';
 import { GraphNodeConfigForm } from './forms/GraphNodeConfigForm';
 import { StoryNodeConfigForm } from './forms/StoryNodeConfigForm';
 import { SequenceArtefactNodeConfigForm } from './forms/SequenceArtefactNodeConfigForm';
@@ -116,6 +117,8 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return <GraphArtefactNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.TREE_ARTEFACT:
         return <TreeArtefactNodeConfigForm key={nodeId} {...commonProps} />;
+      case PlanDagNodeType.PROJECTION:
+        return <ProjectionNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.STORY:
         return (
           <StoryNodeConfigForm
@@ -154,6 +157,8 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
         return 'Graph Artefact';
       case PlanDagNodeType.TREE_ARTEFACT:
         return 'Tree Artefact';
+      case PlanDagNodeType.PROJECTION:
+        return 'Projection';
       case PlanDagNodeType.STORY:
         return 'Story';
       case PlanDagNodeType.SEQUENCE_ARTEFACT:

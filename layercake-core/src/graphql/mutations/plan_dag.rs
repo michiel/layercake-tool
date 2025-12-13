@@ -442,6 +442,7 @@ impl PlanDagMutation {
                 crate::graphql::types::PlanDagNodeType::Merge => "MergeNode",
                 crate::graphql::types::PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
                 crate::graphql::types::PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
+                crate::graphql::types::PlanDagNodeType::Projection => "ProjectionNode",
                 crate::graphql::types::PlanDagNodeType::Story => "StoryNode",
                 crate::graphql::types::PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
             };

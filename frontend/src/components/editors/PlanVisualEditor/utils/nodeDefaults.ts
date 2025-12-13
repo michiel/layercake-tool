@@ -107,6 +107,11 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
         graphConfig: {}
       };
 
+    case PlanDagNodeType.PROJECTION:
+      return {
+        projectionId: undefined,
+      };
+
     case PlanDagNodeType.STORY:
       return {
         storyId: undefined,
@@ -140,6 +145,7 @@ export const getDefaultNodeMetadata = (type: PlanDagNodeType): NodeMetadata => {
     [PlanDagNodeType.MERGE]: 'Merge',
     [PlanDagNodeType.GRAPH_ARTEFACT]: 'Graph Artefact',
     [PlanDagNodeType.TREE_ARTEFACT]: 'Tree Artefact',
+    [PlanDagNodeType.PROJECTION]: 'Projection',
     [PlanDagNodeType.STORY]: 'Story',
     [PlanDagNodeType.SEQUENCE_ARTEFACT]: 'Sequence Artefact',
   };
@@ -158,6 +164,7 @@ export const getNodeColors = () => ({
   [PlanDagNodeType.MERGE]: '#ffd43b',
   [PlanDagNodeType.GRAPH_ARTEFACT]: '#ff6b6b',
   [PlanDagNodeType.TREE_ARTEFACT]: '#845ef7',
+  [PlanDagNodeType.PROJECTION]: '#f97316',
   [PlanDagNodeType.STORY]: '#3b82f6',
   [PlanDagNodeType.SEQUENCE_ARTEFACT]: '#f59e0b',
 });

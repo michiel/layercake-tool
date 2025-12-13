@@ -4,6 +4,7 @@ import { TransformNode } from './nodes/TransformNode'
 import { FilterNode } from './nodes/FilterNode'
 import { MergeNode } from './nodes/MergeNode'
 import { GraphArtefactNode, TreeArtefactNode } from './nodes/GraphArtefactNode'
+import { ProjectionNode } from './nodes/ProjectionNode'
 import { StoryNode } from './nodes/StoryNode'
 import { SequenceArtefactNode } from './nodes/SequenceArtefactNode'
 
@@ -19,6 +20,7 @@ export const NODE_TYPES = {
   MergeNode: MergeNode,
   GraphArtefactNode: GraphArtefactNode,
   TreeArtefactNode: TreeArtefactNode,
+  ProjectionNode: ProjectionNode,
   StoryNode: StoryNode,
   SequenceArtefactNode: SequenceArtefactNode,
 } as const

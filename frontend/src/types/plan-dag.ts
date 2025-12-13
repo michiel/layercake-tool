@@ -33,6 +33,7 @@ export enum PlanDagNodeType {
   MERGE = 'MergeNode',
   GRAPH_ARTEFACT = 'GraphArtefactNode',
   TREE_ARTEFACT = 'TreeArtefactNode',
+  PROJECTION = 'ProjectionNode',
   STORY = 'StoryNode',
   SEQUENCE_ARTEFACT = 'SequenceArtefactNode',
 }
@@ -187,6 +188,11 @@ export interface TreeArtefactNodeConfig {
   };
 }
 
+// Projection Node Configuration
+export interface ProjectionNodeConfig {
+  projectionId?: number; // Reference to Projection entity
+}
+
 // Story Node Configuration
 export interface StoryNodeConfig {
   storyId?: number; // Reference to Story entity
@@ -217,6 +223,7 @@ export type NodeConfig =
   | MergeNodeConfig
   | GraphArtefactNodeConfig
   | TreeArtefactNodeConfig
+  | ProjectionNodeConfig
   | StoryNodeConfig
   | SequenceArtefactNodeConfig;
 

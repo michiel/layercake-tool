@@ -21,6 +21,7 @@ fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Merge => "merge",
         PlanDagNodeType::GraphArtefact => "graphartefact",
         PlanDagNodeType::TreeArtefact => "treeartefact",
+        PlanDagNodeType::Projection => "projection",
         PlanDagNodeType::Story => "story",
         PlanDagNodeType::SequenceArtefact => "sequenceartefact",
     }
@@ -35,6 +36,7 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
         PlanDagNodeType::Merge => "MergeNode",
         PlanDagNodeType::GraphArtefact => "GraphArtefactNode",
         PlanDagNodeType::TreeArtefact => "TreeArtefactNode",
+        PlanDagNodeType::Projection => "ProjectionNode",
         PlanDagNodeType::Story => "StoryNode",
         PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
     }

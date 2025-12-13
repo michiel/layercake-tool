@@ -27,6 +27,7 @@ pub fn generate_node_id_from_ids(
         PlanDagNodeType::Merge => "merge",
         PlanDagNodeType::GraphArtefact => "graphartefact",
         PlanDagNodeType::TreeArtefact => "treeartefact",
+        PlanDagNodeType::Projection => "projection",
         PlanDagNodeType::Story => "story",
         PlanDagNodeType::SequenceArtefact => "sequenceartefact",
     };

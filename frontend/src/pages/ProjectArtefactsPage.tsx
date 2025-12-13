@@ -15,6 +15,7 @@ import {
   IconChevronRight,
   IconSettings,
   IconExternalLink,
+  IconPresentation,
 } from '@tabler/icons-react'
 import { gql } from '@apollo/client'
 import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../graphql/plan-dag'
@@ -350,7 +351,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
         .map((id) => nodeMap.get(id))
         .filter(
           (child): child is PlanDagNode =>
-            !!child && (child.nodeType === 'GraphArtefactNode' || child.nodeType === 'TreeArtefactNode'),
+            !!child && (child.nodeType === 'GraphArtefactNode' || child.nodeType === 'TreeArtefactNode' || child.nodeType === 'ProjectionNode'),
         )
 
       graphChildren.forEach((childId) => traverseGraph(childId, depth + 1))
@@ -448,8 +449,16 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   }
 
   const handleEditNode = (nodeId: string, nodeType: string, config: any, metadata: any) => {
-    const dagNodeType =
-      nodeType === 'GraphArtefactNode' ? PlanDagNodeType.GRAPH_ARTEFACT : PlanDagNodeType.TREE_ARTEFACT
+    let dagNodeType: PlanDagNodeType
+    if (nodeType === 'GraphArtefactNode') {
+      dagNodeType = PlanDagNodeType.GRAPH_ARTEFACT
+    } else if (nodeType === 'TreeArtefactNode') {
+      dagNodeType = PlanDagNodeType.TREE_ARTEFACT
+    } else if (nodeType === 'ProjectionNode') {
+      dagNodeType = PlanDagNodeType.PROJECTION
+    } else {
+      dagNodeType = PlanDagNodeType.TREE_ARTEFACT // fallback
+    }
     setEditNodeDialog({
       open: true,
       nodeId,
@@ -631,6 +640,61 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
 
     if (entry.parentStoryId && collapsedStories.has(entry.parentStoryId)) {
       return null
+    }
+
+    // Handle ProjectionNode specially
+    if (entry.node.nodeType === 'ProjectionNode') {
+      const label = entry.node.metadata?.label || entry.node.id
+      const projectionConfig = parseConfig(entry.node.config)
+      const projectionId = projectionConfig.projectionId
+      const projectionLink = projectionId && projectIdParam ? `/projects/${projectIdParam}/projections/${projectionId}` : null
+
+      return (
+        <div
+          key={entry.node.id}
+          className="flex items-center py-4 px-4 border-b last:border-b-0"
+          style={{ paddingLeft: `${16 + entry.depth * 24}px` }}
+        >
+          <Group gap="sm" className="text-sm min-w-0 flex-shrink-0">
+            <IconPresentation className="h-4 w-4 text-orange-600" />
+            <div className="min-w-0">
+              <p className="font-medium truncate">{label}</p>
+              <p className="text-xs text-muted-foreground">Projection</p>
+            </div>
+          </Group>
+          <Group gap="xs" className="ml-auto flex-shrink-0">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    disabled={!projectionLink}
+                    onClick={() => projectionLink && navigate(projectionLink)}
+                  >
+                    <IconExternalLink size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open projection viewer</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => handleEditNode(entry.node.id, entry.node.nodeType, entry.node.config, entry.node.metadata)}
+                  >
+                    <IconSettings size={16} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit properties</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </Group>
+        </div>
+      )
     }
 
     const label = entry.node.metadata?.label || entry.node.id

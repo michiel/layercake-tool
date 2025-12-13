@@ -9,6 +9,7 @@ export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> 
     PlanDagNodeType.FILTER,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.PROJECTION,
   ],
   [PlanDagNodeType.GRAPH]: [
     PlanDagNodeType.GRAPH,
@@ -17,6 +18,7 @@ export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> 
     PlanDagNodeType.MERGE,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.PROJECTION,
   ],
   [PlanDagNodeType.TRANSFORM]: [
     PlanDagNodeType.GRAPH,
@@ -24,6 +26,7 @@ export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> 
     PlanDagNodeType.FILTER,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.PROJECTION,
     PlanDagNodeType.TRANSFORM,
   ],
   [PlanDagNodeType.FILTER]: [
@@ -33,6 +36,7 @@ export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> 
     PlanDagNodeType.FILTER,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.PROJECTION,
   ],
   [PlanDagNodeType.MERGE]: [
     PlanDagNodeType.GRAPH,
@@ -41,9 +45,11 @@ export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> 
     PlanDagNodeType.MERGE,
     PlanDagNodeType.GRAPH_ARTEFACT,
     PlanDagNodeType.TREE_ARTEFACT,
+    PlanDagNodeType.PROJECTION,
   ],
   [PlanDagNodeType.GRAPH_ARTEFACT]: [],
   [PlanDagNodeType.TREE_ARTEFACT]: [],
+  [PlanDagNodeType.PROJECTION]: [],
   [PlanDagNodeType.STORY]: [PlanDagNodeType.SEQUENCE_ARTEFACT],
   [PlanDagNodeType.SEQUENCE_ARTEFACT]: [],
 }
@@ -125,6 +131,7 @@ export const canAcceptMultipleInputs = (nodeType: PlanDagNodeType): boolean => {
     case PlanDagNodeType.FILTER:      // FilterNodes can have only one input
     case PlanDagNodeType.GRAPH_ARTEFACT: // Artefact nodes can have only one input
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:  // Projection nodes can have only one input
     case PlanDagNodeType.STORY:       // Story nodes don't accept inputs
     case PlanDagNodeType.SEQUENCE_ARTEFACT: // Sequence artefact accepts one input
       return false
@@ -147,6 +154,7 @@ export const canHaveMultipleOutputs = (nodeType: PlanDagNodeType): boolean => {
       return true
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:  // Projection nodes have no outputs
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return false
     default:
@@ -168,6 +176,7 @@ export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return 1 // These require exactly one input
     case PlanDagNodeType.MERGE:
@@ -199,6 +208,8 @@ export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
       return '#f59e0b' // Amber-500
     case PlanDagNodeType.TREE_ARTEFACT:
       return '#845ef7' // Purple
+    case PlanDagNodeType.PROJECTION:
+      return '#f97316' // Orange-500
     case PlanDagNodeType.STORY:
       return '#3b82f6' // Blue-500
     default:
@@ -224,6 +235,8 @@ export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
       return 'export'
+    case PlanDagNodeType.PROJECTION:
+      return 'presentation'
     case PlanDagNodeType.STORY:
       return 'book'
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
@@ -397,8 +410,9 @@ export const isNodeConfigured = (
 
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
-      // Artefact nodes MUST have one input to be configured
+      // Artefact and Projection nodes MUST have one input to be configured
       return inputEdges.length === 1;
 
     case PlanDagNodeType.MERGE:
@@ -443,6 +457,7 @@ export const getMinimumRequiredInputs = (nodeType: PlanDagNodeType): number => {
     case PlanDagNodeType.FILTER:
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return 1; // These need exactly one input
     case PlanDagNodeType.MERGE:
@@ -467,8 +482,9 @@ export const getMinimumRequiredOutputs = (nodeType: PlanDagNodeType): number => 
       return 0; // These can exist without outputs (terminal nodes)
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
+    case PlanDagNodeType.PROJECTION:
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
-      return 0; // Artefact nodes have no outputs
+      return 0; // Artefact and Projection nodes have no outputs
     default:
       return 0;
   }

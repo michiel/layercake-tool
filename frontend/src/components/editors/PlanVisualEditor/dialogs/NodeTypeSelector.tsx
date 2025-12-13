@@ -24,6 +24,7 @@ export const NODE_TYPE_SELECTOR_DEFAULTS: PlanDagNodeType[] = [
   PlanDagNodeType.MERGE,
   PlanDagNodeType.GRAPH_ARTEFACT,
   PlanDagNodeType.TREE_ARTEFACT,
+  PlanDagNodeType.PROJECTION,
   PlanDagNodeType.STORY,
   PlanDagNodeType.SEQUENCE_ARTEFACT,
 ];
