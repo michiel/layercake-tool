@@ -1,11 +1,13 @@
 use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
-    data_sets, graph_edges, graph_edges::Entity as GraphEdges, graph_layers,
-    graph_layers::Entity as Layers, graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases,
-    plan_dag_edges, plan_dag_nodes, project_layers,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges,
+    graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers, graph_nodes,
+    graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
+    project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
+use crate::services::GraphDataService;
 use chrono::Utc;
 use indexmap::IndexMap;
 use sea_orm::prelude::Expr;
@@ -298,8 +300,111 @@ impl GraphService {
         Ok(db_layers)
     }
 
-    /// Build a Graph from a DAG-built graph in the graphs table
+    /// Build a Graph from a DAG-built graph; graph_data-first, fallback to legacy graphs table.
     pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> GraphResult<Graph> {
+        // Try unified schema first
+        if let Some(gd) = graph_data::Entity::find_by_id(graph_id)
+            .one(&self.db)
+            .await
+            .map_err(GraphError::Database)?
+        {
+            let graph_data_service = GraphDataService::new(self.db.clone());
+            let (gd_model, nodes, edges) = graph_data_service
+                .load_full(gd.id)
+                .await
+                .map_err(GraphError::Database)?;
+
+            let graph_nodes: Vec<Node> = nodes
+                .into_iter()
+                .map(|n| Node {
+                    id: n.external_id,
+                    label: n.label.unwrap_or_default(),
+                    layer: n.layer.unwrap_or_default(),
+                    is_partition: n.is_partition,
+                    belongs_to: n.belongs_to,
+                    weight: n.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: n.comment,
+                    dataset: n.source_dataset_id,
+                    attributes: n.attributes,
+                })
+                .collect();
+
+            let graph_edges: Vec<Edge> = edges
+                .into_iter()
+                .map(|e| Edge {
+                    id: e.external_id,
+                    source: e.source,
+                    target: e.target,
+                    label: e.label.unwrap_or_default(),
+                    layer: e.layer.unwrap_or_default(),
+                    weight: e.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: e.comment,
+                    dataset: e.source_dataset_id,
+                    attributes: e.attributes,
+                })
+                .collect();
+
+            // Derive layers from node attributes
+            let mut layer_map: IndexMap<String, Layer> = IndexMap::new();
+            for node in &graph_nodes {
+                if node.layer.is_empty() || layer_map.contains_key(&node.layer) {
+                    continue;
+                }
+
+                let (bg_color, text_color, border_color) = node
+                    .attributes
+                    .as_ref()
+                    .and_then(|attrs| attrs.as_object())
+                    .map(|obj| {
+                        let bg = obj
+                            .get("backgroundColor")
+                            .or_else(|| obj.get("color"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let text = obj
+                            .get("textColor")
+                            .or_else(|| obj.get("labelColor"))
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        let border = obj
+                            .get("borderColor")
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.to_string());
+                        (bg, text, border)
+                    })
+                    .unwrap_or((None, None, None));
+
+                layer_map.insert(
+                    node.layer.clone(),
+                    Layer {
+                        id: node.layer.clone(),
+                        label: node.layer.clone(),
+                        background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
+                        text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
+                        border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+                        alias: None,
+                        dataset: node.dataset,
+                        attributes: node.attributes.clone(),
+                    },
+                );
+            }
+
+            let layers: Vec<Layer> = layer_map.into_values().collect();
+
+            let graph = Graph {
+                name: gd_model.name.clone(),
+                nodes: graph_nodes,
+                edges: graph_edges,
+                layers,
+                annotations: gd_model
+                    .annotations
+                    .as_ref()
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+            };
+
+            return Ok(graph);
+        }
+
         // Fetch the graph metadata
         use crate::database::entities::graphs::Entity as Graphs;
         let graph_meta = Graphs::find_by_id(graph_id)
