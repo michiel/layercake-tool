@@ -42,6 +42,7 @@ mod m20251210_000002_create_graph_data_nodes;
 mod m20251210_000003_create_graph_data_edges;
 pub mod m20251210_000004_migrate_existing_graph_data;
 mod m20251210_000005_create_projections;
+mod m20251213_000001_repair_post_migration_graphs;
 
 pub struct Migrator;
 
@@ -91,6 +92,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251210_000003_create_graph_data_edges::Migration),
             Box::new(m20251210_000004_migrate_existing_graph_data::Migration),
             Box::new(m20251210_000005_create_projections::Migration),
+            Box::new(m20251213_000001_repair_post_migration_graphs::Migration),
         ]
     }
 }
