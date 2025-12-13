@@ -7,8 +7,8 @@
 ## Outstanding Tasks (ordered, uncompleted)
 1. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata). ✅ Added graph_data pipeline E2E test covering merge/transform/filter/projection.
 2. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder). ✅ DagExecutor no longer wires GraphBuilder; legacy modules marked dead-code.
-3. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers.
-4. Schema cleanup migration to drop legacy tables once validation period completes.
+3. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers. 🔜 (see Stage 5 plan)
+4. Schema cleanup migration to drop legacy tables once validation period completes. 🔜 (Stage 6 plan)
 
 ## Executive Summary
 
@@ -399,6 +399,7 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 - [ ] Handle ID offset in frontend (or add `legacyId` field)
 - [ ] Update frontend to use new field names
 - [ ] Provide migration guide for API consumers
+- [ ] Frontend plan: expose both `graphDataId` and `legacyGraphId` during transition, default to `graphDataId` in DAG/artefact selection; display a badge when an artefact/export is using a legacy graph to prompt regeneration.
 
 **Success Criteria:**
 - GraphQL schema updated and documented
@@ -428,10 +429,11 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Tasks:**
 - [ ] Backup production database
 - [ ] Run validation queries
-- [ ] Create and test `m20251215_000001_drop_legacy_graph_tables.rs`
+- [ ] Create and test `m20251215_000001_drop_legacy_graph_tables.rs` (drops graphs/graph_nodes/graph_edges/graph_layers + dataset_graph_* tables)
 - [ ] Execute migration in production
 - [ ] Monitor for any errors
 - [ ] Confirm database size reduction
+- [ ] Frontend/APIs: ensure all calls are graph_data-only before executing migration; fail closed if a legacy table is still queried.
 
 **Success Criteria:**
 - Legacy tables dropped
@@ -540,7 +542,7 @@ WHERE gd.node_count != (SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_i
 - [ ] Developer guide for new graph creation patterns
 - [ ] Database schema diagram
 
-## Timeline Summary
+## Timeline Summary / Next Actions
 
 | Stage | Duration | Status | Risk |
 |-------|----------|--------|------|
@@ -552,6 +554,12 @@ WHERE gd.node_count != (SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_i
 | 6. Schema Cleanup | 1 day + validation | Not Started | High |
 
 **Total Estimated Time:** 5-6 weeks
+
+**Next Actions (frontend + cleanup focus):**
+- Publish GraphQL schema updates (`sourceType`, `graphDataId`, optional `legacyGraphId`) and wire frontend to prefer `graphDataId` for artefact/export selection.
+- Add UI warning/badge when a graph/artefact references a legacy graph; provide “Regenerate on graph_data” action.
+- Prepare migration `m20251215_000001_drop_legacy_graph_tables.rs` with preflight validation queries and rollback guidance; schedule after frontend rollout and telemetry shows zero legacy reads.
+- Add validation hook in backend to fail fast if a new write to legacy tables is attempted after cutoff.
 
 ## Success Criteria
 
