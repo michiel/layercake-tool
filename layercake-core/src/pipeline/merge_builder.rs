@@ -1,751 +1,292 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set, TransactionTrait};
-use serde_json::Value;
+use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
-use super::layer_operations::{insert_layers_to_db, load_layers_from_db};
-use super::persist_utils::{clear_graph_storage, insert_edge_batches, insert_node_batches};
-use super::types::LayerData;
-use crate::database::entities::ExecutionState;
-use crate::database::entities::{data_sets, graph_edges, graph_nodes, graphs, plan_dag_nodes};
+use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
+use crate::database::entities::data_sets;
+use crate::graph::{Edge, Graph, Layer, Node};
+use crate::services::graph_data_service::GraphDataService;
+use crate::services::graph_service::GraphService;
 
-/// Helper function to parse is_partition from JSON Value (handles both boolean and string)
-fn parse_is_partition(value: &Value) -> bool {
-    // Try as boolean first
-    if let Some(b) = value.as_bool() {
-        return b;
-    }
-
-    // Try as string with truthy logic
-    if let Some(s) = value.as_str() {
-        let trimmed_lowercase = s.trim().to_lowercase();
-        return matches!(trimmed_lowercase.as_str(), "true" | "y" | "yes" | "1");
-    }
-
-    // Default to false
-    false
-}
-
-/// Service for merging data from multiple upstream sources
+/// Service for merging data from multiple upstream sources using graph_data-first resolution.
 pub struct MergeBuilder {
     db: DatabaseConnection,
+    graph_data_service: std::sync::Arc<GraphDataService>,
+    graph_service: GraphService,
 }
 
 impl MergeBuilder {
-    pub fn new(db: DatabaseConnection) -> Self {
-        Self { db }
+    pub fn new(
+        db: DatabaseConnection,
+        graph_data_service: std::sync::Arc<GraphDataService>,
+    ) -> Self {
+        let graph_service = GraphService::new(db.clone());
+        Self {
+            db,
+            graph_data_service,
+            graph_service,
+        }
     }
 
-    /// Merge data from upstream sources
-    /// Returns the created/updated graph entity
-    /// Note: Merge nodes reuse the graphs table structure for intermediate results
+    /// Merge data from upstream nodes into a single Graph struct (in-memory).
     pub async fn merge_sources(
         &self,
         project_id: i32,
         _plan_id: i32,
-        node_id: String,
+        _node_id: String,
         name: String,
         upstream_node_ids: Vec<String>,
-    ) -> Result<graphs::Model> {
-        // Get or create graph entity (Merge uses same tables as Graph)
-        let graph = self.get_or_create_graph(project_id, &node_id, name).await?;
+    ) -> Result<Graph> {
+        // Load upstream graphs via graph_data first, falling back to legacy graphs table
+        let mut upstream_graphs = Vec::new();
+        for upstream_id in upstream_node_ids {
+            let graph = self
+                .load_graph_by_dag_node(project_id, &upstream_id)
+                .await?;
+            upstream_graphs.push(graph);
+        }
 
-        // Set to processing state
-        let mut active: graphs::ActiveModel = graph.into();
-        active = active.set_state(ExecutionState::Processing);
-        let graph = active.update(&self.db).await?;
+        // Merge nodes/edges/layers
+        let mut nodes_map: HashMap<String, NodeMerge> = HashMap::new();
+        let mut edges_map: HashMap<String, EdgeMerge> = HashMap::new();
+        let mut layers_map: HashMap<String, Layer> = HashMap::new();
 
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db, project_id, &node_id, &graph,
-        )
-        .await;
+        for graph in &upstream_graphs {
+            for node in &graph.nodes {
+                let entry = nodes_map.entry(node.id.clone()).or_default();
+                entry.id = node.id.clone();
+                entry.label = entry.label.clone().or_else(|| Some(node.label.clone()));
+                entry.layer = entry.layer.clone().or_else(|| Some(node.layer.clone()));
+                entry.is_partition |= node.is_partition;
+                entry.belongs_to = entry
+                    .belongs_to
+                    .clone()
+                    .or_else(|| node.belongs_to.clone());
+                entry.weight += node.weight as i64;
+                entry.comment = entry.comment.clone().or_else(|| node.comment.clone());
+                entry.dataset = entry.dataset.or(node.dataset);
+                entry.attributes = entry.attributes.clone().or_else(|| node.attributes.clone());
+            }
 
-        // Fetch upstream data sources by reading plan_dag_nodes configs
-        let mut data_sets_list = Vec::new();
-        let mut data_set_cache = HashMap::new();
-        for upstream_id in &upstream_node_ids {
-            // Check if upstream is a DataSet node or a Graph/Merge node
-            // Note: Node IDs are globally unique, no need to filter by plan_id
-            let upstream_node = plan_dag_nodes::Entity::find_by_id(upstream_id)
-                .one(&self.db)
-                .await?
-                .ok_or_else(|| anyhow!("Upstream node not found: {}", upstream_id))?;
+            for edge in &graph.edges {
+                let entry = edges_map.entry(edge.id.clone()).or_default();
+                entry.id = edge.id.clone();
+                entry.source = edge.source.clone();
+                entry.target = edge.target.clone();
+                entry.label = entry.label.clone().or_else(|| Some(edge.label.clone()));
+                entry.layer = entry.layer.clone().or_else(|| Some(edge.layer.clone()));
+                entry.weight += edge.weight as i64;
+                entry.comment = entry.comment.clone().or_else(|| edge.comment.clone());
+                entry.dataset = entry.dataset.or(edge.dataset);
+                entry.attributes = entry.attributes.clone().or_else(|| edge.attributes.clone());
+            }
 
-            match upstream_node.node_type.as_str() {
-                "DataSetNode" => {
-                    // Read from data_sets table using the node we just found
-                    let data_set = self
-                        .get_data_set_from_node(&upstream_node, &mut data_set_cache)
-                        .await?;
-                    data_sets_list.push(DataSetOrGraph::DataSet(data_set));
-                }
-                "GraphNode" | "MergeNode" => {
-                    // Read from graphs table
-                    let graph = self.get_upstream_graph(project_id, upstream_id).await?;
-                    data_sets_list.push(DataSetOrGraph::Graph(graph));
-                }
-                _ => {
-                    return Err(anyhow!(
-                        "Unsupported upstream node type for Merge: {}",
-                        upstream_node.node_type
-                    ));
-                }
+            for layer in &graph.layers {
+                layers_map.entry(layer.id.clone()).or_insert_with(|| layer.clone());
             }
         }
 
-        // Compute source hash for change detection
-        let source_hash = self.compute_source_hash(&data_sets_list)?;
-
-        // Check if recomputation is needed
-        if let Some(existing_hash) = &graph.source_hash {
-            if existing_hash == &source_hash {
-                // No changes, return existing graph
-                return Ok(graph);
-            }
-        }
-
-        // Merge data from all sources
-        let result = self.merge_data_from_sources(&graph, &data_sets_list).await;
-
-        match result {
-            Ok((node_count, edge_count, annotation)) => {
-                // Update to completed state
-                let mut active: graphs::ActiveModel = graph.into();
-                active = active.set_completed(source_hash, node_count as i32, edge_count as i32);
-                if let Some(ann) = annotation {
-                    active.annotations = Set(Some(ann));
-                }
-                let updated = active.update(&self.db).await?;
-
-                // Publish execution status change
-                #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_graph_status(
-                    &self.db, project_id, &node_id, &updated,
-                )
-                .await;
-
-                Ok(updated)
-            }
-            Err(e) => {
-                // Update to error state
-                let mut active: graphs::ActiveModel = graph.into();
-                active = active.set_error(e.to_string());
-                let updated = active.update(&self.db).await?;
-
-                // Publish execution status change
-                #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_graph_status(
-                    &self.db, project_id, &node_id, &updated,
-                )
-                .await;
-
-                Err(e)
-            }
-        }
-    }
-
-    /// Get or create graph entity
-    async fn get_or_create_graph(
-        &self,
-        project_id: i32,
-        node_id: &str,
-        name: String,
-    ) -> Result<graphs::Model> {
-        use crate::database::entities::graphs::{Column, Entity};
-        use sea_orm::{ColumnTrait, QueryFilter};
-
-        // Try to find existing
-        if let Some(graph) = Entity::find()
-            .filter(Column::ProjectId.eq(project_id))
-            .filter(Column::NodeId.eq(node_id))
-            .one(&self.db)
-            .await?
-        {
-            return Ok(graph);
-        }
-
-        // Create new (let database auto-generate ID)
-        let graph = graphs::ActiveModel {
-            project_id: Set(project_id),
-            node_id: Set(node_id.to_string()),
-            name: Set(name),
-            ..graphs::ActiveModel::new()
-        };
-
-        let graph = graph.insert(&self.db).await?;
-        Ok(graph)
-    }
-
-    /// Get data_set from a plan_dag_node
-    async fn get_data_set_from_node(
-        &self,
-        dag_node: &plan_dag_nodes::Model,
-        cache: &mut HashMap<i32, data_sets::Model>,
-    ) -> Result<data_sets::Model> {
-        // Parse config to get dataSetId
-        let config: serde_json::Value = serde_json::from_str(&dag_node.config_json)
-            .map_err(|e| anyhow!("Failed to parse node config: {}", e))?;
-
-        let data_set_id = config
-            .get("dataSetId")
-            .and_then(|v| v.as_i64())
-            .map(|v| v as i32)
-            .ok_or_else(|| anyhow!("Node config does not have dataSetId: {}", dag_node.id))?;
-
-        if let Some(cached) = cache.get(&data_set_id) {
-            return Ok(cached.clone());
-        }
-
-        let data_set = data_sets::Entity::find_by_id(data_set_id)
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("DataSet not found with id {}", data_set_id))?;
-
-        cache.insert(data_set_id, data_set.clone());
-        Ok(data_set)
-    }
-
-    /// Get upstream graph (from Graph or Merge node)
-    async fn get_upstream_graph(&self, project_id: i32, node_id: &str) -> Result<graphs::Model> {
-        use crate::database::entities::graphs::{Column, Entity};
-        use sea_orm::{ColumnTrait, QueryFilter};
-
-        Entity::find()
-            .filter(Column::ProjectId.eq(project_id))
-            .filter(Column::NodeId.eq(node_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Graph not found for node {}", node_id))
-    }
-
-    /// Compute hash of upstream sources for change detection
-    fn compute_source_hash(&self, sources: &[DataSetOrGraph]) -> Result<String> {
-        use sha2::{Digest, Sha256};
-
-        let mut hasher = Sha256::new();
-
-        for source in sources {
-            match source {
-                DataSetOrGraph::DataSet(ds) => {
-                    hasher.update(ds.id.to_le_bytes());
-                    hasher.update(ds.graph_json.as_bytes());
-                    if let Some(processed_at) = &ds.processed_at {
-                        hasher.update(processed_at.to_rfc3339().as_bytes());
-                    }
-                }
-                DataSetOrGraph::Graph(graph) => {
-                    hasher.update(graph.id.to_le_bytes());
-                    if let Some(hash) = &graph.source_hash {
-                        hasher.update(hash.as_bytes());
-                    }
-                    hasher.update(graph.updated_at.timestamp_micros().to_le_bytes());
-                    hasher.update(graph.node_id.as_bytes());
-                    if let Some(computed_date) = &graph.computed_date {
-                        hasher.update(computed_date.to_rfc3339().as_bytes());
-                    }
-                }
-            }
-        }
-
-        let hash = format!("{:x}", hasher.finalize());
-        Ok(hash)
-    }
-
-    /// Merge data from all sources (data_sets + graphs)
-    /// Returns (node_count, edge_count, optional_annotation)
-    async fn merge_data_from_sources(
-        &self,
-        graph: &graphs::Model,
-        sources: &[DataSetOrGraph],
-    ) -> Result<(usize, usize, Option<String>)> {
-        let txn = self.db.begin().await?;
-        clear_graph_storage(&txn, graph.id).await?;
-
-        let mut all_nodes = HashMap::new();
-        let mut all_edges: HashMap<String, EdgeData> = HashMap::new();
-        let mut all_layers = HashMap::new(); // layer_id -> layer data
-        let mut merge_stats = MergeStats::new();
-
-        // Process each source
-        for source in sources {
-            match source {
-                DataSetOrGraph::DataSet(ds) => {
-                    // Parse graph_json from data_sets
-                    let graph_data: serde_json::Value = serde_json::from_str(&ds.graph_json)
-                        .map_err(|e| {
-                            anyhow!("Failed to parse graph JSON for {}: {}", ds.name, e)
-                        })?;
-
-                    self.extract_from_dataset_graph(
-                        &mut all_nodes,
-                        &mut all_edges,
-                        &mut all_layers,
-                        &graph_data,
-                        Some(ds.id),
-                        &mut merge_stats,
-                    )?;
-                }
-                DataSetOrGraph::Graph(upstream_graph) => {
-                    // Read nodes and edges from graph_nodes and graph_edges tables
-                    self.extract_from_graph_tables(
-                        &mut all_nodes,
-                        &mut all_edges,
-                        upstream_graph.id,
-                        &mut merge_stats,
-                    )
-                    .await?;
-                    // Also read layers from the upstream graph
-                    self.extract_layers_from_graph(&mut all_layers, upstream_graph.id)
-                        .await?;
-                }
-            }
-        }
-
-        // Validate edges reference existing nodes
-        let node_ids: HashSet<_> = all_nodes.keys().cloned().collect();
-        for (edge_id, edge) in &all_edges {
-            if !node_ids.contains(&edge.source) {
+        // Validate edges reference nodes
+        let node_ids: HashSet<_> = nodes_map.keys().cloned().collect();
+        for (edge_id, edge) in &edges_map {
+            if !node_ids.contains(&edge.source) || !node_ids.contains(&edge.target) {
                 return Err(anyhow!(
-                    "Edge {} references non-existent source node: {}",
+                    "Merge edge {} references missing node (source:{} target:{})",
                     edge_id,
-                    edge.source
-                ));
-            }
-            if !node_ids.contains(&edge.target) {
-                return Err(anyhow!(
-                    "Edge {} references non-existent target node: {}",
-                    edge_id,
+                    edge.source,
                     edge.target
                 ));
             }
-
-            // Validate edges don't reference partition nodes
-            if let Some(source_node) = all_nodes.get(&edge.source) {
-                if source_node.is_partition {
-                    return Err(anyhow!(
-                        "Edge {} has source node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
-                        edge_id,
-                        edge.source
-                    ));
-                }
-            }
-            if let Some(target_node) = all_nodes.get(&edge.target) {
-                if target_node.is_partition {
-                    return Err(anyhow!(
-                        "Edge {} has target node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
-                        edge_id,
-                        edge.target
-                    ));
-                }
-            }
         }
 
-        // Insert nodes
-        let node_models: Vec<_> = all_nodes
-            .into_iter()
-            .map(|(id, node_data)| graph_nodes::ActiveModel {
-                id: Set(id),
-                graph_id: Set(graph.id),
-                label: Set(node_data.label),
-                layer: Set(node_data.layer),
-                weight: Set(node_data.weight),
-                is_partition: Set(node_data.is_partition),
-                belongs_to: Set(node_data.belongs_to),
-                dataset_id: Set(node_data.dataset_id),
-                attrs: Set(node_data.attrs),
-                comment: Set(node_data.comment),
-                created_at: Set(chrono::Utc::now()),
+        // Build merged Graph struct
+        let nodes: Vec<Node> = nodes_map
+            .into_values()
+            .map(|n| Node {
+                id: n.id.clone(),
+                label: n.label.unwrap_or_else(|| n.id.clone()),
+                layer: n.layer.unwrap_or_else(|| "default".to_string()),
+                is_partition: n.is_partition,
+                belongs_to: n.belongs_to,
+                weight: n.weight as i32,
+                comment: n.comment,
+                dataset: n.dataset,
+                attributes: n.attributes,
             })
             .collect();
-        insert_node_batches(&txn, node_models).await?;
 
-        // Insert edges
-        let edge_count = all_edges.len();
-        let edge_models: Vec<_> = all_edges
-            .into_iter()
-            .map(|(edge_id, edge_data)| graph_edges::ActiveModel {
-                id: Set(edge_id),
-                graph_id: Set(graph.id),
-                source: Set(edge_data.source),
-                target: Set(edge_data.target),
-                label: Set(edge_data.label),
-                layer: Set(edge_data.layer),
-                weight: Set(edge_data.weight),
-                dataset_id: Set(edge_data.dataset_id),
-                attrs: Set(edge_data.attrs),
-                comment: Set(edge_data.comment),
-                created_at: Set(chrono::Utc::now()),
+        let edges: Vec<Edge> = edges_map
+            .into_values()
+            .map(|e| Edge {
+                id: e.id.clone(),
+                source: e.source,
+                target: e.target,
+                label: e.label.unwrap_or_else(|| e.id.clone()),
+                layer: e.layer.unwrap_or_else(|| "default".to_string()),
+                weight: e.weight as i32,
+                comment: e.comment,
+                dataset: e.dataset,
+                attributes: e.attributes,
             })
             .collect();
-        insert_edge_batches(&txn, edge_models).await?;
 
-        // Insert layers using shared function
-        insert_layers_to_db(&txn, graph.id, all_layers).await?;
-        txn.commit().await?;
-
-        let node_count = node_ids.len();
-        let annotation = merge_stats.to_annotation();
-        Ok((node_count, edge_count, annotation))
-    }
-
-    /// Extract nodes, edges, and layers from graph_json
-    fn extract_from_dataset_graph(
-        &self,
-        all_nodes: &mut HashMap<String, NodeData>,
-        all_edges: &mut HashMap<String, EdgeData>,
-        all_layers: &mut HashMap<String, LayerData>,
-        graph_data: &serde_json::Value,
-        dataset_id: Option<i32>,
-        merge_stats: &mut MergeStats,
-    ) -> Result<()> {
-        if let Some(nodes_array) = graph_data.get("nodes").and_then(|v| v.as_array()) {
-            for node_val in nodes_array {
-                let id = node_val["id"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Node missing 'id' field"))?
-                    .to_string();
-
-                let node = NodeData {
-                    label: node_val["label"].as_str().map(|s| s.to_string()),
-                    layer: node_val["layer"].as_str().map(|s| s.to_string()),
-                    weight: node_val["weight"].as_f64(),
-                    is_partition: parse_is_partition(&node_val["is_partition"]),
-                    belongs_to: node_val["belongs_to"]
-                        .as_str()
-                        .filter(|s| !s.is_empty())
-                        .map(|s| s.to_string()),
-                    comment: node_val["comment"].as_str().map(|s| s.to_string()),
-                    attrs: Some(node_val.clone()),
-                    dataset_id,
-                };
-
-                merge_node(all_nodes, id, node, merge_stats);
-            }
-        }
-
-        if let Some(edges_array) = graph_data.get("edges").and_then(|v| v.as_array()) {
-            for edge_val in edges_array {
-                let id = edge_val["id"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Edge missing 'id' field"))?
-                    .to_string();
-                let source = edge_val["source"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Edge missing 'source' field"))?
-                    .to_string();
-                let target = edge_val["target"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Edge missing 'target' field"))?
-                    .to_string();
-
-                let edge = EdgeData {
-                    source,
-                    target,
-                    label: edge_val["label"].as_str().map(|s| s.to_string()),
-                    layer: edge_val["layer"].as_str().map(|s| s.to_string()),
-                    weight: edge_val["weight"].as_f64(),
-                    comment: edge_val["comment"].as_str().map(|s| s.to_string()),
-                    attrs: Some(edge_val.clone()),
-                    dataset_id,
-                };
-
-                merge_edge(all_edges, id, edge, merge_stats);
-            }
-        }
-
-        let mut process_layers = |array: &Vec<serde_json::Value>| -> Result<()> {
-            for layer_val in array {
-                let layer_id = layer_val["id"]
-                    .as_str()
-                    .ok_or_else(|| anyhow!("Layer missing 'id' field"))?
-                    .to_string();
-
-                if layer_id.is_empty() {
-                    continue;
-                }
-
-                let name = layer_val["label"].as_str().unwrap_or(&layer_id).to_string();
-
-                let background_color = layer_val["background_color"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                let text_color = layer_val["text_color"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                let border_color = layer_val["border_color"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                let alias = layer_val["alias"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                let comment = layer_val["comment"]
-                    .as_str()
-                    .filter(|s| !s.is_empty())
-                    .map(|s| s.to_string());
-
-                let mut properties = serde_json::Map::new();
-                if let Some(obj) = layer_val.as_object() {
-                    for (key, value) in obj {
-                        if !matches!(
-                            key.as_str(),
-                            "id" | "label"
-                                | "background_color"
-                                | "text_color"
-                                | "border_color"
-                                | "comment"
-                        ) {
-                            properties.insert(key.clone(), value.clone());
-                        }
-                    }
-                }
-
-                let properties_json = if properties.is_empty() {
-                    None
-                } else {
-                    Some(serde_json::to_string(&properties)?)
-                };
-
-                let layer = LayerData {
-                    name,
-                    background_color,
-                    text_color,
-                    border_color,
-                    alias,
-                    comment,
-                    properties: properties_json,
-                    dataset_id,
-                };
-
-                all_layers.insert(layer_id, layer);
-            }
-            Ok(())
+        let layers: Vec<Layer> = if layers_map.is_empty() {
+            // Derive layers from node attributes if none were present
+            derive_layers_from_nodes(&nodes)
+        } else {
+            layers_map.into_values().collect()
         };
 
-        if let Some(layer_array) = graph_data.get("graph_layers").and_then(|v| v.as_array()) {
-            process_layers(layer_array)?;
-        }
-
-        if let Some(layer_array) = graph_data.get("layers").and_then(|v| v.as_array()) {
-            process_layers(layer_array)?;
-        }
-
-        Ok(())
+        Ok(Graph {
+            name,
+            nodes,
+            edges,
+            layers,
+            annotations: None,
+        })
     }
 
-    /// Extract nodes and edges from graph_nodes and graph_edges tables
-    async fn extract_from_graph_tables(
+    async fn load_graph_by_dag_node(
         &self,
-        all_nodes: &mut HashMap<String, NodeData>,
-        all_edges: &mut HashMap<String, EdgeData>,
-        graph_id: i32,
-        merge_stats: &mut MergeStats,
-    ) -> Result<()> {
-        use sea_orm::{ColumnTrait, QueryFilter};
+        project_id: i32,
+        dag_node_id: &str,
+    ) -> Result<Graph> {
+        // Try graph_data first
+        if let Some(gd) = self
+            .graph_data_service
+            .get_by_dag_node(dag_node_id)
+            .await?
+        {
+            let (gd, nodes, edges) = self
+                .graph_data_service
+                .load_full(gd.id)
+                .await
+                .map_err(|e| anyhow!("load_full graph_data {}: {}", gd.id, e))?;
 
-        // Read nodes
-        let nodes = graph_nodes::Entity::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph_id))
-            .all(&self.db)
-            .await?;
+            let graph_nodes: Vec<Node> = nodes
+                .into_iter()
+                .map(|n| Node {
+                    id: n.external_id,
+                    label: n.label.unwrap_or_else(|| "".into()),
+                    layer: n.layer.unwrap_or_else(|| "default".into()),
+                    is_partition: n.is_partition,
+                    belongs_to: n.belongs_to,
+                    weight: n.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: n.comment,
+                    dataset: n.source_dataset_id,
+                    attributes: n.attributes,
+                })
+                .collect();
 
-        for node in nodes {
-            let id = node.id.clone();
-            let node_data = NodeData {
-                label: node.label,
-                layer: node.layer,
-                weight: node.weight,
-                is_partition: node.is_partition,
-                belongs_to: node.belongs_to,
-                comment: node.comment,
-                attrs: node.attrs,
-                dataset_id: node.dataset_id,
-            };
-            merge_node(all_nodes, id, node_data, merge_stats);
+            let graph_edges: Vec<Edge> = edges
+                .into_iter()
+                .map(|e| Edge {
+                    id: e.external_id,
+                    source: e.source,
+                    target: e.target,
+                    label: e.label.unwrap_or_else(|| "".into()),
+                    layer: e.layer.unwrap_or_else(|| "default".into()),
+                    weight: e.weight.map(|w| w as i32).unwrap_or(1),
+                    comment: e.comment,
+                    dataset: e.source_dataset_id,
+                    attributes: e.attributes,
+                })
+                .collect();
+
+            let layers = derive_layers_from_nodes(&graph_nodes);
+
+            return Ok(Graph {
+                name: gd.name,
+                nodes: graph_nodes,
+                edges: graph_edges,
+                layers,
+                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+            });
         }
 
-        // Read edges
-        let edges = graph_edges::Entity::find()
-            .filter(graph_edges::Column::GraphId.eq(graph_id))
-            .all(&self.db)
+        // Fallback to legacy graphs table
+        let legacy_graph = GraphEntity::find()
+            .filter(GraphColumn::ProjectId.eq(project_id))
+            .filter(GraphColumn::NodeId.eq(dag_node_id))
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph found for dag node {} in graph_data or legacy graphs table",
+                    dag_node_id
+                )
+            })?;
+
+        let graph = self
+            .graph_service
+            .build_graph_from_dag_graph(legacy_graph.id)
             .await?;
 
-        for edge in edges {
-            let id = edge.id.clone();
-            let edge_data = EdgeData {
-                source: edge.source,
-                target: edge.target,
-                label: edge.label,
-                layer: edge.layer,
-                weight: edge.weight,
-                comment: edge.comment,
-                attrs: edge.attrs,
-                dataset_id: edge.dataset_id,
-            };
-            merge_edge(all_edges, id, edge_data, merge_stats);
-        }
-
-        Ok(())
-    }
-
-    /// Extract layers from graph layers table using shared function
-    async fn extract_layers_from_graph(
-        &self,
-        all_layers: &mut HashMap<String, LayerData>,
-        graph_id: i32,
-    ) -> Result<()> {
-        let loaded_layers = load_layers_from_db(&self.db, graph_id).await?;
-        all_layers.extend(loaded_layers);
-        Ok(())
+        Ok(graph)
     }
 }
 
-/// Enum to represent either a DataSet or a Graph (for upstream sources)
-enum DataSetOrGraph {
-    DataSet(data_sets::Model),
-    Graph(graphs::Model),
-}
-
-/// Internal node data structure
-struct NodeData {
+/// Helper structures for merging
+#[derive(Default)]
+struct NodeMerge {
+    id: String,
     label: Option<String>,
     layer: Option<String>,
-    weight: Option<f64>,
     is_partition: bool,
     belongs_to: Option<String>,
+    weight: i64,
     comment: Option<String>,
-    attrs: Option<serde_json::Value>,
-    dataset_id: Option<i32>,
+    dataset: Option<i32>,
+    attributes: Option<Value>,
 }
 
-/// Track merged items for annotation
-struct MergeStats {
-    merged_nodes: Vec<(String, f64)>, // (id, total weight)
-    merged_edges: Vec<(String, f64)>, // (id, total weight)
-}
-
-impl MergeStats {
-    fn new() -> Self {
-        Self {
-            merged_nodes: Vec::new(),
-            merged_edges: Vec::new(),
-        }
-    }
-
-    fn to_annotation(&self) -> Option<String> {
-        if self.merged_nodes.is_empty() && self.merged_edges.is_empty() {
-            return None;
-        }
-
-        let mut parts = Vec::new();
-
-        if !self.merged_nodes.is_empty() {
-            let mut node_lines = vec!["## Merged Nodes".to_string()];
-            node_lines.push(String::new());
-            node_lines.push("| Node ID | Total Weight |".to_string());
-            node_lines.push("|---------|--------------|".to_string());
-            for (id, weight) in &self.merged_nodes {
-                node_lines.push(format!("| {} | {} |", id, weight));
-            }
-            parts.push(node_lines.join("\n"));
-        }
-
-        if !self.merged_edges.is_empty() {
-            let mut edge_lines = vec!["## Merged Edges".to_string()];
-            edge_lines.push(String::new());
-            edge_lines.push("| Edge ID | Total Weight |".to_string());
-            edge_lines.push("|---------|--------------|".to_string());
-            for (id, weight) in &self.merged_edges {
-                edge_lines.push(format!("| {} | {} |", id, weight));
-            }
-            parts.push(edge_lines.join("\n"));
-        }
-
-        Some(parts.join("\n\n"))
-    }
-}
-
-/// Merge a node into the map, summing weights if the ID already exists
-fn merge_node(
-    all_nodes: &mut HashMap<String, NodeData>,
+#[derive(Default)]
+struct EdgeMerge {
     id: String,
-    node: NodeData,
-    stats: &mut MergeStats,
-) {
-    use std::collections::hash_map::Entry;
-    match all_nodes.entry(id.clone()) {
-        Entry::Occupied(mut entry) => {
-            // Node exists - sum weights, keep first node's other values
-            let existing = entry.get_mut();
-            let existing_weight = existing.weight.unwrap_or(1.0);
-            let new_weight = node.weight.unwrap_or(1.0);
-            let total_weight = existing_weight + new_weight;
-            existing.weight = Some(total_weight);
-
-            // Update or add to stats
-            if let Some(stat) = stats.merged_nodes.iter_mut().find(|(sid, _)| sid == &id) {
-                stat.1 = total_weight;
-            } else {
-                stats.merged_nodes.push((id, total_weight));
-            }
-        }
-        Entry::Vacant(entry) => {
-            // New node - insert as-is
-            entry.insert(node);
-        }
-    }
-}
-
-/// Merge an edge into the map, summing weights if the ID already exists
-fn merge_edge(
-    all_edges: &mut HashMap<String, EdgeData>,
-    id: String,
-    edge: EdgeData,
-    stats: &mut MergeStats,
-) {
-    use std::collections::hash_map::Entry;
-    match all_edges.entry(id.clone()) {
-        Entry::Occupied(mut entry) => {
-            // Edge exists - sum weights, keep first edge's other values
-            let existing = entry.get_mut();
-            let existing_weight = existing.weight.unwrap_or(1.0);
-            let new_weight = edge.weight.unwrap_or(1.0);
-            let total_weight = existing_weight + new_weight;
-            existing.weight = Some(total_weight);
-
-            // Update or add to stats
-            if let Some(stat) = stats.merged_edges.iter_mut().find(|(sid, _)| sid == &id) {
-                stat.1 = total_weight;
-            } else {
-                stats.merged_edges.push((id, total_weight));
-            }
-        }
-        Entry::Vacant(entry) => {
-            // New edge - insert as-is
-            entry.insert(edge);
-        }
-    }
-}
-
-/// Internal edge data structure
-struct EdgeData {
     source: String,
     target: String,
     label: Option<String>,
     layer: Option<String>,
-    weight: Option<f64>,
+    weight: i64,
     comment: Option<String>,
-    attrs: Option<serde_json::Value>,
-    dataset_id: Option<i32>,
+    dataset: Option<i32>,
+    attributes: Option<Value>,
 }
 
-// LayerData now imported from super::types (was previously defined here)
+fn derive_layers_from_nodes(nodes: &[Node]) -> Vec<Layer> {
+    let mut layer_map: HashMap<String, Layer> = HashMap::new();
+    for node in nodes {
+        let entry = layer_map.entry(node.layer.clone()).or_insert_with(|| Layer {
+            id: node.layer.clone(),
+            label: node.layer.clone(),
+            background_color: "#FFFFFF".into(),
+            text_color: "#000000".into(),
+            border_color: "#000000".into(),
+            alias: None,
+            dataset: node.dataset,
+            attributes: None,
+        });
+
+        if let Some(attrs) = &node.attributes {
+            if let Some(obj) = attrs.as_object() {
+                if let Some(bg) = obj
+                    .get("backgroundColor")
+                    .or_else(|| obj.get("color"))
+                    .and_then(|v| v.as_str())
+                {
+                    entry.background_color = bg.to_string();
+                }
+                if let Some(txt) = obj.get("textColor").and_then(|v| v.as_str()) {
+                    entry.text_color = txt.to_string();
+                }
+                if let Some(border) = obj.get("borderColor").and_then(|v| v.as_str()) {
+                    entry.border_color = border.to_string();
+                }
+                entry.attributes = Some(json!(obj));
+            }
+        }
+    }
+
+    layer_map.into_values().collect()
+}
