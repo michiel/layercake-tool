@@ -50,8 +50,12 @@ impl GraphDataBuilder {
         // Validate layer references are present in project palette
         let layer_ids: HashSet<String> = nodes
             .iter()
-            .filter_map(|n| n.layer.clone())
-            .chain(edges.iter().filter_map(|e| e.layer.clone()))
+            .filter_map(|n| n.layer.as_ref().and_then(|l| (!l.is_empty()).then(|| l.clone())))
+            .chain(
+                edges
+                    .iter()
+                    .filter_map(|e| e.layer.as_ref().and_then(|l| (!l.is_empty()).then(|| l.clone()))),
+            )
             .collect();
 
         let validation = self
@@ -89,42 +93,14 @@ impl GraphDataBuilder {
             self.graph_data_service
                 .replace_nodes(
                     existing.id,
-                    nodes
-                        .into_iter()
-                        .map(|n| crate::services::GraphDataNodeInput {
-                            external_id: n.external_id,
-                            label: n.label,
-                            layer: n.layer,
-                            weight: n.weight,
-                            is_partition: Some(n.is_partition),
-                            belongs_to: n.belongs_to,
-                            comment: n.comment,
-                            source_dataset_id: n.source_dataset_id,
-                            attributes: n.attributes,
-                            created_at: Some(n.created_at),
-                        })
-                        .collect(),
+                    nodes.into_iter().map(normalize_node_input).collect(),
                 )
                 .await?;
 
             self.graph_data_service
                 .replace_edges(
                     existing.id,
-                    edges
-                        .into_iter()
-                        .map(|e| crate::services::GraphDataEdgeInput {
-                            external_id: e.external_id,
-                            source: e.source,
-                            target: e.target,
-                            label: e.label,
-                            layer: e.layer,
-                            weight: e.weight,
-                            comment: e.comment,
-                            source_dataset_id: e.source_dataset_id,
-                            attributes: e.attributes,
-                            created_at: Some(e.created_at),
-                        })
-                        .collect(),
+                    edges.into_iter().map(normalize_edge_input).collect(),
                 )
                 .await?;
 
@@ -146,42 +122,14 @@ impl GraphDataBuilder {
         self.graph_data_service
             .replace_nodes(
                 created.id,
-                nodes
-                    .into_iter()
-                    .map(|n| crate::services::GraphDataNodeInput {
-                        external_id: n.external_id,
-                        label: n.label,
-                        layer: n.layer,
-                        weight: n.weight,
-                        is_partition: Some(n.is_partition),
-                        belongs_to: n.belongs_to,
-                        comment: n.comment,
-                        source_dataset_id: n.source_dataset_id,
-                        attributes: n.attributes,
-                        created_at: Some(n.created_at),
-                    })
-                    .collect(),
+                nodes.into_iter().map(normalize_node_input).collect(),
             )
             .await?;
 
         self.graph_data_service
             .replace_edges(
                 created.id,
-                edges
-                    .into_iter()
-                    .map(|e| crate::services::GraphDataEdgeInput {
-                        external_id: e.external_id,
-                        source: e.source,
-                        target: e.target,
-                        label: e.label,
-                        layer: e.layer,
-                        weight: e.weight,
-                        comment: e.comment,
-                        source_dataset_id: e.source_dataset_id,
-                        attributes: e.attributes,
-                        created_at: Some(e.created_at),
-                    })
-                    .collect(),
+                edges.into_iter().map(normalize_edge_input).collect(),
             )
             .await?;
 
@@ -235,5 +183,43 @@ impl GraphDataBuilder {
         }
 
         format!("{:x}", hasher.finalize())
+    }
+}
+
+fn normalize_layer(layer: Option<String>) -> Option<String> {
+    layer.and_then(|l| (!l.is_empty()).then_some(l))
+}
+
+fn normalize_node_input(
+    n: crate::database::entities::graph_data_nodes::Model,
+) -> crate::services::GraphDataNodeInput {
+    crate::services::GraphDataNodeInput {
+        external_id: n.external_id,
+        label: n.label,
+        layer: normalize_layer(n.layer),
+        weight: n.weight,
+        is_partition: Some(n.is_partition),
+        belongs_to: n.belongs_to,
+        comment: n.comment,
+        source_dataset_id: n.source_dataset_id,
+        attributes: n.attributes,
+        created_at: Some(n.created_at),
+    }
+}
+
+fn normalize_edge_input(
+    e: crate::database::entities::graph_data_edges::Model,
+) -> crate::services::GraphDataEdgeInput {
+    crate::services::GraphDataEdgeInput {
+        external_id: e.external_id,
+        source: e.source,
+        target: e.target,
+        label: e.label,
+        layer: normalize_layer(e.layer),
+        weight: e.weight,
+        comment: e.comment,
+        source_dataset_id: e.source_dataset_id,
+        attributes: e.attributes,
+        created_at: Some(e.created_at),
     }
 }
