@@ -5,8 +5,8 @@
 **Goal:** Migrate backend to use only the unified `graph_data` schema, removing all legacy table usage and code
 
 ## Outstanding Tasks (ordered, uncompleted)
-1. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata).
-2. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder).
+1. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata). ✅ Added graph_data pipeline E2E test covering merge/transform/filter/projection.
+2. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder). ✅ DagExecutor no longer wires GraphBuilder; legacy modules marked dead-code.
 3. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers.
 4. Schema cleanup migration to drop legacy tables once validation period completes.
 
