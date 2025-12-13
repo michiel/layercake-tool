@@ -1,11 +1,12 @@
 use anyhow::Result;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    Set,
+    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
+    QueryFilter, Set,
 };
 use tracing::{debug, warn};
 
 use crate::database::entities::{
+    graph_data, graph_data_edges, graph_data_nodes,
     graph_edges::{self, Entity as GraphEdges},
     graph_edits,
     graph_layers::{self, Entity as Layers},
@@ -34,15 +35,41 @@ impl GraphEditApplicator {
     ///
     /// Returns ApplyResult indicating success, skip, or error
     pub async fn apply_edit(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let is_graph_data = graph_data::Entity::find_by_id(edit.graph_id)
+            .one(&self.db)
+            .await?
+            .is_some();
+
         debug!(
             "Applying edit #{} on {}:{} ({})",
             edit.sequence_number, edit.target_type, edit.target_id, edit.operation
         );
 
         let result = match edit.target_type.as_str() {
-            "node" => self.apply_node_edit(edit).await?,
-            "edge" => self.apply_edge_edit(edit).await?,
-            "layer" => self.apply_layer_edit(edit).await?,
+            "node" => {
+                if is_graph_data {
+                    self.apply_node_edit_graph_data(edit).await?
+                } else {
+                    self.apply_node_edit(edit).await?
+                }
+            }
+            "edge" => {
+                if is_graph_data {
+                    self.apply_edge_edit_graph_data(edit).await?
+                } else {
+                    self.apply_edge_edit(edit).await?
+                }
+            }
+            "layer" => {
+                if is_graph_data {
+                    ApplyResult::Skipped {
+                        reason: "Layer edits are not supported for graph_data; layers derive from node attributes"
+                            .to_string(),
+                    }
+                } else {
+                    self.apply_layer_edit(edit).await?
+                }
+            }
             _ => {
                 let reason = format!("Unknown target type: {}", edit.target_type);
                 warn!("{}", reason);
@@ -185,6 +212,152 @@ impl GraphEditApplicator {
         let result = GraphNodes::delete_many()
             .filter(graph_nodes::Column::GraphId.eq(edit.graph_id))
             .filter(graph_nodes::Column::Id.eq(&edit.target_id))
+            .exec(&self.db)
+            .await?;
+
+        if result.rows_affected == 0 {
+            Ok(ApplyResult::Skipped {
+                reason: format!("Node {} not found", edit.target_id),
+            })
+        } else {
+            Ok(ApplyResult::Success {
+                message: format!("Deleted node {}", edit.target_id),
+            })
+        }
+    }
+
+    /// Apply edit to graph_data node
+    async fn apply_node_edit_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        match edit.operation.as_str() {
+            "create" => self.create_node_graph_data(edit).await,
+            "update" => self.update_node_graph_data(edit).await,
+            "delete" => self.delete_node_graph_data(edit).await,
+            _ => Ok(ApplyResult::Error {
+                reason: format!("Unknown node operation: {}", edit.operation),
+            }),
+        }
+    }
+
+    async fn create_node_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let existing = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
+            .one(&self.db)
+            .await?;
+
+        if existing.is_some() {
+            return Ok(ApplyResult::Skipped {
+                reason: format!("Node {} already exists", edit.target_id),
+            });
+        }
+
+        let new_value = edit
+            .new_value
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
+
+        let label = new_value
+            .get("label")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let layer = new_value
+            .get("layer")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let is_partition = new_value
+            .get("isPartition")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        let belongs_to = new_value
+            .get("belongsTo")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let attrs = new_value.get("attrs").cloned().or_else(|| new_value.get("attributes").cloned());
+
+        let node = graph_data_nodes::ActiveModel {
+            id: ActiveValue::NotSet,
+            graph_data_id: Set(edit.graph_id),
+            external_id: Set(edit.target_id.clone()),
+            label: Set(label),
+            layer: Set(layer),
+            weight: Set(None),
+            is_partition: Set(is_partition),
+            belongs_to: Set(belongs_to),
+            comment: Set(None),
+            source_dataset_id: Set(None),
+            attributes: Set(attrs),
+            created_at: Set(chrono::Utc::now()),
+        };
+
+        node.insert(&self.db).await?;
+
+        Ok(ApplyResult::Success {
+            message: format!("Created node {}", edit.target_id),
+        })
+    }
+
+    async fn update_node_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let node = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
+            .one(&self.db)
+            .await?;
+
+        let Some(node) = node else {
+            return Ok(ApplyResult::Skipped {
+                reason: format!("Node {} not found", edit.target_id),
+            });
+        };
+
+        let mut active_model: graph_data_nodes::ActiveModel = node.into();
+
+        if let Some(field_name) = &edit.field_name {
+            if let Some(new_value) = &edit.new_value {
+                match field_name.as_str() {
+                    "label" => {
+                        active_model.label = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "layer" => {
+                        active_model.layer = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "isPartition" => {
+                        if let Some(is_partition) = new_value.as_bool() {
+                            active_model.is_partition = Set(is_partition);
+                        }
+                    }
+                    "belongsTo" => {
+                        active_model.belongs_to = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "attrs" | "attributes" => {
+                        active_model.attributes = Set(Some(new_value.clone()));
+                    }
+                    _ => {
+                        return Ok(ApplyResult::Skipped {
+                            reason: format!("Unknown field: {}", field_name),
+                        });
+                    }
+                }
+            }
+        }
+
+        active_model.update(&self.db).await?;
+
+        Ok(ApplyResult::Success {
+            message: format!(
+                "Updated node {} field {:?}",
+                edit.target_id, edit.field_name
+            ),
+        })
+    }
+
+    async fn delete_node_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let result = graph_data_nodes::Entity::delete_many()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
             .exec(&self.db)
             .await?;
 
@@ -349,6 +522,141 @@ impl GraphEditApplicator {
         let result = GraphEdges::delete_many()
             .filter(graph_edges::Column::GraphId.eq(edit.graph_id))
             .filter(graph_edges::Column::Id.eq(&edit.target_id))
+            .exec(&self.db)
+            .await?;
+
+        if result.rows_affected == 0 {
+            Ok(ApplyResult::Skipped {
+                reason: format!("Edge {} not found", edit.target_id),
+            })
+        } else {
+            Ok(ApplyResult::Success {
+                message: format!("Deleted edge {}", edit.target_id),
+            })
+        }
+    }
+
+    async fn apply_edge_edit_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        match edit.operation.as_str() {
+            "create" => self.create_edge_graph_data(edit).await,
+            "update" => self.update_edge_graph_data(edit).await,
+            "delete" => self.delete_edge_graph_data(edit).await,
+            _ => Ok(ApplyResult::Error {
+                reason: format!("Unknown edge operation: {}", edit.operation),
+            }),
+        }
+    }
+
+    async fn create_edge_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let existing = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
+            .one(&self.db)
+            .await?;
+
+        if existing.is_some() {
+            return Ok(ApplyResult::Skipped {
+                reason: format!("Edge {} already exists", edit.target_id),
+            });
+        }
+
+        let new_value = edit
+            .new_value
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
+
+        let source = new_value
+            .get("source")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Edge source missing"))?
+            .to_string();
+        let target = new_value
+            .get("target")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow::anyhow!("Edge target missing"))?
+            .to_string();
+        let label = new_value
+            .get("label")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let layer = new_value
+            .get("layer")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        let attrs = new_value.get("attrs").cloned().or_else(|| new_value.get("attributes").cloned());
+
+        let edge = graph_data_edges::ActiveModel {
+            id: ActiveValue::NotSet,
+            graph_data_id: Set(edit.graph_id),
+            external_id: Set(edit.target_id.clone()),
+            source: Set(source),
+            target: Set(target),
+            label: Set(label),
+            layer: Set(layer),
+            weight: Set(None),
+            comment: Set(None),
+            source_dataset_id: Set(None),
+            attributes: Set(attrs),
+            created_at: Set(chrono::Utc::now()),
+        };
+
+        edge.insert(&self.db).await?;
+
+        Ok(ApplyResult::Success {
+            message: format!("Created edge {}", edit.target_id),
+        })
+    }
+
+    async fn update_edge_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let edge = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
+            .one(&self.db)
+            .await?;
+
+        let Some(edge) = edge else {
+            return Ok(ApplyResult::Skipped {
+                reason: format!("Edge {} not found", edit.target_id),
+            });
+        };
+
+        let mut active_model: graph_data_edges::ActiveModel = edge.into();
+
+        if let Some(field_name) = &edit.field_name {
+            if let Some(new_value) = &edit.new_value {
+                match field_name.as_str() {
+                    "label" => {
+                        active_model.label = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "layer" => {
+                        active_model.layer = Set(new_value.as_str().map(|s| s.to_string()));
+                    }
+                    "attrs" | "attributes" => {
+                        active_model.attributes = Set(Some(new_value.clone()));
+                    }
+                    _ => {
+                        return Ok(ApplyResult::Skipped {
+                            reason: format!("Unknown field: {}", field_name),
+                        });
+                    }
+                }
+            }
+        }
+
+        active_model.update(&self.db).await?;
+
+        Ok(ApplyResult::Success {
+            message: format!(
+                "Updated edge {} field {:?}",
+                edit.target_id, edit.field_name
+            ),
+        })
+    }
+
+    async fn delete_edge_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        let result = graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
+            .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
             .exec(&self.db)
             .await?;
 

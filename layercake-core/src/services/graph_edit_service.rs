@@ -1,5 +1,7 @@
 use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
+use crate::database::entities::graph_data;
+use crate::services::GraphDataService;
 use anyhow::Result;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
@@ -90,38 +92,60 @@ impl GraphEditService {
         sequence_number: i32,
         applied: bool,
     ) -> Result<()> {
-        use crate::database::entities::graphs::{self, Entity as Graphs};
-
-        let graph = Graphs::find_by_id(graph_id)
+        if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .is_some()
+        {
+            let graph_data_service = GraphDataService::new(self.db.clone());
+            graph_data_service
+                .update_edit_metadata(graph_id, sequence_number, applied)
+                .await?;
+        } else {
+            use crate::database::entities::graphs::{self, Entity as Graphs};
 
-        let mut active_model: graphs::ActiveModel = graph.into();
-        active_model.last_edit_sequence = Set(sequence_number);
-        // Only mark as pending if the edit is not yet applied
-        if !applied {
-            active_model.has_pending_edits = Set(true);
+            let graph = Graphs::find_by_id(graph_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+
+            let mut active_model: graphs::ActiveModel = graph.into();
+            active_model.last_edit_sequence = Set(sequence_number);
+            // Only mark as pending if the edit is not yet applied
+            if !applied {
+                active_model.has_pending_edits = Set(true);
+            }
+            active_model.updated_at = Set(chrono::Utc::now());
+
+            active_model.update(&self.db).await?;
         }
-        active_model.updated_at = Set(chrono::Utc::now());
-
-        active_model.update(&self.db).await?;
         Ok(())
     }
 
     async fn set_graph_pending_state(&self, graph_id: i32, has_pending: bool) -> Result<()> {
-        use crate::database::entities::graphs::{self, Entity as Graphs};
-
-        let graph = Graphs::find_by_id(graph_id)
+        if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .is_some()
+        {
+            let graph_data_service = GraphDataService::new(self.db.clone());
+            graph_data_service
+                .set_pending_state(graph_id, has_pending)
+                .await?;
+        } else {
+            use crate::database::entities::graphs::{self, Entity as Graphs};
 
-        let mut active_model: graphs::ActiveModel = graph.into();
-        active_model.has_pending_edits = Set(has_pending);
-        active_model.updated_at = Set(chrono::Utc::now());
+            let graph = Graphs::find_by_id(graph_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
 
-        active_model.update(&self.db).await?;
+            let mut active_model: graphs::ActiveModel = graph.into();
+            active_model.has_pending_edits = Set(has_pending);
+            active_model.updated_at = Set(chrono::Utc::now());
+
+            active_model.update(&self.db).await?;
+        }
         Ok(())
     }
 
@@ -183,36 +207,59 @@ impl GraphEditService {
             .await?;
 
         // Reset graph metadata
-        let graph = Graphs::find_by_id(graph_id)
+        if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .is_some()
+        {
+            let graph_data_service = GraphDataService::new(self.db.clone());
+            graph_data_service
+                .reset_edit_metadata(graph_id)
+                .await?;
+            graph_data_service
+                .mark_replayed(graph_id)
+                .await?;
+        } else {
+            let graph = Graphs::find_by_id(graph_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
 
-        let mut active_model: graphs::ActiveModel = graph.into();
-        active_model.last_edit_sequence = Set(0);
-        active_model.has_pending_edits = Set(false);
-        active_model.last_replay_at = Set(None);
-        active_model.updated_at = Set(chrono::Utc::now());
+            let mut active_model: graphs::ActiveModel = graph.into();
+            active_model.last_edit_sequence = Set(0);
+            active_model.has_pending_edits = Set(false);
+            active_model.last_replay_at = Set(None);
+            active_model.updated_at = Set(chrono::Utc::now());
 
-        active_model.update(&self.db).await?;
+            active_model.update(&self.db).await?;
+        }
 
         Ok(result.rows_affected)
     }
 
     /// Update last_replay_at timestamp for a graph
     pub async fn mark_graph_replayed(&self, graph_id: i32) -> Result<()> {
-        use crate::database::entities::graphs::{self, Entity as Graphs};
-
-        let graph = Graphs::find_by_id(graph_id)
+        if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+            .is_some()
+        {
+            let graph_data_service = GraphDataService::new(self.db.clone());
+            graph_data_service.mark_replayed(graph_id).await?;
+        } else {
+            use crate::database::entities::graphs::{self, Entity as Graphs};
 
-        let mut active_model: graphs::ActiveModel = graph.into();
-        active_model.last_replay_at = Set(Some(chrono::Utc::now()));
-        active_model.updated_at = Set(chrono::Utc::now());
+            let graph = Graphs::find_by_id(graph_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
 
-        active_model.update(&self.db).await?;
+            let mut active_model: graphs::ActiveModel = graph.into();
+            active_model.last_replay_at = Set(Some(chrono::Utc::now()));
+            active_model.updated_at = Set(chrono::Utc::now());
+
+            active_model.update(&self.db).await?;
+        }
         Ok(())
     }
 
