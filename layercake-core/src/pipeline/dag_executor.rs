@@ -2,6 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
 };
+use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -9,7 +10,7 @@ use tracing::{debug_span, info, Instrument};
 
 use crate::database::entities::graph_data;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::{graphs, plan_dag_nodes, sequence_contexts};
+use crate::database::entities::{graphs, plan_dag_nodes, projections, sequence_contexts};
 use crate::graphql::types::plan_dag::{
     config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
@@ -39,6 +40,15 @@ struct GraphRecordOptions {
     origin: Option<String>,
     filename: Option<String>,
     file_size: Option<i64>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ProjectionNodeConfig {
+    #[serde(rename = "projectionId")]
+    projection_id: Option<i32>,
+    #[serde(rename = "projectionType")]
+    projection_type: Option<String>,
+    settings: Option<JsonValue>,
 }
 
 impl DagExecutor {
@@ -152,7 +162,7 @@ impl DagExecutor {
                 }));
 
                 // Create or update graph_data record for the merge node
-                let mut graph_data_record = self
+                let graph_data_record = self
                     .get_or_create_graph_record(
                         project_id,
                         node_id,
@@ -236,6 +246,17 @@ impl DagExecutor {
 
                 // TODO: Populate context with graph for downstream transforms
                 // This requires reading back from graph_data, deferred for now
+            }
+            "ProjectionNode" => {
+                self.execute_projection_node(
+                    project_id,
+                    node_id,
+                    &node_name,
+                    node,
+                    edges,
+                    context.as_deref_mut(),
+                )
+                .await?;
             }
             "GraphArtefactNode" | "TreeArtefactNode" | "OutputNode" | "Output" => {
                 // Output nodes deliver exports on demand; no proactive execution required
@@ -478,6 +499,121 @@ impl DagExecutor {
         Ok(())
     }
 
+    async fn execute_projection_node(
+        &self,
+        project_id: i32,
+        node_id: &str,
+        node_name: &str,
+        node: &plan_dag_nodes::Model,
+        edges: &[(String, String)],
+        mut context: Option<&mut DagExecutionContext>,
+    ) -> Result<()> {
+        let config: ProjectionNodeConfig = serde_json::from_str(&node.config_json)
+            .with_context(|| format!("Failed to parse projection config for node {}", node_id))?;
+
+        let upstream_ids = self.get_upstream_nodes(node_id, edges);
+        if upstream_ids.len() != 1 {
+            return Err(anyhow!(
+                "ProjectionNode {} expects exactly one upstream graph, found {}",
+                node_id,
+                upstream_ids.len()
+            ));
+        }
+        let upstream_node_id = &upstream_ids[0];
+
+        // Ensure upstream graph is materialized and determine its graph_data id
+        let (graph, (graph_source_id, is_from_graph_data)) = self
+            .load_graph_by_dag_node(project_id, upstream_node_id)
+            .await
+            .with_context(|| {
+                format!(
+                    "Failed to load upstream graph for projection node {} (upstream {})",
+                    node_id, upstream_node_id
+                )
+            })?;
+
+        if !is_from_graph_data {
+            tracing::warn!(
+                "ProjectionNode {} upstream {} not yet migrated to graph_data; skipping projection materialization",
+                node_id,
+                upstream_node_id
+            );
+            if let Some(ctx) = context.as_deref_mut() {
+                ctx.set_graph(node_id.to_string(), graph);
+            }
+            return Ok(());
+        }
+
+        let projection_type = config
+            .projection_type
+            .unwrap_or_else(|| "force3d".to_string());
+        let settings_json = config.settings;
+
+        let projection = if let Some(existing_id) = config.projection_id {
+            let existing = projections::Entity::find_by_id(existing_id)
+                .one(&self.db)
+                .await?
+                .ok_or_else(|| anyhow!("Projection {} not found for node {}", existing_id, node_id))?;
+
+            if existing.project_id != project_id {
+                return Err(anyhow!(
+                    "Projection {} does not belong to project {}",
+                    existing_id,
+                    project_id
+                ));
+            }
+
+            let mut active: projections::ActiveModel = existing.into();
+            active.graph_id = Set(graph_source_id);
+            active.name = Set(node_name.to_string());
+            active.projection_type = Set(projection_type);
+            active.settings_json = Set(settings_json);
+            active.updated_at = Set(Utc::now());
+
+            active.update(&self.db).await?
+        } else {
+            // Reuse an existing projection for this node/name if present, otherwise create one
+            let maybe_existing = projections::Entity::find()
+                .filter(projections::Column::ProjectId.eq(project_id))
+                .filter(projections::Column::GraphId.eq(graph_source_id))
+                .filter(projections::Column::Name.eq(node_name))
+                .one(&self.db)
+                .await?;
+
+            if let Some(existing) = maybe_existing {
+                let mut active: projections::ActiveModel = existing.into();
+                active.graph_id = Set(graph_source_id);
+                active.name = Set(node_name.to_string());
+                active.projection_type = Set(projection_type);
+                active.settings_json = Set(settings_json);
+                active.updated_at = Set(Utc::now());
+                active.update(&self.db).await?
+            } else {
+                projections::ActiveModel {
+                    project_id: Set(project_id),
+                    graph_id: Set(graph_source_id),
+                    name: Set(node_name.to_string()),
+                    projection_type: Set(projection_type),
+                    settings_json: Set(settings_json),
+                    ..Default::default()
+                }
+                .insert(&self.db)
+                .await?
+            }
+        };
+
+        info!(
+            "ProjectionNode {} linked to graph_data {} as projection {}",
+            node_id, graph_source_id, projection.id
+        );
+
+        if let Some(ctx) = context {
+            ctx.set_graph(node_id.to_string(), graph);
+        }
+
+        Ok(())
+    }
+
     async fn execute_dataset_reference_node(
         &self,
         project_id: i32,
@@ -579,7 +715,7 @@ impl DagExecutor {
             "dataSetName": data_set.name,
         }));
 
-        let mut graph_record = self
+        let graph_record = self
             .get_or_create_graph_record(
                 project_id,
                 node_id,
@@ -718,7 +854,7 @@ impl DagExecutor {
             "upstreamNodeId": upstream_node_id,
         }));
 
-        let mut graph_record = self
+        let graph_record = self
             .get_or_create_graph_record(
                 project_id,
                 node_id,
@@ -846,7 +982,7 @@ impl DagExecutor {
             "upstreamNodeId": upstream_node_id,
         }));
 
-        let mut graph_record = self
+        let graph_record = self
             .get_or_create_graph_record(
                 project_id,
                 node_id,
