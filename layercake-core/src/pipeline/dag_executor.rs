@@ -18,7 +18,7 @@ use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::graph_data_persist_utils::{
     edges_to_graph_data_inputs, nodes_to_graph_data_inputs,
 };
-use crate::pipeline::{DatasourceImporter, GraphBuilder, GraphDataBuilder, MergeBuilder};
+use crate::pipeline::{DatasourceImporter, GraphDataBuilder, MergeBuilder};
 use crate::sequence_context::{build_story_context, SequenceStoryContext};
 use crate::services::graph_service::GraphService;
 use chrono::Utc;
@@ -27,7 +27,6 @@ use chrono::Utc;
 pub struct DagExecutor {
     db: DatabaseConnection,
     dataset_importer: DatasourceImporter,
-    graph_builder: GraphBuilder,
     graph_data_builder: GraphDataBuilder,
     merge_builder: MergeBuilder,
 }
@@ -55,7 +54,6 @@ impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
         let graph_data_service = std::sync::Arc::new(crate::services::GraphDataService::new(db.clone()));
         let dataset_importer = DatasourceImporter::new(db.clone(), graph_data_service.clone());
-        let graph_builder = GraphBuilder::new(db.clone());
         let graph_data_builder = GraphDataBuilder::new(
             graph_data_service.clone(),
             std::sync::Arc::new(crate::services::LayerPaletteService::new(db.clone())),
@@ -65,7 +63,6 @@ impl DagExecutor {
         Self {
             db,
             dataset_importer,
-            graph_builder,
             graph_data_builder,
             merge_builder,
         }

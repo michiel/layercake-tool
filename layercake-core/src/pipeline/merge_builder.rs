@@ -4,7 +4,6 @@ use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::data_sets;
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::graph_data_service::GraphDataService;
 use crate::services::graph_service::GraphService;

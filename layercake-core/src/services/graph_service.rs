@@ -1,9 +1,8 @@
 use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
-    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges,
-    graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers, graph_nodes,
-    graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
-    project_layers,
+    data_sets, graph_data, graph_edges, graph_edges::Entity as GraphEdges, graph_layers,
+    graph_layers::Entity as Layers, graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases,
+    plan_dag_edges, plan_dag_nodes, project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
