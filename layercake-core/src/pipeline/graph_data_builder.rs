@@ -13,7 +13,7 @@ use crate::services::{GraphDataService, LayerPaletteService};
 /// `graphs`/`graph_nodes`/`graph_edges`. For now it is a placeholder that will
 /// be fleshed out as the pipeline migrates.
 pub struct GraphDataBuilder {
-    graph_data_service: Arc<GraphDataService>,
+    pub graph_data_service: Arc<GraphDataService>,
     layer_palette_service: Arc<LayerPaletteService>,
 }
 

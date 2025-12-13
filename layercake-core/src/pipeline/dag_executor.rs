@@ -150,41 +150,43 @@ impl DagExecutor {
                 }
             }
             "GraphNode" => {
-                // Prefer unified graph_data path when config supplies graphDataIds
-                if let Some(ids) = config["graphDataIds"].as_array() {
-                    let upstream_ids: Vec<i32> = ids
-                        .iter()
-                        .filter_map(|v| v.as_i64().map(|n| n as i32))
-                        .collect();
-                    let _graph_data = self
+                // Stage 2: Route all new graphs through GraphDataBuilder
+                let upstream_dag_node_ids = self.get_upstream_nodes(node_id, edges);
+
+                // Resolve upstream DAG node IDs to graph_data IDs
+                let mut upstream_graph_data_ids = Vec::new();
+                for upstream_node_id in &upstream_dag_node_ids {
+                    if let Some(graph_data) = self
                         .graph_data_builder
-                        .build_graph(project_id, node_id.to_string(), node_name, upstream_ids)
-                        .await?;
-                } else {
-                    // Legacy path: build via data_sets/graphs tables
-                    let upstream_ids = self.get_upstream_nodes(node_id, edges);
-
-                    let graph_record = self
-                        .graph_builder
-                        .build_graph(
-                            project_id,
-                            plan_id,
-                            node_id.to_string(),
-                            node_name,
-                            upstream_ids,
-                        )
-                        .await?;
-
-                    if let Some(ctx) = context.as_deref_mut() {
-                        let graph_service = GraphService::new(self.db.clone());
-                        if let Ok(graph) = graph_service
-                            .build_graph_from_dag_graph(graph_record.id)
-                            .await
-                        {
-                            ctx.set_graph(node_id.to_string(), graph);
-                        }
+                        .graph_data_service
+                        .get_by_dag_node(upstream_node_id)
+                        .await?
+                    {
+                        upstream_graph_data_ids.push(graph_data.id);
+                    } else {
+                        // Upstream node doesn't have graph_data yet (legacy data)
+                        // This is expected during transition period - log and skip
+                        tracing::warn!(
+                            "Upstream node {} has no graph_data entry, skipping for now. \
+                             This is expected during schema migration.",
+                            upstream_node_id
+                        );
                     }
                 }
+
+                // Build graph via unified schema
+                let _graph_data = self
+                    .graph_data_builder
+                    .build_graph(
+                        project_id,
+                        node_id.to_string(),
+                        node_name,
+                        upstream_graph_data_ids,
+                    )
+                    .await?;
+
+                // TODO: Populate context with graph for downstream transforms
+                // This requires reading back from graph_data, deferred for now
             }
             "GraphArtefactNode" | "TreeArtefactNode" | "OutputNode" | "Output" => {
                 // Output nodes deliver exports on demand; no proactive execution required
