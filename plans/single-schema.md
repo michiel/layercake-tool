@@ -392,11 +392,66 @@ Stage 2 creates graphs in `graph_data`, but TransformNode/FilterNode still query
 4. `src/graphql/mutations/graph.rs` - graph mutations
 5. Plus 12 other files from original analysis
 
+**Implementation Details (for next session):**
+
+Helper function needed in dag_executor.rs:
+```rust
+async fn build_graph_from_graph_data(
+    &self,
+    graph_data_id: i32,
+    name: String,
+) -> Result<crate::graph::Graph> {
+    let (gd, nodes, edges) = self.graph_data_builder
+        .graph_data_service
+        .load_full(graph_data_id)
+        .await?;
+
+    // Convert graph_data_nodes to Node
+    let graph_nodes: Vec<Node> = nodes.into_iter().map(|n| Node {
+        id: n.external_id,
+        label: n.label.unwrap_or_default(),
+        layer: n.layer.unwrap_or_default(),
+        is_partition: n.is_partition,
+        belongs_to: n.belongs_to,
+        weight: n.weight,
+        comment: n.comment,
+        dataset: n.source_dataset_id,
+        attributes: n.attributes,
+    }).collect();
+
+    // Convert graph_data_edges to Edge
+    let graph_edges: Vec<Edge> = edges.into_iter().map(|e| Edge {
+        id: e.external_id,
+        source: e.source,
+        target: e.target,
+        label: e.label.unwrap_or_default(),
+        layer: e.layer.unwrap_or_default(),
+        weight: e.weight,
+        comment: e.comment,
+        dataset: e.source_dataset_id,
+        attributes: e.attributes,
+    }).collect();
+
+    // Extract layers from nodes (similar to projection.rs:144-194)
+    let layers = extract_layers_from_nodes(&graph_nodes);
+
+    Ok(Graph {
+        name,
+        nodes: graph_nodes,
+        edges: graph_edges,
+        layers,
+        annotations: gd.annotations,
+    })
+}
+```
+
 **Success Criteria:**
 - TransformNode and FilterNode work with graphs created via GraphDataBuilder
 - DAG pipeline executes end-to-end with new schema
 - Cargo check passes
 - Integration tests pass (deferred)
+
+**Status:** Implementation ready to begin
 
 ### Stage 4: GraphQL API Update (Week 3-4)
 
