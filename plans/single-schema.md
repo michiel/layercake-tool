@@ -378,6 +378,7 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 - (working tree) - DataSetNode graph_data records use source_type `dataset` and capture dataset file metadata
 - (working tree) - DataSetNode filePath importer writes graph_data entries, hashes file blob, and persists nodes/edges for CSV/TSV/JSON
 - (next) - MergeNode read migration planned using unified graph loader
+- (working tree) - MergeNode outputs mirrored into graph_data by dag_executor (legacy merge builder still used for computation)
 
 **Critical Read Path (COMPLETE):**
 - [x] **CRITICAL**: Update TransformNode to read from `graph_data` (dag_executor.rs:275-298)
@@ -457,7 +458,7 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 
 **Files Still Requiring Changes:**
 1. ⏳ `src/pipeline/merge_builder.rs` - migrate merge read path to graph_data (use load_graph_by_dag_node-style helper)
-2. ⏳ `src/pipeline/dag_executor.rs` - remaining legacy reads (GraphBuilder) and potential removal of unused graph_builder field
+2. ⏳ `src/pipeline/dag_executor.rs` - remaining legacy reads (GraphBuilder) and potential removal of unused graph_builder field; MergeNode still computes via legacy builder
 3. ⏳ `src/pipeline/dataset_importer.rs` - revisit CSV nodes/edges fidelity (attributes/weight mapping) if needed
 4. 🔜 `src/services/graph_service.rs` - Migrate to GraphDataService (P4)
 5. 🔜 `src/graphql/queries/mod.rs` - Query resolvers (P4)
