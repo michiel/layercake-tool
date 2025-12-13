@@ -1,4 +1,5 @@
 use async_graphql::*;
+use anyhow::anyhow;
 use base64::Engine;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
@@ -10,8 +11,10 @@ use super::helpers::{
     StoredTreeArtefactNodeConfig,
 };
 use crate::database::entities::{
-    datasets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
+    datasets, graph_data_edges, graph_data_nodes, graph_data as graph_data_model, graphs,
+    plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
 };
+use crate::graph::{Edge, Graph, Layer, Node};
 use crate::export::{
     sequence_renderer::SequenceRenderConfigResolved, to_mermaid_sequence, to_plantuml_sequence,
 };
@@ -33,9 +36,12 @@ use crate::plan::{
     GraphvizCommentStyle, GraphvizRenderOptions, LayerSourceStyle as PlanLayerSourceStyle,
     LayerSourceStyleOverride as PlanLayerSourceStyleOverride, NotePosition as PlanNotePosition,
     RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
-    RenderTargetOptions,
+    RenderTargetOptions, ExportFileType,
 };
 use crate::sequence_context::{apply_render_config, SequenceStoryContext};
+use crate::services::{GraphDataService, GraphService};
+use sea_orm::DatabaseConnection;
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct PlanDagMutation;
@@ -255,6 +261,147 @@ fn resolve_sequence_render_config(
     config.mermaid_theme = map_mermaid_theme(&config.built_in_styles);
     config.plantuml_theme = map_plantuml_theme(&config.built_in_styles);
     config
+}
+
+fn apply_preview_limit(content: String, format: &ExportFileType, max_rows: Option<usize>) -> String {
+    match (format, max_rows) {
+        (
+            ExportFileType::CSVNodes | ExportFileType::CSVEdges | ExportFileType::CSVMatrix,
+            Some(limit),
+        ) => {
+            let mut limited_lines = Vec::new();
+
+            for (index, line) in content.lines().enumerate() {
+                if index == 0 || index <= limit {
+                    limited_lines.push(line.to_string());
+                } else {
+                    break;
+                }
+            }
+
+            limited_lines.join("\n")
+        }
+        _ => content,
+    }
+}
+
+async fn load_graph_for_export(
+    db: &DatabaseConnection,
+    project_id: i32,
+    dag_node_id: &str,
+) -> anyhow::Result<(Graph, &'static str)> {
+    let graph_data_service = GraphDataService::new(db.clone());
+
+    if let Some(gd) = graph_data_service.get_by_dag_node(dag_node_id).await? {
+        let (gd_model, nodes, edges) = graph_data_service.load_full(gd.id).await?;
+        let graph = build_graph_from_graph_data(&gd_model, nodes, edges);
+        return Ok((graph, "graph_data"));
+    }
+
+    let legacy_graph = graphs::Entity::find()
+        .filter(graphs::Column::ProjectId.eq(project_id))
+        .filter(graphs::Column::NodeId.eq(dag_node_id))
+        .one(db)
+        .await?
+        .ok_or_else(|| anyhow!("Graph for node with id '{}' not found", dag_node_id))?;
+
+    let graph = GraphService::new(db.clone())
+        .build_graph_from_dag_graph(legacy_graph.id)
+        .await?;
+    Ok((graph, "graphs"))
+}
+
+fn build_graph_from_graph_data(
+    gd: &graph_data_model::Model,
+    nodes: Vec<graph_data_nodes::Model>,
+    edges: Vec<graph_data_edges::Model>,
+) -> Graph {
+    let graph_nodes: Vec<Node> = nodes
+        .into_iter()
+        .map(|n| Node {
+            id: n.external_id,
+            label: n.label.unwrap_or_default(),
+            layer: n.layer.unwrap_or_default(),
+            is_partition: n.is_partition,
+            belongs_to: n.belongs_to,
+            weight: n.weight.map(|w| w as i32).unwrap_or(1),
+            comment: n.comment,
+            dataset: n.source_dataset_id,
+            attributes: n.attributes,
+        })
+        .collect();
+
+    let graph_edges: Vec<Edge> = edges
+        .into_iter()
+        .map(|e| Edge {
+            id: e.external_id,
+            source: e.source,
+            target: e.target,
+            label: e.label.unwrap_or_default(),
+            layer: e.layer.unwrap_or_default(),
+            weight: e.weight.map(|w| w as i32).unwrap_or(1),
+            comment: e.comment,
+            dataset: e.source_dataset_id,
+            attributes: e.attributes,
+        })
+        .collect();
+
+    let mut layer_map: HashMap<String, Layer> = HashMap::new();
+    for node in &graph_nodes {
+        if node.layer.is_empty() || layer_map.contains_key(&node.layer) {
+            continue;
+        }
+
+        let (bg_color, text_color, border_color) = node
+            .attributes
+            .as_ref()
+            .and_then(|attrs| attrs.as_object())
+            .map(|obj| {
+                let bg = obj
+                    .get("backgroundColor")
+                    .or_else(|| obj.get("color"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let text = obj
+                    .get("textColor")
+                    .or_else(|| obj.get("labelColor"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                let border = obj
+                    .get("borderColor")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                (bg, text, border)
+            })
+            .unwrap_or((None, None, None));
+
+        layer_map.insert(
+            node.layer.clone(),
+            Layer {
+                id: node.layer.clone(),
+                label: node.layer.clone(),
+                background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
+                text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
+                border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+                alias: None,
+                dataset: node.dataset,
+                attributes: node.attributes.clone(),
+            },
+        );
+    }
+
+    let layers: Vec<Layer> = layer_map.into_values().collect();
+
+    Graph {
+        name: gd.name.clone(),
+        nodes: graph_nodes,
+        edges: graph_edges,
+        layers,
+        annotations: gd
+            .annotations
+            .as_ref()
+            .and_then(|v| v.as_str().map(|s| s.to_string())),
+    }
 }
 
 fn map_mermaid_theme(style: &str) -> String {
@@ -706,17 +853,10 @@ impl PlanDagMutation {
             .await
             .map_err(|e| StructuredError::service("DagExecutor::execute_with_dependencies", e))?;
 
-        // Get the built graph from the graphs table using the GraphNode's ID
-        use crate::database::entities::graphs;
-        let graph_model = graphs::Entity::find()
-            .filter(graphs::Column::ProjectId.eq(project_id))
-            .filter(graphs::Column::NodeId.eq(&upstream_node_id))
-            .one(&context.db)
+        // Load the built graph (graph_data-first, legacy graphs fallback)
+        let (graph, _source) = load_graph_for_export(&context.db, project_id, &upstream_node_id)
             .await
-            .map_err(|e| StructuredError::database("graphs::Entity::find (node export)", e))?
-            .ok_or_else(|| {
-                StructuredError::not_found("Graph for node", upstream_node_id.clone())
-            })?;
+            .map_err(|e| StructuredError::service("load_graph_for_export", e))?;
 
         let export_format = parse_export_format(render_target.as_str())?;
 
@@ -728,16 +868,13 @@ impl PlanDagMutation {
             }
         });
 
-        let content = context
+        let raw_content = context
             .app
-            .preview_graph_export(
-                graph_model.id,
-                export_format,
-                Some(render_config.clone()),
-                preview_limit,
-            )
-            .await
-            .map_err(|e| StructuredError::service("AppContext::preview_graph_export", e))?;
+            .export_service()
+            .export_to_string(&graph, &export_format, Some(render_config.clone()))
+            .map_err(|e| StructuredError::service("ExportService::export_to_string", e))?;
+
+        let content = apply_preview_limit(raw_content, &export_format, preview_limit);
 
         // Encode as base64
         use base64::Engine;
