@@ -188,19 +188,19 @@ const ProjectArtefactsPage: React.FC = () => {
   const [downloadingNodeId, setDownloadingNodeId] = useState<string | null>(null)
   const [collapsedGraphs, setCollapsedGraphs] = useState<Set<string>>(new Set())
   const [collapsedStories, setCollapsedStories] = useState<Set<string>>(new Set())
-const [editNodeDialog, setEditNodeDialog] = useState<{
-  open: boolean
-  nodeId: string | null
-  nodeType: PlanDagNodeType | null
-  config: any
-  metadata: any
-}>({
-  open: false,
-  nodeId: null,
-  nodeType: null,
-  config: null,
-  metadata: null,
-})
+  const [editNodeDialog, setEditNodeDialog] = useState<{
+    open: boolean
+    nodeId: string | null
+    nodeType: PlanDagNodeType | null
+    config: any
+    metadata: any
+  }>({
+    open: false,
+    nodeId: null,
+    nodeType: null,
+    config: null,
+    metadata: null,
+  })
 
   const toggleGraphCollapse = (graphId: string) => {
     setCollapsedGraphs((prev) => {
@@ -1007,6 +1007,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           nodeId={editNodeDialog.nodeId}
           config={editNodeDialog.config}
           metadata={editNodeDialog.metadata}
+          graphIdHint={null}
         />
       )}
     </>

@@ -1,52 +1,22 @@
 import { PlanDagNodeType, ConnectionType } from '../types/plan-dag'
 import { Node, Edge } from 'reactflow'
 
+const GRAPH_DATA_TARGETS: PlanDagNodeType[] = [
+  PlanDagNodeType.GRAPH,
+  PlanDagNodeType.TRANSFORM,
+  PlanDagNodeType.FILTER,
+  PlanDagNodeType.MERGE,
+  PlanDagNodeType.GRAPH_ARTEFACT,
+  PlanDagNodeType.TREE_ARTEFACT,
+  PlanDagNodeType.PROJECTION,
+]
+
 export const VALID_NODE_CONNECTIONS: Record<PlanDagNodeType, PlanDagNodeType[]> = {
-  [PlanDagNodeType.DATA_SOURCE]: [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.PROJECTION,
-  ],
-  [PlanDagNodeType.GRAPH]: [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.PROJECTION,
-  ],
-  [PlanDagNodeType.TRANSFORM]: [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.PROJECTION,
-    PlanDagNodeType.TRANSFORM,
-  ],
-  [PlanDagNodeType.FILTER]: [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.PROJECTION,
-  ],
-  [PlanDagNodeType.MERGE]: [
-    PlanDagNodeType.GRAPH,
-    PlanDagNodeType.TRANSFORM,
-    PlanDagNodeType.FILTER,
-    PlanDagNodeType.MERGE,
-    PlanDagNodeType.GRAPH_ARTEFACT,
-    PlanDagNodeType.TREE_ARTEFACT,
-    PlanDagNodeType.PROJECTION,
-  ],
+  [PlanDagNodeType.DATA_SOURCE]: GRAPH_DATA_TARGETS,
+  [PlanDagNodeType.GRAPH]: GRAPH_DATA_TARGETS,
+  [PlanDagNodeType.TRANSFORM]: [...GRAPH_DATA_TARGETS, PlanDagNodeType.TRANSFORM],
+  [PlanDagNodeType.FILTER]: GRAPH_DATA_TARGETS,
+  [PlanDagNodeType.MERGE]: GRAPH_DATA_TARGETS,
   [PlanDagNodeType.GRAPH_ARTEFACT]: [],
   [PlanDagNodeType.TREE_ARTEFACT]: [],
   [PlanDagNodeType.PROJECTION]: [],

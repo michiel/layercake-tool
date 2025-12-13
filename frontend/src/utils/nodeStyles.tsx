@@ -8,6 +8,7 @@ import {
   IconFileExport,
   IconBook,
   IconTimeline,
+  IconPresentation,
 } from '@tabler/icons-react'
 
 /**
@@ -19,6 +20,7 @@ export enum OperationCategory {
   OPERATION = 'OPERATION', // Transform, Filter, Merge
   OUTPUT = 'OUTPUT',     // Artefact nodes
   STORY = 'STORY',       // Story nodes
+  PROJECTION = 'PROJECTION', // Projection nodes
 }
 
 /**
@@ -30,6 +32,7 @@ export const OPERATION_COLORS = {
   [OperationCategory.OPERATION]: '#8b5cf6', // Violet-500 - Purple for data operations
   [OperationCategory.OUTPUT]: '#f59e0b',   // Amber-500 - Warm amber for output
   [OperationCategory.STORY]: '#3b82f6',    // Blue-500 - Blue for story nodes
+  [OperationCategory.PROJECTION]: '#f97316', // Orange-500 - Projection nodes
 } as const
 
 /**
@@ -51,6 +54,8 @@ export const getOperationCategory = (nodeType: PlanDagNodeType): OperationCatego
       return OperationCategory.OUTPUT
     case PlanDagNodeType.STORY:
       return OperationCategory.STORY
+    case PlanDagNodeType.PROJECTION:
+      return OperationCategory.PROJECTION
     default:
       return OperationCategory.OPERATION
   }
@@ -88,6 +93,8 @@ export const getNodeIcon = (nodeType: PlanDagNodeType, size: string | number = '
       return <IconBook {...iconProps} />
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
       return <IconTimeline {...iconProps} />
+    case PlanDagNodeType.PROJECTION:
+      return <IconPresentation {...iconProps} />
     default:
       return <IconNetwork {...iconProps} />
   }
@@ -112,6 +119,8 @@ export const getNodeTypeLabel = (nodeType: PlanDagNodeType): string => {
       return 'Graph Artefact'
     case PlanDagNodeType.TREE_ARTEFACT:
       return 'Tree Artefact'
+    case PlanDagNodeType.PROJECTION:
+      return 'Projection'
     case PlanDagNodeType.STORY:
       return 'Story'
     case PlanDagNodeType.SEQUENCE_ARTEFACT:

@@ -29,6 +29,8 @@ interface NodeConfigDialogProps {
   config: any;
   metadata: any;
   storyIdHint?: number;
+  graphIdHint?: number | null;
+  graphSourceNodeIdHint?: string | null;
 }
 
 const sanitizeMetadata = (raw: any): NodeMetadata => {
@@ -56,6 +58,8 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
   config: initialConfig,
   metadata: initialMetadata,
   storyIdHint,
+  graphIdHint,
+  graphSourceNodeIdHint,
 }) => {
   const [config, setConfigState] = React.useState(initialConfig);
   const [metadata, setMetadataState] = React.useState<NodeMetadata>(sanitizeMetadata(initialMetadata));
@@ -118,7 +122,7 @@ export const NodeConfigDialog: React.FC<NodeConfigDialogProps> = ({
       case PlanDagNodeType.TREE_ARTEFACT:
         return <TreeArtefactNodeConfigForm key={nodeId} {...commonProps} />;
       case PlanDagNodeType.PROJECTION:
-        return <ProjectionNodeConfigForm key={nodeId} {...commonProps} />;
+        return <ProjectionNodeConfigForm key={nodeId} {...commonProps} graphIdHint={graphIdHint} graphSourceNodeIdHint={graphSourceNodeIdHint} />;
       case PlanDagNodeType.STORY:
         return (
           <StoryNodeConfigForm

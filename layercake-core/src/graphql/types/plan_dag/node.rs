@@ -96,6 +96,7 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             "MergeNode" => PlanDagNodeType::Merge,
             "GraphArtefactNode" | "OutputNode" | "Output" => PlanDagNodeType::GraphArtefact,
             "TreeArtefactNode" => PlanDagNodeType::TreeArtefact,
+            "ProjectionNode" => PlanDagNodeType::Projection,
             "StoryNode" => PlanDagNodeType::Story,
             "SequenceArtefactNode" => PlanDagNodeType::SequenceArtefact,
             _ => PlanDagNodeType::DataSet, // Default fallback

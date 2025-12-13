@@ -1,26 +1,22 @@
 use anyhow::{anyhow, Context, Result};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-    TransactionTrait,
 };
-use serde_json::{json, Map as JsonMap, Value as JsonValue};
+use serde_json::{json, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::{debug_span, info, Instrument};
 
-use crate::database::entities::graphs::ActiveModel as GraphActiveModel;
+use crate::database::entities::graph_data;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::{graphs, plan_dag_nodes, sequence_contexts, ExecutionState};
+use crate::database::entities::{graphs, plan_dag_nodes, sequence_contexts};
 use crate::graphql::types::plan_dag::{
     config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
 use crate::pipeline::dag_context::DagExecutionContext;
-use crate::pipeline::layer_operations::insert_layers_to_db;
-use crate::pipeline::persist_utils::{
-    clear_graph_storage, edge_to_active_model, insert_edge_batches, insert_node_batches,
-    node_to_active_model,
+use crate::pipeline::graph_data_persist_utils::{
+    edges_to_graph_data_inputs, nodes_to_graph_data_inputs,
 };
-use crate::pipeline::types::LayerData;
 use crate::pipeline::{DatasourceImporter, GraphBuilder, GraphDataBuilder, MergeBuilder};
 use crate::sequence_context::{build_story_context, SequenceStoryContext};
 use crate::services::graph_service::GraphService;
@@ -35,12 +31,23 @@ pub struct DagExecutor {
     merge_builder: MergeBuilder,
 }
 
+/// Options for creating or updating graph_data records originating from DAG nodes
+struct GraphRecordOptions {
+    metadata: Option<JsonValue>,
+    source_type: String,
+    file_format: Option<String>,
+    origin: Option<String>,
+    filename: Option<String>,
+    file_size: Option<i64>,
+}
+
 impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
-        let dataset_importer = DatasourceImporter::new(db.clone());
+        let graph_data_service = std::sync::Arc::new(crate::services::GraphDataService::new(db.clone()));
+        let dataset_importer = DatasourceImporter::new(db.clone(), graph_data_service.clone());
         let graph_builder = GraphBuilder::new(db.clone());
         let graph_data_builder = GraphDataBuilder::new(
-            std::sync::Arc::new(crate::services::GraphDataService::new(db.clone())),
+            graph_data_service.clone(),
             std::sync::Arc::new(crate::services::LayerPaletteService::new(db.clone())),
         );
         let merge_builder = MergeBuilder::new(db.clone());
@@ -531,7 +538,19 @@ impl DagExecutor {
         }));
 
         let mut graph_record = self
-            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .get_or_create_graph_record(
+                project_id,
+                node_id,
+                node_name,
+                GraphRecordOptions {
+                    metadata: metadata.clone(),
+                    source_type: "dataset".to_string(),
+                    file_format: Some(data_set.file_format.clone()),
+                    origin: Some(data_set.origin.clone()),
+                    filename: Some(data_set.filename.clone()),
+                    file_size: Some(data_set.file_size),
+                },
+            )
             .await?;
 
         // Compute hash based on data_set content
@@ -547,41 +566,39 @@ impl DagExecutor {
         }
 
         // Set to processing state
-        let mut active: GraphActiveModel = graph_record.clone().into();
-        active = active.set_state(ExecutionState::Processing);
-        graph_record = active.update(&self.db).await?;
+        self.graph_data_builder
+            .graph_data_service
+            .mark_processing(graph_record.id)
+            .await?;
 
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            node_id,
-            &graph_record,
-        )
-        .await;
+        // TODO: Publish execution status change for graph_data
+        // #[cfg(feature = "graphql")]
+        // crate::graphql::execution_events::publish_graph_data_status(
+        //     &self.db,
+        //     project_id,
+        //     node_id,
+        //     &graph_record,
+        // )
+        // .await;
 
-        // Persist graph contents to graph_nodes, graph_edges, and layers tables
+        // Persist graph contents to graph_data tables (nodes, edges with layer info in attributes)
         self.persist_graph_contents(graph_record.id, &graph).await?;
 
-        // Update to completed state
-        let mut active: GraphActiveModel = graph_record.into();
-        active = active.set_completed(
-            dataset_hash,
-            graph.nodes.len() as i32,
-            graph.edges.len() as i32,
-        );
-        let graph_record = active.update(&self.db).await?;
+        // Update to completed state with source hash
+        self.graph_data_builder
+            .graph_data_service
+            .mark_complete(graph_record.id, dataset_hash)
+            .await?;
 
-        // Publish completion status
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            node_id,
-            &graph_record,
-        )
-        .await;
+        // TODO: Publish completion status for graph_data
+        // #[cfg(feature = "graphql")]
+        // crate::graphql::execution_events::publish_graph_data_status(
+        //     &self.db,
+        //     project_id,
+        //     node_id,
+        //     &graph_record,
+        // )
+        // .await;
 
         info!(
             "DataSetNode {} materialized from data_set {} with nodes:{}, edges:{}, layers:{}",
@@ -660,49 +677,70 @@ impl DagExecutor {
         }));
 
         let mut graph_record = self
-            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .get_or_create_graph_record(
+                project_id,
+                node_id,
+                node_name,
+                GraphRecordOptions {
+                    metadata: metadata.clone(),
+                    source_type: "computed".to_string(),
+                    file_format: None,
+                    origin: None,
+                    filename: None,
+                    file_size: None,
+                },
+            )
             .await?;
 
         let transform_hash = self.compute_transform_hash(node_id, &upstream_graph_for_hash, config)?;
 
-        let annotations_changed = graph_record.annotations != graph.annotations;
+        // Compare annotations (graph_data has JsonValue, graph has String)
+        let graph_annotations_json = graph.annotations.as_ref().map(|s| {
+            serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
+        });
+        let annotations_changed = graph_record.annotations != graph_annotations_json;
         let hash_matches = graph_record.source_hash.as_deref() == Some(&transform_hash);
         if hash_matches && !annotations_changed {
             return Ok(());
         }
 
-        let mut active: GraphActiveModel = graph_record.clone().into();
-        active = active.set_state(ExecutionState::Processing);
-        graph_record = active.update(&self.db).await?;
+        // Set to processing state
+        self.graph_data_builder
+            .graph_data_service
+            .mark_processing(graph_record.id)
+            .await?;
 
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            node_id,
-            &graph_record,
-        )
-        .await;
+        // TODO: Publish execution status change for graph_data
+        // #[cfg(feature = "graphql")]
+        // crate::graphql::execution_events::publish_graph_data_status(
+        //     &self.db,
+        //     project_id,
+        //     node_id,
+        //     &graph_record,
+        // )
+        // .await;
 
+        // Persist graph contents to graph_data tables
         self.persist_graph_contents(graph_record.id, graph).await?;
 
-        let mut active: GraphActiveModel = graph_record.into();
+        // Update metadata, annotations, and mark as complete
+        let mut active: graph_data::ActiveModel = graph_record.into();
         active.metadata = Set(metadata);
-        active.annotations = Set(graph.annotations.clone());
-        active = active.set_completed(
-            transform_hash,
-            graph.nodes.len() as i32,
-            graph.edges.len() as i32,
-        );
-        let updated = active.update(&self.db).await?;
+        active.annotations = Set(graph_annotations_json);
+        active.source_hash = Set(Some(transform_hash));
+        active.computed_date = Set(Some(Utc::now()));
+        active.node_count = Set(graph.nodes.len() as i32);
+        active.edge_count = Set(graph.edges.len() as i32);
+        active.status = Set(graph_data::GraphDataStatus::Active.into());
+        active.updated_at = Set(Utc::now());
+        let _updated = active.update(&self.db).await?;
 
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db, project_id, node_id, &updated,
-        )
-        .await;
+        // TODO: Publish completion status for graph_data
+        // #[cfg(feature = "graphql")]
+        // crate::graphql::execution_events::publish_graph_data_status(
+        //     &self.db, project_id, node_id, &updated,
+        // )
+        // .await;
 
         Ok(())
     }
@@ -767,94 +805,164 @@ impl DagExecutor {
         }));
 
         let mut graph_record = self
-            .get_or_create_graph_record(project_id, node_id, node_name, metadata.clone())
+            .get_or_create_graph_record(
+                project_id,
+                node_id,
+                node_name,
+                GraphRecordOptions {
+                    metadata: metadata.clone(),
+                    source_type: "computed".to_string(),
+                    file_format: None,
+                    origin: None,
+                    filename: None,
+                    file_size: None,
+                },
+            )
             .await?;
 
         let filter_hash = self.compute_filter_hash(node_id, &upstream_graph_for_hash, config)?;
 
-        if graph_record.source_hash.as_deref() == Some(&filter_hash) {
+        // Normalize annotations for comparison (graph_data stores JSON, graph stores string)
+        let graph_annotations_json = graph.annotations.as_ref().map(|s| {
+            serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
+        });
+        let annotations_changed = graph_record.annotations != graph_annotations_json;
+        let hash_matches = graph_record.source_hash.as_deref() == Some(&filter_hash);
+
+        if hash_matches && !annotations_changed {
             return Ok(());
         }
 
-        let mut active: GraphActiveModel = graph_record.clone().into();
-        active = active.set_state(ExecutionState::Processing);
-        graph_record = active.update(&self.db).await?;
-
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db,
-            project_id,
-            node_id,
-            &graph_record,
-        )
-        .await;
+        // Set to processing state in graph_data
+        self.graph_data_builder
+            .graph_data_service
+            .mark_processing(graph_record.id)
+            .await?;
 
         self.persist_graph_contents(graph_record.id, graph).await?;
 
-        let mut active: GraphActiveModel = graph_record.into();
+        // Update metadata, annotations, and mark as complete
+        let mut active: graph_data::ActiveModel = graph_record.into();
         active.metadata = Set(metadata);
-        active.annotations = Set(graph.annotations.clone());
-        active = active.set_completed(
-            filter_hash,
-            graph.nodes.len() as i32,
-            graph.edges.len() as i32,
-        );
-        let updated = active.update(&self.db).await?;
+        active.annotations = Set(graph_annotations_json);
+        active.source_hash = Set(Some(filter_hash));
+        active.computed_date = Set(Some(Utc::now()));
+        active.node_count = Set(graph.nodes.len() as i32);
+        active.edge_count = Set(graph.edges.len() as i32);
+        active.status = Set(graph_data::GraphDataStatus::Active.into());
+        active.updated_at = Set(Utc::now());
+        let _updated = active.update(&self.db).await?;
 
-        // Publish execution status change
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_graph_status(
-            &self.db, project_id, node_id, &updated,
-        )
-        .await;
+        // TODO: Publish graph_data execution status change when graph_data events are wired
+        // #[cfg(feature = "graphql")]
+        // crate::graphql::execution_events::publish_graph_data_status(
+        //     &self.db, project_id, node_id, &updated,
+        // )
+        // .await;
 
         Ok(())
     }
 
+    /// Get or create a graph_data record for a computed graph (transform/filter output)
+    /// Returns the graph_data record, creating it if it doesn't exist
     async fn get_or_create_graph_record(
         &self,
         project_id: i32,
         node_id: &str,
         node_name: &str,
-        metadata: Option<JsonValue>,
-    ) -> Result<graphs::Model> {
-        if let Some(mut graph) = GraphEntity::find()
-            .filter(GraphColumn::ProjectId.eq(project_id))
-            .filter(GraphColumn::NodeId.eq(node_id))
-            .one(&self.db)
+        options: GraphRecordOptions,
+    ) -> Result<graph_data::Model> {
+        let GraphRecordOptions {
+            metadata,
+            source_type,
+            file_format,
+            origin,
+            filename,
+            file_size,
+        } = options;
+
+        // Query by dag_node_id
+        if let Some(mut graph_data) = self
+            .graph_data_builder
+            .graph_data_service
+            .get_by_dag_node(node_id)
             .await?
         {
+            // Update if name or metadata changed
             let mut needs_update = false;
-            let mut active: GraphActiveModel = graph.clone().into();
+            let mut active: graph_data::ActiveModel = graph_data.clone().into();
 
-            if graph.name != node_name {
+            if graph_data.name != node_name {
                 active.name = Set(node_name.to_string());
                 needs_update = true;
             }
 
-            if graph.metadata != metadata {
+            if graph_data.metadata != metadata {
                 active.metadata = Set(metadata.clone());
                 needs_update = true;
             }
 
-            if needs_update {
-                active = active.set_updated_at();
-                graph = active.update(&self.db).await?;
+            if graph_data.source_type != source_type {
+                active.source_type = Set(source_type.clone());
+                needs_update = true;
             }
 
-            Ok(graph)
-        } else {
-            let graph = GraphActiveModel {
-                project_id: Set(project_id),
-                node_id: Set(node_id.to_string()),
-                name: Set(node_name.to_string()),
-                metadata: Set(metadata.clone()),
-                ..GraphActiveModel::new()
+            if graph_data.file_format.as_deref() != file_format.as_deref() {
+                active.file_format = Set(file_format.clone());
+                needs_update = true;
             }
-            .insert(&self.db)
-            .await?;
-            Ok(graph)
+
+            if graph_data.origin.as_deref() != origin.as_deref() {
+                active.origin = Set(origin.clone());
+                needs_update = true;
+            }
+
+            if graph_data.filename.as_deref() != filename.as_deref() {
+                active.filename = Set(filename.clone());
+                needs_update = true;
+            }
+
+            if graph_data.file_size != file_size {
+                active.file_size = Set(file_size);
+                needs_update = true;
+            }
+
+            if needs_update {
+                active.updated_at = Set(Utc::now());
+                graph_data = active.update(&self.db).await?;
+            }
+
+            Ok(graph_data)
+        } else {
+            // Create new computed graph_data entry
+            use crate::services::graph_data_service::GraphDataCreate;
+
+            let graph_data = self
+                .graph_data_builder
+                .graph_data_service
+                .create(GraphDataCreate {
+                    project_id,
+                    name: node_name.to_string(),
+                    source_type: source_type.clone(),
+                    dag_node_id: Some(node_id.to_string()),
+                    file_format: file_format.clone(),
+                    origin: origin.clone(),
+                    filename: filename.clone(),
+                    blob: None,
+                    file_size,
+                    processed_at: None,
+                    source_hash: None,
+                    computed_date: None,
+                    last_edit_sequence: Some(0),
+                    has_pending_edits: Some(false),
+                    last_replay_at: None,
+                    metadata,
+                    annotations: None,
+                    status: Some(graph_data::GraphDataStatus::Processing),
+                })
+                .await?;
+
+            Ok(graph_data)
         }
     }
 
@@ -894,74 +1002,32 @@ impl DagExecutor {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
+    /// Persist graph contents to graph_data schema
+    /// Replaces nodes and edges for the given graph_data_id
+    /// Stores layer information in node attributes
     async fn persist_graph_contents(
         &self,
-        graph_id: i32,
+        graph_data_id: i32,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
-        let txn = self.db.begin().await?;
-        clear_graph_storage(&txn, graph_id).await?;
+        // Convert nodes and edges to graph_data format
+        let node_inputs = nodes_to_graph_data_inputs(&graph.nodes);
+        let edge_inputs = edges_to_graph_data_inputs(&graph.edges);
 
-        let node_models: Vec<_> = graph
-            .nodes
-            .iter()
-            .map(|node| node_to_active_model(graph_id, node))
-            .collect();
-        insert_node_batches(&txn, node_models).await?;
+        // Replace nodes using GraphDataService (handles deletion + insertion + count update)
+        self.graph_data_builder
+            .graph_data_service
+            .replace_nodes(graph_data_id, node_inputs)
+            .await?;
 
-        let edge_models: Vec<_> = graph
-            .edges
-            .iter()
-            .map(|edge| edge_to_active_model(graph_id, edge))
-            .collect();
-        insert_edge_batches(&txn, edge_models).await?;
+        // Replace edges using GraphDataService (handles deletion + insertion + count update)
+        self.graph_data_builder
+            .graph_data_service
+            .replace_edges(graph_data_id, edge_inputs)
+            .await?;
 
-        let mut layer_map = HashMap::new();
-        for layer in &graph.layers {
-            let properties = JsonMap::new();
-            // Only include other properties, not the color fields which are now first-class
-
-            let properties_json = if properties.is_empty() {
-                None
-            } else {
-                Some(serde_json::to_string(&JsonValue::Object(properties))?)
-            };
-
-            let background_color = if layer.background_color.is_empty() {
-                None
-            } else {
-                Some(layer.background_color.clone())
-            };
-
-            let text_color = if layer.text_color.is_empty() {
-                None
-            } else {
-                Some(layer.text_color.clone())
-            };
-
-            let border_color = if layer.border_color.is_empty() {
-                None
-            } else {
-                Some(layer.border_color.clone())
-            };
-
-            layer_map.insert(
-                layer.id.clone(),
-                LayerData {
-                    name: layer.label.clone(),
-                    background_color,
-                    text_color,
-                    border_color,
-                    alias: layer.alias.clone(),
-                    comment: None, // Layer struct doesn't have comment field
-                    properties: properties_json,
-                    dataset_id: layer.dataset,
-                },
-            );
-        }
-
-        insert_layers_to_db(&txn, graph_id, layer_map).await?;
-        txn.commit().await?;
+        // Note: Layer information is now stored in graph_data_nodes.attributes
+        // No separate layer table persistence needed
         Ok(())
     }
 

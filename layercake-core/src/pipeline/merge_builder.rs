@@ -629,8 +629,8 @@ struct NodeData {
 
 /// Track merged items for annotation
 struct MergeStats {
-    merged_nodes: Vec<(String, f64)>, // (id, total_weight)
-    merged_edges: Vec<(String, f64)>, // (id, total_weight)
+    merged_nodes: Vec<(String, f64)>, // (id, total weight)
+    merged_edges: Vec<(String, f64)>, // (id, total weight)
 }
 
 impl MergeStats {

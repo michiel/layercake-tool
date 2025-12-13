@@ -235,6 +235,8 @@ export class ReactFlowAdapter {
       'graph': 'GraphNode',
       'story': 'StoryNode',
       'sequence_artefact': 'SequenceArtefactNode',
+      'projection': 'ProjectionNode',
+      'projection_node': 'ProjectionNode',
       // Backend may return capitalized variants
       'DataSet': 'DataSetNode',
       'Transform': 'TransformNode',
@@ -246,6 +248,7 @@ export class ReactFlowAdapter {
       'Graph': 'GraphNode',
       'Story': 'StoryNode',
       'SequenceArtefact': 'SequenceArtefactNode',
+      'Projection': 'ProjectionNode',
       // TypeScript enum format (PascalCase) - pass through
       'DataSetNode': 'DataSetNode',
       'TransformNode': 'TransformNode',
@@ -257,10 +260,12 @@ export class ReactFlowAdapter {
       'GraphNode': 'GraphNode',
       'StoryNode': 'StoryNode',
       'SequenceArtefactNode': 'SequenceArtefactNode',
+      'ProjectionNode': 'ProjectionNode',
       // Lowercase fallbacks
       'storynode': 'StoryNode',
       'sequenceartefactnode': 'SequenceArtefactNode',
       'sequenceartefact': 'SequenceArtefactNode',
+      'projectionnode': 'ProjectionNode',
     }
 
     const normalized = (nodeType || '').trim()
@@ -289,6 +294,7 @@ export class ReactFlowAdapter {
       'GraphNode': 'graph',
       'StoryNode': 'story',
       'SequenceArtefactNode': 'sequence_artefact',
+      'ProjectionNode': 'projection',
     }
 
     return typeMap[reactFlowType || 'default'] || 'unknown'
@@ -333,6 +339,16 @@ export class ReactFlowAdapter {
         ...baseStyle,
         borderColor: '#ef4444',
         background: '#fef2f2'
+      },
+      'projection': {
+        ...baseStyle,
+        borderColor: '#f97316',
+        background: '#fff7ed'
+      },
+      'ProjectionNode': {
+        ...baseStyle,
+        borderColor: '#f97316',
+        background: '#fff7ed'
       },
       'copy': {
         ...baseStyle,

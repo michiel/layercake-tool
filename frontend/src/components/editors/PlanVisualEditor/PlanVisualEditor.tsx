@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, useRef, useMemo } from 'react'
+import { gql } from '@apollo/client'
 import ReactFlow, {
   Background,
   Controls,
@@ -50,6 +51,13 @@ import { useMutation } from '@apollo/client/react'
 import { UPDATE_GRAPH } from '../../../graphql/graphs'
 import { EXECUTE_PLAN, CLEAR_PROJECT_EXECUTION, STOP_PLAN_EXECUTION } from '../../../graphql/preview'
 import { showSuccessNotification, showErrorNotification } from '../../../utils/notifications'
+import { createApolloClientForEndpoint } from '@/graphql/client'
+
+const DELETE_PROJECTION = gql`
+  mutation DeleteProjection($id: ID!) {
+    deleteProjection(id: $id)
+  }
+`
 
 // Import floating edge components
 import { FloatingEdge } from './edges/FloatingEdge'
@@ -105,6 +113,15 @@ const sanitizeNodeMetadata = (raw: any, fallback?: NodeMetadata): NodeMetadata =
 const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, readonly = false, focusNodeId, collaboration }: PlanVisualEditorProps) => {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [updateGraphNameMutation] = useMutation(UPDATE_GRAPH)
+  const projectionsClient = useMemo(
+    () =>
+      createApolloClientForEndpoint({
+        httpPath: '/projections/graphql',
+        wsPath: '/projections/graphql/ws',
+      }),
+    []
+  )
+  const [deleteProjectionMutation] = useMutation(DELETE_PROJECTION, { client: projectionsClient })
   // Get ReactFlow instance for fit view and screen position conversion
   const { fitView, screenToFlowPosition } = useReactFlow();
 
@@ -119,6 +136,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     outputGraphRef: ''
   } as DataSetNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
+  const [configGraphIdHint, setConfigGraphIdHint] = useState<number | null>(null)
+  const [configGraphSourceNodeId, setConfigGraphSourceNodeId] = useState<string | null>(null)
   const [draggingNode, setDraggingNode] = useState<{ type: PlanDagNodeType, position: { x: number, y: number } } | null>(null);
 
   // Node type selector for edge drop
@@ -129,6 +148,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
 
   // Ref to store nodes for handleNodeEdit (to avoid circular dependency)
   const nodesRef = useRef<Node[]>([])
+  const edgesRef = useRef<Edge[]>([])
 
   // Node action handlers (defined with stable references)
   const handleNodeEdit = useCallback((nodeId: string) => {
@@ -146,6 +166,18 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       setConfigNodeType(resolvedType)
       setConfigNodeConfig(node.data.config || {})
       setConfigNodeMetadata(node.data.metadata || { label: '', description: '' })
+
+      // Infer upstream graph ID for projection nodes
+      const incoming = edgesRef.current.find(e => e.target === nodeId)
+      if (incoming) {
+        const sourceNode = nodesRef.current.find(n => n.id === incoming.source)
+        const graphExecId = (sourceNode as any)?.data?.graphExecution?.graphId
+        setConfigGraphIdHint(typeof graphExecId === 'number' ? graphExecId : null)
+        setConfigGraphSourceNodeId(sourceNode?.id ?? null)
+      } else {
+        setConfigGraphIdHint(null)
+        setConfigGraphSourceNodeId(null)
+      }
     } else {
       console.warn('Node not found:', nodeId)
     }
@@ -192,6 +224,10 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   useEffect(() => {
     nodesRef.current = nodes
   }, [nodes])
+
+  useEffect(() => {
+    edgesRef.current = edges
+  }, [edges])
 
   useEffect(() => {
     if (!focusNodeId) return
@@ -249,6 +285,18 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // Suppress external syncs during delete operations
       setDragging(true)
 
+      // If deleting a projection node, also remove its backing projection
+      const targetNode = nodesRef.current.find(node => node.id === nodeId)
+      const nodeType = targetNode?.data?.nodeType || targetNode?.type
+      if (nodeType === PlanDagNodeType.PROJECTION) {
+        const projectionId = (targetNode as any)?.data?.config?.projectionId
+        if (projectionId) {
+          deleteProjectionMutation({
+            variables: { id: projectionId.toString() },
+          }).catch(err => console.error('Failed to delete projection for node', nodeId, err))
+        }
+      }
+
       // Collect edge IDs to delete BEFORE modifying state
       // (Must access edges state directly to avoid closure issues)
       const edgesToDelete = edges.filter(edge => edge.source === nodeId || edge.target === nodeId)
@@ -269,7 +317,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // Re-enable external syncs after a short delay to allow mutations to complete
       setTimeout(() => setDragging(false), 100)
     }
-  }, [setNodes, setEdges, mutations, setDragging, edges])
+  }, [setNodes, setEdges, mutations, setDragging, edges, deleteProjectionMutation])
 
   // Switch to plan-dag-canvas document when component mounts
   useEffect(() => {
@@ -1434,13 +1482,15 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     const map = new Map<string, boolean>()
 
     nodes.forEach(node => {
+      const nodeType = node.data?.nodeType || PlanDagNodeType.DATA_SOURCE
+      const config = node.data?.config
+      const hasValidConfig =
+        nodeType === PlanDagNodeType.PROJECTION
+          ? Boolean((config as any)?.projectionId)
+          : node.data?.hasValidConfig !== false
+
       // Use the comprehensive isNodeConfigured validation that checks edges
-      const configured = isNodeConfigured(
-        node.data?.nodeType || PlanDagNodeType.DATA_SOURCE,
-        node.id,
-        edges,
-        node.data?.hasValidConfig !== false
-      )
+      const configured = isNodeConfigured(nodeType, node.id, edges, hasValidConfig)
       map.set(node.id, configured)
     })
 
@@ -1457,12 +1507,20 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   const nodeDataMap = useMemo(() => {
     const map = new Map<string, any>()
     nodes.forEach(node => {
+      const nodeType = node.data?.nodeType || PlanDagNodeType.DATA_SOURCE
+      const config = node.data?.config
+      const hasValidConfig =
+        nodeType === PlanDagNodeType.PROJECTION
+          ? Boolean((config as any)?.projectionId)
+          : node.data?.hasValidConfig !== false
+
       map.set(node.id, {
         // Preserve original data first
         ...node.data,
         // Then override with calculated/injected values
         edges: edges,
         isUnconfigured: !isNodeFullyConfigured(node.id),
+        hasValidConfig,
         projectId: projectId
       })
     })
@@ -1722,6 +1780,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         metadata={configNodeMetadata}
         projectId={projectId}
         storyIdHint={sequenceStoryId}
+        graphIdHint={configGraphIdHint}
+        graphSourceNodeIdHint={configGraphSourceNodeId}
         onSave={handleNodeConfigSave}
       />
 
