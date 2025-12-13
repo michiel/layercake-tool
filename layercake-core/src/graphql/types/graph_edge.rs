@@ -1,5 +1,6 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
+use crate::database::entities::graph_data_edges;
 
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
 pub struct GraphEdge {
@@ -33,6 +34,24 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdge {
             attrs: model.attrs.clone(),
             attributes: model.attrs,
             dataset_id: model.dataset_id,
+            created_at: model.created_at,
+        }
+    }
+}
+
+impl From<graph_data_edges::Model> for GraphEdge {
+    fn from(model: graph_data_edges::Model) -> Self {
+        Self {
+            id: model.external_id,
+            graph_id: model.graph_data_id,
+            source: model.source,
+            target: model.target,
+            label: model.label,
+            layer: model.layer,
+            weight: model.weight,
+            attrs: model.attributes.clone(),
+            attributes: model.attributes,
+            dataset_id: model.source_dataset_id,
             created_at: model.created_at,
         }
     }

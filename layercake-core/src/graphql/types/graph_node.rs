@@ -1,5 +1,6 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
+use crate::database::entities::graph_data_nodes;
 
 // Input type for bulk node updates
 #[derive(InputObject, Clone, Debug)]
@@ -47,6 +48,24 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNode {
             attrs: model.attrs.clone(),
             attributes: model.attrs,
             dataset_id: model.dataset_id,
+            created_at: model.created_at,
+        }
+    }
+}
+
+impl From<graph_data_nodes::Model> for GraphNode {
+    fn from(model: graph_data_nodes::Model) -> Self {
+        Self {
+            id: model.external_id,
+            graph_id: model.graph_data_id,
+            label: model.label,
+            layer: model.layer,
+            weight: model.weight,
+            is_partition: model.is_partition,
+            belongs_to: model.belongs_to,
+            attrs: model.attributes.clone(),
+            attributes: model.attributes,
+            dataset_id: model.source_dataset_id,
             created_at: model.created_at,
         }
     }

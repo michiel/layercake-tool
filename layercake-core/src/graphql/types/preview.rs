@@ -90,6 +90,20 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNodePreview {
     }
 }
 
+impl From<crate::database::entities::graph_data_nodes::Model> for GraphNodePreview {
+    fn from(model: crate::database::entities::graph_data_nodes::Model) -> Self {
+        Self {
+            id: model.external_id,
+            label: model.label,
+            layer: model.layer,
+            weight: model.weight,
+            is_partition: model.is_partition,
+            attrs: model.attributes.clone(),
+            attributes: model.attributes,
+        }
+    }
+}
+
 impl From<crate::database::entities::graph_edges::Model> for GraphEdgePreview {
     fn from(model: crate::database::entities::graph_edges::Model) -> Self {
         Self {
@@ -101,6 +115,21 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdgePreview {
             weight: model.weight,
             attrs: model.attrs.clone(),
             attributes: model.attrs,
+        }
+    }
+}
+
+impl From<crate::database::entities::graph_data_edges::Model> for GraphEdgePreview {
+    fn from(model: crate::database::entities::graph_data_edges::Model) -> Self {
+        Self {
+            id: model.external_id,
+            source: model.source,
+            target: model.target,
+            label: model.label,
+            layer: model.layer,
+            weight: model.weight,
+            attrs: model.attributes.clone(),
+            attributes: model.attributes,
         }
     }
 }

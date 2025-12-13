@@ -5,9 +5,9 @@ use sea_orm::{
 };
 
 use crate::database::entities::{
-    data_sets, graph_data, graph_edges, graph_layers, graph_nodes, graphs, layer_aliases,
-    plan_dag_edges, plan_dag_nodes, plans, project_collaborators, projections, sequences, stories,
-    user_sessions, users,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges, graph_layers,
+    graph_nodes, graphs, layer_aliases, plan_dag_edges, plan_dag_nodes, plans,
+    project_collaborators, projections, sequences, stories, user_sessions, users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
@@ -826,19 +826,33 @@ impl Query {
     /// Get all Graphs for a project
     async fn graphs(&self, ctx: &Context<'_>, project_id: i32) -> Result<Vec<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graphs_list = graphs::Entity::find()
+        let mut results = Vec::new();
+
+        let gd_list = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .filter(graph_data::Column::SourceType.eq("computed"))
+            .all(&context.db)
+            .await?;
+        results.extend(gd_list.into_iter().map(Graph::from));
+
+        // Fallback to legacy graphs for any remaining entries
+        let legacy_graphs = graphs::Entity::find()
             .filter(graphs::Column::ProjectId.eq(project_id))
             .all(&context.db)
             .await?;
+        results.extend(legacy_graphs.into_iter().map(Graph::from));
 
-        Ok(graphs_list.into_iter().map(Graph::from).collect())
+        Ok(results)
     }
 
     /// Get Graph by ID
     async fn graph(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph = graphs::Entity::find_by_id(id).one(&context.db).await?;
+        if let Some(gd) = graph_data::Entity::find_by_id(id).one(&context.db).await? {
+            return Ok(Some(Graph::from(gd)));
+        }
 
+        let graph = graphs::Entity::find_by_id(id).one(&context.db).await?;
         Ok(graph.map(Graph::from))
     }
 
@@ -1046,55 +1060,134 @@ impl Query {
     ) -> Result<Option<GraphPreview>> {
         let context = ctx.data::<GraphQLContext>()?;
 
-        // Find graph by project_id and node_id
-        let graph = graphs::Entity::find()
-            .filter(graphs::Column::ProjectId.eq(project_id))
-            .filter(graphs::Column::NodeId.eq(&node_id))
+        // Try graph_data first by dag_node_id
+        let graph_data_model = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .filter(graph_data::Column::DagNodeId.eq(node_id.clone()))
             .one(&context.db)
             .await?;
 
-        let graph = match graph {
-            Some(g) => g,
-            None => return Ok(None),
-        };
+        let (graph_id, name, base_annotations, node_previews, edge_previews, layer_previews, node_count, edge_count, execution_state, computed_date, error_message) =
+            if let Some(gd) = graph_data_model {
+                let nodes = graph_data_nodes::Entity::find()
+                    .filter(graph_data_nodes::Column::GraphDataId.eq(gd.id))
+                    .all(&context.db)
+                    .await?;
+                let edges = graph_data_edges::Entity::find()
+                    .filter(graph_data_edges::Column::GraphDataId.eq(gd.id))
+                    .all(&context.db)
+                    .await?;
 
-        // Get all nodes for this graph
-        let nodes = graph_nodes::Entity::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph.id))
-            .all(&context.db)
-            .await?;
+                let mut layer_set = std::collections::HashSet::new();
+                let mut layers = Vec::new();
+                for (idx, layer_id) in nodes
+                    .iter()
+                    .filter_map(|n| n.layer.clone())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .enumerate()
+                {
+                    layer_set.insert(layer_id.clone());
+                    layers.push(Layer {
+                        id: -(idx as i32 + 1),
+                        graph_id: gd.id,
+                        layer_id: layer_id.clone(),
+                        name: layer_id.clone(),
+                        background_color: None,
+                        text_color: None,
+                        border_color: None,
+                        alias: None,
+                        comment: None,
+                        properties: None,
+                        dataset_id: None,
+                    });
+                }
 
-        // Get all edges for this graph
-        let edges = graph_edges::Entity::find()
-            .filter(graph_edges::Column::GraphId.eq(graph.id))
-            .all(&context.db)
-            .await?;
+                let annotations = gd
+                    .annotations
+                    .as_ref()
+                    .and_then(|v| v.as_str().map(|s| s.to_string()));
 
-        // Get all graph_layers for this graph
-        let db_layers = graph_layers::Entity::find()
-            .filter(graph_layers::Column::GraphId.eq(graph.id))
-            .all(&context.db)
-            .await?;
+                (
+                    gd.id,
+                    gd.name,
+                    annotations,
+                    nodes.into_iter().map(GraphNodePreview::from).collect(),
+                    edges.into_iter().map(GraphEdgePreview::from).collect(),
+                    layers,
+                    gd.node_count,
+                    gd.edge_count,
+                    gd.status,
+                    gd.computed_date.map(|d| d.to_rfc3339()),
+                    gd.error_message,
+                )
+            } else {
+                // Legacy fallback by node_id on graphs table
+                let graph = graphs::Entity::find()
+                    .filter(graphs::Column::ProjectId.eq(project_id))
+                    .filter(graphs::Column::NodeId.eq(&node_id))
+                    .one(&context.db)
+                    .await?;
 
-        // Convert to preview format
-        let node_previews: Vec<GraphNodePreview> =
-            nodes.into_iter().map(GraphNodePreview::from).collect();
+                let Some(graph) = graph else {
+                    return Ok(None);
+                };
 
-        let edge_previews: Vec<GraphEdgePreview> =
-            edges.into_iter().map(GraphEdgePreview::from).collect();
+                let nodes = graph_nodes::Entity::find()
+                    .filter(graph_nodes::Column::GraphId.eq(graph.id))
+                    .all(&context.db)
+                    .await?;
 
-        let layer_previews: Vec<Layer> = db_layers.into_iter().map(Layer::from).collect();
+                let edges = graph_edges::Entity::find()
+                    .filter(graph_edges::Column::GraphId.eq(graph.id))
+                    .all(&context.db)
+                    .await?;
+
+                let db_layers = graph_layers::Entity::find()
+                    .filter(graph_layers::Column::GraphId.eq(graph.id))
+                    .all(&context.db)
+                    .await?;
+
+                (
+                    graph.id,
+                    graph.name,
+                    graph.annotations,
+                    nodes.into_iter().map(GraphNodePreview::from).collect(),
+                    edges.into_iter().map(GraphEdgePreview::from).collect(),
+                    db_layers.into_iter().map(Layer::from).collect(),
+                    graph.node_count,
+                    graph.edge_count,
+                    graph.execution_state,
+                    graph.computed_date.map(|d| d.to_rfc3339()),
+                    graph.error_message,
+                )
+            };
 
         let mut visited = std::collections::HashSet::new();
         let mut stack = vec![node_id.clone()];
         let mut annotation_history = Vec::new();
+        if let Some(text) = base_annotations.clone() {
+            annotation_history.push(text);
+        }
 
         while let Some(current) = stack.pop() {
             if !visited.insert(current.clone()) {
                 continue;
             }
 
-            if let Some(graph) = graphs::Entity::find()
+            if let Some(gd) = graph_data::Entity::find()
+                .filter(graph_data::Column::DagNodeId.eq(&current))
+                .one(&context.db)
+                .await?
+            {
+                if let Some(text) = gd
+                    .annotations
+                    .as_ref()
+                    .and_then(|v| v.as_str().map(|s| s.to_string()))
+                {
+                    annotation_history.push(text);
+                }
+            } else if let Some(graph) = graphs::Entity::find()
                 .filter(graphs::Column::NodeId.eq(&current))
                 .one(&context.db)
                 .await?
@@ -1121,17 +1214,17 @@ impl Query {
 
         Ok(Some(GraphPreview {
             node_id,
-            graph_id: graph.id,
-            name: graph.name,
+            graph_id,
+            name,
             annotations,
             nodes: node_previews,
             edges: edge_previews,
             layers: layer_previews,
-            node_count: graph.node_count,
-            edge_count: graph.edge_count,
-            execution_state: graph.execution_state,
-            computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
-            error_message: graph.error_message,
+            node_count,
+            edge_count,
+            execution_state,
+            computed_date,
+            error_message,
         }))
     }
 

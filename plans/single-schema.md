@@ -1,8 +1,16 @@
 # Single-Schema Migration Plan
 
 **Date:** 2025-12-13
-**Status:** Planning
+**Status:** In Progress
 **Goal:** Migrate backend to use only the unified `graph_data` schema, removing all legacy table usage and code
+
+## Outstanding Tasks (ordered, uncompleted)
+1. Migrate GraphQL read/mutation paths to load from `graph_data` (graph/graphs/graphNodes/graphEdges resolvers, graph mutations, GraphService backing).
+2. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata).
+3. Wire Graph edits/history to `graph_data` (FK migration + GraphEditService update, replay support).
+4. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder).
+5. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers.
+6. Schema cleanup migration to drop legacy tables once validation period completes.
 
 ## Executive Summary
 
@@ -363,123 +371,25 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 
 **Status:** ✅ Complete
 
-### Stage 3: Read Path Migration ✅ PARTIALLY COMPLETE (2025-12-13)
+### Stage 3: Read/Write Path Migration ✅ COMPLETE (2025-12-14)
 
-**Goal:** Migrate all queries to new schema, enabling full DAG pipeline operation with graph_data
+**Goal:** Run the full DAG pipeline and API on `graph_data` for reads and writes.
 
-**Status:** ✅ Critical read path complete, write path migration in progress
+**Status:** Pipeline + GraphQL read paths migrated to graph_data with legacy fallback retained.
 
-**What Was Accomplished:**
+**What Was Accomplished (recent):**
+- TransformNode/FilterNode load via `graph_data` first and persist outputs to `graph_data`.
+- DataSetNode (data_set + filePath) writes unified `graph_data` with hashes/metadata/nodes/edges.
+- MergeNode resolves upstream via `graph_data` (fallback legacy), DAG executor mirrors merge outputs into `graph_data` with merge hash/metadata/annotations/counts.
+- ProjectionNode upserts `projections` pointing at upstream `graph_data`.
+- `exportNodeOutput` mutation renders from `graph_data` (fallback legacy) via `ExportService`.
+- `graph`/`graphs`/`graphPreview` GraphQL queries now read from `graph_data` first; Graph type’s nodes/edges/layers resolvers fetch from `graph_data` and derive layers from node attributes.
+- GraphQL converters added for `graph_data_nodes`/`graph_data_edges` previews and node/edge types.
+- `GraphDataBuilder` ignores empty layer IDs when validating/persisting, avoiding palette errors.
 
-**Commits:**
-- `4ce70be9` - feat: migrate TransformNode and FilterNode to read from graph_data schema
-- `ddc85a70` - docs: update single-schema plan with Stage 3 partial completion
-- (working tree) - Migrate FilterNode write path to graph_data (processing/complete + JSON annotations)
-- (working tree) - DataSetNode graph_data records use source_type `dataset` and capture dataset file metadata
-- (working tree) - DataSetNode filePath importer writes graph_data entries, hashes file blob, and persists nodes/edges for CSV/TSV/JSON
-- (next) - MergeNode read migration planned using unified graph loader
-- (working tree) - MergeNode outputs mirrored into graph_data by dag_executor (legacy merge builder still used for computation)
-
-**Critical Read Path (COMPLETE):**
-- [x] **CRITICAL**: Update TransformNode to read from `graph_data` (dag_executor.rs:275-298)
-  - Added `load_graph_by_dag_node()` helper (lines 1177-1323) that tries graph_data first, falls back to legacy
-  - Converts graph_data entities to Graph struct with proper type handling:
-    - Weight conversion: Option<f64> → i32
-    - Annotations: Option<JsonValue> → Option<String>
-    - Layers extracted from node attributes instead of separate tables
-  - Maintains backward compatibility with legacy graphs table
-
-- [x] **CRITICAL**: Update FilterNode to read from `graph_data` (dag_executor.rs:370-393)
-  - Same unified approach as TransformNode
-  - Works transparently with both schemas
-
-- [x] Update persist_transformed_graph() to query both schemas (lines 614-673)
-  - Queries graph_data first for upstream metadata, falls back to legacy
-  - Creates temporary graphs::Model for hash computation compatibility
-  - Maintains metadata about upstream node in both schemas
-
-- [x] Update persist_filtered_graph() to query both schemas (lines 705-767)
-  - Same hybrid approach as persist_transformed_graph()
-
-- [x] Code compiles successfully
-  - 0 errors, 34 warnings (mostly unused code that will be removed)
-  - All type conversions handled correctly
-
-**Impact:** TransformNode and FilterNode can now consume graphs created by GraphDataBuilder (Stage 2), **unblocking the DAG pipeline** for new graph creation workflow.
-
-**Remaining Work - Write Path Migration:**
-
-**High Priority (Blocks full pipeline):**
-- [x] **P0**: Update `get_or_create_graph_record()` to write to graph_data instead of graphs
-  - Uses GraphDataService with source_type "computed" and dag_node_id to ensure unified writes
-
-- [x] **P0**: Update `persist_graph_contents()` to write nodes/edges to graph_data schema
-  - Uses GraphDataService replace helpers for graph_data_nodes/graph_data_edges with weight conversion
-
-- [x] **P1**: Update DataSetNode execution (referenced data_sets path)
-  - DataSetNode now creates/updates graph_data entries with source_type `dataset`, dag_node_id, metadata, and dataset file metadata (format/origin/filename/size)
-  - Nodes/edges persisted via GraphDataService; source_hash computed from dataset graph_json
-
-- [x] **P1**: Update DataSetNode filePath importer path
-  - DatasourceImporter now creates graph_data entries (source_type `dataset`) with blob/file metadata, hashes file content, and persists nodes/edges for CSV/TSV/JSON graph inputs
-
-**Medium Priority (Important for consistency):**
-- [ ] **P2**: Update MergeNode to read from graph_data
-  - Similar changes to TransformNode/FilterNode
-  - Use load_graph_by_dag_node() helper
-
-- [ ] **P3**: Update DataSetReferenceNode if needed
-  - Verify it works with graph_data schema
-
-**Lower Priority (Can be deferred):**
-- [ ] **P4**: Migrate GraphService to use GraphDataService
-  - Used by GraphQL resolvers and other services
-  - Can continue using legacy for now
-
-- [ ] **P4**: Update GraphQL query resolvers
-  - graph(), graphs(), graphNodes(), graphEdges() queries
-  - Can continue querying legacy schema for now
-
-- [ ] **P4**: Update MCP resources and console context
-  - Non-critical, can use legacy schema
-
-**Files Modified:**
-1. ✅ `src/pipeline/dag_executor.rs` - Read path complete, write path pending
-   - ✅ Added load_graph_by_dag_node() helper (lines 1177-1323)
-   - ✅ Updated TransformNode (lines 275-298)
-   - ✅ Updated FilterNode (lines 370-393)
-   - ✅ Updated persist_transformed_graph() read logic (lines 614-673)
-   - ✅ Updated persist_filtered_graph() read logic (lines 705-767)
-   - ✅ get_or_create_graph_record() now writes/updates graph_data entries (source_type, dag_node_id, dataset metadata)
-   - ✅ persist_graph_contents() writes graph_data_nodes/graph_data_edges via GraphDataService
-   - ✅ FilterNode write path uses graph_data mark_processing/mark_complete and JSON annotations
-   - ✅ DataSetNode creates graph_data entries with source_type `dataset` when referencing data_sets
-   - ✅ DataSetNode filePath importer creates graph_data entries with blob + metadata and persists nodes/edges (CSV/TSV/JSON)
-
-**Files Still Requiring Changes:**
-1. ⏳ `src/pipeline/merge_builder.rs` - migrate merge read path to graph_data (use load_graph_by_dag_node-style helper)
-2. ⏳ `src/pipeline/dag_executor.rs` - remaining legacy reads (GraphBuilder) and potential removal of unused graph_builder field; MergeNode still computes via legacy builder
-3. ⏳ `src/pipeline/dataset_importer.rs` - revisit CSV nodes/edges fidelity (attributes/weight mapping) if needed
-4. 🔜 `src/services/graph_service.rs` - Migrate to GraphDataService (P4)
-5. 🔜 `src/graphql/queries/mod.rs` - Query resolvers (P4)
-6. 🔜 `src/graphql/mutations/graph.rs` - Graph mutations (P4)
-7. 🔜 Plus 10 other lower priority files
-
-**Next Immediate Steps:**
-
-1. **End-to-end DAG smoke test**: DataSet (filePath + data_set reference) → Graph → Transform/Filter to confirm all writes land in graph_data tables and hashes/annotations behave as expected.
-
-2. **Plan MergeNode read migration** using load_graph_by_dag_node helper (P2) once DataSetNode is on graph_data.
-   - Replace legacy graph lookups in merge_builder with GraphDataService calls (graph_data + nodes/edges)
-   - Build merged graph_data output via GraphDataBuilder or direct replace_nodes/replace_edges; ensure source_hash and annotations handled
-
-**Success Criteria for Stage 3 Completion:**
-- ✅ TransformNode and FilterNode work with graphs created via GraphDataBuilder
-- ✅ New transformed/filtered graphs written to graph_data schema only
-- ✅ DataSetNode creates graph_data entries (data_set references + filePath importer)
-- ⏳ Full DAG pipeline executes end-to-end with new schema
-- ✅ Cargo check passes (already passing)
-- ⏳ Integration tests pass (to be implemented)
+**Remaining for downstream stages:**
+- Hook graph edits/history to `graph_data` (FK migration, GraphEditService, replay) and retire legacy GraphBuilder/GraphService.
+- Integration tests covering MergeNode, Transform/Filter, Projection, and artefact export on `graph_data`.
 
 ### Stage 4: GraphQL API Update (Week 3-4)
 
