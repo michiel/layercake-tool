@@ -5,12 +5,10 @@
 **Goal:** Migrate backend to use only the unified `graph_data` schema, removing all legacy table usage and code
 
 ## Outstanding Tasks (ordered, uncompleted)
-1. Migrate GraphQL read/mutation paths to load from `graph_data` (graph/graphs/graphNodes/graphEdges resolvers, graph mutations, GraphService backing).
-2. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata).
-3. Wire Graph edits/history to `graph_data` (FK migration + GraphEditService update, replay support).
-4. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder).
-5. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers.
-6. Schema cleanup migration to drop legacy tables once validation period completes.
+1. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata).
+2. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder).
+3. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers.
+4. Schema cleanup migration to drop legacy tables once validation period completes.
 
 ## Executive Summary
 
@@ -386,9 +384,9 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 - `graph`/`graphs`/`graphPreview` GraphQL queries now read from `graph_data` first; Graph type’s nodes/edges/layers resolvers fetch from `graph_data` and derive layers from node attributes.
 - GraphQL converters added for `graph_data_nodes`/`graph_data_edges` previews and node/edge types.
 - `GraphDataBuilder` ignores empty layer IDs when validating/persisting, avoiding palette errors.
+- Graph edits: GraphEditService/Applicator now apply edits to `graph_data_nodes`/`graph_data_edges` and update graph_data edit metadata (last_edit_sequence, has_pending_edits, last_replay_at).
 
 **Remaining for downstream stages:**
-- Hook graph edits/history to `graph_data` (FK migration, GraphEditService, replay) and retire legacy GraphBuilder/GraphService.
 - Integration tests covering MergeNode, Transform/Filter, Projection, and artefact export on `graph_data`.
 
 ### Stage 4: GraphQL API Update (Week 3-4)
