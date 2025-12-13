@@ -363,24 +363,40 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 
 **Status:** ✅ Complete
 
-### Stage 3: Read Path Migration (Week 2-3)
+### Stage 3: Read Path Migration ⏳ IN PROGRESS
 
 **Goal:** Migrate all queries to new schema
 
-**Tasks:**
-- [ ] Update `GraphService` to read from `graph_data_*`
-- [ ] Update GraphQL query resolvers
-- [ ] Update layer operations to use node attributes
-- [ ] Update graph edit FK and service
-- [ ] Update MCP resources
-- [ ] Update console context
-- [ ] Migrate all tests to use new schema
+**Critical Issue Identified:**
+Stage 2 creates graphs in `graph_data`, but TransformNode/FilterNode still query legacy `graphs` table (dag_executor.rs:275, 382). This breaks the pipeline for new graphs.
+
+**Priority Tasks:**
+- [ ] **CRITICAL**: Update TransformNode to read from `graph_data` (dag_executor.rs:275-285)
+  - Replace `GraphEntity::find()` with `graph_data_service.get_by_dag_node()`
+  - Load graph via `GraphDataService.load_full()` instead of `GraphService.build_graph_from_dag_graph()`
+  - Update persist_transformed_graph() signature from `graphs::Model` → `graph_data::Model`
+- [ ] **CRITICAL**: Update FilterNode to read from `graph_data` (dag_executor.rs:382-390)
+  - Same changes as TransformNode
+  - Update persist_filtered_graph() signature
+- [ ] Update `get_or_create_graph_record()` to use graph_data
+- [ ] Update hash computation functions to work with graph_data
+- [ ] Update `persist_graph_contents()` to write to graph_data_nodes/edges
+- [ ] Update `GraphService` to read from `graph_data_*` (lower priority)
+- [ ] Update GraphQL query resolvers (lower priority)
+- [ ] Update MCP resources and console context (lower priority)
+
+**Files Requiring Changes:**
+1. `src/pipeline/dag_executor.rs` - TransformNode, FilterNode (CRITICAL)
+2. `src/services/graph_service.rs` - migrate to GraphDataService
+3. `src/graphql/queries/mod.rs` - query resolvers
+4. `src/graphql/mutations/graph.rs` - graph mutations
+5. Plus 12 other files from original analysis
 
 **Success Criteria:**
-- All GraphQL queries return data from new schema
-- All services query new tables
-- Integration tests pass
-- No queries to old tables (add logging to verify)
+- TransformNode and FilterNode work with graphs created via GraphDataBuilder
+- DAG pipeline executes end-to-end with new schema
+- Cargo check passes
+- Integration tests pass (deferred)
 
 ### Stage 4: GraphQL API Update (Week 3-4)
 
