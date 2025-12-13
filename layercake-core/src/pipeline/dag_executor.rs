@@ -131,8 +131,8 @@ impl DagExecutor {
                         project_id,
                         plan_id,
                         node_id.to_string(),
-                        node_name,
-                        upstream_ids,
+                        node_name.clone(),
+                        upstream_ids.clone(),
                     )
                     .await?;
 
@@ -151,6 +151,57 @@ impl DagExecutor {
                     graph.edges.len(),
                     graph.layers.len()
                 );
+
+                // Mirror merge output into unified graph_data schema
+                let metadata = Some(json!({
+                    "upstreamNodes": upstream_ids,
+                    "mergeSourceHash": graph_record.source_hash,
+                }));
+
+                // Create or update graph_data record for the merge node
+                let mut graph_data_record = self
+                    .get_or_create_graph_record(
+                        project_id,
+                        node_id,
+                        &node_name,
+                        GraphRecordOptions {
+                            metadata: metadata.clone(),
+                            source_type: "computed".to_string(),
+                            file_format: None,
+                            origin: None,
+                            filename: None,
+                            file_size: None,
+                        },
+                    )
+                    .await?;
+
+                // Mark processing
+                self.graph_data_builder
+                    .graph_data_service
+                    .mark_processing(graph_data_record.id)
+                    .await?;
+
+                // Persist merge output to graph_data tables
+                self.persist_graph_contents(graph_data_record.id, &graph)
+                    .await?;
+
+                // Update metadata, annotations, and completion state
+                let graph_annotations_json = graph.annotations.as_ref().map(|s| {
+                    serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
+                });
+                let mut active: crate::database::entities::graph_data::ActiveModel =
+                    graph_data_record.into();
+                active.metadata = Set(metadata);
+                active.annotations = Set(graph_annotations_json);
+                active.source_hash = Set(graph_record.source_hash.clone());
+                active.computed_date = Set(graph_record.computed_date);
+                active.node_count = Set(graph.nodes.len() as i32);
+                active.edge_count = Set(graph.edges.len() as i32);
+                active.status = Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
+                active.updated_at = Set(Utc::now());
+                graph_data_record = active.update(&self.db).await?;
+
+                // TODO: publish graph_data status events for merge nodes when graph_data execution events are wired
 
                 if let Some(ctx) = context.as_deref_mut() {
                     ctx.set_graph(node_id.to_string(), graph.clone());
