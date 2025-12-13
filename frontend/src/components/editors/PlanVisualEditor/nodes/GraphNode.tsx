@@ -103,7 +103,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   // Use inline execution metadata from PlanDAG query, only query if not available
   const graphExecution = data.graphExecution
   const needsExecutionQuery = !graphExecution && projectId
-  const graphId = graphExecution?.graphId || null
+  const graphId = graphExecution?.graphDataId || graphExecution?.graphId || null
 
   // Query pipeline graph preview (only for visualization dialog)
   const shouldFetchPreview = !!projectId && (showPreview || showAnnotations)

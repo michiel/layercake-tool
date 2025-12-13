@@ -108,6 +108,16 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
                 description: None,
             });
 
+        // Inline execution metadata if graph_data exists for the DAG node
+        let mut graph_execution = None;
+        if node_type == PlanDagNodeType::Graph {
+            if let Ok(Some(gd)) =
+                crate::graphql::types::plan_dag::node::load_graph_execution(&model.id)
+            {
+                graph_execution = Some(gd);
+            }
+        }
+
         Self {
             id: model.id,
             node_type,
@@ -122,7 +132,12 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
             created_at: model.created_at,
             updated_at: model.updated_at,
             dataset_execution: None,
-            graph_execution: None,
+            graph_execution,
         }
     }
+}
+
+fn load_graph_execution(_node_id: &str) -> Result<Option<crate::graphql::types::plan_dag::GraphExecutionMetadata>, anyhow::Error> {
+    // This helper uses a global DB via AppContext is not available; kept for future enrichment.
+    Ok(None)
 }

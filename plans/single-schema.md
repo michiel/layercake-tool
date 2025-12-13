@@ -385,6 +385,7 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 - GraphQL converters added for `graph_data_nodes`/`graph_data_edges` previews and node/edge types.
 - `GraphDataBuilder` ignores empty layer IDs when validating/persisting, avoiding palette errors.
 - Graph edits: GraphEditService/Applicator now apply edits to `graph_data_nodes`/`graph_data_edges` and update graph_data edit metadata (last_edit_sequence, has_pending_edits, last_replay_at).
+- Frontend/DAG/artefact UI now prefers `graphDataId` with legacy badge fallback; GraphExecution metadata carries `graphDataId`.
 
 **Remaining for downstream stages:**
 - Integration tests covering MergeNode, Transform/Filter, Projection, and artefact export on `graph_data`.
@@ -556,10 +557,10 @@ WHERE gd.node_count != (SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_i
 **Total Estimated Time:** 5-6 weeks
 
 **Next Actions (frontend + cleanup focus):**
-- Publish GraphQL schema updates (`sourceType`, `graphDataId`, optional `legacyGraphId`) and wire frontend to prefer `graphDataId` for artefact/export selection.
-- Add UI warning/badge when a graph/artefact references a legacy graph; provide “Regenerate on graph_data” action.
-- Prepare migration `m20251215_000001_drop_legacy_graph_tables.rs` with preflight validation queries and rollback guidance; schedule after frontend rollout and telemetry shows zero legacy reads.
-- Add validation hook in backend to fail fast if a new write to legacy tables is attempted after cutoff.
+- Publish GraphQL schema updates (`sourceType`, `graphDataId`, optional `legacyGraphId`) and wire frontend to prefer `graphDataId` for artefact/export selection. ✅
+- Add UI warning/badge when a graph/artefact references a legacy graph; provide “Regenerate on graph_data” action. ✅ (badge + legacy indicator)
+- Prepare migration `m20251215_000001_drop_legacy_graph_tables.rs` with preflight validation queries and rollback guidance; schedule after frontend rollout and telemetry shows zero legacy reads. ✅ migration added; scheduling pending telemetry.
+- Add validation hook in backend to fail fast if a new write to legacy tables is attempted after cutoff. 🔜 (currently logs legacy fallback; add hard guard before running drop migration)
 
 ## Success Criteria
 

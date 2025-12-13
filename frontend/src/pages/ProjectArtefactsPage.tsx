@@ -484,7 +484,9 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   const renderEntry = (entry: ArtefactEntry, index: number) => {
     if (entry.type === 'graph') {
       const label = entry.node.metadata?.label || entry.node.id
-      const graphId = entry.node.graphExecution?.graphId ?? null
+      const graphId = entry.node.graphExecution?.graphDataId ?? entry.node.graphExecution?.graphId ?? null
+      const legacyGraphId = entry.node.graphExecution?.graphId
+      const isLegacy = !!legacyGraphId && legacyGraphId !== graphId
       const isCollapsed = collapsedGraphs.has(entry.node.id)
       const hasChildren = entries.some(
         (child, childIndex) =>
@@ -515,7 +517,9 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
             <IconGraph className="h-4 w-4 text-muted-foreground" />
             <div>
               <p className="font-medium">{label}</p>
-              <p className="text-xs text-muted-foreground">Graph Node</p>
+              <p className="text-xs text-muted-foreground">
+                Graph Node {isLegacy ? '(legacy data)' : ''}
+              </p>
             </div>
           </Group>
           <Group gap="xs">

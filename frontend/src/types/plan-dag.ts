@@ -280,6 +280,7 @@ export interface DataSetExecutionMetadata {
 // Execution metadata for Graph nodes
 export interface GraphExecutionMetadata {
   graphId: number;
+  graphDataId?: number;
   nodeCount: number;
   edgeCount: number;
   executionState: string;

@@ -68,6 +68,7 @@ pub async fn publish_graph_status(
         dataset_execution: None,
         graph_execution: Some(GraphExecutionMetadata {
             graph_id: graph.id,
+            graph_data_id: None,
             node_count: graph.node_count,
             edge_count: graph.edge_count,
             execution_state: graph.execution_state.clone(),

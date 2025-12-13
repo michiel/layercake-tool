@@ -344,6 +344,7 @@ export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
       }
       graphExecution {
         graphId
+        graphDataId
         nodeCount
         edgeCount
         executionState

@@ -411,6 +411,11 @@ impl GraphService {
             .await
             .map_err(GraphError::Database)?
             .ok_or(GraphError::NotFound(graph_id))?;
+        tracing::warn!(
+            "GraphService falling back to legacy graphs table for graph_id {} (project {})",
+            graph_id,
+            graph_meta.project_id
+        );
 
         // Fetch graph nodes
         let db_graph_nodes = GraphNodes::find()

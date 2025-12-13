@@ -795,7 +795,9 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       const nodeType = nodeRecord?.data?.nodeType as PlanDagNodeType | undefined
       const existingLabel = (nodeRecord?.data?.metadata?.label || '').trim()
       const nextLabel = sanitizedMetadata.label?.trim()
-      const graphIdForNode = nodeRecord?.data?.graphExecution?.graphId
+      const graphIdForNode =
+        nodeRecord?.data?.graphExecution?.graphDataId ??
+        nodeRecord?.data?.graphExecution?.graphId
 
       try {
         if (

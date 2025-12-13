@@ -48,6 +48,8 @@ pub struct DataSetExecutionMetadata {
 pub struct GraphExecutionMetadata {
     #[graphql(name = "graphId")]
     pub graph_id: i32,
+    #[graphql(name = "graphDataId")]
+    pub graph_data_id: Option<i32>,
     #[graphql(name = "nodeCount")]
     pub node_count: i32,
     #[graphql(name = "edgeCount")]

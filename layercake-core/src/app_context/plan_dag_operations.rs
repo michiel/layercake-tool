@@ -10,6 +10,7 @@ use crate::graphql::types::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
 };
+use crate::services::GraphDataService;
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
 
 fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
@@ -145,7 +146,23 @@ impl AppContext {
                         }
                     }
                     PlanDagNodeType::Graph => {
-                        if let Some(graph) = graphs::Entity::find()
+                        // Prefer graph_data records keyed by dag_node_id; fall back to legacy graphs.
+                        let gd_service = GraphDataService::new(self.db.clone());
+                        if let Ok(Some(gd)) = gd_service.get_by_dag_node(&node_id).await {
+                            nodes[idx].graph_execution = Some(GraphExecutionMetadata {
+                                graph_id: gd.id,
+                                graph_data_id: Some(gd.id),
+                                node_count: gd.node_count,
+                                edge_count: gd.edge_count,
+                                execution_state: gd.status.clone(),
+                                computed_date: gd.computed_date.map(|d| d.to_rfc3339()),
+                                error_message: gd.error_message.clone(),
+                                annotations: gd
+                                    .annotations
+                                    .as_ref()
+                                    .and_then(|v| v.as_str().map(|s| s.to_string())),
+                            });
+                        } else if let Some(graph) = graphs::Entity::find()
                             .filter(graphs::Column::ProjectId.eq(project_id))
                             .filter(graphs::Column::NodeId.eq(node_id.clone()))
                             .one(&self.db)
@@ -160,6 +177,7 @@ impl AppContext {
                         {
                             nodes[idx].graph_execution = Some(GraphExecutionMetadata {
                                 graph_id: graph.id,
+                                graph_data_id: None,
                                 node_count: graph.node_count,
                                 edge_count: graph.edge_count,
                                 execution_state: graph.execution_state.clone(),
