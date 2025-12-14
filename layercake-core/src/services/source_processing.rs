@@ -34,6 +34,11 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
     let headers = reader.headers()?.clone();
     let mut nodes = Vec::new();
 
+    let parse_bool = |value: &str| {
+        let lowered = value.trim().to_lowercase();
+        matches!(lowered.as_str(), "true" | "1" | "y" | "yes")
+    };
+
     if !headers.iter().any(|h| h == "id") || !headers.iter().any(|h| h == "label") {
         return Err(anyhow!("CSV must contain 'id' and 'label' columns"));
     }
@@ -54,6 +59,11 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
                     "layer" => {
                         if !field.is_empty() {
                             node.insert("layer".to_string(), json!(field));
+                        }
+                    }
+                    "is_partition" | "isPartition" => {
+                        if !field.is_empty() {
+                            node.insert("is_partition".to_string(), json!(parse_bool(field)));
                         }
                     }
                     "x" => {
