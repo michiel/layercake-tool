@@ -6,7 +6,7 @@
 
 ## Outstanding Tasks (ordered, uncompleted)
 1. Add telemetry/guards to block any new legacy writes and log/alert legacy reads; fail fast once confidence window ends.
-2. Stage 5 cleanup: deprecate/guard legacy builders and entities, remove dual-schema imports/usages, and prune unused legacy paths once telemetry is in place.
+2. Finish Stage 5 cleanup: remove unused legacy entities/imports and dual-schema code paths once telemetry is in place.
 3. Schedule and execute `m20251215_000001_drop_legacy_graph_tables.rs` after telemetry shows zero legacy usage; coordinate backup/rollback notes.
 
 ## Executive Summary
@@ -412,7 +412,7 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Tasks:**
 - [x] Mark `GraphBuilder` (and legacy GraphService paths) as `#[deprecated]` or guard them
 - [ ] Remove unused legacy entity definitions once drop migration is scheduled
-- [ ] Remove dual-schema code paths (leave telemetry/guards until zero usage confirmed)
+- [x] Remove dual-schema code paths (leave telemetry/guards until zero usage confirmed) — Graph GraphQL type now resolves solely via `graph_data` nodes/edges/layers; legacy table fallbacks removed.
 - [ ] Update documentation
 - [ ] Remove legacy imports from `entities/mod.rs`
 

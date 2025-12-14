@@ -1,9 +1,8 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use crate::database::entities::{graph_data, graph_data_edges, graph_data_nodes};
+use crate::database::entities::{graph_data_edges, graph_data_nodes};
 use std::collections::HashSet;
 
-use crate::database::entities::{graph_edges, graph_layers, graph_nodes};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edge::GraphEdge;
@@ -67,86 +66,46 @@ impl Graph {
     #[graphql(name = "layers")]
     async fn graph_layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
         let context = ctx.data::<GraphQLContext>()?;
-        if graph_data::Entity::find_by_id(self.id)
-            .one(&context.db)
-            .await?
-            .is_some()
-        {
-            let nodes = graph_data_nodes::Entity::find()
-                .filter(graph_data_nodes::Column::GraphDataId.eq(self.id))
-                .all(&context.db)
-                .await?;
-
-            let mut layers = Vec::new();
-            let unique_layers: HashSet<String> =
-                nodes.iter().filter_map(|n| n.layer.clone()).collect();
-            for (idx, layer_id) in unique_layers.into_iter().enumerate() {
-                layers.push(Layer {
-                    id: -(idx as i32 + 1),
-                    graph_id: self.id,
-                    layer_id: layer_id.clone(),
-                    name: layer_id.clone(),
-                    background_color: None,
-                    text_color: None,
-                    border_color: None,
-                    alias: None,
-                    comment: None,
-                    properties: None,
-                    dataset_id: None,
-                });
-            }
-            return Ok(layers);
-        }
-
-        let graph_layers = graph_layers::Entity::find()
-            .filter(graph_layers::Column::GraphId.eq(self.id))
+        let nodes = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(self.id))
             .all(&context.db)
             .await?;
 
-        Ok(graph_layers.into_iter().map(Layer::from).collect())
+        let mut layers = Vec::new();
+        let unique_layers: HashSet<String> = nodes.iter().filter_map(|n| n.layer.clone()).collect();
+        for (idx, layer_id) in unique_layers.into_iter().enumerate() {
+            layers.push(Layer {
+                id: -(idx as i32 + 1),
+                graph_id: self.id,
+                layer_id: layer_id.clone(),
+                name: layer_id.clone(),
+                background_color: None,
+                text_color: None,
+                border_color: None,
+                alias: None,
+                comment: None,
+                properties: None,
+                dataset_id: None,
+            });
+        }
+        Ok(layers)
     }
 
     async fn graph_nodes(&self, ctx: &Context<'_>) -> Result<Vec<GraphNode>> {
         let context = ctx.data::<GraphQLContext>()?;
-        if graph_data::Entity::find_by_id(self.id)
-            .one(&context.db)
-            .await?
-            .is_some()
-        {
-            let nodes = graph_data_nodes::Entity::find()
-                .filter(graph_data_nodes::Column::GraphDataId.eq(self.id))
-                .all(&context.db)
-                .await?;
-            return Ok(nodes.into_iter().map(GraphNode::from).collect());
-        }
-
-        let nodes = graph_nodes::Entity::find()
-            .filter(graph_nodes::Column::GraphId.eq(self.id))
+        let nodes = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(self.id))
             .all(&context.db)
             .await?;
-
         Ok(nodes.into_iter().map(GraphNode::from).collect())
     }
 
     async fn graph_edges(&self, ctx: &Context<'_>) -> Result<Vec<GraphEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
-        if graph_data::Entity::find_by_id(self.id)
-            .one(&context.db)
-            .await?
-            .is_some()
-        {
-            let edges = graph_data_edges::Entity::find()
-                .filter(graph_data_edges::Column::GraphDataId.eq(self.id))
-                .all(&context.db)
-                .await?;
-            return Ok(edges.into_iter().map(GraphEdge::from).collect());
-        }
-
-        let edges = graph_edges::Entity::find()
-            .filter(graph_edges::Column::GraphId.eq(self.id))
+        let edges = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.eq(self.id))
             .all(&context.db)
             .await?;
-
         Ok(edges.into_iter().map(GraphEdge::from).collect())
     }
 }
