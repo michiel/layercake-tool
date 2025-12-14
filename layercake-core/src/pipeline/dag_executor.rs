@@ -4,7 +4,7 @@ use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
-use tracing::{debug_span, info, Instrument};
+use tracing::{debug_span, info, warn, Instrument};
 
 use crate::database::entities::graph_data;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
@@ -546,30 +546,66 @@ impl DagExecutor {
             .unwrap_or_else(|| "force3d".to_string());
         let settings_json = config.settings;
 
-        let projection = if let Some(existing_id) = config.projection_id {
-            let existing = projections::Entity::find_by_id(existing_id)
-                .one(&self.db)
-                .await?
-                .ok_or_else(|| {
-                    anyhow!("Projection {} not found for node {}", existing_id, node_id)
-                })?;
-
-            if existing.project_id != project_id {
-                return Err(anyhow!(
-                    "Projection {} does not belong to project {}",
-                    existing_id,
-                    project_id
-                ));
+        let create_projection = |graph_id: i32,
+                                 project_id: i32,
+                                 name: &str,
+                                 projection_type: String,
+                                 settings_json: Option<JsonValue>|
+         -> projections::ActiveModel {
+            projections::ActiveModel {
+                project_id: Set(project_id),
+                graph_id: Set(graph_id),
+                name: Set(name.to_string()),
+                projection_type: Set(projection_type),
+                settings_json: Set(settings_json),
+                ..Default::default()
             }
+        };
 
-            let mut active: projections::ActiveModel = existing.into();
-            active.graph_id = Set(graph_source_id);
-            active.name = Set(node_name.to_string());
-            active.projection_type = Set(projection_type);
-            active.settings_json = Set(settings_json);
-            active.updated_at = Set(Utc::now());
+        let projection = if let Some(existing_id) = config.projection_id {
+            let existing = projections::Entity::find_by_id(existing_id).one(&self.db).await?;
 
-            active.update(&self.db).await?
+            match existing {
+                Some(record) if record.project_id == project_id => {
+                    let mut active: projections::ActiveModel = record.into();
+                    active.graph_id = Set(graph_source_id);
+                    active.name = Set(node_name.to_string());
+                    active.projection_type = Set(projection_type);
+                    active.settings_json = Set(settings_json);
+                    active.updated_at = Set(Utc::now());
+                    active.update(&self.db).await?
+                }
+                Some(record) => {
+                    warn!(
+                        "Projection {} belongs to project {} (expected {}), creating new for node {}",
+                        existing_id, record.project_id, project_id, node_id
+                    );
+                    create_projection(
+                        graph_source_id,
+                        project_id,
+                        node_name,
+                        projection_type,
+                        settings_json,
+                    )
+                    .insert(&self.db)
+                    .await?
+                }
+                None => {
+                    warn!(
+                        "Projection {} not found for node {}; creating a new projection",
+                        existing_id, node_id
+                    );
+                    create_projection(
+                        graph_source_id,
+                        project_id,
+                        node_name,
+                        projection_type,
+                        settings_json,
+                    )
+                    .insert(&self.db)
+                    .await?
+                }
+            }
         } else {
             // Reuse an existing projection for this node/name if present, otherwise create one
             let maybe_existing = projections::Entity::find()
@@ -588,14 +624,13 @@ impl DagExecutor {
                 active.updated_at = Set(Utc::now());
                 active.update(&self.db).await?
             } else {
-                projections::ActiveModel {
-                    project_id: Set(project_id),
-                    graph_id: Set(graph_source_id),
-                    name: Set(node_name.to_string()),
-                    projection_type: Set(projection_type),
-                    settings_json: Set(settings_json),
-                    ..Default::default()
-                }
+                create_projection(
+                    graph_source_id,
+                    project_id,
+                    node_name,
+                    projection_type,
+                    settings_json,
+                )
                 .insert(&self.db)
                 .await?
             }
