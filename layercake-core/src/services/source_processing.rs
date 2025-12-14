@@ -66,6 +66,11 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
                             node.insert("is_partition".to_string(), json!(parse_bool(field)));
                         }
                     }
+                    "weight" => {
+                        if let Ok(w) = field.parse::<f64>() {
+                            node.insert("weight".to_string(), json!(w));
+                        }
+                    }
                     "x" => {
                         if let Ok(x) = field.parse::<f64>() {
                             node.insert("x".to_string(), json!(x));
