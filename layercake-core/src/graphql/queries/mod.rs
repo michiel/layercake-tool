@@ -828,6 +828,11 @@ impl Query {
         let context = ctx.data::<GraphQLContext>()?;
         let mut results = Vec::new();
 
+        // Repair any invalid annotations stored as plain strings to avoid JSON decode errors
+        repair_invalid_graph_data_annotations(&context.db, project_id)
+            .await
+            .map_err(|e| StructuredError::database("repair_invalid_graph_data_annotations", e))?;
+
         let gd_list = graph_data::Entity::find()
             .filter(graph_data::Column::ProjectId.eq(project_id))
             .filter(graph_data::Column::SourceType.eq("computed"))

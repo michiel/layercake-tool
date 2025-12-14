@@ -484,7 +484,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   const renderEntry = (entry: ArtefactEntry, index: number) => {
     if (entry.type === 'graph') {
       const label = entry.node.metadata?.label || entry.node.id
-      const graphId = entry.node.graphExecution?.graphDataId ?? entry.node.graphExecution?.graphId ?? null
+      const graphId = (entry.node.graphExecution as any)?.graphDataId ?? entry.node.graphExecution?.graphId ?? null
       const legacyGraphId = entry.node.graphExecution?.graphId
       const isLegacy = !!legacyGraphId && legacyGraphId !== graphId
       const isCollapsed = collapsedGraphs.has(entry.node.id)

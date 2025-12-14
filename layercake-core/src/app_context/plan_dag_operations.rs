@@ -149,12 +149,19 @@ impl AppContext {
                         // Prefer graph_data records keyed by dag_node_id; fall back to legacy graphs.
                         let gd_service = GraphDataService::new(self.db.clone());
                         if let Ok(Some(gd)) = gd_service.get_by_dag_node(&node_id).await {
+                            let execution_state = match gd.status.as_str() {
+                                "active" => "completed".to_string(),
+                                "processing" => "processing".to_string(),
+                                "pending" => "pending".to_string(),
+                                "error" => "error".to_string(),
+                                other => other.to_string(),
+                            };
                             nodes[idx].graph_execution = Some(GraphExecutionMetadata {
                                 graph_id: gd.id,
                                 graph_data_id: Some(gd.id),
                                 node_count: gd.node_count,
                                 edge_count: gd.edge_count,
-                                execution_state: gd.status.clone(),
+                                execution_state,
                                 computed_date: gd.computed_date.map(|d| d.to_rfc3339()),
                                 error_message: gd.error_message.clone(),
                                 annotations: gd
