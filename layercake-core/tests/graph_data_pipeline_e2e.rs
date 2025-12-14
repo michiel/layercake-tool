@@ -1,6 +1,8 @@
 use chrono::Utc;
 use layercake as layercake_core;
-use layercake_core::database::entities::{graph_data, plan_dag_nodes, project_layers, projects, projections};
+use layercake_core::database::entities::{
+    graph_data, plan_dag_nodes, project_layers, projections, projects,
+};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::DagExecutor;
 use layercake_core::services::{GraphDataEdgeInput, GraphDataNodeInput, GraphDataService};
@@ -179,7 +181,8 @@ async fn graph_data_pipeline_end_to_end() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Merge"}).to_string(),
-            config_json: json!({"mergeStrategy": "Union", "conflictResolution": "PreferLast"}).to_string(),
+            config_json: json!({"mergeStrategy": "Union", "conflictResolution": "PreferLast"})
+                .to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
@@ -192,7 +195,8 @@ async fn graph_data_pipeline_end_to_end() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Transform"}).to_string(),
-            config_json: json!({"transforms": [{"kind": "AggregateEdges", "params": {}}]}).to_string(),
+            config_json: json!({"transforms": [{"kind": "AggregateEdges", "params": {}}]})
+                .to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
@@ -266,6 +270,13 @@ async fn graph_data_pipeline_end_to_end() {
         .await
         .expect("query projections")
         .expect("projection should exist");
-    assert_eq!(projection.graph_id, service.get_by_dag_node("filter-1").await.unwrap().unwrap().id);
+    assert_eq!(
+        projection.graph_id,
+        service
+            .get_by_dag_node("filter-1")
+            .await
+            .unwrap()
+            .unwrap()
+            .id
+    );
 }
-

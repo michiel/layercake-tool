@@ -1,7 +1,5 @@
 use anyhow::{anyhow, Context, Result};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
+use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use serde::Deserialize;
 use serde_json::{json, Value as JsonValue};
 use sha2::{Digest, Sha256};
@@ -52,7 +50,8 @@ struct ProjectionNodeConfig {
 
 impl DagExecutor {
     pub fn new(db: DatabaseConnection) -> Self {
-        let graph_data_service = std::sync::Arc::new(crate::services::GraphDataService::new(db.clone()));
+        let graph_data_service =
+            std::sync::Arc::new(crate::services::GraphDataService::new(db.clone()));
         let dataset_importer = DatasourceImporter::new(db.clone(), graph_data_service.clone());
         let graph_data_builder = GraphDataBuilder::new(
             graph_data_service.clone(),
@@ -197,7 +196,8 @@ impl DagExecutor {
                 active.computed_date = Set(Some(Utc::now()));
                 active.node_count = Set(graph.nodes.len() as i32);
                 active.edge_count = Set(graph.edges.len() as i32);
-                active.status = Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
+                active.status =
+                    Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
                 active.updated_at = Set(Utc::now());
                 let _updated = active.update(&self.db).await?;
 
@@ -550,7 +550,9 @@ impl DagExecutor {
             let existing = projections::Entity::find_by_id(existing_id)
                 .one(&self.db)
                 .await?
-                .ok_or_else(|| anyhow!("Projection {} not found for node {}", existing_id, node_id))?;
+                .ok_or_else(|| {
+                    anyhow!("Projection {} not found for node {}", existing_id, node_id)
+                })?;
 
             if existing.project_id != project_id {
                 return Err(anyhow!(
@@ -823,7 +825,9 @@ impl DagExecutor {
                 edge_count: gd.edge_count,
                 error_message: None, // graph_data doesn't track error_message separately
                 metadata: gd.metadata,
-                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                annotations: gd
+                    .annotations
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
                 last_edit_sequence: gd.last_edit_sequence,
                 has_pending_edits: gd.has_pending_edits,
                 last_replay_at: gd.last_replay_at,
@@ -867,12 +871,14 @@ impl DagExecutor {
             )
             .await?;
 
-        let transform_hash = self.compute_transform_hash(node_id, &upstream_graph_for_hash, config)?;
+        let transform_hash =
+            self.compute_transform_hash(node_id, &upstream_graph_for_hash, config)?;
 
         // Compare annotations (graph_data has JsonValue, graph has String)
-        let graph_annotations_json = graph.annotations.as_ref().map(|s| {
-            serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
-        });
+        let graph_annotations_json = graph
+            .annotations
+            .as_ref()
+            .map(|s| serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone())));
         let annotations_changed = graph_record.annotations != graph_annotations_json;
         let hash_matches = graph_record.source_hash.as_deref() == Some(&transform_hash);
         if hash_matches && !annotations_changed {
@@ -951,7 +957,9 @@ impl DagExecutor {
                 edge_count: gd.edge_count,
                 error_message: None, // graph_data doesn't track error_message separately
                 metadata: gd.metadata,
-                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                annotations: gd
+                    .annotations
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
                 last_edit_sequence: gd.last_edit_sequence,
                 has_pending_edits: gd.has_pending_edits,
                 last_replay_at: gd.last_replay_at,
@@ -998,9 +1006,10 @@ impl DagExecutor {
         let filter_hash = self.compute_filter_hash(node_id, &upstream_graph_for_hash, config)?;
 
         // Normalize annotations for comparison (graph_data stores JSON, graph stores string)
-        let graph_annotations_json = graph.annotations.as_ref().map(|s| {
-            serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
-        });
+        let graph_annotations_json = graph
+            .annotations
+            .as_ref()
+            .map(|s| serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone())));
         let annotations_changed = graph_record.annotations != graph_annotations_json;
         let hash_matches = graph_record.source_hash.as_deref() == Some(&filter_hash);
 
@@ -1533,7 +1542,10 @@ impl DagExecutor {
                 .load_full(graph_data.id)
                 .await
                 .with_context(|| {
-                    format!("Failed to load graph_data {} for node {}", graph_data.id, dag_node_id)
+                    format!(
+                        "Failed to load graph_data {} for node {}",
+                        graph_data.id, dag_node_id
+                    )
                 })?;
 
             // Convert graph_data entities to Graph struct
@@ -1621,7 +1633,9 @@ impl DagExecutor {
                 nodes: graph_nodes,
                 edges: graph_edges,
                 layers,
-                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                annotations: gd
+                    .annotations
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
             };
 
             return Ok((graph, (gd.id, true)));

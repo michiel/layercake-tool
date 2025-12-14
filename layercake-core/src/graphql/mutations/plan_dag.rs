@@ -1,5 +1,5 @@
-use async_graphql::*;
 use anyhow::anyhow;
+use async_graphql::*;
 use base64::Engine;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
@@ -11,13 +11,13 @@ use super::helpers::{
     StoredTreeArtefactNodeConfig,
 };
 use crate::database::entities::{
-    datasets, graph_data_edges, graph_data_nodes, graph_data as graph_data_model, graphs,
+    datasets, graph_data as graph_data_model, graph_data_edges, graph_data_nodes, graphs,
     plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
 };
-use crate::graph::{Edge, Graph, Layer, Node};
 use crate::export::{
     sequence_renderer::SequenceRenderConfigResolved, to_mermaid_sequence, to_plantuml_sequence,
 };
+use crate::graph::{Edge, Graph, Layer, Node};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{
@@ -33,10 +33,11 @@ use crate::graphql::types::plan_dag::{
 };
 use crate::pipeline::DagExecutor;
 use crate::plan::{
-    GraphvizCommentStyle, GraphvizRenderOptions, LayerSourceStyle as PlanLayerSourceStyle,
+    ExportFileType, GraphvizCommentStyle, GraphvizRenderOptions,
+    LayerSourceStyle as PlanLayerSourceStyle,
     LayerSourceStyleOverride as PlanLayerSourceStyleOverride, NotePosition as PlanNotePosition,
     RenderConfig as PlanRenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,
-    RenderTargetOptions, ExportFileType,
+    RenderTargetOptions,
 };
 use crate::sequence_context::{apply_render_config, SequenceStoryContext};
 use crate::services::{GraphDataService, GraphService};
@@ -263,7 +264,11 @@ fn resolve_sequence_render_config(
     config
 }
 
-fn apply_preview_limit(content: String, format: &ExportFileType, max_rows: Option<usize>) -> String {
+fn apply_preview_limit(
+    content: String,
+    format: &ExportFileType,
+    max_rows: Option<usize>,
+) -> String {
     match (format, max_rows) {
         (
             ExportFileType::CSVNodes | ExportFileType::CSVEdges | ExportFileType::CSVMatrix,
@@ -291,10 +296,18 @@ async fn load_graph_for_export(
     dag_node_id: &str,
 ) -> anyhow::Result<(Graph, &'static str)> {
     let graph_data_service = GraphDataService::new(db.clone());
+    let palette_layers = GraphService::new(db.clone())
+        .get_all_resolved_layers(project_id)
+        .await
+        .unwrap_or_default();
+    let palette_map: HashMap<String, Layer> = palette_layers
+        .into_iter()
+        .map(|layer| (layer.id.clone(), layer))
+        .collect();
 
     if let Some(gd) = graph_data_service.get_by_dag_node(dag_node_id).await? {
         let (gd_model, nodes, edges) = graph_data_service.load_full(gd.id).await?;
-        let graph = build_graph_from_graph_data(&gd_model, nodes, edges);
+        let graph = build_graph_from_graph_data(&gd_model, nodes, edges, Some(&palette_map));
         return Ok((graph, "graph_data"));
     }
 
@@ -315,6 +328,7 @@ fn build_graph_from_graph_data(
     gd: &graph_data_model::Model,
     nodes: Vec<graph_data_nodes::Model>,
     edges: Vec<graph_data_edges::Model>,
+    palette: Option<&HashMap<String, Layer>>,
 ) -> Graph {
     let graph_nodes: Vec<Node> = nodes
         .into_iter()
@@ -375,19 +389,28 @@ fn build_graph_from_graph_data(
             })
             .unwrap_or((None, None, None));
 
-        layer_map.insert(
-            node.layer.clone(),
-            Layer {
-                id: node.layer.clone(),
-                label: node.layer.clone(),
-                background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
-                text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
-                border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
-                alias: None,
-                dataset: node.dataset,
-                attributes: node.attributes.clone(),
-            },
-        );
+        let mut layer = Layer {
+            id: node.layer.clone(),
+            label: node.layer.clone(),
+            background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
+            text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
+            border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+            alias: None,
+            dataset: node.dataset,
+            attributes: node.attributes.clone(),
+        };
+
+        if let Some(palette) = palette {
+            if let Some(p) = palette.get(&node.layer) {
+                layer.background_color = p.background_color.clone();
+                layer.text_color = p.text_color.clone();
+                layer.border_color = p.border_color.clone();
+                layer.alias = p.alias.clone();
+                layer.dataset = p.dataset;
+            }
+        }
+
+        layer_map.insert(node.layer.clone(), layer);
     }
 
     let layers: Vec<Layer> = layer_map.into_values().collect();

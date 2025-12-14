@@ -276,7 +276,10 @@ impl GraphEditApplicator {
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
 
-        let attrs = new_value.get("attrs").cloned().or_else(|| new_value.get("attributes").cloned());
+        let attrs = new_value
+            .get("attrs")
+            .cloned()
+            .or_else(|| new_value.get("attributes").cloned());
 
         let node = graph_data_nodes::ActiveModel {
             id: ActiveValue::NotSet,
@@ -583,7 +586,10 @@ impl GraphEditApplicator {
             .get("layer")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
-        let attrs = new_value.get("attrs").cloned().or_else(|| new_value.get("attributes").cloned());
+        let attrs = new_value
+            .get("attrs")
+            .cloned()
+            .or_else(|| new_value.get("attributes").cloned());
 
         let edge = graph_data_edges::ActiveModel {
             id: ActiveValue::NotSet,

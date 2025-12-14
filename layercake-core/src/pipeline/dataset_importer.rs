@@ -22,7 +22,10 @@ pub struct DatasourceImporter {
 }
 
 impl DatasourceImporter {
-    pub fn new(db: DatabaseConnection, graph_data_service: std::sync::Arc<GraphDataService>) -> Self {
+    pub fn new(
+        db: DatabaseConnection,
+        graph_data_service: std::sync::Arc<GraphDataService>,
+    ) -> Self {
         let persist_dataset_rows = std::env::var("PIPELINE_PERSIST_DATASET_ROWS")
             .map(|value| matches!(value.to_lowercase().as_str(), "1" | "true" | "yes"))
             .unwrap_or(false);
@@ -140,7 +143,10 @@ impl DatasourceImporter {
                 self.import_csv_edges(&dataset, &file_content, b'\t', &node_id)
                     .await
             }
-            ("json", "graph") => self.import_json_graph(&dataset, &file_content, &node_id).await,
+            ("json", "graph") => {
+                self.import_json_graph(&dataset, &file_content, &node_id)
+                    .await
+            }
             _ => Err(anyhow!("Unsupported file type combination")),
         };
 
@@ -191,22 +197,22 @@ impl DatasourceImporter {
 
                 Ok(updated)
             }
-                Err(e) => {
-                    // Save values before moving dataset
-                    let project_id = dataset.project_id;
-                    let node_id = dataset.node_id.clone();
+            Err(e) => {
+                // Save values before moving dataset
+                let project_id = dataset.project_id;
+                let node_id = dataset.node_id.clone();
 
-                    // Mark graph_data as error
-                    let mut graph_active: graph_data::ActiveModel = graph_data.into();
-                    graph_active.status = Set(graph_data::GraphDataStatus::Error.into());
-                    graph_active.error_message = Set(Some(e.to_string()));
-                    graph_active.updated_at = Set(chrono::Utc::now());
-                    let _ = graph_active.update(&self.db).await;
+                // Mark graph_data as error
+                let mut graph_active: graph_data::ActiveModel = graph_data.into();
+                graph_active.status = Set(graph_data::GraphDataStatus::Error.into());
+                graph_active.error_message = Set(Some(e.to_string()));
+                graph_active.updated_at = Set(chrono::Utc::now());
+                let _ = graph_active.update(&self.db).await;
 
-                    // Update to error state
-                    let mut active: datasets::ActiveModel = dataset.into();
-                    active = active.set_error(e.to_string());
-                    let updated = active.update(&self.db).await?;
+                // Update to error state
+                let mut active: datasets::ActiveModel = dataset.into();
+                active = active.set_error(e.to_string());
+                let updated = active.update(&self.db).await?;
 
                 // Publish execution status change
                 #[cfg(feature = "graphql")]
@@ -227,7 +233,12 @@ impl DatasourceImporter {
         file_content: &str,
         delimiter: u8,
         _dag_node_id: &str,
-    ) -> Result<(usize, Value, Vec<GraphDataNodeInput>, Vec<GraphDataEdgeInput>)> {
+    ) -> Result<(
+        usize,
+        Value,
+        Vec<GraphDataNodeInput>,
+        Vec<GraphDataEdgeInput>,
+    )> {
         let mut reader = ReaderBuilder::new()
             .has_headers(true)
             .delimiter(delimiter)
@@ -344,7 +355,12 @@ impl DatasourceImporter {
         file_content: &str,
         delimiter: u8,
         _dag_node_id: &str,
-    ) -> Result<(usize, Value, Vec<GraphDataNodeInput>, Vec<GraphDataEdgeInput>)> {
+    ) -> Result<(
+        usize,
+        Value,
+        Vec<GraphDataNodeInput>,
+        Vec<GraphDataEdgeInput>,
+    )> {
         let mut reader = ReaderBuilder::new()
             .has_headers(true)
             .delimiter(delimiter)
@@ -474,7 +490,12 @@ impl DatasourceImporter {
         dataset: &datasets::Model,
         file_content: &str,
         _dag_node_id: &str,
-    ) -> Result<(usize, Value, Vec<GraphDataNodeInput>, Vec<GraphDataEdgeInput>)> {
+    ) -> Result<(
+        usize,
+        Value,
+        Vec<GraphDataNodeInput>,
+        Vec<GraphDataEdgeInput>,
+    )> {
         let graph_data: Value = serde_json::from_str(file_content)?;
 
         // Validate structure

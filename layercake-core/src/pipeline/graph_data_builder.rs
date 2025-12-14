@@ -50,12 +50,16 @@ impl GraphDataBuilder {
         // Validate layer references are present in project palette
         let layer_ids: HashSet<String> = nodes
             .iter()
-            .filter_map(|n| n.layer.as_ref().and_then(|l| (!l.is_empty()).then(|| l.clone())))
-            .chain(
-                edges
-                    .iter()
-                    .filter_map(|e| e.layer.as_ref().and_then(|l| (!l.is_empty()).then(|| l.clone()))),
-            )
+            .filter_map(|n| {
+                n.layer
+                    .as_ref()
+                    .and_then(|l| (!l.is_empty()).then(|| l.clone()))
+            })
+            .chain(edges.iter().filter_map(|e| {
+                e.layer
+                    .as_ref()
+                    .and_then(|l| (!l.is_empty()).then(|| l.clone()))
+            }))
             .collect();
 
         let validation = self

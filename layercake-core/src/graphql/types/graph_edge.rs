@@ -1,6 +1,6 @@
+use crate::database::entities::graph_data_edges;
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
-use crate::database::entities::graph_data_edges;
 
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]
 pub struct GraphEdge {

@@ -1,6 +1,6 @@
 use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
-use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
 use crate::database::entities::graph_data;
+use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
 use crate::services::GraphDataService;
 use anyhow::Result;
 use sea_orm::{
@@ -213,12 +213,8 @@ impl GraphEditService {
             .is_some()
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
-            graph_data_service
-                .reset_edit_metadata(graph_id)
-                .await?;
-            graph_data_service
-                .mark_replayed(graph_id)
-                .await?;
+            graph_data_service.reset_edit_metadata(graph_id).await?;
+            graph_data_service.mark_replayed(graph_id).await?;
         } else {
             let graph = Graphs::find_by_id(graph_id)
                 .one(&self.db)

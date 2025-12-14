@@ -1,8 +1,9 @@
 use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
-    data_sets, graph_data, graph_edges, graph_edges::Entity as GraphEdges, graph_layers,
-    graph_layers::Entity as Layers, graph_nodes, graph_nodes::Entity as GraphNodes, layer_aliases,
-    plan_dag_edges, plan_dag_nodes, project_layers,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges,
+    graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers, graph_nodes,
+    graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
+    project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -14,7 +15,7 @@ use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
 };
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub struct GraphService {
     db: DatabaseConnection,
@@ -312,6 +313,14 @@ impl GraphService {
                 .load_full(gd.id)
                 .await
                 .map_err(GraphError::Database)?;
+            let palette_layers = self
+                .get_all_resolved_layers(gd_model.project_id)
+                .await
+                .unwrap_or_default();
+            let palette_map: HashMap<String, crate::graph::Layer> = palette_layers
+                .into_iter()
+                .map(|layer| (layer.id.clone(), layer))
+                .collect();
 
             let graph_nodes: Vec<Node> = nodes
                 .into_iter()
@@ -373,19 +382,26 @@ impl GraphService {
                     })
                     .unwrap_or((None, None, None));
 
-                layer_map.insert(
-                    node.layer.clone(),
-                    Layer {
-                        id: node.layer.clone(),
-                        label: node.layer.clone(),
-                        background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
-                        text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
-                        border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
-                        alias: None,
-                        dataset: node.dataset,
-                        attributes: node.attributes.clone(),
-                    },
-                );
+                let mut layer = Layer {
+                    id: node.layer.clone(),
+                    label: node.layer.clone(),
+                    background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
+                    text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
+                    border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+                    alias: None,
+                    dataset: node.dataset,
+                    attributes: node.attributes.clone(),
+                };
+
+                if let Some(p) = palette_map.get(&node.layer) {
+                    layer.background_color = p.background_color.clone();
+                    layer.text_color = p.text_color.clone();
+                    layer.border_color = p.border_color.clone();
+                    layer.alias = p.alias.clone();
+                    layer.dataset = p.dataset;
+                }
+
+                layer_map.insert(node.layer.clone(), layer);
             }
 
             let layers: Vec<Layer> = layer_map.into_values().collect();
@@ -1011,8 +1027,6 @@ impl GraphService {
     }
 
     pub async fn missing_layers(&self, project_id: i32) -> GraphResult<Vec<String>> {
-        use crate::database::entities::graphs::Entity as Graphs;
-
         // Get enabled project layers to build the known set. Disabled entries should be treated
         // as missing so that palette coverage reflects the active configuration.
         let enabled_layers = project_layers::Entity::find()
@@ -1041,23 +1055,24 @@ impl GraphService {
             }
         }
 
-        let graph_ids: Vec<i32> = Graphs::find()
-            .filter(crate::database::entities::graphs::Column::ProjectId.eq(project_id))
+        // Collect layers referenced in graph_data nodes/edges for this project
+        let gd_ids: Vec<i32> = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
             .map_err(GraphError::Database)?
             .into_iter()
-            .map(|g| g.id)
+            .map(|gd| gd.id)
             .collect();
 
-        if graph_ids.is_empty() {
+        if gd_ids.is_empty() {
             return Ok(vec![]);
         }
 
         let mut missing = HashSet::new();
 
-        let node_layers = GraphNodes::find()
-            .filter(graph_nodes::Column::GraphId.is_in(graph_ids.clone()))
+        let node_layers = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.is_in(gd_ids.clone()))
             .all(&self.db)
             .await
             .map_err(GraphError::Database)?;
@@ -1070,8 +1085,8 @@ impl GraphService {
             }
         }
 
-        let edge_layers = GraphEdges::find()
-            .filter(graph_edges::Column::GraphId.is_in(graph_ids))
+        let edge_layers = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.is_in(gd_ids))
             .all(&self.db)
             .await
             .map_err(GraphError::Database)?;

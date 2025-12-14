@@ -137,7 +137,9 @@ impl From<plan_dag_nodes::Model> for PlanDagNode {
     }
 }
 
-fn load_graph_execution(_node_id: &str) -> Result<Option<crate::graphql::types::plan_dag::GraphExecutionMetadata>, anyhow::Error> {
+fn load_graph_execution(
+    _node_id: &str,
+) -> Result<Option<crate::graphql::types::plan_dag::GraphExecutionMetadata>, anyhow::Error> {
     // This helper uses a global DB via AppContext is not available; kept for future enrichment.
     Ok(None)
 }

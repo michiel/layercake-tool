@@ -58,10 +58,7 @@ impl MergeBuilder {
                 entry.label = entry.label.clone().or_else(|| Some(node.label.clone()));
                 entry.layer = entry.layer.clone().or_else(|| Some(node.layer.clone()));
                 entry.is_partition |= node.is_partition;
-                entry.belongs_to = entry
-                    .belongs_to
-                    .clone()
-                    .or_else(|| node.belongs_to.clone());
+                entry.belongs_to = entry.belongs_to.clone().or_else(|| node.belongs_to.clone());
                 entry.weight += node.weight as i64;
                 entry.comment = entry.comment.clone().or_else(|| node.comment.clone());
                 entry.dataset = entry.dataset.or(node.dataset);
@@ -82,7 +79,9 @@ impl MergeBuilder {
             }
 
             for layer in &graph.layers {
-                layers_map.entry(layer.id.clone()).or_insert_with(|| layer.clone());
+                layers_map
+                    .entry(layer.id.clone())
+                    .or_insert_with(|| layer.clone());
             }
         }
 
@@ -146,17 +145,9 @@ impl MergeBuilder {
         })
     }
 
-    async fn load_graph_by_dag_node(
-        &self,
-        project_id: i32,
-        dag_node_id: &str,
-    ) -> Result<Graph> {
+    async fn load_graph_by_dag_node(&self, project_id: i32, dag_node_id: &str) -> Result<Graph> {
         // Try graph_data first
-        if let Some(gd) = self
-            .graph_data_service
-            .get_by_dag_node(dag_node_id)
-            .await?
-        {
+        if let Some(gd) = self.graph_data_service.get_by_dag_node(dag_node_id).await? {
             let (gd, nodes, edges) = self
                 .graph_data_service
                 .load_full(gd.id)
@@ -200,7 +191,9 @@ impl MergeBuilder {
                 nodes: graph_nodes,
                 edges: graph_edges,
                 layers,
-                annotations: gd.annotations.and_then(|v| v.as_str().map(|s| s.to_string())),
+                annotations: gd
+                    .annotations
+                    .and_then(|v| v.as_str().map(|s| s.to_string())),
             });
         }
 
@@ -256,16 +249,18 @@ struct EdgeMerge {
 fn derive_layers_from_nodes(nodes: &[Node]) -> Vec<Layer> {
     let mut layer_map: HashMap<String, Layer> = HashMap::new();
     for node in nodes {
-        let entry = layer_map.entry(node.layer.clone()).or_insert_with(|| Layer {
-            id: node.layer.clone(),
-            label: node.layer.clone(),
-            background_color: "#FFFFFF".into(),
-            text_color: "#000000".into(),
-            border_color: "#000000".into(),
-            alias: None,
-            dataset: node.dataset,
-            attributes: None,
-        });
+        let entry = layer_map
+            .entry(node.layer.clone())
+            .or_insert_with(|| Layer {
+                id: node.layer.clone(),
+                label: node.layer.clone(),
+                background_color: "#FFFFFF".into(),
+                text_color: "#000000".into(),
+                border_color: "#000000".into(),
+                alias: None,
+                dataset: node.dataset,
+                attributes: None,
+            });
 
         if let Some(attrs) = &node.attributes {
             if let Some(obj) = attrs.as_object() {

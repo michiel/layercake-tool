@@ -1,13 +1,14 @@
+use crate::database::entities::{graph_data_edges, graph_data_nodes};
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-use crate::database::entities::{graph_data_edges, graph_data_nodes};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;
 use crate::graphql::types::{Layer, Project};
+use crate::services::GraphService;
 
 /// DEPRECATED: Use GraphData type instead.
 /// This type is maintained for backward compatibility but will be removed in a future version.
@@ -66,6 +67,14 @@ impl Graph {
     #[graphql(name = "layers")]
     async fn graph_layers(&self, ctx: &Context<'_>) -> Result<Vec<Layer>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let palette_layers = GraphService::new(context.db.clone())
+            .get_all_resolved_layers(self.project_id)
+            .await
+            .unwrap_or_default();
+        let palette_map: HashMap<String, crate::graph::Layer> = palette_layers
+            .into_iter()
+            .map(|layer| (layer.id.clone(), layer))
+            .collect();
         let nodes = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(self.id))
             .all(&context.db)
@@ -74,18 +83,21 @@ impl Graph {
         let mut layers = Vec::new();
         let unique_layers: HashSet<String> = nodes.iter().filter_map(|n| n.layer.clone()).collect();
         for (idx, layer_id) in unique_layers.into_iter().enumerate() {
+            let palette_entry = palette_map.get(&layer_id);
             layers.push(Layer {
                 id: -(idx as i32 + 1),
                 graph_id: self.id,
                 layer_id: layer_id.clone(),
-                name: layer_id.clone(),
-                background_color: None,
-                text_color: None,
-                border_color: None,
-                alias: None,
+                name: palette_entry
+                    .map(|p| p.label.clone())
+                    .unwrap_or_else(|| layer_id.clone()),
+                background_color: palette_entry.map(|p| p.background_color.clone()),
+                text_color: palette_entry.map(|p| p.text_color.clone()),
+                border_color: palette_entry.map(|p| p.border_color.clone()),
+                alias: palette_entry.and_then(|p| p.alias.clone()),
                 comment: None,
                 properties: None,
-                dataset_id: None,
+                dataset_id: palette_entry.and_then(|p| p.dataset),
             });
         }
         Ok(layers)

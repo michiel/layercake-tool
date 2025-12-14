@@ -103,13 +103,11 @@ impl ProjectionMutation {
             .iter()
             .any(|s| s.project_id != projection.project_id)
         {
-            return Err(
-                StructuredError::validation(
-                    "storyIds",
-                    "All stories must belong to the projection's project",
-                )
-                .into(),
-            );
+            return Err(StructuredError::validation(
+                "storyIds",
+                "All stories must belong to the projection's project",
+            )
+            .into());
         }
 
         let sequence_models = sequences::Entity::find()
@@ -143,8 +141,9 @@ impl ProjectionMutation {
             let Some(seq_list) = sequences_by_story.get(&selection.story_id) else {
                 continue;
             };
-            let enabled_ids: Option<HashSet<i32>> =
-                selection.enabled_sequence_ids.map(|ids| ids.into_iter().collect());
+            let enabled_ids: Option<HashSet<i32>> = selection
+                .enabled_sequence_ids
+                .map(|ids| ids.into_iter().collect());
 
             for seq in seq_list {
                 if let Some(enabled) = &enabled_ids {

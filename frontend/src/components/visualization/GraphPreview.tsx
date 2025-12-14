@@ -221,12 +221,22 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       linkColor: 'rgba(156, 163, 175, 0.4)' // transparent gray
     };
 
+    const normalizeColor = (value: string) => (value.startsWith('#') ? value : `#${value}`);
+
     // Build layer color map from data.layers
     const layerColorMap = new Map<string, string>();
+    const textColorMap = new Map<string, string>();
+    const borderColorMap = new Map<string, string>();
     if (data.layers) {
       data.layers.forEach(layer => {
         if (layer.backgroundColor) {
-          layerColorMap.set(layer.layerId, `#${layer.backgroundColor}`);
+          layerColorMap.set(layer.layerId, normalizeColor(layer.backgroundColor));
+        }
+        if (layer.textColor) {
+          textColorMap.set(layer.layerId, normalizeColor(layer.textColor));
+        }
+        if (layer.borderColor) {
+          borderColorMap.set(layer.layerId, normalizeColor(layer.borderColor));
         }
       });
     }
@@ -250,10 +260,12 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       defaults,
       getStyle(layerId?: string) {
         const nodeColor = layerId ? layerColorMap.get(layerId) ?? defaults.nodeColor : defaults.nodeColor;
+        const textColor = layerId ? textColorMap.get(layerId) ?? defaults.textColor : defaults.textColor;
+        const borderColor = layerId ? borderColorMap.get(layerId) ?? defaults.borderColor : defaults.borderColor;
         return {
           nodeColor,
-          borderColor: defaults.borderColor,
-          textColor: defaults.textColor,
+          borderColor,
+          textColor,
           linkColor: nodeColor // Use same color as node for links
         };
       }
@@ -306,7 +318,7 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
       .nodeLabel((node: any) => node.name || node.id)
       .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
         const p = paramsRef.current;
-        const label = node.name;
+        const label = node.name || node.id || '';
         const fontSize = p.nodeLabelSize / globalScale;
         ctx.font = `${fontSize}px Sans-Serif`;
         const textWidth = ctx.measureText(label).width;

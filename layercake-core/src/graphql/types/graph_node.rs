@@ -1,6 +1,6 @@
+use crate::database::entities::graph_data_nodes;
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
-use crate::database::entities::graph_data_nodes;
 
 // Input type for bulk node updates
 #[derive(InputObject, Clone, Debug)]

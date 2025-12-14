@@ -151,10 +151,7 @@ impl MigrationTrait for Migration {
             ))
             .await?;
 
-        tracing::info!(
-            "Repaired {} post-migration graphs",
-            repair_summary.len()
-        );
+        tracing::info!("Repaired {} post-migration graphs", repair_summary.len());
         for row in repair_summary {
             let id: i32 = row.try_get("", "id")?;
             let name: String = row.try_get("", "name")?;

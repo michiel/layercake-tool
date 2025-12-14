@@ -10,8 +10,8 @@ use crate::graphql::types::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
 };
-use crate::services::GraphDataService;
 use crate::services::plan_dag_service::PlanDagNodePositionUpdate;
+use crate::services::GraphDataService;
 
 fn node_type_prefix(node_type: &PlanDagNodeType) -> &'static str {
     match node_type {
