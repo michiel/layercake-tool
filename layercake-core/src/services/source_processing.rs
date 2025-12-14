@@ -67,8 +67,10 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
                         }
                     }
                     "weight" => {
-                        if let Ok(w) = field.parse::<f64>() {
+                        if let Ok(w) = field.parse::<i32>() {
                             node.insert("weight".to_string(), json!(w));
+                        } else if let Ok(wf) = field.parse::<f64>() {
+                            node.insert("weight".to_string(), json!(wf.round() as i32));
                         }
                     }
                     "x" => {
@@ -135,8 +137,10 @@ async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> Result<Stri
                         }
                     }
                     "weight" => {
-                        if let Ok(weight) = field.parse::<f64>() {
+                        if let Ok(weight) = field.parse::<i32>() {
                             edge.insert("weight".to_string(), json!(weight));
+                        } else if let Ok(wf) = field.parse::<f64>() {
+                            edge.insert("weight".to_string(), json!(wf.round() as i32));
                         }
                     }
                     _ => {
