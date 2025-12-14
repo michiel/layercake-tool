@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+- GraphQL Graph/GraphData now expose `graphDataId`/`legacyGraphId` plus `sourceType`; clients should prefer `graphDataId` for all mutations/queries and treat `legacyGraphId` only as a badge/regeneration hint during the single-schema migration.
+- Backend graph queries/validation run solely on `graph_data`; legacy fallbacks removed ahead of the legacy table drop migration (`m20251215_000001_drop_legacy_graph_tables.rs`).
+
 ## v0.3.6 - 2025-11-26
 - Added full Story and Sequence authoring workflows (GraphQL, UI editor, artefact previews, export fixes) so workbench projects can narrate execution paths alongside graph artefacts.
 - Expanded dataset management with validation workflows, streamlined editors (copy/paste helpers, prompt library previews), merge/split helpers, and better metadata so pipelines can curate graph bundles without leaving the app.

@@ -6,7 +6,7 @@
 
 ## Outstanding Tasks (ordered, uncompleted)
 1. Add telemetry/guards to block any new legacy writes and log/alert legacy reads; fail fast once confidence window ends.
-2. Final frontend/API pass: ensure all surfaces (exports/previews/DAG editor/graph lists) prefer `graphDataId`, keep `legacyGraphId` only for badges/regeneration, and update remaining GraphQL clients if any.
+2. Stage 5 cleanup: deprecate/guard legacy builders and entities, remove dual-schema imports/usages, and prune unused legacy paths once telemetry is in place.
 3. Schedule and execute `m20251215_000001_drop_legacy_graph_tables.rs` after telemetry shows zero legacy usage; coordinate backup/rollback notes.
 
 ## Executive Summary
@@ -389,28 +389,28 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Remaining for downstream stages:**
 - Integration tests covering MergeNode, Transform/Filter, Projection, and artefact export on `graph_data`.
 
-### Stage 4: GraphQL API Update (Week 3-4) — In Progress
+### Stage 4: GraphQL API Update (Week 3-4) — Complete
 
 **Goal:** Update public API to reflect new schema
 
 **Tasks:**
 - [x] Update GraphQL types for `Graph`, `Node`, `Edge` with `graphDataId`/`legacyGraphId`
-- [ ] Add `sourceType` field to Graph type (optional if derivable from metadata)
+- [x] Add `sourceType` field to Graph type (optional if derivable from metadata)
 - [x] Handle ID offset in frontend by dual-ID exposure; default to `graphDataId`
 - [x] Update frontend to use new field names and badges for legacy graphs
-- [ ] Provide migration guide for API consumers (brief note + schema changelog)
+- [x] Provide migration guide for API consumers (brief note + schema changelog)
 
 **Success Criteria:**
-- GraphQL schema updated and documented
+- GraphQL schema updated and documented (changelog + dual-ID/schema notes)
 - Frontend works with new API and prefers `graphDataId`
 - API versioning strategy in place if needed
 
-### Stage 5: Code Cleanup (Week 4-5) — Pending
+### Stage 5: Code Cleanup (Week 4-5) — In Progress
 
 **Goal:** Remove legacy code
 
 **Tasks:**
-- [ ] Mark `GraphBuilder` (and legacy GraphService paths) as `#[deprecated]` or guard them
+- [x] Mark `GraphBuilder` (and legacy GraphService paths) as `#[deprecated]` or guard them
 - [ ] Remove unused legacy entity definitions once drop migration is scheduled
 - [ ] Remove dual-schema code paths (leave telemetry/guards until zero usage confirmed)
 - [ ] Update documentation
@@ -548,8 +548,8 @@ WHERE gd.node_count != (SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_i
 | 1. Data Repair | 2-3 days | ✅ Complete | Low |
 | 2. New Graph Creation | 1 week | ✅ Complete | Medium |
 | 3. Read Path Migration | 1-2 weeks | ✅ Complete | Medium |
-| 4. GraphQL API Update | 1 week | In Progress | High |
-| 5. Code Cleanup | 1 week | Pending | Low |
+| 4. GraphQL API Update | 1 week | ✅ Complete | High |
+| 5. Code Cleanup | 1 week | In Progress | Low |
 | 6. Schema Cleanup | 1 day + validation | Pending | High |
 
 **Total Estimated Time:** 5-6 weeks

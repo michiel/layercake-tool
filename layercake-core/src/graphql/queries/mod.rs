@@ -5,9 +5,9 @@ use sea_orm::{
 };
 
 use crate::database::entities::{
-    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges, graph_layers,
-    graph_nodes, layer_aliases, plan_dag_edges, plan_dag_nodes, plans, project_collaborators,
-    projections, sequences, stories, user_sessions, users,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, layer_aliases, plan_dag_edges,
+    plan_dag_nodes, plans, project_collaborators, projections, sequences, stories, user_sessions,
+    users,
 };
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;

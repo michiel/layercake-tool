@@ -31,6 +31,7 @@ fn parse_is_partition(value: &Value) -> bool {
 }
 
 /// Service for building graphs from datasets
+#[deprecated(note = "Use GraphDataBuilder; legacy graph tables are being removed.")]
 pub struct GraphBuilder {
     db: DatabaseConnection,
 }

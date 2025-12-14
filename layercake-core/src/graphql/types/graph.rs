@@ -26,6 +26,9 @@ pub struct Graph {
     /// Legacy graphs.id when a legacy record exists
     #[graphql(name = "legacyGraphId")]
     pub legacy_graph_id: Option<i32>,
+    /// Type discriminator, mirrors graph_data.source_type ("computed" or "dataset")
+    #[graphql(name = "sourceType")]
+    pub source_type: Option<String>,
     pub name: String,
     pub node_id: String,
     pub execution_state: String,
@@ -155,6 +158,7 @@ impl From<crate::database::entities::graphs::Model> for Graph {
             project_id: model.project_id,
             graph_data_id: None,
             legacy_graph_id: Some(model.id),
+            source_type: Some("computed".to_string()),
             name: model.name,
             node_id: model.node_id,
             execution_state: model.execution_state,
@@ -195,6 +199,7 @@ impl From<crate::database::entities::graph_data::Model> for Graph {
             project_id: model.project_id,
             graph_data_id: Some(model.id),
             legacy_graph_id: None,
+            source_type: Some(model.source_type.clone()),
             name: model.name,
             node_id: model
                 .dag_node_id
