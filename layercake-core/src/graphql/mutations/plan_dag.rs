@@ -330,6 +330,8 @@ fn build_graph_from_graph_data(
     edges: Vec<graph_data_edges::Model>,
     palette: Option<&HashMap<String, Layer>>,
 ) -> Graph {
+    let normalize_hex = |value: &str| value.trim_start_matches('#').to_string();
+
     let graph_nodes: Vec<Node> = nodes
         .into_iter()
         .map(|n| Node {
@@ -392,9 +394,18 @@ fn build_graph_from_graph_data(
         let mut layer = Layer {
             id: node.layer.clone(),
             label: node.layer.clone(),
-            background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
-            text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
-            border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+            background_color: bg_color
+                .as_deref()
+                .map(normalize_hex)
+                .unwrap_or_else(|| "FFFFFF".to_string()),
+            text_color: text_color
+                .as_deref()
+                .map(normalize_hex)
+                .unwrap_or_else(|| "000000".to_string()),
+            border_color: border_color
+                .as_deref()
+                .map(normalize_hex)
+                .unwrap_or_else(|| "000000".to_string()),
             alias: None,
             dataset: node.dataset,
             attributes: node.attributes.clone(),
@@ -402,9 +413,9 @@ fn build_graph_from_graph_data(
 
         if let Some(palette) = palette {
             if let Some(p) = palette.get(&node.layer) {
-                layer.background_color = p.background_color.clone();
-                layer.text_color = p.text_color.clone();
-                layer.border_color = p.border_color.clone();
+                layer.background_color = normalize_hex(&p.background_color);
+                layer.text_color = normalize_hex(&p.text_color);
+                layer.border_color = normalize_hex(&p.border_color);
                 layer.alias = p.alias.clone();
                 layer.dataset = p.dataset;
             }

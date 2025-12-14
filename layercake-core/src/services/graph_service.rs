@@ -302,6 +302,8 @@ impl GraphService {
 
     /// Build a Graph from a DAG-built graph; graph_data-first, fallback to legacy graphs table.
     pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> GraphResult<Graph> {
+        let normalize_hex = |value: &str| value.trim_start_matches('#').to_string();
+
         // Try unified schema first
         if let Some(gd) = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
@@ -385,18 +387,27 @@ impl GraphService {
                 let mut layer = Layer {
                     id: node.layer.clone(),
                     label: node.layer.clone(),
-                    background_color: bg_color.unwrap_or_else(|| "#FFFFFF".to_string()),
-                    text_color: text_color.unwrap_or_else(|| "#000000".to_string()),
-                    border_color: border_color.unwrap_or_else(|| "#000000".to_string()),
+                    background_color: bg_color
+                        .as_deref()
+                        .map(normalize_hex)
+                        .unwrap_or_else(|| "FFFFFF".to_string()),
+                    text_color: text_color
+                        .as_deref()
+                        .map(normalize_hex)
+                        .unwrap_or_else(|| "000000".to_string()),
+                    border_color: border_color
+                        .as_deref()
+                        .map(normalize_hex)
+                        .unwrap_or_else(|| "000000".to_string()),
                     alias: None,
                     dataset: node.dataset,
                     attributes: node.attributes.clone(),
                 };
 
                 if let Some(p) = palette_map.get(&node.layer) {
-                    layer.background_color = p.background_color.clone();
-                    layer.text_color = p.text_color.clone();
-                    layer.border_color = p.border_color.clone();
+                    layer.background_color = normalize_hex(&p.background_color);
+                    layer.text_color = normalize_hex(&p.text_color);
+                    layer.border_color = normalize_hex(&p.border_color);
                     layer.alias = p.alias.clone();
                     layer.dataset = p.dataset;
                 }
