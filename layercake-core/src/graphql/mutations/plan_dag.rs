@@ -10,6 +10,7 @@ use super::helpers::{
     StoredGraphArtefactNodeConfig, StoredSequenceArtefactNodeConfig, StoredSequenceRenderConfig,
     StoredTreeArtefactNodeConfig,
 };
+use crate::database::entities::graph_data;
 use crate::database::entities::{
     datasets, graph_data as graph_data_model, graph_data_edges, graph_data_nodes, graphs,
     plan_dag_edges, plan_dag_nodes, plans, projects, ExecutionState,
@@ -984,29 +985,27 @@ impl PlanDagMutation {
             .map_err(|e| StructuredError::database("projects::Entity::find_by_id", e))?
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
-        // Find all graphs in processing or pending state for this project
-        let processing_graphs = graphs::Entity::find()
-            .filter(graphs::Column::ProjectId.eq(project_id))
-            .filter(
-                graphs::Column::ExecutionState
-                    .eq(ExecutionState::Processing.as_str())
-                    .or(graphs::Column::ExecutionState.eq(ExecutionState::Pending.as_str())),
-            )
+        // Find all graph_data entries in processing state for this project
+        let processing_graphs = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .filter(graph_data::Column::Status.eq("processing"))
             .all(&context.db)
             .await
-            .map_err(|e| StructuredError::database("graphs::Entity::find (stop execution)", e))?;
+            .map_err(|e| {
+                StructuredError::database("graph_data::Entity::find (stop execution)", e)
+            })?;
 
         let mut stopped_count = 0;
 
-        // Update each graph to not_started state
+        // Update each graph_data to error state with a stop message
         for graph in processing_graphs {
-            let mut active: graphs::ActiveModel = graph.into();
-            active = active.set_state(ExecutionState::NotStarted);
+            let mut active: graph_data::ActiveModel = graph.into();
+            active.status = Set("error".to_string());
             active.error_message = Set(Some("Execution stopped by user".to_string()));
             active
                 .update(&context.db)
                 .await
-                .map_err(|e| StructuredError::database("graphs::Entity::update", e))?;
+                .map_err(|e| StructuredError::database("graph_data::Entity::update", e))?;
             stopped_count += 1;
         }
 
