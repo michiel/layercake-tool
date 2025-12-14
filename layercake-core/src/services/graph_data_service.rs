@@ -133,6 +133,15 @@ impl GraphDataService {
     ) -> Result<(), sea_orm::DbErr> {
         let txn = self.db.begin().await?;
 
+        // Gather node ids to validate FK constraints before inserting edges
+        let node_ids: std::collections::HashSet<String> = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
+            .all(&txn)
+            .await?
+            .into_iter()
+            .map(|n| n.external_id)
+            .collect();
+
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
             .exec(&txn)
@@ -140,6 +149,15 @@ impl GraphDataService {
 
         let now = Utc::now();
         for edge in edges.iter() {
+            // Skip edges that reference missing nodes to avoid FK violations
+            if !node_ids.contains(&edge.source) || !node_ids.contains(&edge.target) {
+                warn!(
+                    "Skipping edge {} because source or target is missing (source={}, target={})",
+                    edge.external_id, edge.source, edge.target
+                );
+                continue;
+            }
+
             let active = graph_data_edges::ActiveModel {
                 graph_data_id: Set(graph_data_id),
                 external_id: Set(edge.external_id.clone()),

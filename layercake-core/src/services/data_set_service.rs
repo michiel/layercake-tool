@@ -366,7 +366,15 @@ impl DataSetService {
             model.insert(&txn).await?;
         }
 
-        for edge in &parsed.edges {
+        // Skip edges whose endpoints do not exist in the node list to avoid FK violations
+        let node_ids: std::collections::HashSet<String> =
+            parsed.nodes.iter().map(|n| n.id.clone()).collect();
+
+        for edge in parsed
+            .edges
+            .iter()
+            .filter(|e| node_ids.contains(&e.source) && node_ids.contains(&e.target))
+        {
             let model = graph_data_edges::ActiveModel {
                 id: sea_orm::ActiveValue::NotSet,
                 graph_data_id: Set(id),
