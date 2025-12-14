@@ -5,10 +5,9 @@
 **Goal:** Migrate backend to use only the unified `graph_data` schema, removing all legacy table usage and code
 
 ## Outstanding Tasks (ordered, uncompleted)
-1. Finish MergeNode end-to-end validation on graph_data (graph_data write path is active; add scenario tests to confirm hash/metadata). ✅ Added graph_data pipeline E2E test covering merge/transform/filter/projection.
-2. Deprecate/remove legacy GraphBuilder/GraphService legacy tables after read path migration; clean unused fields (e.g., DagExecutor.graph_builder). ✅ DagExecutor no longer wires GraphBuilder; legacy modules marked dead-code.
-3. Frontend/ID transition plan (legacyId or graphDataId exposure) and docs for API consumers. 🔜 (see Stage 5 plan)
-4. Schema cleanup migration to drop legacy tables once validation period completes. 🔜 (Stage 6 plan)
+1. Add telemetry/guards to block any new legacy writes and log/alert legacy reads; fail fast once confidence window ends.
+2. Final frontend/API pass: ensure all surfaces (exports/previews/DAG editor/graph lists) prefer `graphDataId`, keep `legacyGraphId` only for badges/regeneration, and update remaining GraphQL clients if any.
+3. Schedule and execute `m20251215_000001_drop_legacy_graph_tables.rs` after telemetry shows zero legacy usage; coordinate backup/rollback notes.
 
 ## Executive Summary
 
@@ -390,31 +389,30 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 **Remaining for downstream stages:**
 - Integration tests covering MergeNode, Transform/Filter, Projection, and artefact export on `graph_data`.
 
-### Stage 4: GraphQL API Update (Week 3-4)
+### Stage 4: GraphQL API Update (Week 3-4) — In Progress
 
 **Goal:** Update public API to reflect new schema
 
 **Tasks:**
-- [ ] Update GraphQL types for `Graph`, `Node`, `Edge`
-- [ ] Add `sourceType` field to Graph type
-- [ ] Handle ID offset in frontend (or add `legacyId` field)
-- [ ] Update frontend to use new field names
-- [ ] Provide migration guide for API consumers
-- [ ] Frontend plan: expose both `graphDataId` and `legacyGraphId` during transition, default to `graphDataId` in DAG/artefact selection; display a badge when an artefact/export is using a legacy graph to prompt regeneration.
+- [x] Update GraphQL types for `Graph`, `Node`, `Edge` with `graphDataId`/`legacyGraphId`
+- [ ] Add `sourceType` field to Graph type (optional if derivable from metadata)
+- [x] Handle ID offset in frontend by dual-ID exposure; default to `graphDataId`
+- [x] Update frontend to use new field names and badges for legacy graphs
+- [ ] Provide migration guide for API consumers (brief note + schema changelog)
 
 **Success Criteria:**
 - GraphQL schema updated and documented
-- Frontend works with new API
+- Frontend works with new API and prefers `graphDataId`
 - API versioning strategy in place if needed
 
-### Stage 5: Code Cleanup (Week 4-5)
+### Stage 5: Code Cleanup (Week 4-5) — Pending
 
 **Goal:** Remove legacy code
 
 **Tasks:**
-- [ ] Mark `GraphBuilder` as `#[deprecated]`
-- [ ] Remove unused entity definitions
-- [ ] Remove dual-schema code paths
+- [ ] Mark `GraphBuilder` (and legacy GraphService paths) as `#[deprecated]` or guard them
+- [ ] Remove unused legacy entity definitions once drop migration is scheduled
+- [ ] Remove dual-schema code paths (leave telemetry/guards until zero usage confirmed)
 - [ ] Update documentation
 - [ ] Remove legacy imports from `entities/mod.rs`
 
@@ -423,15 +421,15 @@ GraphDataBuilder is 90% feature complete and ready for basic use. Missing featur
 - Code coverage maintained
 - Documentation updated
 
-### Stage 6: Schema Cleanup (Week 6 - After Validation Period)
+### Stage 6: Schema Cleanup (Week 6 - After Validation Period) — Pending
 
 **Goal:** Drop legacy tables
 
 **Tasks:**
 - [ ] Backup production database
 - [ ] Run validation queries
-- [ ] Create and test `m20251215_000001_drop_legacy_graph_tables.rs` (drops graphs/graph_nodes/graph_edges/graph_layers + dataset_graph_* tables)
-- [ ] Execute migration in production
+- [x] Create and test `m20251215_000001_drop_legacy_graph_tables.rs` (drops graphs/graph_nodes/graph_edges/graph_layers + dataset_graph_* tables)
+- [ ] Execute migration in production after telemetry zero legacy usage; include fail-closed guard for legacy writes
 - [ ] Monitor for any errors
 - [ ] Confirm database size reduction
 - [ ] Frontend/APIs: ensure all calls are graph_data-only before executing migration; fail closed if a legacy table is still queried.
@@ -547,12 +545,12 @@ WHERE gd.node_count != (SELECT COUNT(*) FROM graph_data_nodes WHERE graph_data_i
 
 | Stage | Duration | Status | Risk |
 |-------|----------|--------|------|
-| 1. Data Repair | 2-3 days | Not Started | Low |
-| 2. New Graph Creation | 1 week | Not Started | Medium |
-| 3. Read Path Migration | 1-2 weeks | Not Started | Medium |
-| 4. GraphQL API Update | 1 week | Not Started | High |
-| 5. Code Cleanup | 1 week | Not Started | Low |
-| 6. Schema Cleanup | 1 day + validation | Not Started | High |
+| 1. Data Repair | 2-3 days | ✅ Complete | Low |
+| 2. New Graph Creation | 1 week | ✅ Complete | Medium |
+| 3. Read Path Migration | 1-2 weeks | ✅ Complete | Medium |
+| 4. GraphQL API Update | 1 week | In Progress | High |
+| 5. Code Cleanup | 1 week | Pending | Low |
+| 6. Schema Cleanup | 1 day + validation | Pending | High |
 
 **Total Estimated Time:** 5-6 weeks
 

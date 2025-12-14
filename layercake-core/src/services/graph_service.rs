@@ -583,25 +583,12 @@ impl GraphService {
     }
 
     pub async fn validate_graph(&self, graph_id: i32) -> GraphResult<GraphValidationSummary> {
-        // Prefer graph_data; fall back to legacy graphs table (logs warning)
-        let (graph_meta_project, graph) = if let Some(gd) = graph_data::Entity::find_by_id(graph_id)
+        let gd = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?
-        {
-            let graph_meta_project = gd.project_id;
-            let graph = self.build_graph_from_dag_graph(graph_id).await?;
-            (graph_meta_project, graph)
-        } else {
-            use crate::database::entities::graphs::Entity as Graphs;
-            let graph_meta = Graphs::find_by_id(graph_id)
-                .one(&self.db)
-                .await
-                .map_err(GraphError::Database)?
-                .ok_or(GraphError::NotFound(graph_id))?;
-            let graph = self.build_graph_from_dag_graph(graph_id).await?;
-            (graph_meta.project_id, graph)
-        };
+            .ok_or(GraphError::NotFound(graph_id))?;
+        let graph = self.build_graph_from_dag_graph(graph_id).await?;
 
         let mut errors = Vec::new();
         let warnings = Vec::new();
@@ -612,7 +599,7 @@ impl GraphService {
 
         Ok(GraphValidationSummary {
             graph_id,
-            project_id: graph_meta_project,
+            project_id: gd.project_id,
             is_valid: errors.is_empty(),
             errors,
             warnings,
