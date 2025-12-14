@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
@@ -225,6 +225,30 @@ const ProjectArtefactsPage: React.FC = () => {
       return next
     })
   }
+
+  const openProjectionViewer = useCallback(async (projectionId: string | number) => {
+    if (!projectionId) return
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
+    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${projectionId}`
+    if ((window as any).__TAURI__) {
+      try {
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+        const label = `projection-${projectionId}-${Date.now()}`
+        const win = new WebviewWindow(label, { url })
+        win.once('tauri://created', () => {
+          showSuccessNotification('Projection opened', 'New window created.')
+        })
+        win.once('tauri://error', (e: unknown) => {
+          showErrorNotification('Open failed', String(e))
+        })
+        return
+      } catch (err: any) {
+        console.error('Failed to open projection window', err)
+        showErrorNotification('Open failed', err?.message || 'Unable to open projection window')
+      }
+    }
+    window.open(url, '_blank', 'noreferrer')
+  }, [])
 
 const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   onCompleted: (response: any) => {
@@ -651,7 +675,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       const label = entry.node.metadata?.label || entry.node.id
       const projectionConfig = parseConfig(entry.node.config)
       const projectionId = projectionConfig.projectionId
-      const projectionLink = projectionId && projectIdParam ? `/projects/${projectIdParam}/projections/${projectionId}` : null
+      const hasProjection = Boolean(projectionId)
 
       return (
         <div
@@ -674,8 +698,8 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8"
-                    disabled={!projectionLink}
-                    onClick={() => projectionLink && navigate(projectionLink)}
+                    disabled={!hasProjection}
+                    onClick={() => hasProjection && openProjectionViewer(projectionId)}
                   >
                     <IconExternalLink size={16} />
                   </Button>
