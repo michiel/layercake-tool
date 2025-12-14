@@ -1,7 +1,7 @@
 //! Layercake resource registry for MCP backed by the shared application context.
 
 use crate::app_context::AppContext;
-use crate::database::entities::graphs;
+use crate::database::entities::graph_data;
 use axum_mcp::prelude::*;
 use axum_mcp::protocol::ToolContent;
 use axum_mcp::server::resource::{
@@ -203,13 +203,13 @@ impl LayercakeResourceRegistry {
     ) -> McpResult<Resource> {
         match analysis_type {
             "connectivity" => {
-                let graph = graphs::Entity::find()
-                    .filter(graphs::Column::ProjectId.eq(project_id))
-                    .order_by_asc(graphs::Column::Id)
+                let graph = graph_data::Entity::find()
+                    .filter(graph_data::Column::ProjectId.eq(project_id))
+                    .order_by_asc(graph_data::Column::Id)
                     .one(self.app.db())
                     .await
                     .map_err(|e| McpError::Internal {
-                        message: format!("Failed to load graphs for project {}: {}", project_id, e),
+                        message: format!("Failed to load graph_data for project {}: {}", project_id, e),
                     })?
                     .ok_or_else(|| McpError::ResourceNotFound {
                         uri: format!("layercake://analysis/{}/connectivity", project_id),

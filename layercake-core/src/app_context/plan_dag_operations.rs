@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use super::{AppContext, PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanDagSnapshot};
 use super::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest};
-use crate::database::entities::{data_sets, graphs, projects};
+use crate::database::entities::{data_sets, projects};
 use crate::graphql::types::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
@@ -146,7 +146,7 @@ impl AppContext {
                         }
                     }
                     PlanDagNodeType::Graph => {
-                        // Prefer graph_data records keyed by dag_node_id; fall back to legacy graphs.
+                        // graph_data-only: resolve by dag_node_id
                         let gd_service = GraphDataService::new(self.db.clone());
                         if let Ok(Some(gd)) = gd_service.get_by_dag_node(&node_id).await {
                             let execution_state = match gd.status.as_str() {
@@ -169,29 +169,8 @@ impl AppContext {
                                     .as_ref()
                                     .and_then(|v| v.as_str().map(|s| s.to_string())),
                             });
-                        } else if let Some(graph) = graphs::Entity::find()
-                            .filter(graphs::Column::ProjectId.eq(project_id))
-                            .filter(graphs::Column::NodeId.eq(node_id.clone()))
-                            .one(&self.db)
-                            .await
-                            .map_err(|e| {
-                                anyhow!(
-                                    "Failed to load graph execution for node {}: {}",
-                                    node_id,
-                                    e
-                                )
-                            })?
-                        {
-                            nodes[idx].graph_execution = Some(GraphExecutionMetadata {
-                                graph_id: graph.id,
-                                graph_data_id: None,
-                                node_count: graph.node_count,
-                                edge_count: graph.edge_count,
-                                execution_state: graph.execution_state.clone(),
-                                computed_date: graph.computed_date.map(|d| d.to_rfc3339()),
-                                error_message: graph.error_message.clone(),
-                                annotations: graph.annotations.clone(),
-                            });
+                        } else {
+                            nodes[idx].graph_execution = None;
                         }
                     }
                     _ => {}

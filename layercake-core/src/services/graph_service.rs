@@ -661,7 +661,7 @@ impl GraphService {
             filename: Set(None),
             blob: Set(None),
             file_size: Set(None),
-            status: Set(Some("pending".to_string())),
+            status: Set("pending".to_string()),
             source_hash: Set(None),
             processed_at: Set(None),
             computed_date: Set(None),
