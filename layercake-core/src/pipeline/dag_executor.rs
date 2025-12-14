@@ -543,8 +543,11 @@ impl DagExecutor {
 
         let projection_type = config
             .projection_type
+            .or_else(|| graph.metadata.as_ref().and_then(|m| m.get("projectionType")).and_then(|v| v.as_str()).map(|s| s.to_string()))
             .unwrap_or_else(|| "force3d".to_string());
-        let settings_json = config.settings;
+        let settings_json = config
+            .settings
+            .or_else(|| graph.metadata.clone());
 
         let create_projection = |graph_id: i32,
                                  project_id: i32,
