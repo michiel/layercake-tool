@@ -66,17 +66,7 @@ impl MergeBuilder {
             }
 
             for edge in &graph.edges {
-                // Include structural properties in the map key so edges from different datasets
-                // with the same id do not overwrite each other.
-                let key = format!(
-                    "{}|{}|{}|{}|{}",
-                    edge.id,
-                    edge.source,
-                    edge.target,
-                    edge.layer,
-                    edge.dataset.unwrap_or_default()
-                );
-                let entry = edges_map.entry(key).or_default();
+                let entry = edges_map.entry(edge.id.clone()).or_default();
                 entry.id = edge.id.clone();
                 entry.source = edge.source.clone();
                 entry.target = edge.target.clone();
