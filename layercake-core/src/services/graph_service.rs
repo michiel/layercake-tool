@@ -642,17 +642,40 @@ impl GraphService {
         project_id: i32,
         name: String,
         node_id: Option<String>,
-    ) -> GraphResult<crate::database::entities::graphs::Model> {
-        use crate::database::entities::graphs;
+    ) -> GraphResult<crate::database::entities::graph_data::Model> {
+        use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, Set};
 
         let node_id =
             node_id.unwrap_or_else(|| format!("graphnode_{}", uuid::Uuid::new_v4().simple()));
 
-        let mut graph = graphs::ActiveModel::new();
-        graph.project_id = Set(project_id);
-        graph.name = Set(name);
-        graph.node_id = Set(node_id);
+        let now = chrono::Utc::now();
+        let graph = graph_data::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            project_id: Set(project_id),
+            name: Set(name),
+            source_type: Set("computed".to_string()),
+            dag_node_id: Set(Some(node_id)),
+            file_format: Set(None),
+            origin: Set(Some("generated".to_string())),
+            filename: Set(None),
+            blob: Set(None),
+            file_size: Set(None),
+            status: Set(Some("pending".to_string())),
+            source_hash: Set(None),
+            processed_at: Set(None),
+            computed_date: Set(None),
+            node_count: Set(0),
+            edge_count: Set(0),
+            last_edit_sequence: Set(0),
+            has_pending_edits: Set(false),
+            last_replay_at: Set(None),
+            metadata: Set(None),
+            annotations: Set(None),
+            created_at: Set(now),
+            updated_at: Set(now),
+            error_message: Set(None),
+        };
 
         let graph = graph.insert(&self.db).await.map_err(GraphError::Database)?;
 
