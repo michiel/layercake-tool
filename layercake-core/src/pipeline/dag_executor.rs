@@ -552,12 +552,15 @@ impl DagExecutor {
                                  projection_type: String,
                                  settings_json: Option<JsonValue>|
          -> projections::ActiveModel {
+            let now = Utc::now();
             projections::ActiveModel {
                 project_id: Set(project_id),
                 graph_id: Set(graph_id),
                 name: Set(name.to_string()),
                 projection_type: Set(projection_type),
                 settings_json: Set(settings_json),
+                created_at: Set(now),
+                updated_at: Set(now),
                 ..Default::default()
             }
         };
