@@ -62,16 +62,7 @@ impl GraphDataBuilder {
             }))
             .collect();
 
-        let validation = self
-            .layer_palette_service
-            .validate_layer_references(project_id, &layer_ids)
-            .await?;
-        if !validation.missing_layers.is_empty() {
-            bail!(
-                "Missing layers in project palette: {:?}",
-                validation.missing_layers
-            );
-        }
+        self.ensure_layers(project_id, &layer_ids).await?;
 
         // Compute source hash for change detection
         let source_hash = self.compute_source_hash(&nodes, &edges);
@@ -145,6 +136,42 @@ impl GraphDataBuilder {
         // Reload full record with counts
         let (graph, _, _) = self.graph_data_service.load_full(created.id).await?;
         Ok(graph)
+    }
+
+    /// Ensure all layer ids used by nodes/edges exist in the project palette; create defaults when missing.
+    async fn ensure_layers(
+        &self,
+        project_id: i32,
+        layer_ids: &std::collections::HashSet<String>,
+    ) -> Result<()> {
+        let validation = self
+            .layer_palette_service
+            .validate_layer_references(project_id, layer_ids)
+            .await?;
+
+        if !validation.missing_layers.is_empty() {
+            for layer_id in validation.missing_layers {
+                // Add a neutral default palette entry so exports/rendering have styles
+                let _ = self
+                    .layer_palette_service
+                    .add_layer(
+                        project_id,
+                        crate::services::layer_palette_service::NewLayer {
+                            layer_id: layer_id.clone(),
+                            name: layer_id.clone(),
+                            background_color: Some("#f7f7f8".into()),
+                            text_color: Some("#0f172a".into()),
+                            border_color: Some("#1f2933".into()),
+                            alias: None,
+                            source_dataset_id: None,
+                            enabled: Some(true),
+                        },
+                    )
+                    .await?;
+            }
+        }
+
+        Ok(())
     }
 
     fn compute_source_hash(
