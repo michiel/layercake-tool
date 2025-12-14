@@ -66,7 +66,17 @@ impl MergeBuilder {
             }
 
             for edge in &graph.edges {
-                let entry = edges_map.entry(edge.id.clone()).or_default();
+                // Use a composite map key to avoid dropping edges that share an empty/duplicate id.
+                // The external `id` field is preserved as-is; the key only affects merge accumulation.
+                let map_key = format!(
+                    "{}|{}|{}|{}|{}",
+                    edge.id,
+                    edge.source,
+                    edge.target,
+                    edge.layer,
+                    edge.dataset.unwrap_or_default()
+                );
+                let entry = edges_map.entry(map_key).or_default();
                 entry.id = edge.id.clone();
                 entry.source = edge.source.clone();
                 entry.target = edge.target.clone();
