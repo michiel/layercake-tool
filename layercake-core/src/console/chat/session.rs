@@ -47,7 +47,7 @@ use rmcp::{
 
 use crate::app_context::summarize_graph_counts;
 use crate::database::entities::{
-    data_sets, graphs, plan_dag_edges, plan_dag_nodes, plans, projects, users,
+    data_sets, graph_data, plan_dag_edges, plan_dag_nodes, plans, projects, users,
 };
 use crate::mcp::security::build_user_security_context;
 use crate::services::system_settings_service::SystemSettingsService;
@@ -1323,8 +1323,9 @@ async fn load_agent_project_context(
         }
     }
 
-    let graphs = graphs::Entity::find()
-        .filter(graphs::Column::ProjectId.eq(project_id))
+    let graphs = graph_data::Entity::find()
+        .filter(graph_data::Column::ProjectId.eq(project_id))
+        .filter(graph_data::Column::SourceType.eq("computed"))
         .all(db)
         .await
         .map_err(|e| anyhow!("Failed to load graphs for project {}: {}", project_id, e))?;
@@ -1333,9 +1334,7 @@ async fn load_agent_project_context(
     let mut graph_state_counts: BTreeMap<String, usize> = BTreeMap::new();
     let mut last_graph_update: Option<DateTime<Utc>> = None;
     for graph in graphs {
-        *graph_state_counts
-            .entry(graph.execution_state.clone())
-            .or_insert(0) += 1;
+        *graph_state_counts.entry(graph.status.clone()).or_insert(0) += 1;
         last_graph_update = match last_graph_update {
             Some(current) if current > graph.updated_at => Some(current),
             _ => Some(graph.updated_at),

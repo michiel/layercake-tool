@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::EntityTrait;
 use serde_json::Value;
 use uuid::Uuid;
 

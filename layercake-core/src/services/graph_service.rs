@@ -1,9 +1,7 @@
 use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
-    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_edges,
-    graph_edges::Entity as GraphEdges, graph_layers, graph_layers::Entity as Layers, graph_nodes,
-    graph_nodes::Entity as GraphNodes, layer_aliases, plan_dag_edges, plan_dag_nodes,
-    project_layers,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_layers,
+    graph_layers::Entity as Layers, layer_aliases, plan_dag_edges, plan_dag_nodes, project_layers,
 };
 use crate::errors::{GraphError, GraphResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -12,7 +10,8 @@ use chrono::Utc;
 use indexmap::IndexMap;
 use sea_orm::prelude::Expr;
 use sea_orm::{
-    ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    ColumnTrait, Condition, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
+    QueryOrder,
 };
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -431,182 +430,7 @@ impl GraphService {
             return Ok(graph);
         }
 
-        // Fetch the graph metadata
-        use crate::database::entities::graphs::Entity as Graphs;
-        let graph_meta = Graphs::find_by_id(graph_id)
-            .one(&self.db)
-            .await
-            .map_err(GraphError::Database)?
-            .ok_or(GraphError::NotFound(graph_id))?;
-        tracing::warn!(
-            "GraphService falling back to legacy graphs table for graph_id {} (project {})",
-            graph_id,
-            graph_meta.project_id
-        );
-
-        // Fetch graph nodes
-        let db_graph_nodes = GraphNodes::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph_id))
-            .all(&self.db)
-            .await
-            .map_err(GraphError::Database)?;
-
-        // Fetch graph edges
-        let db_graph_edges = GraphEdges::find()
-            .filter(graph_edges::Column::GraphId.eq(graph_id))
-            .all(&self.db)
-            .await
-            .map_err(GraphError::Database)?;
-
-        // Fetch project-wide layers; fall back to legacy graph-level layers
-        let palette_layers = self
-            .get_project_layers_palette(graph_meta.project_id)
-            .await?;
-
-        if palette_layers.is_empty() {
-            tracing::warn!(
-                "Project {} has no enabled palette layers; exports will fall back to neutral styling",
-                graph_meta.project_id
-            );
-        }
-
-        let mut layer_map: IndexMap<String, Layer> = palette_layers
-            .into_iter()
-            .map(|layer| {
-                (
-                    layer.id.clone(),
-                    Layer {
-                        id: layer.id,
-                        label: layer.label,
-                        background_color: sanitize_hex(&layer.background_color, "FFFFFF"),
-                        text_color: sanitize_hex(&layer.text_color, "000000"),
-                        border_color: sanitize_hex(&layer.border_color, "000000"),
-                        alias: layer.alias,
-                        dataset: layer.dataset,
-                        attributes: None,
-                    },
-                )
-            })
-            .collect();
-
-        // Track data quality issues for logging
-        let mut nodes_missing_label = 0;
-        let mut edges_missing_layer = 0;
-
-        // Convert to Graph Node structs
-        let graph_nodes: Vec<Node> = db_graph_nodes
-            .into_iter()
-            .map(|db_node| {
-                // Use node ID as label fallback for visibility
-                let label = if let Some(label) = db_node.label {
-                    label
-                } else {
-                    nodes_missing_label += 1;
-                    db_node.id.clone()
-                };
-
-                // Empty layer means inherit default styling
-                let layer = db_node.layer.unwrap_or_default();
-                let comment = db_node.comment.or_else(|| {
-                    db_node
-                        .attrs
-                        .as_ref()
-                        .and_then(|attrs| attrs.get("comment"))
-                        .and_then(|value| value.as_str())
-                        .map(|s| s.to_string())
-                });
-
-                Node {
-                    id: db_node.id,
-                    label,
-                    layer,
-                    is_partition: db_node.is_partition,
-                    belongs_to: db_node.belongs_to,
-                    weight: db_node.weight.unwrap_or(1.0) as i32,
-                    comment,
-                    dataset: db_node.dataset_id,
-                    attributes: db_node.attrs,
-                }
-            })
-            .collect();
-
-        // Convert to Graph Edge structs
-        let graph_edges: Vec<Edge> = db_graph_edges
-            .into_iter()
-            .map(|db_edge| {
-                // Empty layer means inherit default styling
-                let layer = if let Some(layer) = db_edge.layer {
-                    layer
-                } else {
-                    edges_missing_layer += 1;
-                    String::new()
-                };
-
-                Edge {
-                    id: db_edge.id.clone(),
-                    source: db_edge.source,
-                    target: db_edge.target,
-                    label: db_edge.label.unwrap_or_default(),
-                    layer,
-                    weight: db_edge.weight.unwrap_or(1.0) as i32,
-                    comment: None,
-                    dataset: db_edge.dataset_id,
-                    attributes: db_edge.attrs,
-                }
-            })
-            .collect();
-
-        // Ensure every referenced layer has a placeholder entry so template exporters
-        // always receive a complete layer map (important for DOT/Mermaid/PUML helpers).
-        let mut ensure_layer = |layer_id: &str| {
-            if layer_id.is_empty() || layer_map.contains_key(layer_id) {
-                return;
-            }
-            layer_map.insert(
-                layer_id.to_string(),
-                Layer {
-                    id: layer_id.to_string(),
-                    label: layer_id.to_string(),
-                    background_color: "f7f7f8".to_string(),
-                    text_color: "0f172a".to_string(),
-                    border_color: "1f2933".to_string(),
-                    alias: None,
-                    dataset: None,
-                    attributes: None,
-                },
-            );
-        };
-
-        for node in &graph_nodes {
-            ensure_layer(&node.layer);
-        }
-        for edge in &graph_edges {
-            ensure_layer(&edge.layer);
-        }
-
-        // Log data quality warnings
-        if nodes_missing_label > 0 {
-            tracing::warn!(
-                "Graph {}: {} nodes missing label, using node ID as fallback",
-                graph_id,
-                nodes_missing_label
-            );
-        }
-        if edges_missing_layer > 0 {
-            tracing::debug!(
-                "Graph {}: {} edges have no layer (will inherit default styling)",
-                graph_id,
-                edges_missing_layer
-            );
-        }
-
-        Ok(Graph {
-            name: graph_meta.name,
-            nodes: graph_nodes,
-            edges: graph_edges,
-            layers: layer_map.into_values().collect(),
-            annotations: graph_meta.annotations,
-        })
+        Err(GraphError::NotFound(graph_id))
     }
 
     pub async fn validate_graph(&self, graph_id: i32) -> GraphResult<GraphValidationSummary> {
@@ -686,17 +510,17 @@ impl GraphService {
         &self,
         id: i32,
         name: Option<String>,
-    ) -> GraphResult<crate::database::entities::graphs::Model> {
-        use crate::database::entities::graphs;
+    ) -> GraphResult<crate::database::entities::graph_data::Model> {
+        use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, Set};
 
-        let graph = graphs::Entity::find_by_id(id)
+        let graph = graph_data::Entity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?
             .ok_or(GraphError::NotFound(id))?;
 
-        let mut active_model: graphs::ActiveModel = graph.into();
+        let mut active_model: graph_data::ActiveModel = graph.into();
 
         if let Some(name) = name {
             active_model.name = Set(name);
@@ -711,44 +535,46 @@ impl GraphService {
     }
 
     pub async fn delete_graph(&self, id: i32) -> GraphResult<()> {
-        use crate::database::entities::graphs;
+        use crate::database::entities::graph_data;
 
-        let graph = graphs::Entity::find_by_id(id)
+        let graph = graph_data::Entity::find_by_id(id)
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?
             .ok_or(GraphError::NotFound(id))?;
 
         // Find and delete all plan_dag_nodes that reference this graph by node_id
-        let dag_nodes = plan_dag_nodes::Entity::find()
-            .filter(plan_dag_nodes::Column::Id.eq(&graph.node_id))
-            .all(&self.db)
-            .await
-            .map_err(GraphError::Database)?;
-
-        for dag_node in dag_nodes {
-            // Delete connected edges first
-            plan_dag_edges::Entity::delete_many()
-                .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
-                .exec(&self.db)
+        if let Some(dag_node_id) = graph.dag_node_id {
+            let dag_nodes = plan_dag_nodes::Entity::find()
+                .filter(plan_dag_nodes::Column::Id.eq(&dag_node_id))
+                .all(&self.db)
                 .await
                 .map_err(GraphError::Database)?;
 
-            plan_dag_edges::Entity::delete_many()
-                .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
-                .exec(&self.db)
-                .await
-                .map_err(GraphError::Database)?;
+            for dag_node in dag_nodes {
+                // Delete connected edges first
+                plan_dag_edges::Entity::delete_many()
+                    .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
+                    .exec(&self.db)
+                    .await
+                    .map_err(GraphError::Database)?;
 
-            // Delete the node
-            plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
-                .exec(&self.db)
-                .await
-                .map_err(GraphError::Database)?;
+                plan_dag_edges::Entity::delete_many()
+                    .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
+                    .exec(&self.db)
+                    .await
+                    .map_err(GraphError::Database)?;
+
+                // Delete the node
+                plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
+                    .exec(&self.db)
+                    .await
+                    .map_err(GraphError::Database)?;
+            }
         }
 
-        // Delete the graph itself
-        graphs::Entity::delete_by_id(graph.id)
+        // Delete the graph itself (cascades to nodes/edges)
+        graph_data::Entity::delete_by_id(graph.id)
             .exec(&self.db)
             .await
             .map_err(GraphError::Database)?;
@@ -766,20 +592,21 @@ impl GraphService {
         belongs_to: Option<String>,
         weight: Option<f64>,
         attrs: Option<serde_json::Value>,
-    ) -> GraphResult<graph_nodes::Model> {
+    ) -> GraphResult<graph_data_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let now = chrono::Utc::now();
-        let active_model = graph_nodes::ActiveModel {
-            id: Set(node_id),
-            graph_id: Set(graph_id),
+        let active_model = graph_data_nodes::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            graph_data_id: Set(graph_id),
+            external_id: Set(node_id),
             label: Set(label),
             layer: Set(layer),
             is_partition: Set(is_partition),
             belongs_to: Set(belongs_to),
             weight: Set(weight),
-            attrs: Set(attrs),
-            dataset_id: Set(None),
+            attributes: Set(attrs),
+            source_dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(now),
         };
@@ -795,21 +622,32 @@ impl GraphService {
         &self,
         graph_id: i32,
         node_id: String,
-    ) -> GraphResult<graph_nodes::Model> {
+    ) -> GraphResult<graph_data_nodes::Model> {
         use sea_orm::{EntityTrait, QueryFilter};
 
-        let node = GraphNodes::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph_id))
-            .filter(graph_nodes::Column::Id.eq(&node_id))
+        // Delete dependent edges to satisfy FK constraints on graph_data_edges
+        let edge_condition = Condition::any()
+            .add(graph_data_edges::Column::Source.eq(node_id.clone()))
+            .add(graph_data_edges::Column::Target.eq(node_id.clone()));
+        graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(graph_id))
+            .filter(edge_condition)
+            .exec(&self.db)
+            .await
+            .map_err(GraphError::Database)?;
+
+        let node = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?
             .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
 
         // Delete the node
-        GraphNodes::delete_many()
-            .filter(graph_nodes::Column::GraphId.eq(graph_id))
-            .filter(graph_nodes::Column::Id.eq(&node_id))
+        graph_data_nodes::Entity::delete_many()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .exec(&self.db)
             .await
             .map_err(GraphError::Database)?;
@@ -825,18 +663,18 @@ impl GraphService {
         layer: Option<String>,
         attrs: Option<serde_json::Value>,
         belongs_to: Option<Option<String>>,
-    ) -> GraphResult<graph_nodes::Model> {
+    ) -> GraphResult<graph_data_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
-        let node = GraphNodes::find()
-            .filter(graph_nodes::Column::GraphId.eq(graph_id))
-            .filter(graph_nodes::Column::Id.eq(&node_id))
+        let node = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(graph_id))
+            .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .one(&self.db)
             .await
             .map_err(GraphError::Database)?
             .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
 
-        let mut active_model: graph_nodes::ActiveModel = node.into();
+        let mut active_model: graph_data_nodes::ActiveModel = node.into();
 
         if let Some(label) = label {
             active_model.label = Set(Some(label));
@@ -847,7 +685,7 @@ impl GraphService {
         }
 
         if let Some(attrs) = attrs {
-            active_model.attrs = Set(Some(attrs));
+            active_model.attributes = Set(Some(attrs));
         }
 
         if let Some(belongs_to_value) = belongs_to {

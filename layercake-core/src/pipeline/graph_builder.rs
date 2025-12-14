@@ -52,6 +52,9 @@ impl GraphBuilder {
         name: String,
         upstream_node_ids: Vec<String>,
     ) -> Result<graphs::Model> {
+        return Err(anyhow!(
+            "Legacy GraphBuilder has been retired; use GraphDataBuilder (graph_data tables) instead"
+        ));
         // Get or create graph entity
         let graph = self.get_or_create_graph(project_id, &node_id, name).await?;
 

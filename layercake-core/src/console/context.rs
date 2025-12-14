@@ -8,7 +8,7 @@ use sea_orm::{
 };
 
 use crate::{
-    database::entities::{graph_edges, graphs, projects, users},
+    database::entities::{graph_data, graph_data_edges, projects, users},
     services::system_settings_service::SystemSettingsService,
 };
 
@@ -134,9 +134,9 @@ impl ConsoleContext {
             .ok_or_else(|| anyhow!("Select a project first or pass --project <id>"))?;
 
         let mut rows = Vec::new();
-        let graphs = graphs::Entity::find()
-            .filter(graphs::Column::ProjectId.eq(project_id))
-            .order_by_asc(graphs::Column::Id)
+        let graphs = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .order_by_asc(graph_data::Column::Id)
             .all(&self.db)
             .await?;
 
@@ -146,7 +146,7 @@ impl ConsoleContext {
                 graph.name,
                 graph.node_count.to_string(),
                 graph.edge_count.to_string(),
-                graph.execution_state,
+                graph.status,
             ]));
         }
 
@@ -159,13 +159,13 @@ impl ConsoleContext {
     }
 
     pub async fn show_graph(&self, graph_id: i32) -> Result<()> {
-        let graph = graphs::Entity::find_by_id(graph_id)
+        let graph = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await?
-            .ok_or_else(|| anyhow!("Graph {graph_id} not found"))?;
+            .ok_or_else(|| anyhow!("GraphData {graph_id} not found"))?;
 
-        let edge_count = graph_edges::Entity::find()
-            .filter(graph_edges::Column::GraphId.eq(graph_id))
+        let edge_count = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.eq(graph_id))
             .count(&self.db)
             .await?;
 
@@ -177,7 +177,10 @@ impl ConsoleContext {
             "  edges: {} (recorded {} snapshots)",
             graph.edge_count, edge_count
         );
-        println!("  state: {}", graph.execution_state);
+        println!("  status: {}", graph.status);
+        if let Some(node_id) = &graph.dag_node_id {
+            println!("  dag node: {node_id}");
+        }
         if let Some(err) = graph.error_message {
             println!("  error: {err}");
         }

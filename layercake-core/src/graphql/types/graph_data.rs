@@ -101,20 +101,10 @@ impl GraphData {
 
     /// Best-effort lookup of legacy graphs.id for this graph_data (by dag_node_id and project_id)
     #[graphql(name = "legacyGraphId")]
-    async fn legacy_graph_id_resolved(&self, ctx: &Context<'_>) -> Result<Option<i32>> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        if let Some(dag_node_id) = &self.dag_node_id {
-            let legacy = crate::database::entities::graphs::Entity::find()
-                .filter(crate::database::entities::graphs::Column::ProjectId.eq(self.project_id))
-                .filter(crate::database::entities::graphs::Column::NodeId.eq(dag_node_id.clone()))
-                .one(&context.db)
-                .await
-                .map_err(|e| StructuredError::database("graphs::Entity::find", e))?;
-            Ok(legacy.map(|g| g.id))
-        } else {
-            Ok(None)
-        }
+    async fn legacy_graph_id_resolved(&self, _ctx: &Context<'_>) -> Result<Option<i32>> {
+        // Legacy graphs table has been removed; keep the field for schema
+        // compatibility but always return None.
+        Ok(None)
     }
 
     /// Lazy-load nodes from graph_data_nodes table

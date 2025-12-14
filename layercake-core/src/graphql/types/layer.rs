@@ -1,7 +1,7 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use crate::database::entities::{graph_layers, graphs, layer_aliases, project_layers};
+use crate::database::entities::{graph_data, graph_layers, layer_aliases, project_layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
@@ -126,7 +126,7 @@ impl From<project_layers::Model> for ProjectLayer {
 impl Layer {
     async fn graph(&self, ctx: &Context<'_>) -> Result<Option<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph = graphs::Entity::find_by_id(self.graph_id)
+        let graph = graph_data::Entity::find_by_id(self.graph_id)
             .one(&context.db)
             .await?;
 

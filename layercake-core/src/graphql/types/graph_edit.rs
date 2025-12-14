@@ -2,7 +2,7 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 
-use crate::database::entities::{graph_edits, graphs};
+use crate::database::entities::{graph_data, graph_edits};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
@@ -47,7 +47,7 @@ impl From<graph_edits::Model> for GraphEdit {
 impl GraphEdit {
     async fn graph(&self, ctx: &Context<'_>) -> Result<Option<Graph>> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph = graphs::Entity::find_by_id(self.graph_id)
+        let graph = graph_data::Entity::find_by_id(self.graph_id)
             .one(&context.db)
             .await?;
 

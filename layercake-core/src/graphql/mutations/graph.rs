@@ -6,7 +6,6 @@ use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::{
     CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
 };
-use crate::services::graph_edit_service::GraphEditService;
 use crate::services::graph_service::GraphService;
 use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
@@ -211,7 +210,6 @@ impl GraphMutation {
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
-        let edit_service = GraphEditService::new(context.db.clone());
 
         let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
@@ -229,31 +227,6 @@ impl GraphMutation {
             )
             .await
             .map_err(|e| StructuredError::service("GraphService::add_graph_node", e))?;
-
-        // Create edit record for the new node
-        let node_data = serde_json::json!({
-            "id": id,
-            "label": label,
-            "layer": layer,
-            "is_partition": is_partition,
-            "belongs_to": belongs_to,
-            "weight": weight,
-            "attributes": attributes,
-        });
-
-        let _ = edit_service
-            .create_edit(
-                graph_id,
-                "node".to_string(),
-                id.clone(),
-                "create".to_string(),
-                None,
-                None,
-                Some(node_data),
-                None,
-                true,
-            )
-            .await;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -275,74 +248,34 @@ impl GraphMutation {
         >,
     ) -> Result<crate::graphql::types::graph_edge::GraphEdge> {
         let context = ctx.data::<GraphQLContext>()?;
-        let edit_service = GraphEditService::new(context.db.clone());
-
-        use crate::database::entities::graph_edges::{
-            ActiveModel as GraphEdgeActiveModel, Entity as GraphEdges,
-        };
-        use sea_orm::{ActiveValue::Set, EntityTrait};
+        use crate::database::entities::graph_data_edges::ActiveModel as GraphEdgeActiveModel;
+        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
 
         let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         // Create the new edge
         let now = chrono::Utc::now();
         let edge_model = GraphEdgeActiveModel {
-            id: Set(id.clone()),
-            graph_id: Set(graph_id),
+            id: sea_orm::ActiveValue::NotSet,
+            graph_data_id: Set(graph_id),
+            external_id: Set(id.clone()),
             source: Set(source.clone()),
             target: Set(target.clone()),
             label: Set(label.clone()),
             layer: Set(layer.clone()),
             weight: Set(weight),
-            attrs: Set(attributes.clone()),
-            dataset_id: Set(None),
+            attributes: Set(attributes.clone()),
+            source_dataset_id: Set(None),
             comment: Set(None),
             created_at: Set(now),
         };
 
-        GraphEdges::insert(edge_model)
-            .exec_without_returning(&context.db)
+        let inserted = edge_model
+            .insert(&context.db)
             .await
-            .map_err(|e| StructuredError::database("graph_edges::Entity::insert", e))?;
+            .map_err(|e| StructuredError::database("graph_data_edges::Entity::insert", e))?;
 
-        // Create edit record for the new edge
-        let edge_data = serde_json::json!({
-            "id": id,
-            "source": source,
-            "target": target,
-            "label": label,
-            "layer": layer,
-            "weight": weight,
-            "attributes": attributes,
-        });
-
-        let _ = edit_service
-            .create_edit(
-                graph_id,
-                "edge".to_string(),
-                id.clone(),
-                "create".to_string(),
-                None,
-                None,
-                Some(edge_data),
-                None,
-                true,
-            )
-            .await;
-
-        // Fetch the inserted edge to return
-        use crate::database::entities::graph_edges::Column as EdgeColumn;
-        use sea_orm::{ColumnTrait, QueryFilter};
-
-        let edge = GraphEdges::find()
-            .filter(EdgeColumn::GraphId.eq(graph_id))
-            .filter(EdgeColumn::Id.eq(&id))
-            .one(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("graph_edges::Entity::find", e))?
-            .ok_or_else(|| StructuredError::not_found("Graph edge", &id))?;
-
-        Ok(crate::graphql::types::graph_edge::GraphEdge::from(edge))
+        Ok(crate::graphql::types::graph_edge::GraphEdge::from(inserted))
     }
 
     /// Delete an edge from a graph
@@ -353,53 +286,28 @@ impl GraphMutation {
         edge_id: String,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        let edit_service = GraphEditService::new(context.db.clone());
 
-        use crate::database::entities::graph_edges::{Column as EdgeColumn, Entity as GraphEdges};
+        use crate::database::entities::graph_data_edges::{
+            Column as EdgeColumn, Entity as GraphEdges,
+        };
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
         // Fetch current edge to get old values for edit record
         let old_edge = GraphEdges::find()
-            .filter(EdgeColumn::GraphId.eq(graph_id))
-            .filter(EdgeColumn::Id.eq(&edge_id))
+            .filter(EdgeColumn::GraphDataId.eq(graph_id))
+            .filter(EdgeColumn::ExternalId.eq(&edge_id))
             .one(&context.db)
             .await
-            .map_err(|e| StructuredError::database("graph_edges::Entity::find", e))?;
+            .map_err(|e| StructuredError::database("graph_data_edges::Entity::find", e))?;
 
-        if let Some(old_edge) = old_edge {
-            // Create edit record for the deletion
-            let edge_data = serde_json::json!({
-                "id": old_edge.id,
-                "source": old_edge.source,
-                "target": old_edge.target,
-                "label": old_edge.label,
-                "layer": old_edge.layer,
-                "weight": old_edge.weight,
-                "attrs": old_edge.attrs.clone(),
-                "attributes": old_edge.attrs,
-            });
-
-            let _ = edit_service
-                .create_edit(
-                    graph_id,
-                    "edge".to_string(),
-                    edge_id.clone(),
-                    "delete".to_string(),
-                    None,
-                    Some(edge_data),
-                    None,
-                    None,
-                    true,
-                )
-                .await;
-
+        if let Some(_old_edge) = old_edge {
             // Delete the edge
             GraphEdges::delete_many()
-                .filter(EdgeColumn::GraphId.eq(graph_id))
-                .filter(EdgeColumn::Id.eq(&edge_id))
+                .filter(EdgeColumn::GraphDataId.eq(graph_id))
+                .filter(EdgeColumn::ExternalId.eq(&edge_id))
                 .exec(&context.db)
                 .await
-                .map_err(|e| StructuredError::database("graph_edges::Entity::delete_many", e))?;
+                .map_err(|e| StructuredError::database("graph_data_edges::Entity::delete_many", e))?;
 
             Ok(true)
         } else {
@@ -416,39 +324,12 @@ impl GraphMutation {
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
         let graph_service = GraphService::new(context.db.clone());
-        let edit_service = GraphEditService::new(context.db.clone());
 
         // Fetch current node to get old values for edit record
-        let old_node = graph_service
+        let _old_node = graph_service
             .delete_graph_node(graph_id, node_id.clone())
             .await
             .map_err(|e| StructuredError::service("GraphService::delete_graph_node", e))?;
-
-        // Create edit record for the deletion
-        let node_data = serde_json::json!({
-            "id": old_node.id,
-            "label": old_node.label,
-            "layer": old_node.layer,
-            "is_partition": old_node.is_partition,
-            "belongs_to": old_node.belongs_to,
-            "weight": old_node.weight,
-            "attrs": old_node.attrs.clone(),
-            "attributes": old_node.attrs,
-        });
-
-        let _ = edit_service
-            .create_edit(
-                graph_id,
-                "node".to_string(),
-                node_id,
-                "delete".to_string(),
-                None,
-                Some(node_data),
-                None,
-                None,
-                true,
-            )
-            .await;
 
         Ok(true)
     }
