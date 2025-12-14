@@ -64,6 +64,15 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   readOnly = false,
   layersReadOnly = false
 }) => {
+  const coerceBoolean = (value: any): boolean => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
+    }
+    return Boolean(value);
+  };
+
   const normalizeNode = (node: GraphNode): GraphNode => ({
     ...node,
     attributes: sanitizeAttributes(node.attributes || (node as any).attrs),
@@ -275,7 +284,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     try {
       const normalizedNodes = localNodes.map(node => ({
         ...node,
-        is_partition: Boolean(node.is_partition),
+        is_partition: coerceBoolean(node.is_partition),
         attributes: sanitizeAttributes(node.attributes),
       }));
       const normalizedEdges = localEdges.map(edge => ({
