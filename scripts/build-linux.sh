@@ -29,6 +29,8 @@ cd frontend && npm run build && cd ..
 # Build Tauri app
 echo "Building Tauri application..."
 cd src-tauri
+# AppImage builds need FUSE; fall back to extraction when unavailable
+export APPIMAGE_EXTRACT_AND_RUN=1
 cargo tauri build
 
 echo "===================================="
