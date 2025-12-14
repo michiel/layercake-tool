@@ -9,7 +9,10 @@ use std::collections::{HashMap, HashSet};
 use crate::app_context::DataSetValidationSummary;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
-use crate::database::entities::{dataset_graph_edges, dataset_graph_layers, dataset_graph_nodes};
+use crate::database::entities::{
+    dataset_graph_edges, dataset_graph_layers, dataset_graph_nodes, graph_data, graph_data_edges,
+    graph_data_nodes,
+};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
@@ -287,59 +290,96 @@ impl DataSetService {
         parsed.sanitize_labels();
         let sanitized_graph_json = serde_json::to_string(&parsed)?;
         let txn = self.db.begin().await?;
-        dataset_graph_nodes::Entity::delete_many()
+        // Legacy tables removed; keep dataset_graph_* cleanup for back-compat but ignore errors if tables are gone
+        let _ = dataset_graph_nodes::Entity::delete_many()
             .filter(dataset_graph_nodes::Column::DatasetId.eq(id))
             .exec(&txn)
-            .await?;
-        dataset_graph_edges::Entity::delete_many()
+            .await;
+        let _ = dataset_graph_edges::Entity::delete_many()
             .filter(dataset_graph_edges::Column::DatasetId.eq(id))
             .exec(&txn)
-            .await?;
-        dataset_graph_layers::Entity::delete_many()
+            .await;
+        let _ = dataset_graph_layers::Entity::delete_many()
             .filter(dataset_graph_layers::Column::DatasetId.eq(id))
+            .exec(&txn)
+            .await;
+
+        // Ensure a graph_data row exists for this dataset (id is reused)
+        let gd_existing = graph_data::Entity::find_by_id(id).one(&txn).await?;
+        if gd_existing.is_none() {
+            graph_data::ActiveModel {
+                id: Set(id),
+                project_id: Set(data_set.project_id),
+                name: Set(data_set.name.clone()),
+                source_type: Set("dataset".to_string()),
+                dag_node_id: Set(None),
+                file_format: Set(Some(data_set.file_format.clone())),
+                origin: Set(Some(data_set.origin.clone())),
+                filename: Set(Some(data_set.filename.clone())),
+                blob: Set(None),
+                file_size: Set(Some(data_set.file_size)),
+                processed_at: Set(Some(chrono::Utc::now())),
+                computed_date: Set(None),
+                status: Set("active".to_string()),
+                source_hash: Set(None),
+                node_count: Set(0),
+                edge_count: Set(0),
+                last_edit_sequence: Set(0),
+                has_pending_edits: Set(false),
+                last_replay_at: Set(None),
+                metadata: Set(None),
+                annotations: Set(None),
+                created_at: Set(chrono::Utc::now()),
+                updated_at: Set(chrono::Utc::now()),
+                error_message: Set(None),
+            }
+            .insert(&txn)
+            .await?;
+        }
+
+        // Replace graph_data nodes/edges for this dataset
+        graph_data_nodes::Entity::delete_many()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(id))
+            .exec(&txn)
+            .await?;
+        graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(id))
             .exec(&txn)
             .await?;
 
-        for layer in &parsed.layers {
-            let model = dataset_graph_layers::ActiveModel {
-                id: Set(layer.id.clone()),
-                dataset_id: Set(id),
-                label: Set(layer.label.clone()),
-                background_color: Set(layer.background_color.clone()),
-                text_color: Set(layer.text_color.clone()),
-                border_color: Set(layer.border_color.clone()),
-            };
-            model.insert(&txn).await?;
-        }
-
+        let now = chrono::Utc::now();
         for node in &parsed.nodes {
-            let model = dataset_graph_nodes::ActiveModel {
-                id: Set(node.id.clone()),
-                dataset_id: Set(id),
-                label: Set(node.label.clone()),
-                layer: Set(node.layer.clone()),
-                weight: Set(node.weight),
+            let model = graph_data_nodes::ActiveModel {
+                id: sea_orm::ActiveValue::NotSet,
+                graph_data_id: Set(id),
+                external_id: Set(node.id.clone()),
+                label: Set(Some(node.label.clone())),
+                layer: Set(Some(node.layer.clone())),
+                weight: Set(Some(node.weight as f64)),
                 is_partition: Set(node.is_partition),
                 belongs_to: Set(node.belongs_to.clone()),
                 comment: Set(node.comment.clone()),
-                dataset: Set(node.dataset),
+                source_dataset_id: Set(node.dataset),
                 attributes: Set(node.attributes.clone()),
+                created_at: Set(now),
             };
             model.insert(&txn).await?;
         }
 
         for edge in &parsed.edges {
-            let model = dataset_graph_edges::ActiveModel {
-                id: Set(edge.id.clone()),
-                dataset_id: Set(id),
+            let model = graph_data_edges::ActiveModel {
+                id: sea_orm::ActiveValue::NotSet,
+                graph_data_id: Set(id),
+                external_id: Set(edge.id.clone()),
                 source: Set(edge.source.clone()),
                 target: Set(edge.target.clone()),
-                label: Set(edge.label.clone()),
-                layer: Set(edge.layer.clone()),
-                weight: Set(edge.weight),
+                label: Set(Some(edge.label.clone())),
+                layer: Set(Some(edge.layer.clone())),
+                weight: Set(Some(edge.weight as f64)),
                 comment: Set(edge.comment.clone()),
-                dataset: Set(edge.dataset),
+                source_dataset_id: Set(edge.dataset),
                 attributes: Set(edge.attributes.clone()),
+                created_at: Set(now),
             };
             model.insert(&txn).await?;
         }
@@ -348,6 +388,20 @@ impl DataSetService {
         active_model.graph_json = Set(sanitized_graph_json);
         active_model.processed_at = Set(Some(chrono::Utc::now()));
         active_model.updated_at = Set(chrono::Utc::now());
+
+        // Update graph_data metadata counts/status
+        let mut gd_active: graph_data::ActiveModel = graph_data::Entity::find_by_id(id)
+            .one(&txn)
+            .await?
+            .ok_or_else(|| anyhow!("graph_data missing for dataset {}", id))?
+            .into();
+        gd_active.node_count = Set(parsed.nodes.len() as i32);
+        gd_active.edge_count = Set(parsed.edges.len() as i32);
+        gd_active.status = Set("active".to_string());
+        gd_active.updated_at = Set(now);
+        gd_active.processed_at = Set(Some(now));
+        gd_active.computed_date = Set(Some(now));
+        gd_active.update(&txn).await?;
 
         let updated = active_model.update(&txn).await?;
         txn.commit().await?;
