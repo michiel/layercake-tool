@@ -1,7 +1,7 @@
 use anyhow::Result;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
-    QueryFilter, Set,
+    ActiveModelTrait, ActiveValue, ColumnTrait, Condition, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, Set,
 };
 use tracing::{debug, warn};
 
@@ -358,6 +358,16 @@ impl GraphEditApplicator {
     }
 
     async fn delete_node_graph_data(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+        // Remove dependent edges first due to FK constraints on graph_data_edges
+        let edge_condition = Condition::any()
+            .add(graph_data_edges::Column::Source.eq(edit.target_id.clone()))
+            .add(graph_data_edges::Column::Target.eq(edit.target_id.clone()));
+        graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
+            .filter(edge_condition)
+            .exec(&self.db)
+            .await?;
+
         let result = graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))

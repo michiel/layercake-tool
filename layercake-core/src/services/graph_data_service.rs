@@ -83,6 +83,12 @@ impl GraphDataService {
     ) -> Result<(), sea_orm::DbErr> {
         let txn = self.db.begin().await?;
 
+        // Remove edges first to satisfy FK constraints on graph_data_edges
+        graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
+            .exec(&txn)
+            .await?;
+
         graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .exec(&txn)
@@ -110,6 +116,7 @@ impl GraphDataService {
         graph_data::ActiveModel {
             id: Set(graph_data_id),
             node_count: Set(nodes.len() as i32),
+            edge_count: Set(0),
             updated_at: Set(now),
             ..Default::default()
         }

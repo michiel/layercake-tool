@@ -337,13 +337,13 @@ impl DataSetService {
             .await?;
         }
 
-        // Replace graph_data nodes/edges for this dataset
-        graph_data_nodes::Entity::delete_many()
-            .filter(graph_data_nodes::Column::GraphDataId.eq(id))
-            .exec(&txn)
-            .await?;
+        // Replace graph_data nodes/edges for this dataset (delete edges first for FK safety)
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(id))
+            .exec(&txn)
+            .await?;
+        graph_data_nodes::Entity::delete_many()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(id))
             .exec(&txn)
             .await?;
 
