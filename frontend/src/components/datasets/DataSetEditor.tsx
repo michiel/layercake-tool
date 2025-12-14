@@ -155,8 +155,26 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   }, [dataSource?.annotations])
   const graphPage = graphNodes.length ? { nodes: graphNodes, edges: graphEdges, layers: graphLayers, hasMore: graphHasMore } : undefined
   const rawGraphData = useMemo((): GraphData | null => {
+    const coerceBoolean = (value: any) => {
+      if (typeof value === 'boolean') return value
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase()
+        return ['true', '1', 'yes', 'y', 'on'].includes(normalized)
+      }
+      return Boolean(value)
+    }
+
+    const normalizeGraphData = (graph: GraphData): GraphData => ({
+      nodes: (graph.nodes || []).map(n => ({
+        ...n,
+        is_partition: coerceBoolean((n as any).is_partition ?? (n as any).isPartition),
+      })),
+      edges: graph.edges || [],
+      layers: graph.layers || [],
+    })
+
     if (graphPage && graphPage.nodes.length > 0) {
-      return {
+      return normalizeGraphData({
         nodes: graphPage.nodes.map(n => ({
           id: n.id,
           label: n.label,
@@ -186,13 +204,13 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
           text_color: l.textColor || '#0f172a',
           border_color: l.borderColor || '#94a3b8',
         }))
-      }
+      })
     }
     if (!dataSource?.graphJson) {
       return null
     }
     try {
-      return JSON.parse(dataSource.graphJson)
+      return normalizeGraphData(JSON.parse(dataSource.graphJson))
     } catch (error) {
       console.error('Failed to parse dataset graph JSON', error)
       return null

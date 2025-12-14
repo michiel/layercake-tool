@@ -227,9 +227,16 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const handleNodeChange = (rowIdx: number, field: string, value: string) => {
     setLocalNodes(prevNodes => {
       const newNodes = [...prevNodes];
+      const current = newNodes[rowIdx];
+      if (!current) return newNodes;
+
+      // Normalize booleans for is_partition
+      const nextValue =
+        field === 'is_partition' ? value === 'true' || value === '1' || value === 'on' : value;
+
       newNodes[rowIdx] = {
-        ...newNodes[rowIdx],
-        [field]: value
+        ...current,
+        [field]: nextValue
       };
       return newNodes;
     });
@@ -268,6 +275,7 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
     try {
       const normalizedNodes = localNodes.map(node => ({
         ...node,
+        is_partition: Boolean(node.is_partition),
         attributes: sanitizeAttributes(node.attributes),
       }));
       const normalizedEdges = localEdges.map(edge => ({
