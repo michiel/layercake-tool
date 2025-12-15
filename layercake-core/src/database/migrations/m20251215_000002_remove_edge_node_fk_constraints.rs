@@ -13,7 +13,15 @@ impl MigrationTrait for Migration {
             sea_orm::DatabaseBackend::Sqlite => {
                 // SQLite doesn't support dropping FK constraints, so recreate table
 
-                // 1. Create new table without node FK constraints
+                // 1. Drop existing indexes (they'll be recreated after table rename)
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph_external_unique").await;
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph").await;
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_source").await;
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_target").await;
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_source_target").await;
+                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_layer").await;
+
+                // 2. Create new table without node FK constraints
                 db.execute_unprepared(
                     r#"
                     CREATE TABLE graph_data_edges_new (
@@ -35,7 +43,7 @@ impl MigrationTrait for Migration {
                 )
                 .await?;
 
-                // 2. Copy data from old table
+                // 3. Copy data from old table
                 db.execute_unprepared(
                     r#"
                     INSERT INTO graph_data_edges_new
@@ -46,15 +54,15 @@ impl MigrationTrait for Migration {
                 )
                 .await?;
 
-                // 3. Drop old table
+                // 4. Drop old table
                 db.execute_unprepared("DROP TABLE graph_data_edges")
                     .await?;
 
-                // 4. Rename new table
+                // 5. Rename new table
                 db.execute_unprepared("ALTER TABLE graph_data_edges_new RENAME TO graph_data_edges")
                     .await?;
 
-                // 5. Recreate indexes
+                // 6. Recreate indexes
                 db.execute_unprepared(
                     "CREATE UNIQUE INDEX idx_edges_graph_external_unique ON graph_data_edges(graph_data_id, external_id)"
                 )
