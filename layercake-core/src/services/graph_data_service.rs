@@ -9,7 +9,7 @@ use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    QuerySelect, TransactionTrait,
 };
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -21,6 +21,92 @@ pub struct GraphDataService {
 impl GraphDataService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
+    }
+
+    /// Check if node external_ids are unique across the entire project
+    /// Returns the list of conflicting IDs if any duplicates are found
+    pub async fn check_project_node_uniqueness(
+        &self,
+        project_id: i32,
+        node_external_ids: &[String],
+        exclude_graph_data_id: Option<i32>,
+    ) -> Result<Vec<String>, sea_orm::DbErr> {
+        // First get all graph_data IDs for this project
+        let graph_data_ids: Vec<i32> = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(|gd| gd.id)
+            .collect();
+
+        // Filter to exclude if specified
+        let graph_data_ids_to_check: Vec<i32> = if let Some(exclude_id) = exclude_graph_data_id {
+            graph_data_ids.into_iter().filter(|&id| id != exclude_id).collect()
+        } else {
+            graph_data_ids
+        };
+
+        if graph_data_ids_to_check.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Now check for conflicts
+        let existing_nodes = graph_data_nodes::Entity::find()
+            .filter(graph_data_nodes::Column::GraphDataId.is_in(graph_data_ids_to_check))
+            .filter(graph_data_nodes::Column::ExternalId.is_in(node_external_ids))
+            .all(&self.db)
+            .await?;
+
+        let conflicts: Vec<String> = existing_nodes
+            .into_iter()
+            .map(|n| n.external_id)
+            .collect();
+
+        Ok(conflicts)
+    }
+
+    /// Check if edge external_ids are unique across the entire project
+    /// Returns the list of conflicting IDs if any duplicates are found
+    pub async fn check_project_edge_uniqueness(
+        &self,
+        project_id: i32,
+        edge_external_ids: &[String],
+        exclude_graph_data_id: Option<i32>,
+    ) -> Result<Vec<String>, sea_orm::DbErr> {
+        // First get all graph_data IDs for this project
+        let graph_data_ids: Vec<i32> = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await?
+            .into_iter()
+            .map(|gd| gd.id)
+            .collect();
+
+        // Filter to exclude if specified
+        let graph_data_ids_to_check: Vec<i32> = if let Some(exclude_id) = exclude_graph_data_id {
+            graph_data_ids.into_iter().filter(|&id| id != exclude_id).collect()
+        } else {
+            graph_data_ids
+        };
+
+        if graph_data_ids_to_check.is_empty() {
+            return Ok(vec![]);
+        }
+
+        // Now check for conflicts
+        let existing_edges = graph_data_edges::Entity::find()
+            .filter(graph_data_edges::Column::GraphDataId.is_in(graph_data_ids_to_check))
+            .filter(graph_data_edges::Column::ExternalId.is_in(edge_external_ids))
+            .all(&self.db)
+            .await?;
+
+        let conflicts: Vec<String> = existing_edges
+            .into_iter()
+            .map(|e| e.external_id)
+            .collect();
+
+        Ok(conflicts)
     }
 
     pub async fn create(
@@ -81,6 +167,28 @@ impl GraphDataService {
         graph_data_id: i32,
         nodes: Vec<GraphDataNodeInput>,
     ) -> Result<(), sea_orm::DbErr> {
+        // Get graph_data to obtain project_id for uniqueness check
+        let graph_data_record = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("graph_data {} not found", graph_data_id)))?;
+
+        // Check project-wide uniqueness of node IDs (excluding this graph_data)
+        let node_ids: Vec<String> = nodes.iter().map(|n| n.external_id.clone()).collect();
+        let conflicts = self.check_project_node_uniqueness(
+            graph_data_record.project_id,
+            &node_ids,
+            Some(graph_data_id)
+        ).await?;
+
+        if !conflicts.is_empty() {
+            return Err(sea_orm::DbErr::Custom(format!(
+                "Node ID uniqueness violation: The following node IDs already exist in project {}: {}. Node IDs must be unique across the entire project.",
+                graph_data_record.project_id,
+                conflicts.join(", ")
+            )));
+        }
+
         let txn = self.db.begin().await?;
 
         // Remove edges first to satisfy FK constraints on graph_data_edges
@@ -131,6 +239,28 @@ impl GraphDataService {
         graph_data_id: i32,
         edges: Vec<GraphDataEdgeInput>,
     ) -> Result<(), sea_orm::DbErr> {
+        // Get graph_data to obtain project_id for uniqueness check
+        let graph_data_record = graph_data::Entity::find_by_id(graph_data_id)
+            .one(&self.db)
+            .await?
+            .ok_or_else(|| sea_orm::DbErr::RecordNotFound(format!("graph_data {} not found", graph_data_id)))?;
+
+        // Check project-wide uniqueness of edge IDs (excluding this graph_data)
+        let edge_ids: Vec<String> = edges.iter().map(|e| e.external_id.clone()).collect();
+        let conflicts = self.check_project_edge_uniqueness(
+            graph_data_record.project_id,
+            &edge_ids,
+            Some(graph_data_id)
+        ).await?;
+
+        if !conflicts.is_empty() {
+            return Err(sea_orm::DbErr::Custom(format!(
+                "Edge ID uniqueness violation: The following edge IDs already exist in project {}: {}. Edge IDs must be unique across the entire project.",
+                graph_data_record.project_id,
+                conflicts.join(", ")
+            )));
+        }
+
         let txn = self.db.begin().await?;
 
         // Gather node ids to validate FK constraints before inserting edges
