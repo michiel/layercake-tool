@@ -67,7 +67,8 @@ impl MergeBuilder {
 
             for edge in &graph.edges {
                 // Use a composite map key to avoid dropping edges that share an empty/duplicate id.
-                // The external `id` field is preserved as-is; the key only affects merge accumulation.
+                // If edges have the same id but different (source,target,layer,dataset), they are
+                // distinct edges and must have unique external_ids to avoid UNIQUE constraint violations.
                 let map_key = format!(
                     "{}|{}|{}|{}|{}",
                     edge.id,
@@ -76,8 +77,9 @@ impl MergeBuilder {
                     edge.layer,
                     edge.dataset.unwrap_or_default()
                 );
-                let entry = edges_map.entry(map_key).or_default();
-                entry.id = edge.id.clone();
+                let entry = edges_map.entry(map_key.clone()).or_default();
+                // Use map_key as the id to ensure uniqueness when multiple edges share the same original id
+                entry.id = map_key;
                 entry.source = edge.source.clone();
                 entry.target = edge.target.clone();
                 entry.label = entry.label.clone().or_else(|| Some(edge.label.clone()));
