@@ -1697,11 +1697,55 @@ impl Graph {
     }
 }
 
+// Helper function to deserialize booleans that might be strings
+fn deserialize_bool_from_anything<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Unexpected};
+    use serde_json::Value;
+
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Bool(b) => Ok(b),
+        Value::String(s) => {
+            match s.to_lowercase().as_str() {
+                "true" | "1" | "yes" => Ok(true),
+                "false" | "0" | "no" | "" => Ok(false),
+                _ => Err(de::Error::invalid_value(
+                    Unexpected::Str(&s),
+                    &"a boolean or a string representing a boolean"
+                )),
+            }
+        }
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(i != 0)
+            } else if let Some(f) = n.as_f64() {
+                Ok(f != 0.0)
+            } else {
+                Err(de::Error::invalid_type(
+                    Unexpected::Other("number"),
+                    &"a boolean"
+                ))
+            }
+        }
+        _ => Err(de::Error::invalid_type(
+            Unexpected::Other("unexpected type"),
+            &"a boolean"
+        )),
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct Node {
     pub id: String,
     pub label: String,
     pub layer: String,
+    #[serde(
+        deserialize_with = "deserialize_bool_from_anything",
+        default
+    )]
     pub is_partition: bool,
     pub belongs_to: Option<String>,
     pub weight: i32,

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
-import { VALIDATE_AND_MIGRATE_PLAN_DAG } from '@/graphql/plan-dag'
+import { RESET_PROJECT } from '@/graphql/libraryItems'
 import {
   IconGraph,
   IconDatabase,
@@ -18,7 +18,6 @@ import {
   IconBooks,
   IconHierarchy2,
   IconAffiliate,
-  IconTool,
 } from '@tabler/icons-react'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -63,36 +62,32 @@ export const WorkbenchPage = () => {
   const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
   const stories = storiesData?.stories ?? []
 
-  const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
-    VALIDATE_AND_MIGRATE_PLAN_DAG
-  )
+  const [resetProjectMutation, { loading: resetProjectLoading }] = useMutation(RESET_PROJECT)
 
-  const handleValidateAndMigratePlan = async () => {
+  const handleResetProject = async () => {
     if (!Number.isFinite(projectIdNum)) {
       return
     }
+    if (!window.confirm('Are you sure you want to reset this project? This will re-initialise the project with fresh IDs while preserving all data.')) {
+      return
+    }
     try {
-      const { data } = await validatePlanDagMutation({
-        variables: { projectId: projectIdNum },
+      const { data } = await resetProjectMutation({
+        variables: { projectId: projectIdNum, includeKnowledgeBase: true },
       })
-      const result = (data as any)?.validateAndMigratePlanDag
-      const migratedCount = result?.updatedNodes?.length || 0
-      const warningCount = result?.warnings?.length || 0
-      const errors: string[] = result?.errors || []
+      const result = (data as any)?.resetProject
 
-      if (errors.length > 0) {
-        showErrorNotification('Migration failed', `Found ${errors.length} error(s). First: ${errors[0]}`)
-        console.error('Plan DAG validation errors', errors)
-        return
+      if (result) {
+        showSuccessNotification(
+          'Project reset successfully',
+          `The project "${result.name}" has been reset with fresh IDs. Please refresh the page to see the changes.`
+        )
+        // Redirect to the new project
+        window.location.href = `/projects/${result.id}/workbench`
       }
-
-      showSuccessNotification(
-        'Project migration complete',
-        `Migrated ${migratedCount} legacy node(s). Warnings: ${warningCount}.`
-      )
     } catch (error: any) {
-      console.error('Failed to validate/migrate plan DAG', error)
-      showErrorNotification('Migration failed', error?.message || 'Unable to migrate the plan DAG.')
+      console.error('Failed to reset project', error)
+      showErrorNotification('Project reset failed', error?.message || 'Unable to reset the project.')
     }
   }
 
@@ -180,21 +175,12 @@ export const WorkbenchPage = () => {
           </Button>
           <Button
             variant="secondary"
-            onClick={handleValidateAndMigratePlan}
-            disabled={validatePlanDagLoading}
+            onClick={handleResetProject}
+            disabled={resetProjectLoading}
           >
-            {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
+            {resetProjectLoading && <Spinner className="mr-2 h-4 w-4" />}
             <IconAdjustments className="mr-2 h-4 w-4" />
-            Validate &amp; migrate plan
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleValidateAndMigratePlan}
-            disabled={validatePlanDagLoading}
-          >
-            {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
-            <IconTool className="mr-2 h-4 w-4" />
-            Migrate project
+            Reset project
           </Button>
           <Button variant="secondary" onClick={() => navigate(`/projects/${project.id}/workbench/layers`)}>
             Layers

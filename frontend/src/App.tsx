@@ -38,8 +38,7 @@ import { ChatProvider } from './components/chat/ChatProvider'
 import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
-import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE } from './graphql/libraryItems'
-import { VALIDATE_AND_MIGRATE_PLAN_DAG } from './graphql/plan-dag'
+import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE, RESET_PROJECT } from './graphql/libraryItems'
 import { LIST_PLANS, GET_PLAN } from './graphql/plans'
 import { LIST_STORIES, type Story } from './graphql/stories'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
@@ -1323,7 +1322,7 @@ const ProjectDetailPage = () => {
     }>
   }>(GET_PROJECTS)
 
-  const { data: planDagData, refetch: refetchPlanDag } = useQuery(GET_PLAN_DAG, {
+  const { data: planDagData } = useQuery(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum },
     skip: !projectId,
   })
@@ -1357,9 +1356,7 @@ const ProjectDetailPage = () => {
   const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
     EXPORT_PROJECT_AS_TEMPLATE
   )
-  const [validatePlanDagMutation, { loading: validatePlanDagLoading }] = useMutation(
-    VALIDATE_AND_MIGRATE_PLAN_DAG
-  )
+  const [resetProjectMutation, { loading: resetProjectLoading }] = useMutation(RESET_PROJECT)
 
   const formatUpdatedAt = (value?: string | null) => {
     if (!value) {
@@ -1402,43 +1399,32 @@ const ProjectDetailPage = () => {
     console.log(`Downloaded Plan DAG as ${filename}`)
   }
 
-  const handleValidateAndMigratePlan = async () => {
+  const handleResetProject = async () => {
     if (!Number.isFinite(projectIdNum)) {
       return
     }
+    if (!window.confirm('Are you sure you want to reset this project? This will re-initialise the project with fresh IDs while preserving all data.')) {
+      return
+    }
     try {
-      const { data } = await validatePlanDagMutation({
-        variables: { projectId: projectIdNum },
+      const { data } = await resetProjectMutation({
+        variables: { projectId: projectIdNum, includeKnowledgeBase: true },
       })
-      const result = (data as any)?.validateAndMigratePlanDag
-      const migratedCount = result?.updatedNodes?.length || 0
-      const warningCount = result?.warnings?.length || 0
-      const errors: string[] = result?.errors || []
+      const result = (data as any)?.resetProject
 
-      if (errors.length > 0) {
-        showErrorNotification(
-          'Plan DAG validation failed',
-          `Found ${errors.length} error(s). First: ${errors[0]}`
+      if (result) {
+        showSuccessNotification(
+          'Project reset successfully',
+          `The project "${result.name}" has been reset with fresh IDs. Please refresh the page to see the changes.`
         )
-        console.error('Plan DAG validation errors', errors)
-        return
-      }
-
-      showSuccessNotification(
-        'Plan DAG validated',
-        `Migrated ${migratedCount} legacy node(s). Warnings: ${warningCount}.`
-      )
-      if (typeof refetchPlanDag === 'function') {
-        refetchPlanDag()
-      }
-      if (warningCount > 0) {
-        console.warn('Plan DAG validation warnings', result?.warnings)
+        // Redirect to the new project
+        window.location.href = `/projects/${result.id}/workbench`
       }
     } catch (error: any) {
-      console.error('Failed to validate/migrate plan DAG', error)
+      console.error('Failed to reset project', error)
       showErrorNotification(
-        'Plan validation failed',
-        error?.message || 'Unable to validate or migrate the plan DAG.'
+        'Project reset failed',
+        error?.message || 'Unable to reset the project.'
       )
     }
   }
@@ -1636,12 +1622,12 @@ const ProjectDetailPage = () => {
             <Group gap="xs">
               <Button
                 variant="secondary"
-                onClick={handleValidateAndMigratePlan}
-                disabled={validatePlanDagLoading}
+                onClick={handleResetProject}
+                disabled={resetProjectLoading}
               >
-                {validatePlanDagLoading && <Spinner className="mr-2 h-4 w-4" />}
+                {resetProjectLoading && <Spinner className="mr-2 h-4 w-4" />}
                 <IconAdjustments className="mr-2 h-4 w-4" />
-                Validate &amp; migrate plan
+                Reset project
               </Button>
               <Button variant="secondary" onClick={() => handleDownloadYAML()} disabled={!planDag}>
                 <IconDownload className="mr-2 h-4 w-4" />

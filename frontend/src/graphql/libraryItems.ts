@@ -123,6 +123,19 @@ export const EXPORT_PROJECT_ARCHIVE = gql`
   }
 `
 
+export const RESET_PROJECT = gql`
+  mutation ResetProject($projectId: Int!, $includeKnowledgeBase: Boolean) {
+    resetProject(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase) {
+      id
+      name
+      description
+      tags
+      createdAt
+      updatedAt
+    }
+  }
+`
+
 export const CREATE_PROJECT_FROM_LIBRARY = gql`
   mutation CreateProjectFromLibrary($libraryItemId: Int!, $name: String) {
     createProjectFromLibrary(libraryItemId: $libraryItemId, name: $name) {

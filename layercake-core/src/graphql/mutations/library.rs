@@ -231,6 +231,49 @@ impl LibraryMutation {
         Ok(Project::from(project))
     }
 
+    /// Reset a project by exporting and re-importing it
+    /// This recreates the project with fresh IDs while preserving all data
+    async fn reset_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+
+        // Export the project
+        let archive = context
+            .app
+            .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
+            .await
+            .map_err(|e| StructuredError::service("AppContext::export_project_archive", e))?;
+
+        // Get project name before deletion
+        let projects = context.app.list_projects().await
+            .map_err(|e| StructuredError::service("AppContext::list_projects", e))?;
+        let project_name = projects
+            .into_iter()
+            .find(|p| p.id == project_id)
+            .map(|p| p.name)
+            .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
+
+        // Delete the old project
+        context
+            .app
+            .delete_project(project_id)
+            .await
+            .map_err(|e| StructuredError::service("AppContext::delete_project", e))?;
+
+        // Re-import the project
+        let new_project = context
+            .app
+            .import_project_archive(archive.bytes, Some(project_name))
+            .await
+            .map_err(|e| StructuredError::service("AppContext::import_project_archive", e))?;
+
+        Ok(Project::from(new_project))
+    }
+
     /// Create a new project from a stored library item (project or template)
     async fn create_project_from_library(
         &self,
