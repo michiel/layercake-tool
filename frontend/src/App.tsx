@@ -234,28 +234,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
       }
     }
 
-    const dataAcquisitionChildren: ProjectNavChild[] = [
-      {
-        key: 'knowledge-base',
-        label: 'Knowledge base',
-        route: `/projects/${projectId}/data-acquisition/knowledge-base`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
-      },
+    const graphCreationChildren: ProjectNavChild[] = [
       {
         key: 'data-sets',
         label: 'Data sets',
         route: `/projects/${projectId}/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/datasets`),
       },
-      {
-        key: 'code-analysis',
-        label: 'Code analysis',
-        route: `/projects/${projectId}/data-acquisition/code-analysis`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/code-analysis`),
-      },
-    ]
-
-    const graphCreationChildren: ProjectNavChild[] = [
       {
         key: 'plans',
         label: 'Plans',
@@ -274,18 +259,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         route: `/projects/${projectId}/stories`,
         isActive: makeRouteMatcher(`/projects/${projectId}/stories`, { prefix: true }),
       },
-      {
-        key: 'graphs',
-        label: 'Graphs',
-        route: `/projects/${projectId}/graphs`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
-      },
-      {
-        key: 'projections',
-        label: 'Projections',
-        route: `/projects/${projectId}/workbench/projections`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/projections`, { prefix: true }),
-      },
     ]
 
     const experimentalChildren: ProjectNavChild[] = [
@@ -302,10 +275,34 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
       },
       {
+        key: 'knowledge-base',
+        label: 'Knowledge base',
+        route: `/projects/${projectId}/data-acquisition/knowledge-base`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
+      },
+      {
         key: 'dataset-creation',
         label: 'Data set creation',
         route: `/projects/${projectId}/data-acquisition/datasets`,
         isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
+      },
+      {
+        key: 'code-analysis',
+        label: 'Code analysis',
+        route: `/projects/${projectId}/data-acquisition/code-analysis`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/code-analysis`),
+      },
+      {
+        key: 'graphs',
+        label: 'Graphs',
+        route: `/projects/${projectId}/graphs`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/graphs`),
+      },
+      {
+        key: 'projections',
+        label: 'Projections',
+        route: `/projects/${projectId}/workbench/projections`,
+        isActive: makeRouteMatcher(`/projects/${projectId}/workbench/projections`, { prefix: true }),
       },
     ]
 
@@ -315,13 +312,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         label: 'Project overview',
         icon: <IconFolderPlus className="h-4 w-4" />,
         route: `/projects/${projectId}`,
-      }),
-      createSection({
-        key: 'data-acquisition',
-        label: 'Data management',
-        icon: <IconDatabase className="h-4 w-4" />,
-        route: dataAcquisitionChildren[0].route,
-        children: dataAcquisitionChildren,
       }),
       createSection({
         key: 'graph-creation',
