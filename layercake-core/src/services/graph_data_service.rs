@@ -133,7 +133,7 @@ impl GraphDataService {
     ) -> Result<(), sea_orm::DbErr> {
         let txn = self.db.begin().await?;
 
-        // Gather node ids to validate FK constraints before inserting edges
+        // Gather node ids for informational logging about external references
         let node_ids: std::collections::HashSet<String> = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .all(&txn)
@@ -148,14 +148,17 @@ impl GraphDataService {
             .await?;
 
         let now = Utc::now();
+        let mut external_ref_count = 0;
         for edge in edges.iter() {
-            // Skip edges that reference missing nodes to avoid FK violations
+            // Allow edges that reference external nodes (nodes from other datasets)
+            // This is a design feature for managing connections between datasets separately
             if !node_ids.contains(&edge.source) || !node_ids.contains(&edge.target) {
-                warn!(
-                    "Skipping edge {} because source or target is missing (source={}, target={})",
+                external_ref_count += 1;
+                debug!(
+                    "Edge {} references external node(s) (source={}, target={}). \
+                    This is expected when edges connect nodes from other datasets.",
                     edge.external_id, edge.source, edge.target
                 );
-                continue;
             }
 
             let active = graph_data_edges::ActiveModel {
@@ -173,6 +176,15 @@ impl GraphDataService {
                 ..Default::default()
             };
             graph_data_edges::Entity::insert(active).exec(&txn).await?;
+        }
+
+        if external_ref_count > 0 {
+            info!(
+                "Persisted {} edge(s) with external node references for graph_data {}. \
+                These edges will connect to nodes from other datasets during merge.",
+                external_ref_count,
+                graph_data_id
+            );
         }
 
         graph_data::ActiveModel {
