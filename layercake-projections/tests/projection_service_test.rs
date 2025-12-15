@@ -1,5 +1,4 @@
 use chrono::Utc;
-use layercake_core::database::migrations::Migrator;
 use layercake_projections::entities::{
     graph_data, graph_data_edges, graph_data_nodes, projections,
 };
@@ -7,13 +6,89 @@ use layercake_projections::service::{
     ProjectionCreateInput, ProjectionService, ProjectionUpdateInput,
 };
 use sea_orm::prelude::*;
-use sea_orm::{ActiveModelTrait, Database, Set};
-use sea_orm_migration::MigratorTrait;
+use sea_orm::{ActiveModelTrait, Database, Set, Statement};
 use serde_json::json;
 
 async fn setup_db() -> DatabaseConnection {
     let db = Database::connect("sqlite::memory:").await.unwrap();
-    Migrator::up(&db, None).await.unwrap();
+    // Minimal schema needed for projection service tests
+    let stmts = [
+        r#"CREATE TABLE graph_data (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            source_type TEXT NOT NULL,
+            dag_node_id TEXT,
+            file_format TEXT,
+            origin TEXT,
+            filename TEXT,
+            blob BLOB,
+            file_size INTEGER,
+            processed_at DATETIME,
+            source_hash TEXT,
+            computed_date DATETIME,
+            last_edit_sequence INTEGER NOT NULL DEFAULT 0,
+            has_pending_edits BOOLEAN NOT NULL DEFAULT 0,
+            last_replay_at DATETIME,
+            node_count INTEGER NOT NULL DEFAULT 0,
+            edge_count INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            metadata JSON,
+            annotations JSON,
+            status TEXT NOT NULL DEFAULT 'active',
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        );"#,
+        r#"CREATE TABLE graph_data_nodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            graph_data_id INTEGER NOT NULL,
+            external_id TEXT NOT NULL,
+            label TEXT,
+            layer TEXT,
+            weight REAL,
+            is_partition BOOLEAN NOT NULL DEFAULT 0,
+            belongs_to TEXT,
+            comment TEXT,
+            source_dataset_id INTEGER,
+            attributes JSON,
+            created_at DATETIME NOT NULL,
+            FOREIGN KEY(graph_data_id) REFERENCES graph_data(id)
+        );"#,
+        r#"CREATE TABLE graph_data_edges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            graph_data_id INTEGER NOT NULL,
+            external_id TEXT NOT NULL,
+            source TEXT NOT NULL,
+            target TEXT NOT NULL,
+            label TEXT,
+            layer TEXT,
+            weight REAL,
+            comment TEXT,
+            source_dataset_id INTEGER,
+            attributes JSON,
+            created_at DATETIME NOT NULL,
+            FOREIGN KEY(graph_data_id) REFERENCES graph_data(id)
+        );"#,
+        r#"CREATE TABLE projections (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id INTEGER NOT NULL,
+            graph_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            projection_type TEXT NOT NULL,
+            settings_json JSON,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            FOREIGN KEY(graph_id) REFERENCES graph_data(id)
+        );"#,
+    ];
+    for sql in stmts {
+        db.execute(Statement::from_string(
+            sea_orm::DatabaseBackend::Sqlite,
+            sql.to_string(),
+        ))
+        .await
+        .unwrap();
+    }
     db
 }
 

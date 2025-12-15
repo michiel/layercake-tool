@@ -3,7 +3,9 @@ use layercake as layercake_core;
 use layercake_core::database::entities::{graph_data, plan_dag_nodes, project_layers, projects};
 use layercake_core::database::migrations::Migrator;
 use layercake_core::pipeline::DagExecutor;
-use layercake_core::services::{GraphDataCreate, GraphDataNodeInput, GraphDataService};
+use layercake_core::services::{
+    GraphDataCreate, GraphDataEdgeInput, GraphDataNodeInput, GraphDataService,
+};
 use sea_orm::prelude::*;
 use sea_orm::{ActiveModelTrait, Database, Set};
 use sea_orm_migration::MigratorTrait;
@@ -62,6 +64,16 @@ async fn create_test_dataset(
     project_id: i32,
     name: &str,
 ) -> graph_data::Model {
+    create_dataset_with_edges(service, project_id, name, vec![], vec![]).await
+}
+
+async fn create_dataset_with_edges(
+    service: &GraphDataService,
+    project_id: i32,
+    name: &str,
+    nodes: Vec<GraphDataNodeInput>,
+    edges: Vec<layercake_core::services::GraphDataEdgeInput>,
+) -> graph_data::Model {
     let dataset = service
         .create(GraphDataCreate {
             project_id,
@@ -90,35 +102,56 @@ async fn create_test_dataset(
     service
         .replace_nodes(
             dataset.id,
-            vec![
-                GraphDataNodeInput {
-                    external_id: format!("{}-n1", name),
-                    label: Some(format!("{} Node 1", name)),
-                    layer: Some("L1".to_string()),
-                    weight: Some(1.0),
-                    is_partition: Some(false),
-                    belongs_to: None,
-                    comment: None,
-                    source_dataset_id: Some(dataset.id),
-                    attributes: None,
-                    created_at: None,
-                },
-                GraphDataNodeInput {
-                    external_id: format!("{}-n2", name),
-                    label: Some(format!("{} Node 2", name)),
-                    layer: Some("L1".to_string()),
-                    weight: Some(2.0),
-                    is_partition: Some(false),
-                    belongs_to: None,
-                    comment: None,
-                    source_dataset_id: Some(dataset.id),
-                    attributes: None,
-                    created_at: None,
-                },
-            ],
+            if nodes.is_empty() {
+                vec![
+                    GraphDataNodeInput {
+                        external_id: format!("{}-n1", name),
+                        label: Some(format!("{} Node 1", name)),
+                        layer: Some("L1".to_string()),
+                        weight: Some(1.0),
+                        is_partition: Some(false),
+                        belongs_to: None,
+                        comment: None,
+                        source_dataset_id: Some(dataset.id),
+                        attributes: None,
+                        created_at: None,
+                    },
+                    GraphDataNodeInput {
+                        external_id: format!("{}-n2", name),
+                        label: Some(format!("{} Node 2", name)),
+                        layer: Some("L1".to_string()),
+                        weight: Some(2.0),
+                        is_partition: Some(false),
+                        belongs_to: None,
+                        comment: None,
+                        source_dataset_id: Some(dataset.id),
+                        attributes: None,
+                        created_at: None,
+                    },
+                ]
+            } else {
+                nodes
+            },
         )
         .await
         .unwrap();
+
+    if !edges.is_empty() {
+        service
+            .replace_edges(
+                dataset.id,
+                edges
+                    .into_iter()
+                    .map(|mut e| {
+                        let mut edge = e;
+                        edge.source_dataset_id = Some(dataset.id);
+                        edge
+                    })
+                    .collect(),
+            )
+            .await
+            .unwrap();
+    }
 
     dataset
 }
@@ -261,6 +294,177 @@ async fn test_dag_executor_graph_chaining() {
         "Graph2 should inherit graph1's merged nodes"
     );
     assert_eq!(graph2.node_count, 4, "Should have 4 nodes total");
+}
+
+#[tokio::test]
+async fn test_merge_preserves_edges_and_partition_flags() {
+    let db = setup_db().await;
+    let project_id = seed_project_and_palette(&db).await;
+    let service = GraphDataService::new(db.clone());
+
+    let dataset_a = create_dataset_with_edges(
+        &service,
+        project_id,
+        "A",
+        vec![
+            GraphDataNodeInput {
+                external_id: "A-root".into(),
+                label: Some("Root".into()),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                is_partition: Some(true),
+                belongs_to: None,
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            },
+            GraphDataNodeInput {
+                external_id: "A-child".into(),
+                label: Some("Child".into()),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                is_partition: Some(false),
+                belongs_to: Some("A-root".into()),
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            },
+        ],
+        (0..3)
+            .map(|i| GraphDataEdgeInput {
+                external_id: format!("A-e{}", i),
+                source: "A-root".into(),
+                target: "A-child".into(),
+                label: Some(format!("A edge {}", i)),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            })
+            .collect(),
+    )
+    .await;
+
+    let dataset_b = create_dataset_with_edges(
+        &service,
+        project_id,
+        "B",
+        vec![
+            GraphDataNodeInput {
+                external_id: "B-n1".into(),
+                label: Some("B1".into()),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                is_partition: Some(false),
+                belongs_to: None,
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            },
+            GraphDataNodeInput {
+                external_id: "B-n2".into(),
+                label: Some("B2".into()),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                is_partition: Some(false),
+                belongs_to: None,
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            },
+            GraphDataNodeInput {
+                external_id: "B-n3".into(),
+                label: Some("B3".into()),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                is_partition: Some(false),
+                belongs_to: None,
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            },
+        ],
+        (0..12)
+            .map(|i| GraphDataEdgeInput {
+                external_id: format!("B-e{}", i),
+                source: if i % 2 == 0 { "B-n1".into() } else { "B-n2".into() },
+                target: "B-n3".into(),
+                label: Some(format!("B edge {}", i)),
+                layer: Some("L1".into()),
+                weight: Some(1.0),
+                comment: None,
+                source_dataset_id: None,
+                attributes: None,
+                created_at: None,
+            })
+            .collect(),
+    )
+    .await;
+
+    let nodes = vec![plan_dag_nodes::Model {
+        id: "merge-node".to_string(),
+        plan_id: 1,
+        node_type: "GraphNode".to_string(),
+        position_x: 0.0,
+        position_y: 0.0,
+        source_position: None,
+        target_position: None,
+        metadata_json: json!({"label": "Merged Graph"}).to_string(),
+        config_json: json!({"graphDataIds": [dataset_a.id, dataset_b.id]}).to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }];
+    let edges: Vec<(String, String)> = vec![];
+
+    let executor = DagExecutor::new(db.clone());
+    executor
+        .execute_dag(project_id, 1, &nodes, &edges)
+        .await
+        .expect("DAG should succeed");
+
+    let merged = service
+        .get_by_dag_node("merge-node")
+        .await
+        .expect("query merged graph")
+        .expect("merged graph missing");
+    assert_eq!(merged.edge_count, 15, "expected edges from both datasets");
+
+    let merged_nodes = service.load_nodes(merged.id).await.unwrap();
+    let merged_edges = service.load_edges(merged.id).await.unwrap();
+    assert_eq!(
+        merged_nodes.len(),
+        5,
+        "should merge all nodes from both datasets"
+    );
+    assert_eq!(merged_edges.len(), 15, "edges should be preserved");
+
+    let root = merged_nodes
+        .iter()
+        .find(|n| n.external_id == "A-root")
+        .expect("root node missing");
+    assert!(root.is_partition, "partition flag should be preserved");
+
+    let child = merged_nodes
+        .iter()
+        .find(|n| n.external_id == "A-child")
+        .expect("child node missing");
+    assert_eq!(
+        child.belongs_to.as_deref(),
+        Some("A-root"),
+        "belongs_to should survive merges"
+    );
+
+    assert!(
+        merged_edges.iter().any(|e| e.external_id == "B-e11"),
+        "edge ids should remain stable through merge"
+    );
 }
 
 #[tokio::test]
