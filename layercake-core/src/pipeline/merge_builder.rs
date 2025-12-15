@@ -108,6 +108,37 @@ impl MergeBuilder {
             }
         }
 
+        // Check for conflicting edge IDs: same ID but different (source, target, layer, dataset)
+        // This would violate UNIQUE (graph_data_id, external_id) when persisted
+        let mut edge_id_to_details: HashMap<String, Vec<String>> = HashMap::new();
+        for edge in edges_map.values() {
+            let details = format!("{}→{} (layer:{}, dataset:{})",
+                edge.source,
+                edge.target,
+                edge.layer.as_ref().map(|s| s.as_str()).unwrap_or("none"),
+                edge.dataset.map(|d| d.to_string()).unwrap_or_else(|| "none".to_string())
+            );
+            edge_id_to_details
+                .entry(edge.id.clone())
+                .or_insert_with(Vec::new)
+                .push(details);
+        }
+
+        let conflicts: Vec<String> = edge_id_to_details
+            .iter()
+            .filter(|(_, details)| details.len() > 1)
+            .map(|(id, details)| format!("'{}' appears in: {}", id, details.join(", ")))
+            .collect();
+
+        if !conflicts.is_empty() {
+            return Err(anyhow!(
+                "Merge failed: Conflicting edge IDs detected. The following edge IDs are used for different edges:\n  {}\n\n\
+                Edge IDs must uniquely identify edges within the merged result. This indicates a data quality issue in your source datasets. \
+                Please ensure each edge has a unique ID, or use composite IDs like 'source-target' or 'relation_type_N'.",
+                conflicts.join("\n  ")
+            ));
+        }
+
         // Build merged Graph struct
         let nodes: Vec<Node> = nodes_map
             .into_values()
