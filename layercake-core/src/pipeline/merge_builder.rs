@@ -95,75 +95,17 @@ impl MergeBuilder {
             }
         }
 
-        // Check for duplicate node IDs that would violate project-wide uniqueness
-        let node_id_counts: HashMap<String, usize> = nodes_map
-            .values()
-            .fold(HashMap::new(), |mut acc, node| {
-                *acc.entry(node.id.clone()).or_insert(0) += 1;
-                acc
-            });
-
-        let node_duplicates: Vec<(String, usize)> = node_id_counts
-            .iter()
-            .filter(|(_, &count)| count > 1)
-            .map(|(id, count)| (id.clone(), *count))
-            .collect();
-
-        if !node_duplicates.is_empty() {
-            let dup_list: Vec<String> = node_duplicates
-                .iter()
-                .map(|(id, count)| format!("'{}' ({}x)", id, count))
-                .collect();
-            return Err(anyhow!(
-                "Merge validation failed: Duplicate node IDs detected: {}. \
-                Node IDs must be unique across the entire project. \
-                These duplicates likely exist in the source datasets and should be resolved before merging. \
-                You may need to re-import the datasets or use unique node IDs.",
-                dup_list.join(", ")
-            ));
-        }
-
         // Validate edges reference nodes
         let node_ids: HashSet<_> = nodes_map.keys().cloned().collect();
         for (edge_id, edge) in &edges_map {
             if !node_ids.contains(&edge.source) || !node_ids.contains(&edge.target) {
                 return Err(anyhow!(
-                    "Merge validation failed: Edge '{}' references missing node (source:'{}' target:'{}'). \
-                    This usually indicates an incomplete dataset or mismatched node IDs between merged sources.",
+                    "Merge edge {} references missing node (source:{} target:{})",
                     edge_id,
                     edge.source,
                     edge.target
                 ));
             }
-        }
-
-        // Check for duplicate edge IDs that would violate project-wide uniqueness
-        // This shouldn't happen if datasets are properly validated at import, but check defensively
-        let edge_id_counts: HashMap<String, usize> = edges_map
-            .values()
-            .fold(HashMap::new(), |mut acc, edge| {
-                *acc.entry(edge.id.clone()).or_insert(0) += 1;
-                acc
-            });
-
-        let duplicates: Vec<(String, usize)> = edge_id_counts
-            .iter()
-            .filter(|(_, &count)| count > 1)
-            .map(|(id, count)| (id.clone(), *count))
-            .collect();
-
-        if !duplicates.is_empty() {
-            let dup_list: Vec<String> = duplicates
-                .iter()
-                .map(|(id, count)| format!("'{}' ({}x)", id, count))
-                .collect();
-            return Err(anyhow!(
-                "Merge validation failed: Duplicate edge IDs detected: {}. \
-                Edge IDs must be unique across the entire project. \
-                These duplicates likely exist in the source datasets and should be resolved before merging. \
-                You may need to re-import the datasets or use unique edge IDs.",
-                dup_list.join(", ")
-            ));
         }
 
         // Build merged Graph struct
