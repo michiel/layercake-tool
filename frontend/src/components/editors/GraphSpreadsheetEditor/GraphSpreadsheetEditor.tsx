@@ -755,7 +755,23 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
                             </Button>
                           </div>
                         ) : readOnly ? (
-                          <p className="text-sm">{String(node[col] ?? '')}</p>
+                          col === 'is_partition' ? (
+                            <input
+                              type="checkbox"
+                              checked={Boolean(node[col])}
+                              disabled
+                              className="h-4 w-4"
+                            />
+                          ) : (
+                            <p className="text-sm">{String(node[col] ?? '')}</p>
+                          )
+                        ) : col === 'is_partition' ? (
+                          <input
+                            type="checkbox"
+                            checked={Boolean(node[col])}
+                            onChange={(e) => handleNodeChange(rowIdx, col, e.target.checked ? 'true' : 'false')}
+                            className="h-4 w-4"
+                          />
                         ) : (
                           <Input
                             value={String(node[col] ?? '')}
