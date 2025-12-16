@@ -353,10 +353,6 @@ export const isNodeConfigured = (
   edges: Edge[],
   hasValidConfig: boolean = true
 ): boolean => {
-  if (!hasValidConfig) {
-    return false; // Node-specific configuration must pass validation
-  }
-
   const inputEdges = edges.filter(edge => edge.target === nodeId);
   const outputEdges = edges.filter(edge => edge.source === nodeId);
 
@@ -380,9 +376,13 @@ export const isNodeConfigured = (
 
     case PlanDagNodeType.GRAPH_ARTEFACT:
     case PlanDagNodeType.TREE_ARTEFACT:
-    case PlanDagNodeType.PROJECTION:
     case PlanDagNodeType.SEQUENCE_ARTEFACT:
-      // Artefact and Projection nodes MUST have one input to be configured
+      // Artefact nodes MUST have one input and valid config to be configured
+      return inputEdges.length === 1 && hasValidConfig;
+
+    case PlanDagNodeType.PROJECTION:
+      // Projection nodes are configured when connected (they have defaults)
+      // They start with default settings (force3d) and work without explicit config
       return inputEdges.length === 1;
 
     case PlanDagNodeType.MERGE:
