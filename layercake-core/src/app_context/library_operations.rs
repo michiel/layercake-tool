@@ -204,9 +204,37 @@ struct KnowledgeBaseIndex {
     vector_states: Vec<KnowledgeBaseVectorStateEntry>,
 }
 
+fn deserialize_i32_from_string_or_number<'de, D>(deserializer: D) -> Result<i32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::{self, Unexpected};
+    use serde_json::Value;
+
+    let value = Value::deserialize(deserializer)?;
+    match value {
+        Value::Number(n) => n
+            .as_i64()
+            .and_then(|i| i32::try_from(i).ok())
+            .ok_or_else(|| de::Error::invalid_value(Unexpected::Signed(n.as_i64().unwrap_or(0)), &"a valid i32")),
+        Value::String(s) => s
+            .parse::<i32>()
+            .map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &"a string containing a valid i32")),
+        _ => Err(de::Error::invalid_type(
+            match value {
+                Value::Bool(_) => Unexpected::Bool(false),
+                Value::Null => Unexpected::Unit,
+                _ => Unexpected::Other("unexpected type"),
+            },
+            &"a number or string representing an i32",
+        )),
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DatasetBundleDescriptor {
+    #[serde(deserialize_with = "deserialize_i32_from_string_or_number")]
     pub original_id: i32,
     pub name: String,
     pub description: Option<String>,
