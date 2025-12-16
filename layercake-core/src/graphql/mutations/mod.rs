@@ -55,6 +55,6 @@ pub struct Mutation(
     pub project::ProjectMutation,
     pub projection::ProjectionMutation,
     pub sequence::SequenceMutation,
-    // pub story::StoryMutation,
+    pub story::StoryMutation,
     pub system::SystemMutation,
 );
