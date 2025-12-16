@@ -1,26 +1,22 @@
-# Origin Tracking Implementation Plan
+# Dataset Source Tracking Implementation Plan
 
 ## Overview
 
-Currently, when datasets are used as inputs for graphs, the information about source datasets for individual nodes and edges is lost during transformations and merges. This plan implements comprehensive origin tracking to:
+Currently, when datasets are used as inputs for graphs, the information about source datasets for individual nodes and edges is lost during transformations and merges. This plan ensures that `source_dataset_id` is properly preserved throughout the pipeline so we can trace which dataset each node/edge originally came from.
 
-- Track which dataset each node/edge originally came from
-- Track when transformations create new nodes/edges
-- Maintain a registry of all origins (datasets + transformations) in graph metadata
-- Provide lineage/provenance information for graph elements throughout the pipeline
-
-**Key Concepts:**
-- **Origin**: A source that creates nodes/edges (either a dataset or a transformation)
-- **Origin ID**: A unique identifier for an origin (dataset ID or transformation-specific ID)
-- **Origins Metadata**: A map stored in `graph_data.metadata` that describes all origins contributing to a graph
+**Key Goals:**
+- Preserve `source_dataset_id` on nodes/edges when they pass through transformations
+- Ensure dataset imports correctly set `source_dataset_id`
+- Make dataset source information available in GraphQL and UI
+- No transformation tracking needed - focus only on dataset provenance
 
 ## Current State
 
 ### Database Schema
-- `graph_data` table has `metadata` JSON column (currently unused for origins)
-- `graph_data_nodes` has `source_dataset_id INTEGER` column
-- `graph_data_edges` has `source_dataset_id INTEGER` column
+- `graph_data_nodes` has `source_dataset_id INTEGER NULL` column
+- `graph_data_edges` has `source_dataset_id INTEGER NULL` column
 - Both refer to `data_sets.id` when the node/edge came from a dataset
+- **Already exists** - no schema changes needed
 
 ### In-Memory Graph Structure (Rust)
 ```rust
@@ -35,425 +31,166 @@ pub struct Graph {
 pub struct Node {
     pub id: String,
     // ... other fields
-    pub dataset: Option<i32>,  // Currently maps to source_dataset_id
+    pub dataset: Option<i32>,  // Maps to source_dataset_id
 }
 
 pub struct Edge {
     pub id: String,
     // ... other fields
-    pub dataset: Option<i32>,  // Currently maps to source_dataset_id
+    pub dataset: Option<i32>,  // Maps to source_dataset_id
 }
 ```
+
+### Current Issues
+1. **Dataset imports may not set `source_dataset_id`** - Need to verify and fix
+2. **Transformations may lose `source_dataset_id`** - Filter/Transform/Merge need to preserve it
+3. **GraphQL may not expose dataset info** - Need to add resolvers
+4. **UI doesn't show dataset source** - Need to display which dataset nodes/edges came from
 
 ## Target State
 
-### Database Schema Changes
+### Database Schema
+- **No changes needed** - Keep existing `source_dataset_id` columns as-is
 
-1. **Rename columns** (breaking change requires migration):
-   - `graph_data_nodes.source_dataset_id` → `origin_id` (TEXT, nullable)
-   - `graph_data_edges.source_dataset_id` → `origin_id` (TEXT, nullable)
-   - Store as TEXT to support both `dataset:<id>` and `transform:<dag_node_id>` formats
+### In-Memory Graph Structure
+- **No changes needed** - Keep existing `dataset: Option<i32>` field
+- Dataset metadata can be looked up from project's datasets when needed
 
-2. **Use `graph_data.metadata` JSON column** to store origins map:
-   ```json
-   {
-     "origins": {
-       "dataset:42": {
-         "type": "dataset",
-         "datasetId": 42,
-         "name": "Customer Data",
-         "fileName": "customers.csv"
-       },
-       "dataset:43": {
-         "type": "dataset",
-         "datasetId": 43,
-         "name": "Order Data",
-         "fileName": "orders.json"
-       },
-       "transform:filter-node-123": {
-         "type": "transformation",
-         "nodeId": "filter-node-123",
-         "nodeType": "FilterNode",
-         "operation": "layer_filter",
-         "config": { "layer": "important" }
-       },
-       "transform:merge-abc": {
-         "type": "transformation",
-         "nodeId": "merge-abc",
-         "nodeType": "MergeNode",
-         "operation": "merge"
-       }
-     }
-   }
-   ```
+### Behavior Changes
 
-### In-Memory Graph Structure Changes
-
-```rust
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Graph {
-    pub name: String,
-    pub nodes: Vec<Node>,
-    pub edges: Vec<Edge>,
-    pub layers: Vec<Layer>,
-    pub annotations: Option<String>,
-    /// Map of origin_id -> origin metadata
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub origins: Option<HashMap<String, Origin>>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum Origin {
-    Dataset {
-        #[serde(rename = "datasetId")]
-        dataset_id: i32,
-        name: String,
-        #[serde(rename = "fileName", skip_serializing_if = "Option::is_none")]
-        file_name: Option<String>,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        origin: Option<String>,
-    },
-    Transformation {
-        #[serde(rename = "nodeId")]
-        node_id: String,
-        #[serde(rename = "nodeType")]
-        node_type: String,
-        operation: String,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        config: Option<serde_json::Value>,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct Node {
-    pub id: String,
-    pub label: String,
-    pub layer: String,
-    // ... existing fields ...
-
-    /// Origin ID referencing the origins map (replaces dataset field)
-    #[serde(rename = "originId", skip_serializing_if = "Option::is_none")]
-    pub origin_id: Option<String>,
-
-    /// DEPRECATED: Use origin_id instead. Kept for backwards compatibility during migration.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[deprecated(note = "Use origin_id instead")]
-    pub dataset: Option<i32>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
-pub struct Edge {
-    pub id: String,
-    pub source: String,
-    pub target: String,
-    // ... existing fields ...
-
-    /// Origin ID referencing the origins map (replaces dataset field)
-    #[serde(rename = "originId", skip_serializing_if = "Option::is_none")]
-    pub origin_id: Option<String>,
-
-    /// DEPRECATED: Use origin_id instead. Kept for backwards compatibility during migration.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[deprecated(note = "Use origin_id instead")]
-    pub dataset: Option<i32>,
-}
-```
-
-### GraphQL Schema Changes
-
-```graphql
-type Graph {
-  id: ID!
-  projectId: ID!
-  # ... existing fields ...
-  origins: [Origin!]
-}
-
-union Origin = DatasetOrigin | TransformationOrigin
-
-type DatasetOrigin {
-  type: String! # "dataset"
-  originId: String! # "dataset:42"
-  datasetId: ID!
-  name: String!
-  fileName: String
-  origin: String
-}
-
-type TransformationOrigin {
-  type: String! # "transformation"
-  originId: String! # "transform:filter-node-123"
-  nodeId: String!
-  nodeType: String!
-  operation: String!
-  config: JSON
-}
-
-type Node {
-  id: String!
-  # ... existing fields ...
-  originId: String
-  origin: Origin
-}
-
-type Edge {
-  id: String!
-  # ... existing fields ...
-  originId: String
-  origin: Origin
-}
-```
+1. **Dataset Import**: Always set `source_dataset_id` on imported nodes/edges
+2. **Filter Operations**: Preserve `source_dataset_id` on filtered nodes/edges
+3. **Transform Operations**:
+   - Preserve `source_dataset_id` on modified nodes/edges
+   - New nodes/edges created by transforms have `source_dataset_id = NULL`
+4. **Merge Operations**: Preserve `source_dataset_id` from source nodes/edges
+5. **GraphQL**: Add resolver to fetch dataset details by ID
+6. **UI**: Display dataset name/info for nodes/edges with `source_dataset_id`
 
 ## Implementation Phases
 
-### Phase 1: Database Schema Migration
+### Phase 1: Audit Current State
 
-**Goal**: Migrate database columns without breaking existing functionality
+**Goal**: Understand where `source_dataset_id` is currently being set/preserved
 
 **Tasks**:
-1. Create migration `m20251217_000001_add_origin_tracking.rs`
-   - Add `origin_id TEXT` column to `graph_data_nodes` (nullable)
-   - Add `origin_id TEXT` column to `graph_data_edges` (nullable)
-   - Backfill existing `origin_id` from `source_dataset_id`: `UPDATE graph_data_nodes SET origin_id = 'dataset:' || source_dataset_id WHERE source_dataset_id IS NOT NULL`
-   - Same for `graph_data_edges`
-   - Add indices: `CREATE INDEX idx_nodes_origin ON graph_data_nodes(origin_id)` and `CREATE INDEX idx_edges_origin ON graph_data_edges(origin_id)`
-
-2. Update SeaORM entities
-   - `layercake-core/src/database/entities/graph_data_nodes.rs`: Add `origin_id` field
-   - `layercake-core/src/database/entities/graph_data_edges.rs`: Add `origin_id` field
-   - Keep `source_dataset_id` fields temporarily for backwards compatibility
+1. Audit `GraphDataService::replace_nodes()` - verify it sets `source_dataset_id`
+2. Audit `GraphDataService::replace_edges()` - verify it sets `source_dataset_id`
+3. Audit `GraphDataService::load_full()` - verify it populates `node.dataset` and `edge.dataset`
+4. Check all transformation builders:
+   - `FilterBuilder::filter_graph()` - does it preserve `dataset` field?
+   - `TransformBuilder` operations - do they preserve `dataset` field?
+   - `MergeBuilder::merge_sources()` - does it preserve `dataset` field?
+5. Document current behavior in test file
 
 **Success Criteria**:
-- Migration runs successfully on test database
-- All tests pass with both `origin_id` and `source_dataset_id` populated
-- No data loss
+- Clear documentation of which operations currently preserve `source_dataset_id`
+- List of gaps where `source_dataset_id` is being lost
 
-### Phase 2: Core Data Model Updates
+### Phase 2: Fix Dataset Import
 
-**Goal**: Update Rust types to support origin tracking
+**Goal**: Ensure all dataset imports set `source_dataset_id`
 
 **Tasks**:
-1. Add `Origin` enum to `layercake-core/src/graph.rs`
+1. Update `GraphDataService::replace_nodes()` in `layercake-core/src/services/graph_data_service.rs`:
    ```rust
-   #[derive(Serialize, Deserialize, Clone, Debug)]
-   #[serde(tag = "type", rename_all = "lowercase")]
-   pub enum Origin {
-       Dataset {
-           #[serde(rename = "datasetId")]
-           dataset_id: i32,
-           name: String,
-           #[serde(rename = "fileName", skip_serializing_if = "Option::is_none")]
-           file_name: Option<String>,
-           #[serde(skip_serializing_if = "Option::is_none")]
-           origin: Option<String>,
-       },
-       Transformation {
-           #[serde(rename = "nodeId")]
-           node_id: String,
-           #[serde(rename = "nodeType")]
-           node_type: String,
-           operation: String,
-           #[serde(skip_serializing_if = "Option::is_none")]
-           config: Option<serde_json::Value>,
-       },
-   }
-   ```
+   pub async fn replace_nodes(
+       &self,
+       graph_data_id: i32,
+       nodes: &[graph_data_nodes::Model],
+       source_dataset_id: Option<i32>, // NEW parameter
+   ) -> Result<()> {
+       // ... existing code ...
 
-2. Update `Graph` struct in `layercake-core/src/graph.rs`
-   - Add `pub origins: Option<HashMap<String, Origin>>`
-
-3. Update `Node` and `Edge` structs
-   - Add `pub origin_id: Option<String>`
-   - Deprecate but keep `pub dataset: Option<i32>` for backwards compatibility
-
-4. Add helper functions:
-   ```rust
-   impl Graph {
-       pub fn add_dataset_origin(&mut self, dataset_id: i32, name: String, file_name: Option<String>, origin: Option<String>) -> String {
-           let origin_id = format!("dataset:{}", dataset_id);
-           self.origins.get_or_insert_with(HashMap::new).insert(
-               origin_id.clone(),
-               Origin::Dataset { dataset_id, name, file_name, origin }
-           );
-           origin_id
-       }
-
-       pub fn add_transformation_origin(&mut self, node_id: String, node_type: String, operation: String, config: Option<serde_json::Value>) -> String {
-           let origin_id = format!("transform:{}", node_id);
-           self.origins.get_or_insert_with(HashMap::new).insert(
-               origin_id.clone(),
-               Origin::Transformation { node_id, node_type, operation, config }
-           );
-           origin_id
-       }
-
-       pub fn get_origin(&self, origin_id: &str) -> Option<&Origin> {
-           self.origins.as_ref()?.get(origin_id)
+       for node in nodes.iter() {
+           let active = graph_data_nodes::ActiveModel {
+               graph_data_id: Set(graph_data_id),
+               external_id: Set(node.external_id.clone()),
+               source_dataset_id: Set(source_dataset_id), // Set from parameter
+               // ... other fields
+           };
+           // ... insert
        }
    }
    ```
 
-**Success Criteria**:
-- All types compile
-- Serialization/deserialization tests pass
-- Helper methods work correctly
-
-### Phase 3: Dataset Import with Origin Tracking
-
-**Goal**: Set origin_id when importing datasets
-
-**Tasks**:
-1. Update `GraphDataService::replace_nodes()` in `layercake-core/src/services/graph_data_service.rs`
-   - When creating node records, generate `origin_id` from dataset info
-   - Set `origin_id = format!("dataset:{}", dataset_id)` for nodes from datasets
-
-2. Update `GraphDataService::replace_edges()`
-   - Same logic for edges
-
-3. Update `GraphDataService::load_full()` to populate `Graph.origins`
-   - Query all unique `origin_id` values from nodes and edges
-   - For `dataset:*` origins, fetch dataset metadata from `data_sets` table
-   - Build `origins` HashMap
-   - Populate `node.origin_id` and `edge.origin_id` when building Graph
-
-4. Update dataset import in `DataSetService::create_from_file()`
-   - Ensure dataset ID is available when calling `graph_data_service.replace_nodes/edges`
-   - Pass dataset metadata so origins can be populated
-
-**Code Example**:
-```rust
-// In GraphDataService::replace_nodes
-let origin_id = Some(format!("dataset:{}", dataset_id));
-for node in nodes {
-    let active = graph_data_nodes::ActiveModel {
-        graph_data_id: Set(graph_data_id),
-        external_id: Set(node.external_id.clone()),
-        origin_id: Set(origin_id.clone()), // NEW
-        // ... other fields
-    };
-    // ... insert
-}
-
-// In GraphDataService::load_full
-let (gd, nodes, edges) = /* load from DB */;
-
-// Collect all unique origin_ids
-let mut origin_ids: HashSet<String> = nodes.iter()
-    .filter_map(|n| n.origin_id.as_ref())
-    .chain(edges.iter().filter_map(|e| e.origin_id.as_ref()))
-    .map(|s| s.to_string())
-    .collect();
-
-// Build origins map
-let mut origins = HashMap::new();
-for origin_id in origin_ids {
-    if let Some(dataset_id_str) = origin_id.strip_prefix("dataset:") {
-        if let Ok(dataset_id) = dataset_id_str.parse::<i32>() {
-            if let Some(ds) = data_sets::Entity::find_by_id(dataset_id).one(&self.db).await? {
-                origins.insert(origin_id.clone(), Origin::Dataset {
-                    dataset_id,
-                    name: ds.name,
-                    file_name: Some(ds.filename),
-                    origin: ds.origin,
-                });
-            }
-        }
-    }
-    // Transformation origins handled in Phase 4
-}
-
-let graph = Graph {
-    // ... other fields
-    origins: if origins.is_empty() { None } else { Some(origins) },
-};
-```
-
-**Success Criteria**:
-- New dataset imports have `origin_id` set on all nodes/edges
-- Loading a graph populates the `origins` map with dataset metadata
-- Tests verify origin tracking for dataset imports
-
-### Phase 4: Transformation Origin Tracking
-
-**Goal**: Track when transformations create or modify nodes/edges
-
-**Tasks**:
-1. Update `FilterBuilder` in `layercake-core/src/pipeline/filter_builder.rs`
-   - When a filter removes nodes/edges, keep origin_id unchanged on remaining elements
-   - Add transformation origin to graph metadata if any filtering occurred
+2. Update `GraphDataService::replace_edges()` similarly:
    ```rust
-   let transform_origin_id = graph.add_transformation_origin(
-       node_id.to_string(),
-       "FilterNode".to_string(),
-       "layer_filter".to_string(),
-       Some(json!({"layer": layer_name}))
-   );
+   pub async fn replace_edges(
+       &self,
+       graph_data_id: i32,
+       edges: &[graph_data_edges::Model],
+       source_dataset_id: Option<i32>, // NEW parameter
+   ) -> Result<()> {
+       // Similar changes to replace_nodes
+   }
    ```
 
-2. Update `TransformBuilder` in `layercake-core/src/pipeline/transform_builder.rs`
-   - For transformations that modify nodes/edges (weights, labels, attributes):
-     - Preserve origin_id from source nodes/edges
-     - Add transformation origin to metadata
-   - For transformations that CREATE new nodes/edges:
-     - Set `origin_id = format!("transform:{}", node_id)` on new elements
-     - Add transformation origin to metadata
+3. Update dataset import flow in `DataSetService::create_from_file()`:
+   - When calling `replace_nodes()` and `replace_edges()`, pass `Some(dataset.id)`
+   - Ensure the dataset ID is available at the time of import
 
-3. Update `MergeBuilder` in `layercake-core/src/pipeline/merge_builder.rs`
-   - Merge `origins` maps from all upstream graphs
-   - Preserve `origin_id` on nodes/edges from upstream
-   - Add merge transformation to origins if creating combined elements:
+4. Add test to verify nodes/edges have `source_dataset_id` after import
+
+**Code Locations**:
+- `layercake-core/src/services/graph_data_service.rs`: `replace_nodes()`, `replace_edges()`
+- `layercake-core/src/app_context/data_set_operations.rs`: dataset import logic
+
+**Success Criteria**:
+- All nodes/edges imported from datasets have `source_dataset_id` set to dataset ID
+- Test verifies `source_dataset_id` persistence
+- No breaking changes to existing code
+
+### Phase 3: Preserve Dataset Info in Transformations
+
+**Goal**: Ensure transformations preserve `source_dataset_id` on nodes/edges
+
+**Tasks**:
+
+1. **FilterBuilder** (`layercake-core/src/pipeline/filter_builder.rs`):
+   - Verify nodes/edges keep their `dataset` field when filtered
+   - No changes likely needed - filtering just removes elements, doesn't modify them
+   - Add test to confirm
+
+2. **TransformBuilder** (`layercake-core/src/pipeline/transform_builder.rs`):
+   - For operations that modify existing nodes/edges (weight changes, label updates):
+     - **Preserve** the `dataset` field from source
+   - For operations that create new nodes/edges:
+     - **Set** `dataset = None` (new elements don't come from a dataset)
+   - Review each transform operation type and update accordingly
+
+3. **MergeBuilder** (`layercake-core/src/pipeline/merge_builder.rs`):
+   - Already has logic to preserve `dataset` field - verify it works:
      ```rust
-     let merge_origin_id = merged_graph.add_transformation_origin(
-         node_id.to_string(),
-         "MergeNode".to_string(),
-         "merge".to_string(),
-         None
-     );
+     // In merge_sources() around line 64
+     entry.dataset = entry.dataset.or(node.dataset);
      ```
+   - Add test to confirm dataset IDs are preserved from upstream graphs
 
-4. Update `GraphDataBuilder` in `layercake-core/src/pipeline/graph_data_builder.rs`
-   - When persisting computed graphs, serialize `origins` map to `graph_data.metadata`
-   - When loading, deserialize `origins` from metadata
-
-**Code Example**:
+**Code Example** (TransformBuilder):
 ```rust
-// In FilterBuilder::filter_graph
-pub async fn filter_graph(&self, /* ... */) -> Result<Graph> {
+// When modifying existing nodes
+pub async fn update_node_weights(&self, /* ... */) -> Result<Graph> {
     let mut graph = /* load upstream graph */;
 
-    // Add transformation origin for this filter operation
-    let transform_origin_id = graph.add_transformation_origin(
-        node_id.to_string(),
-        "FilterNode".to_string(),
-        "layer_filter".to_string(),
-        Some(json!({"layer": layer_name}))
-    );
-
-    // Filter nodes/edges but preserve their origin_id
-    graph.nodes.retain(|n| n.layer == layer_name);
-    graph.edges.retain(|e| e.layer == layer_name);
+    for node in &mut graph.nodes {
+        node.weight = compute_new_weight(node);
+        // node.dataset is preserved automatically - no change needed
+    }
 
     Ok(graph)
 }
 
-// In TransformBuilder for creating new edges
-pub async fn create_edges(&self, /* ... */) -> Result<Graph> {
-    let mut graph = /* load upstream */;
+// When creating new edges
+pub async fn create_derived_edges(&self, /* ... */) -> Result<Graph> {
+    let mut graph = /* load upstream graph */;
 
-    let transform_origin_id = graph.add_transformation_origin(
-        node_id.to_string(),
-        "TransformNode".to_string(),
-        "create_edges".to_string(),
-        Some(json!({"algorithm": "shortest_path"}))
-    );
-
-    for new_edge in computed_edges {
+    for new_edge in compute_edges() {
         graph.edges.push(Edge {
             id: new_edge.id,
             source: new_edge.source,
             target: new_edge.target,
-            origin_id: Some(transform_origin_id.clone()), // NEW
+            dataset: None, // NEW element, no dataset source
             // ... other fields
         });
     }
@@ -463,320 +200,350 @@ pub async fn create_edges(&self, /* ... */) -> Result<Graph> {
 ```
 
 **Success Criteria**:
-- Filter operations preserve origin_id and add transformation metadata
-- Transform operations that create new elements assign transformation origin_id
-- Merge operations combine origins from all inputs
-- Transformations are visible in graph metadata
+- Filter preserves `dataset` field
+- Transform preserves `dataset` on modified elements, sets `None` on new elements
+- Merge preserves `dataset` from upstream sources
+- Tests verify preservation through full pipeline
 
-### Phase 5: GraphQL API Updates
+### Phase 4: GraphQL API Updates
 
-**Goal**: Expose origin tracking through GraphQL
+**Goal**: Expose dataset source information through GraphQL
 
 **Tasks**:
-1. Add `Origin` types to `layercake-core/src/graphql/types/graph.rs`:
+
+1. Verify `Node` and `Edge` GraphQL types expose `dataset` field:
    ```rust
-   #[derive(Union)]
-   pub enum OriginType {
-       Dataset(DatasetOrigin),
-       Transformation(TransformationOrigin),
-   }
+   // In layercake-core/src/graphql/types/graph.rs
 
    #[derive(SimpleObject)]
-   pub struct DatasetOrigin {
-       #[graphql(name = "type")]
-       pub origin_type: String,
-       #[graphql(name = "originId")]
-       pub origin_id: String,
+   pub struct Node {
+       pub id: String,
+       pub label: String,
+       // ... other fields
+
+       /// Source dataset ID if this node came from a dataset
        #[graphql(name = "datasetId")]
-       pub dataset_id: i32,
-       pub name: String,
-       #[graphql(name = "fileName")]
-       pub file_name: Option<String>,
-       pub origin: Option<String>,
+       pub dataset_id: Option<i32>,
    }
 
    #[derive(SimpleObject)]
-   pub struct TransformationOrigin {
-       #[graphql(name = "type")]
-       pub origin_type: String,
-       #[graphql(name = "originId")]
-       pub origin_id: String,
-       #[graphql(name = "nodeId")]
-       pub node_id: String,
-       #[graphql(name = "nodeType")]
-       pub node_type: String,
-       pub operation: String,
-       pub config: Option<serde_json::Value>,
+   pub struct Edge {
+       pub id: String,
+       pub source: String,
+       pub target: String,
+       // ... other fields
+
+       /// Source dataset ID if this edge came from a dataset
+       #[graphql(name = "datasetId")]
+       pub dataset_id: Option<i32>,
    }
    ```
 
-2. Update `Graph` GraphQL type to include `origins` field
-3. Update `Node` and `Edge` types to include `originId` and resolved `origin` field
-4. Add resolver to lookup origin from origins map:
+2. Add resolver to fetch dataset details (optional - for convenience):
    ```rust
    impl Node {
-       async fn origin(&self, ctx: &Context<'_>) -> Option<OriginType> {
-           let origin_id = self.origin_id.as_ref()?;
-           let graph = ctx.data::<Graph>().ok()?;
-           let origin = graph.get_origin(origin_id)?;
-           // Convert Origin enum to OriginType union
+       async fn dataset(&self, ctx: &Context<'_>) -> Result<Option<DataSet>> {
+           let dataset_id = match self.dataset_id {
+               Some(id) => id,
+               None => return Ok(None),
+           };
+
+           let context = ctx.data::<GraphQLContext>()?;
+           let dataset = data_sets::Entity::find_by_id(dataset_id)
+               .one(&context.db)
+               .await?;
+
+           Ok(dataset.map(DataSet::from))
        }
    }
    ```
 
-**Success Criteria**:
-- GraphQL queries can fetch origins array
-- Node and edge queries can resolve their origin
-- Schema validates and generates correct TypeScript types
-
-### Phase 6: Frontend Integration
-
-**Goal**: Display origin information in UI
-
-**Tasks**:
-1. Update TypeScript types in `frontend/src/types/graph.ts`:
-   ```typescript
-   export type Origin = DatasetOrigin | TransformationOrigin
-
-   export interface DatasetOrigin {
-     type: 'dataset'
-     originId: string
-     datasetId: number
-     name: string
-     fileName?: string
-     origin?: string
-   }
-
-   export interface TransformationOrigin {
-     type: 'transformation'
-     originId: string
-     nodeId: string
-     nodeType: string
-     operation: string
-     config?: any
-   }
-
-   export interface Node {
-     id: string
-     // ... existing fields
-     originId?: string
-     origin?: Origin
-   }
-
-   export interface Edge {
-     id: string
-     // ... existing fields
-     originId?: string
-     origin?: Origin
-   }
-
-   export interface Graph {
-     name: string
-     nodes: Node[]
-     edges: Edge[]
-     layers: Layer[]
-     annotations?: string
-     origins?: Record<string, Origin>
-   }
-   ```
-
-2. Update GraphQL fragments to fetch origin data
+3. Update GraphQL queries to include dataset info:
    ```graphql
-   fragment NodeFields on Node {
-     id
-     label
-     layer
-     # ... existing fields
-     originId
-     origin {
-       ... on DatasetOrigin {
-         type
-         originId
+   query GetGraph($id: ID!) {
+     graph(id: $id) {
+       id
+       name
+       nodes {
+         id
+         label
          datasetId
-         name
-         fileName
+         dataset {
+           id
+           name
+           fileName
+         }
        }
-       ... on TransformationOrigin {
-         type
-         originId
-         nodeId
-         nodeType
-         operation
+       edges {
+         id
+         source
+         target
+         datasetId
+         dataset {
+           id
+           name
+         }
        }
      }
    }
    ```
 
-3. Add origin badge/chip to node/edge displays in `GraphSpreadsheetEditor`:
+**Success Criteria**:
+- GraphQL exposes `datasetId` on nodes and edges
+- Optional resolver allows fetching full dataset details
+- Frontend can query dataset source information
+
+### Phase 5: Frontend Integration
+
+**Goal**: Display dataset source information in UI
+
+**Tasks**:
+
+1. Update TypeScript types (if not auto-generated):
+   ```typescript
+   // frontend/src/types/graph.ts
+   export interface Node {
+     id: string
+     label: string
+     // ... existing fields
+     datasetId?: number
+     dataset?: {
+       id: number
+       name: string
+       fileName?: string
+     }
+   }
+
+   export interface Edge {
+     id: string
+     source: string
+     target: string
+     // ... existing fields
+     datasetId?: number
+     dataset?: {
+       id: number
+       name: string
+     }
+   }
+   ```
+
+2. Add dataset badge to `GraphSpreadsheetEditor`:
    ```tsx
-   {node.origin && (
-     <Badge variant="outline" className="text-xs">
-       {node.origin.type === 'dataset'
-         ? `Dataset: ${node.origin.name}`
-         : `Transform: ${node.origin.operation}`
-       }
+   // frontend/src/components/editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor.tsx
+
+   {node.dataset && (
+     <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+       {node.dataset.name}
      </Badge>
    )}
    ```
 
-4. Add Origins panel to graph detail view showing all contributing sources
+3. Add dataset column to spreadsheet view (optional):
    ```tsx
-   <OriginsList origins={graph.origins} />
+   const columns = [
+     'id',
+     'label',
+     'layer',
+     'dataset', // NEW
+     // ... other columns
+   ]
+
+   // Render dataset name in cell
+   {col === 'dataset' && (
+     <span className="text-xs text-muted-foreground">
+       {node.dataset?.name || '-'}
+     </span>
+   )}
+   ```
+
+4. Add dataset filter to graph view (optional):
+   ```tsx
+   <Select
+     value={selectedDatasetId}
+     onChange={(id) => setSelectedDatasetId(id)}
+   >
+     <option value="">All datasets</option>
+     {project.datasets.map(ds => (
+       <option key={ds.id} value={ds.id}>{ds.name}</option>
+     ))}
+   </Select>
    ```
 
 **Success Criteria**:
-- UI shows origin badges on nodes/edges
-- Origins panel displays all datasets and transformations
-- Clicking an origin filters/highlights related elements
-
-### Phase 7: Migration & Cleanup
-
-**Goal**: Complete transition to origin_id, deprecate old fields
-
-**Tasks**:
-1. Create migration `m20251217_000002_drop_source_dataset_id.rs`
-   - Remove `source_dataset_id` column from `graph_data_nodes`
-   - Remove `source_dataset_id` column from `graph_data_edges`
-   - This is a breaking migration - only run after verifying Phase 1-6 work
-
-2. Remove deprecated `dataset` field from `Node` and `Edge` structs
-
-3. Update all code using `node.dataset` to use `node.origin_id`
-
-4. Update documentation and examples
-
-**Success Criteria**:
-- No references to `source_dataset_id` in codebase
-- All tests pass
-- Documentation updated
+- Nodes/edges display their source dataset name
+- Users can see which dataset each element came from
+- Optional: Can filter graph view by dataset source
 
 ## Testing Strategy
 
 ### Unit Tests
-- `graph.rs`: Test Origin enum serialization/deserialization
-- Helper methods: `add_dataset_origin()`, `add_transformation_origin()`
-- Migration: backfill logic correctness
+
+1. **Dataset Import Test** (`layercake-core/src/services/graph_data_service.rs`):
+   ```rust
+   #[tokio::test]
+   async fn test_dataset_id_set_on_import() {
+       let service = GraphDataService::new(test_db());
+       let graph_data = /* create graph_data */;
+       let dataset_id = 42;
+
+       let nodes = vec![/* test nodes */];
+       service.replace_nodes(graph_data.id, &nodes, Some(dataset_id)).await?;
+
+       let loaded_nodes = /* load nodes from DB */;
+       assert!(loaded_nodes.iter().all(|n| n.source_dataset_id == Some(dataset_id)));
+   }
+   ```
+
+2. **Transformation Preservation Test**:
+   ```rust
+   #[tokio::test]
+   async fn test_filter_preserves_dataset_id() {
+       let filter_builder = FilterBuilder::new(test_db());
+
+       // Create graph with nodes having dataset IDs
+       let input_graph = Graph {
+           nodes: vec![
+               Node { id: "n1".into(), dataset: Some(1), /* ... */ },
+               Node { id: "n2".into(), dataset: Some(2), /* ... */ },
+           ],
+           // ...
+       };
+
+       let filtered = filter_builder.filter_graph(/* params */).await?;
+
+       // Verify dataset IDs preserved
+       for node in &filtered.nodes {
+           assert!(node.dataset.is_some());
+       }
+   }
+   ```
+
+3. **Merge Preservation Test**:
+   ```rust
+   #[tokio::test]
+   async fn test_merge_preserves_dataset_ids() {
+       // Merge two graphs with different dataset IDs
+       // Verify each node keeps its original dataset ID
+   }
+   ```
 
 ### Integration Tests
-1. **Dataset Import Test** (`tests/origin_tracking_dataset.rs`):
-   ```rust
-   #[tokio::test]
-   async fn test_dataset_origin_tracking() {
-       // Import dataset
-       // Verify origin_id = "dataset:<id>" on all nodes/edges
-       // Verify origins map contains dataset metadata
-   }
-   ```
 
-2. **Transform Origin Test** (`tests/origin_tracking_transform.rs`):
-   ```rust
-   #[tokio::test]
-   async fn test_transformation_origin_tracking() {
-       // Import dataset -> filter -> transform
-       // Verify filtered nodes keep dataset origin_id
-       // Verify new nodes have transform origin_id
-       // Verify origins map contains both dataset and transform
-   }
-   ```
+**Full Pipeline Test** (`tests/dataset_source_tracking_e2e.rs`):
+```rust
+#[tokio::test]
+async fn test_dataset_source_through_pipeline() {
+    let db = test_database().await;
+    let project_id = 1;
 
-3. **Merge Origin Test** (`tests/origin_tracking_merge.rs`):
-   ```rust
-   #[tokio::test]
-   async fn test_merge_origin_tracking() {
-       // Merge two datasets
-       // Verify origins map has both datasets
-       // Verify nodes preserve their source origin_id
-   }
-   ```
+    // Import two datasets
+    let ds1 = import_dataset(&db, project_id, "Dataset A", /* data */).await;
+    let ds2 = import_dataset(&db, project_id, "Dataset B", /* data */).await;
 
-4. **Full Pipeline Test** (`tests/origin_tracking_e2e.rs`):
-   ```rust
-   #[tokio::test]
-   async fn test_full_pipeline_origin_tracking() {
-       // Dataset A -> Transform -> Merge
-       // Dataset B -> Filter     /
-       //                        |
-       //                        v
-       //                  Final Graph
-       //
-       // Verify final graph has:
-       // - origins map with Dataset A, Dataset B, Transform, Filter, Merge
-       // - Correct origin_id on all nodes/edges
-   }
-   ```
+    // Create pipeline: DS1 -> Filter -> Merge
+    //                   DS2 ----------->
+    let dag = create_test_dag(vec![
+        ("ds1-node", "DataSourceNode", ds1.id),
+        ("ds2-node", "DataSourceNode", ds2.id),
+        ("filter-node", "FilterNode", /* config */),
+        ("merge-node", "MergeNode", /* config */),
+    ]);
+
+    // Execute pipeline
+    let executor = DagExecutor::new(db.clone());
+    executor.execute_dag(project_id, 1, &dag.nodes, &dag.edges).await?;
+
+    // Load final merged graph
+    let merged_graph = load_graph_for_node("merge-node").await?;
+
+    // Verify nodes from DS1 have dataset = Some(ds1.id)
+    let ds1_nodes: Vec<_> = merged_graph.nodes.iter()
+        .filter(|n| n.id.starts_with("ds1"))
+        .collect();
+    assert!(ds1_nodes.iter().all(|n| n.dataset == Some(ds1.id)));
+
+    // Verify nodes from DS2 have dataset = Some(ds2.id)
+    let ds2_nodes: Vec<_> = merged_graph.nodes.iter()
+        .filter(|n| n.id.starts_with("ds2"))
+        .collect();
+    assert!(ds2_nodes.iter().all(|n| n.dataset == Some(ds2.id)));
+}
+```
 
 ### Frontend Tests
-- Snapshot tests for origin badges
-- Integration test: load graph with origins, verify display
+- Snapshot test: Node/edge with dataset badge
+- Integration test: Load graph with dataset info, verify display
 
 ## Rollout Plan
 
-1. **Week 1**: Phase 1 (Database Migration)
-   - Deploy migration to dev environment
-   - Verify backfill correctness
-   - Monitor for issues
+This is a non-breaking change that can be rolled out incrementally:
 
-2. **Week 2**: Phase 2-3 (Core Models + Dataset Import)
-   - Deploy to dev
-   - Test dataset imports
-   - Verify origin tracking on new datasets
+1. **Week 1**: Phase 1-2 (Audit + Dataset Import)
+   - Audit current behavior
+   - Fix dataset import to set `source_dataset_id`
+   - Deploy to dev, verify new imports have dataset IDs
 
-3. **Week 3**: Phase 4 (Transformations)
-   - Deploy to dev
-   - Test transform/filter/merge operations
-   - Verify origin propagation
+2. **Week 2**: Phase 3 (Transformations)
+   - Update filter/transform/merge to preserve dataset IDs
+   - Deploy to dev, test full pipeline
+   - Verify dataset IDs flow through transformations
 
-4. **Week 4**: Phase 5-6 (API + Frontend)
-   - Deploy to dev
+3. **Week 3**: Phase 4-5 (API + Frontend)
+   - Add GraphQL resolvers
+   - Update frontend to display dataset source
    - User acceptance testing
    - Gather feedback
 
-5. **Week 5**: Phase 7 (Cleanup)
-   - Deploy final breaking migration
-   - Remove deprecated fields
-   - Production deployment
+4. **Week 4**: Production Deployment
+   - Deploy to production
+   - Monitor for issues
+   - Document feature for users
 
-## Open Questions & Decisions
+## Validation Checklist
 
-1. **Q**: Should we track intermediate transformation steps?
-   **A**: Yes, but only transformations that create/modify nodes/edges. Pure filtering preserves origins.
+After implementation, verify:
 
-2. **Q**: How to handle manual edits in graph editor?
-   **A**: Manual edits get a special origin type `manual:<edit_id>` with user/timestamp info.
+- [ ] New dataset imports have `source_dataset_id` set on all nodes/edges
+- [ ] Filter operations preserve `source_dataset_id`
+- [ ] Transform operations preserve `source_dataset_id` on modified elements
+- [ ] Transform operations set `source_dataset_id = NULL` on new elements
+- [ ] Merge operations preserve `source_dataset_id` from each source
+- [ ] GraphQL exposes `datasetId` field on nodes and edges
+- [ ] GraphQL can resolve full dataset details
+- [ ] UI displays dataset badges on nodes/edges
+- [ ] Full pipeline test passes (dataset import -> filter -> merge)
+- [ ] No performance degradation
+- [ ] All existing tests still pass
 
-3. **Q**: What if a node is created by merging two nodes with different origins?
-   **A**: Assign merge transformation as origin; original origins still in metadata for reference.
+## Implementation Complexity
 
-4. **Q**: Should origin_id be indexed for performance?
-   **A**: Yes, add index in Phase 1 for efficient filtering by origin.
+**Estimated Effort**: 2-3 weeks (simplified from original 5-week plan)
 
-## Performance Considerations
+**Reduced Scope**:
+- ❌ No database migrations needed
+- ❌ No Origin enum or complex type hierarchy
+- ❌ No origins metadata map in graphs
+- ❌ No transformation tracking
+- ❌ No origin_id field or renaming
+- ✅ Just preserve existing `source_dataset_id` field
+- ✅ Ensure it flows through pipeline
+- ✅ Display in UI
 
-- **Origins map size**: For large graphs with many datasets, origins map could grow. Mitigated by:
-  - Only including origins actually used by nodes/edges in the graph
-  - Lazy-loading origin details on frontend
-
-- **Database queries**: Loading origins requires joining with `data_sets` table
-  - Cache dataset metadata during graph load
-  - Consider denormalizing dataset name into origin_id if needed
-
-- **Serialization overhead**: Origins map adds to JSON size
-  - Skip serialization when `origins` is empty
-  - Consider compression for large graphs
+**Risk Assessment**: Low
+- No schema changes = no migration risk
+- No new complex types = less code to maintain
+- Preserving existing fields = minimal code changes
+- Can be tested incrementally
 
 ## Future Enhancements
 
-1. **Origin-based filtering**: Filter graph to show only nodes from specific origin
-2. **Lineage visualization**: Visual graph of data flow from datasets through transformations
-3. **Origin-based colors**: Color nodes/edges by their origin in projections
-4. **Provenance export**: Export full lineage report for compliance/auditing
-5. **Manual edit tracking**: Track user edits as transformation origins with user/timestamp
-6. **Version tracking**: Link origins to specific dataset versions
+These are **NOT** in scope for this implementation but could be added later:
 
-## Success Metrics
+1. **Transformation tracking**: Track when transforms create new elements
+2. **Manual edit tracking**: Track user edits in graph editor
+3. **Dataset versioning**: Link to specific dataset versions
+4. **Lineage visualization**: Visual graph showing data flow
+5. **Dataset-based filtering**: Filter graph view by source dataset
+6. **Dataset-based coloring**: Color nodes by dataset in projections
 
-- 100% of nodes/edges in new graphs have origin_id set
-- Origins map correctly reflects all contributing datasets and transformations
-- Zero data loss during migration
-- UI displays origin information without performance degradation
-- Test coverage >90% for origin tracking code
+For now, focus on the simple goal: **preserve dataset provenance through the pipeline**.
