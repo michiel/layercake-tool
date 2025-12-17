@@ -307,7 +307,9 @@ impl GraphMutation {
                 .filter(EdgeColumn::ExternalId.eq(&edge_id))
                 .exec(&context.db)
                 .await
-                .map_err(|e| StructuredError::database("graph_data_edges::Entity::delete_many", e))?;
+                .map_err(|e| {
+                    StructuredError::database("graph_data_edges::Entity::delete_many", e)
+                })?;
 
             Ok(true)
         } else {

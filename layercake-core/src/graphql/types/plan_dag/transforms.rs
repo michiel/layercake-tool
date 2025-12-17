@@ -107,7 +107,7 @@ impl GraphTransform {
                         "### Transform: Partition Depth Limit (Skipped)\n\
                          No partition structure found in graph. \
                          Add `belongs_to` relationships to use this transform."
-                            .to_string()
+                            .to_string(),
                     ));
                 }
 
@@ -134,7 +134,7 @@ impl GraphTransform {
                     return Ok(Some(
                         "### Transform: Partition Width Limit (Skipped)\n\
                          No partition structure found in graph."
-                            .to_string()
+                            .to_string(),
                     ));
                 }
 
@@ -270,8 +270,13 @@ impl GraphTransform {
                 ))
             }
             GraphTransformKind::GenerateHierarchy => {
-                let root_count = graph.nodes.iter()
-                    .filter(|n| n.belongs_to.is_none() || n.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false))
+                let root_count = graph
+                    .nodes
+                    .iter()
+                    .filter(|n| {
+                        n.belongs_to.is_none()
+                            || n.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false)
+                    })
                     .count();
 
                 graph.generate_hierarchy();

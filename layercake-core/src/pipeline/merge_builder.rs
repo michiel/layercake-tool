@@ -112,11 +112,14 @@ impl MergeBuilder {
         // This would violate UNIQUE (graph_data_id, external_id) when persisted
         let mut edge_id_to_details: HashMap<String, Vec<String>> = HashMap::new();
         for edge in edges_map.values() {
-            let details = format!("{}→{} (layer:{}, dataset:{})",
+            let details = format!(
+                "{}→{} (layer:{}, dataset:{})",
                 edge.source,
                 edge.target,
                 edge.layer.as_ref().map(|s| s.as_str()).unwrap_or("none"),
-                edge.dataset.map(|d| d.to_string()).unwrap_or_else(|| "none".to_string())
+                edge.dataset
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "none".to_string())
             );
             edge_id_to_details
                 .entry(edge.id.clone())

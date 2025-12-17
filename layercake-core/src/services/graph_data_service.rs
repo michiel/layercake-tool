@@ -182,8 +182,7 @@ impl GraphDataService {
             info!(
                 "Persisted {} edge(s) with external node references for graph_data {}. \
                 These edges will connect to nodes from other datasets during merge.",
-                external_ref_count,
-                graph_data_id
+                external_ref_count, graph_data_id
             );
         }
 

@@ -566,7 +566,9 @@ impl DagExecutor {
         };
 
         let projection = if let Some(existing_id) = config.projection_id {
-            let existing = projections::Entity::find_by_id(existing_id).one(&self.db).await?;
+            let existing = projections::Entity::find_by_id(existing_id)
+                .one(&self.db)
+                .await?;
 
             match existing {
                 Some(record) if record.project_id == project_id => {

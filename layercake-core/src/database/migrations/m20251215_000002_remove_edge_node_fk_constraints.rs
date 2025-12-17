@@ -14,12 +14,24 @@ impl MigrationTrait for Migration {
                 // SQLite doesn't support dropping FK constraints, so recreate table
 
                 // 1. Drop existing indexes (they'll be recreated after table rename)
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph_external_unique").await;
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph").await;
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_source").await;
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_target").await;
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_source_target").await;
-                let _ = db.execute_unprepared("DROP INDEX IF EXISTS idx_edges_layer").await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph_external_unique")
+                    .await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_graph")
+                    .await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_source")
+                    .await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_target")
+                    .await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_source_target")
+                    .await;
+                let _ = db
+                    .execute_unprepared("DROP INDEX IF EXISTS idx_edges_layer")
+                    .await;
 
                 // 2. Create new table without node FK constraints
                 db.execute_unprepared(
@@ -55,12 +67,13 @@ impl MigrationTrait for Migration {
                 .await?;
 
                 // 4. Drop old table
-                db.execute_unprepared("DROP TABLE graph_data_edges")
-                    .await?;
+                db.execute_unprepared("DROP TABLE graph_data_edges").await?;
 
                 // 5. Rename new table
-                db.execute_unprepared("ALTER TABLE graph_data_edges_new RENAME TO graph_data_edges")
-                    .await?;
+                db.execute_unprepared(
+                    "ALTER TABLE graph_data_edges_new RENAME TO graph_data_edges",
+                )
+                .await?;
 
                 // 6. Recreate indexes
                 db.execute_unprepared(
@@ -69,29 +82,27 @@ impl MigrationTrait for Migration {
                 .await?;
 
                 db.execute_unprepared(
-                    "CREATE INDEX idx_edges_graph ON graph_data_edges(graph_data_id)"
+                    "CREATE INDEX idx_edges_graph ON graph_data_edges(graph_data_id)",
                 )
                 .await?;
 
                 db.execute_unprepared(
-                    "CREATE INDEX idx_edges_source ON graph_data_edges(graph_data_id, source)"
+                    "CREATE INDEX idx_edges_source ON graph_data_edges(graph_data_id, source)",
                 )
                 .await?;
 
                 db.execute_unprepared(
-                    "CREATE INDEX idx_edges_target ON graph_data_edges(graph_data_id, target)"
+                    "CREATE INDEX idx_edges_target ON graph_data_edges(graph_data_id, target)",
                 )
                 .await?;
 
                 db.execute_unprepared(
-                    "CREATE INDEX idx_edges_source_target ON graph_data_edges(source, target)"
+                    "CREATE INDEX idx_edges_source_target ON graph_data_edges(source, target)",
                 )
                 .await?;
 
-                db.execute_unprepared(
-                    "CREATE INDEX idx_edges_layer ON graph_data_edges(layer)"
-                )
-                .await?;
+                db.execute_unprepared("CREATE INDEX idx_edges_layer ON graph_data_edges(layer)")
+                    .await?;
             }
             sea_orm::DatabaseBackend::Postgres => {
                 // Postgres can drop constraints directly
@@ -108,12 +119,12 @@ impl MigrationTrait for Migration {
             sea_orm::DatabaseBackend::MySql => {
                 // MySQL syntax
                 db.execute_unprepared(
-                    "ALTER TABLE graph_data_edges DROP FOREIGN KEY fk_graph_data_edges_source"
+                    "ALTER TABLE graph_data_edges DROP FOREIGN KEY fk_graph_data_edges_source",
                 )
                 .await?;
 
                 db.execute_unprepared(
-                    "ALTER TABLE graph_data_edges DROP FOREIGN KEY fk_graph_data_edges_target"
+                    "ALTER TABLE graph_data_edges DROP FOREIGN KEY fk_graph_data_edges_target",
                 )
                 .await?;
             }
@@ -128,7 +139,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
 
         db.execute_unprepared(
-            "-- Downgrade not supported: Cannot safely re-add FK constraints that may be violated"
+            "-- Downgrade not supported: Cannot safely re-add FK constraints that may be violated",
         )
         .await?;
 

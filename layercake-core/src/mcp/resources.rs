@@ -209,7 +209,10 @@ impl LayercakeResourceRegistry {
                     .one(self.app.db())
                     .await
                     .map_err(|e| McpError::Internal {
-                        message: format!("Failed to load graph_data for project {}: {}", project_id, e),
+                        message: format!(
+                            "Failed to load graph_data for project {}: {}",
+                            project_id, e
+                        ),
                     })?
                     .ok_or_else(|| McpError::ResourceNotFound {
                         uri: format!("layercake://analysis/{}/connectivity", project_id),

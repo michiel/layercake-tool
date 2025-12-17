@@ -415,7 +415,9 @@ impl Graph {
     /// Check if the graph has any partition structure
     /// Returns true if there are any partition nodes or any belongs_to relationships
     pub fn has_partition_structure(&self) -> bool {
-        self.nodes.iter().any(|n| n.is_partition || n.belongs_to.is_some())
+        self.nodes
+            .iter()
+            .any(|n| n.is_partition || n.belongs_to.is_some())
     }
 
     pub fn get_hierarchy_nodes(&self) -> Vec<Node> {
@@ -846,7 +848,9 @@ impl Graph {
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
         // Check if graph has partition structure
         if !self.has_partition_structure() {
-            tracing::warn!("PartitionDepthLimit transform skipped: no partition structure in graph");
+            tracing::warn!(
+                "PartitionDepthLimit transform skipped: no partition structure in graph"
+            );
             return Ok(());
         }
 
@@ -949,7 +953,9 @@ impl Graph {
     ) -> Result<Vec<PartitionWidthAggregation>, String> {
         // Check if graph has partition structure
         if !self.has_partition_structure() {
-            tracing::warn!("PartitionWidthLimit transform skipped: no partition structure in graph");
+            tracing::warn!(
+                "PartitionWidthLimit transform skipped: no partition structure in graph"
+            );
             return Ok(vec![]);
         }
 
@@ -1231,8 +1237,13 @@ impl Graph {
         }
 
         // Count how many root nodes exist (nodes without belongs_to)
-        let root_count = self.nodes.iter()
-            .filter(|n| n.belongs_to.is_none() || n.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false))
+        let root_count = self
+            .nodes
+            .iter()
+            .filter(|n| {
+                n.belongs_to.is_none()
+                    || n.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false)
+            })
             .count();
 
         // If single root or no nodes, just convert belongs_to to edges without synthetic root
@@ -1351,7 +1362,13 @@ impl Graph {
 
         // Update root nodes (those without belongs_to) to belong to synthetic hierarchy node
         for node in self.nodes.iter_mut() {
-            if node.belongs_to.is_none() || node.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false) {
+            if node.belongs_to.is_none()
+                || node
+                    .belongs_to
+                    .as_ref()
+                    .map(|s| s.is_empty())
+                    .unwrap_or(false)
+            {
                 node.belongs_to = Some(hierarchy_node_id.clone());
             }
             // Remove partition flags from all nodes
@@ -1684,16 +1701,14 @@ where
     let value = Value::deserialize(deserializer)?;
     match value {
         Value::Bool(b) => Ok(b),
-        Value::String(s) => {
-            match s.to_lowercase().as_str() {
-                "true" | "1" | "yes" => Ok(true),
-                "false" | "0" | "no" | "" => Ok(false),
-                _ => Err(de::Error::invalid_value(
-                    Unexpected::Str(&s),
-                    &"a boolean or a string representing a boolean"
-                )),
-            }
-        }
+        Value::String(s) => match s.to_lowercase().as_str() {
+            "true" | "1" | "yes" => Ok(true),
+            "false" | "0" | "no" | "" => Ok(false),
+            _ => Err(de::Error::invalid_value(
+                Unexpected::Str(&s),
+                &"a boolean or a string representing a boolean",
+            )),
+        },
         Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Ok(i != 0)
@@ -1702,13 +1717,13 @@ where
             } else {
                 Err(de::Error::invalid_type(
                     Unexpected::Other("number"),
-                    &"a boolean"
+                    &"a boolean",
                 ))
             }
         }
         _ => Err(de::Error::invalid_type(
             Unexpected::Other("unexpected type"),
-            &"a boolean"
+            &"a boolean",
         )),
     }
 }
@@ -1718,10 +1733,7 @@ pub struct Node {
     pub id: String,
     pub label: String,
     pub layer: String,
-    #[serde(
-        deserialize_with = "deserialize_bool_from_anything",
-        default
-    )]
+    #[serde(deserialize_with = "deserialize_bool_from_anything", default)]
     pub is_partition: bool,
     pub belongs_to: Option<String>,
     pub weight: i32,

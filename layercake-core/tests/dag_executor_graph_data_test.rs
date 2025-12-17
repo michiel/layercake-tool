@@ -394,7 +394,11 @@ async fn test_merge_preserves_edges_and_partition_flags() {
         (0..12)
             .map(|i| GraphDataEdgeInput {
                 external_id: format!("B-e{}", i),
-                source: if i % 2 == 0 { "B-n1".into() } else { "B-n2".into() },
+                source: if i % 2 == 0 {
+                    "B-n1".into()
+                } else {
+                    "B-n2".into()
+                },
                 target: "B-n3".into(),
                 label: Some(format!("B edge {}", i)),
                 layer: Some("L1".into()),

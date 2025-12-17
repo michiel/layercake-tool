@@ -642,7 +642,10 @@ impl ProjectionService {
             .one(&self.db)
             .await?
         else {
-            return Err(sea_orm::DbErr::RecordNotFound(format!("graph_data {}", graph_id)));
+            return Err(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_id
+            )));
         };
 
         if graph.project_id != project_id {
@@ -664,7 +667,10 @@ impl ProjectionService {
             .await?;
 
         let Some(graph) = graph else {
-            return Err(sea_orm::DbErr::RecordNotFound(format!("graph_data {}", graph_id)));
+            return Err(sea_orm::DbErr::RecordNotFound(format!(
+                "graph_data {}",
+                graph_id
+            )));
         };
 
         if graph.project_id != project_id {
