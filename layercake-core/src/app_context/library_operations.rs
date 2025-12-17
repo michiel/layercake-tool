@@ -769,6 +769,17 @@ impl AppContext {
         archive_bytes: Vec<u8>,
         project_name: Option<String>,
     ) -> Result<ProjectSummary> {
+        self.import_project_archive_internal(archive_bytes, project_name, None, None)
+            .await
+    }
+
+    async fn import_project_archive_internal(
+        &self,
+        archive_bytes: Vec<u8>,
+        project_name: Option<String>,
+        target_project_id: Option<i32>,
+        keep_connection_path: Option<String>,
+    ) -> Result<ProjectSummary> {
         let mut archive = ZipArchive::new(Cursor::new(archive_bytes))
             .map_err(|e| anyhow!("Failed to read project archive: {}", e))?;
 
@@ -797,17 +808,21 @@ impl AppContext {
         let desired_name = project_name.unwrap_or(project_record.name.clone());
         let now = Utc::now();
 
-        let project = projects::ActiveModel {
+        let mut project_model = projects::ActiveModel {
+            id: target_project_id.map(Set).unwrap_or(NotSet),
             name: Set(desired_name.clone()),
             description: Set(project_record.description.clone()),
             tags: Set(serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string())),
+            import_export_path: Set(keep_connection_path.clone()),
             created_at: Set(now),
             updated_at: Set(now),
             ..Default::default()
-        }
-        .insert(&self.db)
-        .await
-        .map_err(|e| anyhow!("Failed to create project from archive: {}", e))?;
+        };
+
+        let project = project_model
+            .insert(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to create project from archive: {}", e))?;
 
         let dataset_service = DataSetService::new(self.db.clone());
         let mut id_map = HashMap::new();
@@ -900,21 +915,19 @@ impl AppContext {
         }
 
         let archive_bytes = archive_directory(source_path)?;
-        let project = self
-            .import_project_archive(archive_bytes, project_name)
-            .await?;
+        let path_string = if keep_connection {
+            Some(
+                source_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Failed to serialize import path"))?
+                    .to_string(),
+            )
+        } else {
+            None
+        };
 
-        if keep_connection {
-            let path_string = source_path
-                .to_str()
-                .ok_or_else(|| anyhow!("Failed to serialize import path"))?
-                .to_string();
-            let update =
-                super::ProjectUpdate::new(None, None, false, None, Some(Some(path_string)));
-            let _ = self.update_project(project.id, update).await?;
-        }
-
-        Ok(project)
+        self.import_project_archive_internal(archive_bytes, project_name, None, path_string)
+            .await
     }
 
     pub async fn reimport_project_from_connection(
@@ -932,8 +945,17 @@ impl AppContext {
             .clone()
             .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
 
-        self.import_project_from_directory(Path::new(&path), Some(project.name), true)
-            .await
+        // Remove the existing project and re-import using the same ID
+        self.delete_project(project_id).await?;
+
+        let archive_bytes = archive_directory(Path::new(&path))?;
+        self.import_project_archive_internal(
+            archive_bytes,
+            Some(project.name),
+            Some(project_id),
+            Some(path),
+        )
+        .await
     }
 
     pub async fn reexport_project_to_connection(
