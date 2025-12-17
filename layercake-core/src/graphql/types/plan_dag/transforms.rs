@@ -271,12 +271,35 @@ impl GraphTransform {
                 ))
             }
             GraphTransformKind::GenerateHierarchy => {
+                let root_count = graph.nodes.iter()
+                    .filter(|n| n.belongs_to.is_none() || n.belongs_to.as_ref().map(|s| s.is_empty()).unwrap_or(false))
+                    .count();
+
                 graph.generate_hierarchy();
-                Some(format!(
-                    "### Transform: Generate Hierarchy\n- Nodes after: {}\n- Edges after: {}",
-                    graph.nodes.len(),
-                    graph.edges.len()
-                ))
+
+                let message = if root_count <= 1 {
+                    format!(
+                        "### Transform: Generate Hierarchy\n\
+                         Graph already has single root - no synthetic root needed.\n\
+                         Converting belongs_to references to explicit edges.\n\
+                         - Nodes after: {}\n\
+                         - Edges after: {}",
+                        graph.nodes.len(),
+                        graph.edges.len()
+                    )
+                } else {
+                    format!(
+                        "### Transform: Generate Hierarchy\n\
+                         Graph has {} root nodes - creating synthetic 'Hierarchy' root to unify them.\n\
+                         - Nodes after: {}\n\
+                         - Edges after: {}",
+                        root_count,
+                        graph.nodes.len(),
+                        graph.edges.len()
+                    )
+                };
+
+                Some(message)
             }
             GraphTransformKind::AggregateLayerNodes => {
                 let threshold = self.params.layer_connections_threshold.unwrap_or(3);
