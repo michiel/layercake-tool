@@ -2,7 +2,7 @@ use csv::StringRecord;
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, warn};
 
 use crate::data_loader::{DfEdgeLoadProfile, DfNodeLoadProfile};
 
