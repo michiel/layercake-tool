@@ -436,20 +436,23 @@ impl Graph {
         let mut edges = Vec::new();
         self.nodes.iter().for_each(|node| {
             if let Some(parent_id) = &node.belongs_to {
-                if let Some(parent) = self.get_node_by_id(parent_id) {
-                    edges.push(Edge {
-                        id: format!("{}_{}", parent.id, node.id),
-                        source: parent.id.clone(),
-                        target: node.id.clone(),
-                        label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
-                        layer: parent.layer.clone(),
-                        weight: 1,
-                        comment: None,
-                        dataset: None,
-                        attributes: None,
-                    });
+                // Skip empty string belongs_to values (treated as None)
+                if !parent_id.is_empty() {
+                    if let Some(parent) = self.get_node_by_id(parent_id) {
+                        edges.push(Edge {
+                            id: format!("{}_{}", parent.id, node.id),
+                            source: parent.id.clone(),
+                            target: node.id.clone(),
+                            label: "".to_string(), // format!("{} -> {}", parent.label, node.label),
+                            layer: parent.layer.clone(),
+                            weight: 1,
+                            comment: None,
+                            dataset: None,
+                            attributes: None,
+                        });
+                    }
+                    // If parent node not found, skip this edge - could log warning if needed
                 }
-                // If parent node not found, skip this edge - could log warning if needed
             }
         });
 
