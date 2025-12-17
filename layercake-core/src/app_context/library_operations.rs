@@ -1,5 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::io::{Cursor, Read, Seek, Write};
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
@@ -216,10 +218,15 @@ where
         Value::Number(n) => n
             .as_i64()
             .and_then(|i| i32::try_from(i).ok())
-            .ok_or_else(|| de::Error::invalid_value(Unexpected::Signed(n.as_i64().unwrap_or(0)), &"a valid i32")),
-        Value::String(s) => s
-            .parse::<i32>()
-            .map_err(|_| de::Error::invalid_value(Unexpected::Str(&s), &"a string containing a valid i32")),
+            .ok_or_else(|| {
+                de::Error::invalid_value(
+                    Unexpected::Signed(n.as_i64().unwrap_or(0)),
+                    &"a valid i32",
+                )
+            }),
+        Value::String(s) => s.parse::<i32>().map_err(|_| {
+            de::Error::invalid_value(Unexpected::Str(&s), &"a string containing a valid i32")
+        }),
         _ => Err(de::Error::invalid_type(
             match value {
                 Value::Bool(_) => Unexpected::Bool(false),
@@ -271,6 +278,26 @@ struct ProjectRecord {
     pub tags: Vec<String>,
 }
 
+fn has_hidden_component(path: &Path) -> bool {
+    path.components().any(|component| match component {
+        Component::Normal(value) => value.to_string_lossy().starts_with('.'),
+        Component::ParentDir | Component::RootDir | Component::Prefix(_) => true,
+        Component::CurDir => false,
+    })
+}
+
+fn sanitize_relative_path(path: &str) -> Result<PathBuf> {
+    let candidate = Path::new(path);
+    if candidate.is_absolute()
+        || candidate
+            .components()
+            .any(|c| matches!(c, Component::ParentDir))
+    {
+        return Err(anyhow!("Invalid path component in archive entry: {}", path));
+    }
+    Ok(candidate.components().collect())
+}
+
 fn node_type_storage_name(
     node_type: &crate::graphql::types::plan_dag::PlanDagNodeType,
 ) -> &'static str {
@@ -287,6 +314,168 @@ fn node_type_storage_name(
         PlanDagNodeType::Story => "StoryNode",
         PlanDagNodeType::SequenceArtefact => "SequenceArtefactNode",
     }
+}
+
+fn collect_paths_for_zip(bytes: &[u8], target_dir: &Path) -> Result<HashSet<PathBuf>> {
+    let mut archive = ZipArchive::new(Cursor::new(bytes))
+        .map_err(|e| anyhow!("Failed to read archive: {}", e))?;
+    let mut written_paths = HashSet::new();
+
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| anyhow!("Failed to read archive entry: {}", e))?;
+        if entry.is_dir() {
+            continue;
+        }
+
+        let rel_path = sanitize_relative_path(entry.name())?;
+        if has_hidden_component(&rel_path) {
+            continue;
+        }
+
+        let out_path = target_dir.join(&rel_path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|e| anyhow!("Failed to create directory {:?}: {}", parent, e))?;
+        }
+
+        let mut outfile = fs::File::create(&out_path)
+            .map_err(|e| anyhow!("Failed to create file {:?}: {}", out_path, e))?;
+        std::io::copy(&mut entry, &mut outfile)
+            .map_err(|e| anyhow!("Failed to write {:?}: {}", out_path, e))?;
+
+        written_paths.insert(rel_path);
+    }
+
+    Ok(written_paths)
+}
+
+fn remove_stale_exports(root: &Path, expected: &HashSet<PathBuf>) -> Result<()> {
+    let mut allowed_heads: HashSet<String> = HashSet::new();
+    for path in expected {
+        if let Some(Component::Normal(head)) = path.components().next() {
+            allowed_heads.insert(head.to_string_lossy().to_string());
+        }
+    }
+
+    fn walk(
+        root: &Path,
+        current: &Path,
+        expected: &HashSet<PathBuf>,
+        allowed_heads: &HashSet<String>,
+    ) -> Result<bool> {
+        let mut is_empty = true;
+        for entry in fs::read_dir(current)
+            .map_err(|e| anyhow!("Failed to read directory {:?}: {}", current, e))?
+        {
+            let entry = entry.map_err(|e| anyhow!("Failed to read dir entry: {}", e))?;
+            let path = entry.path();
+            let rel = path
+                .strip_prefix(root)
+                .map_err(|e| anyhow!("Failed to compute relative path: {}", e))?;
+            if has_hidden_component(rel) {
+                is_empty = false;
+                continue;
+            }
+
+            if path.is_dir() {
+                let child_empty = walk(root, &path, expected, allowed_heads)?;
+                if child_empty {
+                    fs::remove_dir(&path)
+                        .map_err(|e| anyhow!("Failed to remove directory {:?}: {}", path, e))?;
+                } else {
+                    is_empty = false;
+                }
+                continue;
+            }
+
+            let head_ok = rel
+                .components()
+                .next()
+                .and_then(|c| match c {
+                    Component::Normal(val) => Some(val.to_string_lossy().to_string()),
+                    _ => None,
+                })
+                .map(|head| allowed_heads.contains(&head))
+                .unwrap_or(false);
+
+            if !expected.contains(rel) && head_ok {
+                fs::remove_file(&path)
+                    .map_err(|e| anyhow!("Failed to remove file {:?}: {}", path, e))?;
+            } else {
+                is_empty = false;
+            }
+        }
+
+        Ok(is_empty)
+    }
+
+    let _ = walk(root, root, expected, &allowed_heads)?;
+    Ok(())
+}
+
+fn write_archive_to_directory(bytes: &[u8], target_dir: &Path) -> Result<()> {
+    let expected = collect_paths_for_zip(bytes, target_dir)?;
+    remove_stale_exports(target_dir, &expected)?;
+    Ok(())
+}
+
+fn archive_directory(source_dir: &Path) -> Result<Vec<u8>> {
+    if !source_dir.exists() {
+        return Err(anyhow!(
+            "Import source directory {:?} does not exist",
+            source_dir
+        ));
+    }
+    let mut files: Vec<PathBuf> = Vec::new();
+
+    fn collect(dir: &Path, root: &Path, acc: &mut Vec<PathBuf>) -> Result<()> {
+        for entry in
+            fs::read_dir(dir).map_err(|e| anyhow!("Failed to read directory {:?}: {}", dir, e))?
+        {
+            let entry = entry.map_err(|e| anyhow!("Failed to read dir entry: {}", e))?;
+            let path = entry.path();
+            let rel = path
+                .strip_prefix(root)
+                .map_err(|e| anyhow!("Failed to compute relative path: {}", e))?;
+            if has_hidden_component(rel) {
+                continue;
+            }
+            if path.is_dir() {
+                collect(&path, root, acc)?;
+            } else {
+                acc.push(rel.to_path_buf());
+            }
+        }
+        Ok(())
+    }
+
+    collect(source_dir, source_dir, &mut files)?;
+    files.sort();
+
+    let mut cursor = Cursor::new(Vec::new());
+    {
+        let mut writer = ZipWriter::new(&mut cursor);
+        let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
+
+        for rel in files {
+            let full_path = source_dir.join(&rel);
+            let mut file = fs::File::open(&full_path)
+                .map_err(|e| anyhow!("Failed to open {:?}: {}", full_path, e))?;
+            let rel_string = rel.to_string_lossy().replace('\\', "/");
+            writer
+                .start_file(rel_string, options)
+                .map_err(|e| anyhow!("Failed to start archive entry {:?}: {}", rel, e))?;
+            std::io::copy(&mut file, &mut writer)
+                .map_err(|e| anyhow!("Failed to write {:?}: {}", rel, e))?;
+        }
+
+        writer
+            .finish()
+            .map_err(|e| anyhow!("Failed to finalize archive: {}", e))?;
+    }
+    Ok(cursor.into_inner())
 }
 
 impl AppContext {
@@ -535,6 +724,46 @@ impl AppContext {
         })
     }
 
+    pub async fn export_project_to_directory(
+        &self,
+        project_id: i32,
+        target_path: &Path,
+        include_knowledge_base: bool,
+        keep_connection: bool,
+    ) -> Result<()> {
+        if !target_path.is_absolute() {
+            return Err(anyhow!(
+                "Export target must be an absolute path, got {:?}",
+                target_path
+            ));
+        }
+
+        fs::create_dir_all(target_path).map_err(|e| {
+            anyhow!(
+                "Failed to ensure export directory {:?} exists: {}",
+                target_path,
+                e
+            )
+        })?;
+
+        let archive = self
+            .export_project_archive(project_id, include_knowledge_base)
+            .await?;
+        write_archive_to_directory(&archive.bytes, target_path)?;
+
+        if keep_connection {
+            let path_string = target_path
+                .to_str()
+                .ok_or_else(|| anyhow!("Failed to serialize export path"))?
+                .to_string();
+            let update =
+                super::ProjectUpdate::new(None, None, false, None, Some(Some(path_string)));
+            let _ = self.update_project(project_id, update).await?;
+        }
+
+        Ok(())
+    }
+
     pub async fn import_project_archive(
         &self,
         archive_bytes: Vec<u8>,
@@ -655,6 +884,81 @@ impl AppContext {
         }
 
         Ok(ProjectSummary::from(project))
+    }
+
+    pub async fn import_project_from_directory(
+        &self,
+        source_path: &Path,
+        project_name: Option<String>,
+        keep_connection: bool,
+    ) -> Result<ProjectSummary> {
+        if !source_path.is_absolute() {
+            return Err(anyhow!(
+                "Import source must be an absolute path, got {:?}",
+                source_path
+            ));
+        }
+
+        let archive_bytes = archive_directory(source_path)?;
+        let project = self
+            .import_project_archive(archive_bytes, project_name)
+            .await?;
+
+        if keep_connection {
+            let path_string = source_path
+                .to_str()
+                .ok_or_else(|| anyhow!("Failed to serialize import path"))?
+                .to_string();
+            let update =
+                super::ProjectUpdate::new(None, None, false, None, Some(Some(path_string)));
+            let _ = self.update_project(project.id, update).await?;
+        }
+
+        Ok(project)
+    }
+
+    pub async fn reimport_project_from_connection(
+        &self,
+        project_id: i32,
+    ) -> Result<ProjectSummary> {
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
+            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+
+        let path = project
+            .import_export_path
+            .clone()
+            .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
+
+        self.import_project_from_directory(Path::new(&path), Some(project.name), true)
+            .await
+    }
+
+    pub async fn reexport_project_to_connection(
+        &self,
+        project_id: i32,
+        include_knowledge_base: bool,
+    ) -> Result<()> {
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
+            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+
+        let path = project
+            .import_export_path
+            .clone()
+            .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
+
+        self.export_project_to_directory(
+            project_id,
+            Path::new(&path),
+            include_knowledge_base,
+            false,
+        )
+        .await
     }
 
     pub async fn create_project_from_library(

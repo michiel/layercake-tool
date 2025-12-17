@@ -139,7 +139,7 @@ pub async fn update_project(
         });
     }
 
-    let update = ProjectUpdate::new(name, description, description_is_set, None);
+    let update = ProjectUpdate::new(name, description, description_is_set, None, None);
     let project = app
         .update_project(project_id, update)
         .await

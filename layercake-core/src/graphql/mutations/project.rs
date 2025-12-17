@@ -54,7 +54,8 @@ impl ProjectMutation {
         input: UpdateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
-        let update = ProjectUpdate::new(Some(input.name), input.description, true, input.tags);
+        let update =
+            ProjectUpdate::new(Some(input.name), input.description, true, input.tags, None);
         let project = context
             .app
             .update_project(id, update)

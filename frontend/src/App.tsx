@@ -75,6 +75,7 @@ const GET_PROJECTS = gql`
       id
       name
       description
+      importExportPath
       tags
       createdAt
       updatedAt
@@ -115,7 +116,52 @@ const IMPORT_PROJECT_ARCHIVE = gql`
       id
       name
       description
+      importExportPath
     }
+  }
+`
+
+const IMPORT_PROJECT_FROM_DIRECTORY = gql`
+  mutation ImportProjectFromDirectory($path: String!, $name: String, $keepConnection: Boolean) {
+    importProjectFromDirectory(path: $path, name: $name, keepConnection: $keepConnection) {
+      id
+      name
+      description
+      importExportPath
+    }
+  }
+`
+
+const EXPORT_PROJECT_TO_DIRECTORY = gql`
+  mutation ExportProjectToDirectory(
+    $projectId: Int!
+    $path: String!
+    $includeKnowledgeBase: Boolean
+    $keepConnection: Boolean
+  ) {
+    exportProjectToDirectory(
+      projectId: $projectId
+      path: $path
+      includeKnowledgeBase: $includeKnowledgeBase
+      keepConnection: $keepConnection
+    )
+  }
+`
+
+const REIMPORT_PROJECT = gql`
+  mutation ReimportProject($projectId: Int!) {
+    reimportProject(projectId: $projectId) {
+      id
+      name
+      description
+      importExportPath
+    }
+  }
+`
+
+const REEXPORT_PROJECT = gql`
+  mutation ReexportProject($projectId: Int!, $includeKnowledgeBase: Boolean) {
+    reexportProject(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase)
   }
 `
 
@@ -658,6 +704,7 @@ const HomePage = () => {
       id: number
       name: string
       description: string
+      importExportPath?: string | null
       tags: string[]
       createdAt: string
       updatedAt: string
@@ -705,6 +752,22 @@ const HomePage = () => {
     refetchQueries: [{ query: GET_PROJECTS }]
   })
 
+  const [importProjectFromDirectory, { loading: importDirectoryLoading }] = useMutation(
+    IMPORT_PROJECT_FROM_DIRECTORY,
+    {
+      onCompleted: (result) => {
+        const project = (result as any)?.importProjectFromDirectory
+        if (project) {
+          navigate(`/projects/${project.id}`)
+        }
+      },
+      onError: (error) => {
+        alert(`Failed to import project from directory: ${error.message}`)
+      },
+      refetchQueries: [{ query: GET_PROJECTS }]
+    }
+  )
+
   // Get 5 most recent projects
   const recentProjects = [...(projectsData?.projects || [])]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
@@ -750,6 +813,25 @@ const HomePage = () => {
 
   const handleImportClick = () => {
     fileInputRef.current?.click()
+  }
+
+  const handleImportFromDirectory = async () => {
+    const path = window.prompt('Enter the project directory to import')
+    if (!path) return
+    const keepConnection = window.confirm('Keep connection to this directory for re-import/re-export?')
+    const nameOverride = window.prompt('Optional project name (leave blank to use export metadata)') || undefined
+
+    try {
+      await importProjectFromDirectory({
+        variables: {
+          path,
+          name: nameOverride || null,
+          keepConnection,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to import project from directory', error)
+    }
   }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -826,6 +908,16 @@ const HomePage = () => {
           >
             <IconUpload className="mr-2 h-5 w-5 md:h-6 md:w-6" />
             {importLoading ? 'Importing...' : 'Import Project'}
+          </Button>
+          <Button
+            size="lg"
+            onClick={handleImportFromDirectory}
+            variant="secondary"
+            className="w-full md:w-auto md:min-w-[220px] h-16 md:h-20 text-base md:text-lg"
+            disabled={importDirectoryLoading}
+          >
+            <IconUpload className="mr-2 h-5 w-5 md:h-6 md:w-6" />
+            {importDirectoryLoading ? 'Importing...' : 'Import (Filesystem)'}
           </Button>
           <input
             ref={fileInputRef}
@@ -1003,6 +1095,7 @@ const ProjectsPage = () => {
       id: number
       name: string
       description: string
+      importExportPath?: string | null
       tags: string[]
       createdAt: string
       updatedAt: string
@@ -1307,6 +1400,7 @@ const ProjectDetailPage = () => {
       id: number
       name: string
       description: string
+      importExportPath?: string | null
       createdAt: string
       updatedAt: string
     }>
@@ -1346,6 +1440,13 @@ const ProjectDetailPage = () => {
   const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
     EXPORT_PROJECT_AS_TEMPLATE
   )
+  const [exportProjectToDirectoryMutation, { loading: exportDirectoryLoading }] = useMutation(
+    EXPORT_PROJECT_TO_DIRECTORY
+  )
+  const [reimportProjectMutation, { loading: reimportProjectLoading }] = useMutation(REIMPORT_PROJECT, {
+    refetchQueries: [{ query: GET_PROJECTS }],
+  })
+  const [reexportProjectMutation, { loading: reexportProjectLoading }] = useMutation(REEXPORT_PROJECT)
   const [resetProjectMutation, { loading: resetProjectLoading }] = useMutation(RESET_PROJECT)
 
   const formatUpdatedAt = (value?: string | null) => {
@@ -1387,6 +1488,56 @@ const ProjectDetailPage = () => {
     URL.revokeObjectURL(url)
 
     console.log(`Downloaded Plan DAG as ${filename}`)
+  }
+
+  const handleExportToDirectory = async () => {
+    if (!selectedProject) return
+    const path = window.prompt('Enter target directory for export')
+    if (!path) return
+    const keepConnection = window.confirm('Keep connection to this directory for future re-imports?')
+
+    try {
+      await exportProjectToDirectoryMutation({
+        variables: {
+          projectId: selectedProject.id,
+          path,
+          includeKnowledgeBase,
+          keepConnection,
+        },
+      })
+      showSuccessNotification('Exported project to filesystem', `Saved to ${path}`)
+    } catch (error: any) {
+      showErrorNotification('Failed to export project', error.message || 'Unknown error')
+    }
+  }
+
+  const handleReimportFromConnection = async () => {
+    if (!selectedProject?.importExportPath) return
+    try {
+      const { data } = await reimportProjectMutation({
+        variables: { projectId: selectedProject.id },
+      })
+      const projectName = (data as any)?.reimportProject?.name ?? 'project'
+      const newId = (data as any)?.reimportProject?.id
+      if (newId && newId !== selectedProject.id) {
+        navigate(`/projects/${newId}`)
+      }
+      showSuccessNotification('Re-import complete', `Reloaded ${projectName} from ${selectedProject.importExportPath}`)
+    } catch (error: any) {
+      showErrorNotification('Failed to re-import project', error.message || 'Unknown error')
+    }
+  }
+
+  const handleReexportToConnection = async () => {
+    if (!selectedProject?.importExportPath) return
+    try {
+      await reexportProjectMutation({
+        variables: { projectId: selectedProject.id, includeKnowledgeBase },
+      })
+      showSuccessNotification('Re-export complete', `Updated ${selectedProject.importExportPath}`)
+    } catch (error: any) {
+      showErrorNotification('Failed to re-export project', error.message || 'Unknown error')
+    }
   }
 
   const handleResetProject = async () => {
@@ -1586,6 +1737,10 @@ const ProjectDetailPage = () => {
           </Group>
         </div>
         <Group gap="sm">
+          <Button variant="outline" onClick={handleExportToDirectory} disabled={exportDirectoryLoading}>
+            <IconDownload className="mr-2 h-4 w-4" />
+            {exportDirectoryLoading ? 'Exporting...' : 'Export to filesystem'}
+          </Button>
           <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
             <IconDownload className="mr-2 h-4 w-4" />
             Export Project
@@ -1599,6 +1754,36 @@ const ProjectDetailPage = () => {
           </Button>
         </Group>
       </Group>
+
+      {selectedProject.importExportPath && (
+        <Alert className="mb-4">
+          <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className="truncate">
+              Connected to <span className="font-mono">{selectedProject.importExportPath}</span>
+            </span>
+            <Group gap="xs" className="flex-shrink-0">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleReimportFromConnection}
+                disabled={reimportProjectLoading}
+              >
+                {reimportProjectLoading && <Spinner className="mr-2 h-4 w-4" />}
+                Re-import from source
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleReexportToConnection}
+                disabled={reexportProjectLoading}
+              >
+                {reexportProjectLoading && <Spinner className="mr-2 h-4 w-4" />}
+                Re-export to source
+              </Button>
+            </Group>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Stack gap="xl">
         <section>
@@ -1817,6 +2002,7 @@ const PlanEditorPage = () => {
       id: number
       name: string
       description: string
+      importExportPath?: string | null
       createdAt: string
       updatedAt: string
     }>

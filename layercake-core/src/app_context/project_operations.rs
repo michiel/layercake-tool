@@ -76,6 +76,7 @@ impl AppContext {
             name: Set(name),
             description: Set(description),
             tags: Set(tags_json),
+            import_export_path: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
             ..Default::default()
@@ -109,6 +110,9 @@ impl AppContext {
         if let Some(tags) = update.tags {
             let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
             active.tags = Set(tags_json);
+        }
+        if let Some(path) = update.import_export_path {
+            active.import_export_path = Set(path);
         }
         active.updated_at = Set(Utc::now());
 

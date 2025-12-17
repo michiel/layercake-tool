@@ -1,6 +1,7 @@
 use async_graphql::*;
 use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
+use std::path::PathBuf;
 
 use crate::database::entities::common_types::FileFormat as EntityFileFormat;
 use crate::graphql::context::GraphQLContext;
@@ -231,6 +232,91 @@ impl LibraryMutation {
         Ok(Project::from(project))
     }
 
+    /// Export a project archive directly to a filesystem directory
+    async fn export_project_to_directory(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        path: String,
+        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
+        #[graphql(name = "keepConnection")] keep_connection: Option<bool>,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let target = PathBuf::from(&path);
+
+        context
+            .app
+            .export_project_to_directory(
+                project_id,
+                &target,
+                include_knowledge_base.unwrap_or(false),
+                keep_connection.unwrap_or(false),
+            )
+            .await
+            .map_err(|e| StructuredError::service("AppContext::export_project_to_directory", e))?;
+
+        Ok(true)
+    }
+
+    /// Import a project from a filesystem directory matching the exported bundle layout
+    async fn import_project_from_directory(
+        &self,
+        ctx: &Context<'_>,
+        path: String,
+        name: Option<String>,
+        #[graphql(name = "keepConnection")] keep_connection: Option<bool>,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let source = PathBuf::from(&path);
+
+        let project = context
+            .app
+            .import_project_from_directory(&source, name, keep_connection.unwrap_or(false))
+            .await
+            .map_err(|e| {
+                StructuredError::service("AppContext::import_project_from_directory", e)
+            })?;
+
+        Ok(Project::from(project))
+    }
+
+    /// Re-import a project using its stored connection path
+    async fn reimport_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+    ) -> Result<Project> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let project = context
+            .app
+            .reimport_project_from_connection(project_id)
+            .await
+            .map_err(|e| {
+                StructuredError::service("AppContext::reimport_project_from_connection", e)
+            })?;
+
+        Ok(Project::from(project))
+    }
+
+    /// Re-export a project to its stored connection path
+    async fn reexport_project(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
+    ) -> Result<bool> {
+        let context = ctx.data::<GraphQLContext>()?;
+        context
+            .app
+            .reexport_project_to_connection(project_id, include_knowledge_base.unwrap_or(false))
+            .await
+            .map_err(|e| {
+                StructuredError::service("AppContext::reexport_project_to_connection", e)
+            })?;
+
+        Ok(true)
+    }
+
     /// Reset a project by exporting and re-importing it
     /// This recreates the project with fresh IDs while preserving all data
     async fn reset_project(
@@ -249,7 +335,10 @@ impl LibraryMutation {
             .map_err(|e| StructuredError::service("AppContext::export_project_archive", e))?;
 
         // Get project name before deletion
-        let projects = context.app.list_projects().await
+        let projects = context
+            .app
+            .list_projects()
+            .await
             .map_err(|e| StructuredError::service("AppContext::list_projects", e))?;
         let project_name = projects
             .into_iter()

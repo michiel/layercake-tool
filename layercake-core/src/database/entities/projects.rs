@@ -11,6 +11,7 @@ pub struct Model {
     pub description: Option<String>,
     #[sea_orm(column_type = "Text", default_value = "[]")]
     pub tags: String, // JSON array stored as string
+    pub import_export_path: Option<String>,
     pub created_at: ChronoDateTimeUtc,
     pub updated_at: ChronoDateTimeUtc,
 }
@@ -44,6 +45,7 @@ impl ActiveModel {
             name: ActiveValue::NotSet,
             description: ActiveValue::NotSet,
             tags: Set("[]".to_string()),
+            import_export_path: Set(None),
             created_at: Set(chrono::Utc::now()),
             updated_at: Set(chrono::Utc::now()),
         }

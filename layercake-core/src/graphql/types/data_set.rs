@@ -78,6 +78,7 @@ impl DataSet {
             name: project.name,
             description: project.description,
             tags: serde_json::from_str(&project.tags).unwrap_or_default(),
+            import_export_path: project.import_export_path,
             created_at: project.created_at,
             updated_at: project.updated_at,
         })

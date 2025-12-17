@@ -148,6 +148,7 @@ pub struct ProjectSummary {
     pub name: String,
     pub description: Option<String>,
     pub tags: Vec<String>,
+    pub import_export_path: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -160,6 +161,7 @@ impl From<projects::Model> for ProjectSummary {
             name: model.name,
             description: model.description,
             tags,
+            import_export_path: model.import_export_path,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -178,6 +180,7 @@ pub struct ProjectUpdate {
     pub description: Option<String>,
     pub description_is_set: bool,
     pub tags: Option<Vec<String>>,
+    pub import_export_path: Option<Option<String>>,
 }
 
 impl ProjectUpdate {
@@ -186,12 +189,14 @@ impl ProjectUpdate {
         description: Option<String>,
         description_is_set: bool,
         tags: Option<Vec<String>>,
+        import_export_path: Option<Option<String>>,
     ) -> Self {
         Self {
             name,
             description,
             description_is_set,
             tags,
+            import_export_path,
         }
     }
 }

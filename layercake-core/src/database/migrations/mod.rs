@@ -45,6 +45,7 @@ mod m20251210_000005_create_projections;
 mod m20251213_000001_repair_post_migration_graphs;
 mod m20251215_000001_drop_legacy_graph_tables;
 mod m20251215_000002_remove_edge_node_fk_constraints;
+mod m20251216_000001_add_import_export_path_to_projects;
 
 pub struct Migrator;
 
@@ -97,6 +98,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251213_000001_repair_post_migration_graphs::Migration),
             Box::new(m20251215_000001_drop_legacy_graph_tables::Migration),
             Box::new(m20251215_000002_remove_edge_node_fk_constraints::Migration),
+            Box::new(m20251216_000001_add_import_export_path_to_projects::Migration),
         ]
     }
 }

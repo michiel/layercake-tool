@@ -15,6 +15,8 @@ pub struct Project {
     pub name: String,
     pub description: Option<String>,
     pub tags: Vec<String>,
+    #[graphql(name = "importExportPath")]
+    pub import_export_path: Option<String>,
     #[graphql(name = "createdAt")]
     pub created_at: DateTime<Utc>,
     #[graphql(name = "updatedAt")]
@@ -29,6 +31,7 @@ impl From<projects::Model> for Project {
             name: model.name,
             description: model.description,
             tags,
+            import_export_path: model.import_export_path,
             created_at: model.created_at,
             updated_at: model.updated_at,
         }
@@ -42,6 +45,7 @@ impl From<ProjectSummary> for Project {
             name: summary.name,
             description: summary.description,
             tags: summary.tags,
+            import_export_path: summary.import_export_path,
             created_at: summary.created_at,
             updated_at: summary.updated_at,
         }
