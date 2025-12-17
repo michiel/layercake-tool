@@ -480,23 +480,23 @@ impl GraphBuilder {
                 ));
             }
 
-            // Validate edges don't reference partition nodes
+            // Warn if edges reference partition nodes (allowed but unusual)
             if let Some(source_node) = all_nodes.get(&edge.source) {
                 if source_node.is_partition {
-                    return Err(anyhow!(
-                        "Edge {} has source node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
+                    tracing::warn!(
+                        "Edge {} has source node {} which is a partition (subflow). This is allowed but unusual.",
                         edge.id,
                         edge.source
-                    ));
+                    );
                 }
             }
             if let Some(target_node) = all_nodes.get(&edge.target) {
                 if target_node.is_partition {
-                    return Err(anyhow!(
-                        "Edge {} has target node {} which is a partition (subflow). Edges cannot connect to partition nodes.",
+                    tracing::warn!(
+                        "Edge {} has target node {} which is a partition (subflow). This is allowed but unusual.",
                         edge.id,
                         edge.target
-                    ));
+                    );
                 }
             }
         }

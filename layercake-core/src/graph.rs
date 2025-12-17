@@ -1562,6 +1562,28 @@ impl Graph {
         serde_json::json!(tree)
     }
 
+    /// Check if a node's belongs_to chain contains a cycle
+    fn check_belongs_to_cycle(&self, start_id: &str) -> Result<(), String> {
+        let mut visited = HashSet::new();
+        let mut current_id = start_id.to_string();
+
+        while let Some(node) = self.nodes.iter().find(|n| n.id == current_id) {
+            if let Some(parent_id) = &node.belongs_to {
+                if !parent_id.is_empty() {
+                    if !visited.insert(current_id.clone()) {
+                        return Err(format!("cycle involving '{}'", current_id));
+                    }
+                    current_id = parent_id.clone();
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        Ok(())
+    }
+
     pub fn verify_graph_integrity(&self) -> Result<(), Vec<String>> {
         let node_ids: HashSet<String> = self.nodes.iter().map(|n| n.id.clone()).collect();
         let mut errors = Vec::new();
@@ -1592,45 +1614,11 @@ impl Graph {
             warn!("Some edges have missing source and/or target nodes");
         }
 
-        let partition_node_ids = self
-            .nodes
-            .iter()
-            .filter(|n| n.is_partition)
-            .map(|n| n.id.clone())
-            .collect::<HashSet<String>>();
-
-        let non_partition_node_ids = self
-            .nodes
-            .iter()
-            .filter(|n| !n.is_partition)
-            .map(|n| n.id.clone())
-            .collect::<HashSet<String>>();
-
-        //
-        // verify that partition nodes and non-partition nodes do not have edges between them
-
-        self.edges.iter().for_each(|e| {
-            if partition_node_ids.contains(&e.source) && non_partition_node_ids.contains(&e.target)
-            {
-                let err = format!(
-                    "Edge id:[{}] source {:?} is a partition node and target {:?} is a non-partition node",
-                    e.id, e.source, e.target
-                );
-                errors.push(err);
-            }
-            if partition_node_ids.contains(&e.target) && non_partition_node_ids.contains(&e.source)
-            {
-                let err = format!(
-                    "Edge id:[{}] target {:?} is a partition node and source {:?} is a non-partition node",
-                    e.id, e.target, e.source
-                );
-                errors.push(err);
-            }
-        });
-
+        // Validate belongs_to references when present
+        // Empty string is treated as None (no parent)
         self.nodes.iter().for_each(|n| {
             if let Some(belongs_to) = &n.belongs_to {
-                if !node_ids.contains(belongs_to) {
+                if !belongs_to.is_empty() && !node_ids.contains(belongs_to) {
                     let err = format!(
                         "Node id:[{}] belongs_to {:?} not found in nodes",
                         n.id, belongs_to
@@ -1640,17 +1628,15 @@ impl Graph {
             }
         });
 
-        // verify that all nodes that are not partitions have a parent
-
-        self.nodes.iter().for_each(|n| {
-            if n.belongs_to.is_none() && !n.is_partition {
-                let err = format!(
-                    "Node id:[{}] is not a partition AND does not belong to a partition",
-                    n.id,
-                );
-                errors.push(err);
+        // Detect cycles in belongs_to chains
+        for node in &self.nodes {
+            if let Err(cycle_err) = self.check_belongs_to_cycle(&node.id) {
+                errors.push(format!(
+                    "Node id:[{}] - cycle detected in belongs_to chain: {}",
+                    node.id, cycle_err
+                ));
             }
-        });
+        }
 
         // verify that all nodes are assigned to a layer
         self.nodes.iter().for_each(|n| {
