@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { createApolloClientForEndpoint } from '@/graphql/client'
+import { getServerInfo } from '@/utils/tauri'
 
 const EXPORT_PROJECTION = gql`
   mutation ExportProjection($id: ID!) {
@@ -83,22 +84,41 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
                   size="icon"
                   variant="ghost"
                   className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
-                  onMouseDown={(e) => {
+                  onMouseDown={async (e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
-                    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${config.projectionId}`
+
                     if ((window as any).__TAURI__) {
-                      import('@tauri-apps/api/webviewWindow')
-                        .then(({ WebviewWindow }) => {
-                          const label = `projection-${config.projectionId}-${Date.now()}`
-                          new WebviewWindow(label, { url })
+                      try {
+                        // Get actual server URL from Tauri
+                        const serverInfo = await getServerInfo()
+                        if (!serverInfo) {
+                          showErrorNotification('Open failed', 'Unable to get server information')
+                          return
+                        }
+                        // Pass the server URL as a query parameter so the projection viewer knows where to connect
+                        const url = `${serverInfo.url}/projections/viewer/${config.projectionId}?apiBase=${encodeURIComponent(serverInfo.url)}`
+                        console.log('Creating Tauri window with URL:', url)
+
+                        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+                        const label = `projection-${config.projectionId}-${Date.now()}`
+                        const win = new WebviewWindow(label, { url })
+                        win.once('tauri://created', () => {
+                          console.log('Tauri window created successfully')
+                          showSuccessNotification('Projection opened', 'New window created.')
                         })
-                        .catch((err) => {
-                          console.error('Failed to open projection window', err)
-                          showErrorNotification('Open failed', 'Unable to open projection viewer')
+                        win.once('tauri://error', (e: unknown) => {
+                          console.error('Tauri window error event:', e)
+                          const errorMsg = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e)
+                          showErrorNotification('Open failed', errorMsg)
                         })
+                      } catch (err: any) {
+                        console.error('Failed to open projection window', err)
+                        showErrorNotification('Open failed', err?.message || 'Unable to open projection viewer')
+                      }
                     } else {
+                      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
+                      const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${config.projectionId}`
                       window.open(url, '_blank', 'noreferrer')
                     }
                   }}

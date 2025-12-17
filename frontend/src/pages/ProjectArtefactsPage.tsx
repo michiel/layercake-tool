@@ -228,10 +228,16 @@ const ProjectArtefactsPage: React.FC = () => {
 
   const openProjectionViewer = useCallback(async (projectionId: string | number) => {
     if (!projectionId) return
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
-    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${projectionId}`
     if ((window as any).__TAURI__) {
       try {
+        const { getServerInfo } = await import('@/utils/tauri')
+        const serverInfo = await getServerInfo()
+        if (!serverInfo) {
+          showErrorNotification('Open failed', 'Unable to get server information')
+          return
+        }
+        const url = `${serverInfo.url}/projections/viewer/${projectionId}?apiBase=${encodeURIComponent(serverInfo.url)}`
+
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
         const label = `projection-${projectionId}-${Date.now()}`
         const win = new WebviewWindow(label, { url })
@@ -247,6 +253,8 @@ const ProjectArtefactsPage: React.FC = () => {
         showErrorNotification('Open failed', err?.message || 'Unable to open projection window')
       }
     }
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
+    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${projectionId}`
     window.open(url, '_blank', 'noreferrer')
   }, [])
 

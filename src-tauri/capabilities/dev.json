@@ -15,6 +15,7 @@
     "core:event:default",
     "core:window:default",
     "core:webview:default",
+    "core:webview:allow-create-webview-window",
     "dialog:default",
     "shell:default"
   ]

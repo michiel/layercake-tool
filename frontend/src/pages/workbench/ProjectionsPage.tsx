@@ -145,10 +145,16 @@ export const ProjectionsPage = () => {
   }
 
   const handleOpen = async (id: string) => {
-    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
-    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${id}`
     if ((window as any).__TAURI__) {
       try {
+        const { getServerInfo } = await import('@/utils/tauri')
+        const serverInfo = await getServerInfo()
+        if (!serverInfo) {
+          showErrorNotification('Open failed', 'Unable to get server information')
+          return
+        }
+        const url = `${serverInfo.url}/projections/viewer/${id}?apiBase=${encodeURIComponent(serverInfo.url)}`
+
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
         const label = `projection-${id}-${Date.now()}`
         const win = new WebviewWindow(label, { url })
@@ -163,6 +169,8 @@ export const ProjectionsPage = () => {
         showErrorNotification('Open failed', err?.message || 'Unable to open projection window')
       }
     }
+    const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
+    const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${id}`
     window.open(url, '_blank', 'noreferrer')
   }
 

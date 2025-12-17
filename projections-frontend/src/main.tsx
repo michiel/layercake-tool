@@ -8,7 +8,12 @@ import { getMainDefinition } from '@apollo/client/utilities'
 import { createClient } from 'graphql-ws'
 import App from './app'
 
-const baseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3001'
+// Get API base URL from query parameter (for Tauri) or environment variable (for web)
+const urlParams = new URLSearchParams(window.location.search)
+const apiBaseFromUrl = urlParams.get('apiBase')
+const baseUrl = apiBaseFromUrl || (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3001'
+console.log('[Projections Viewer] Using API base URL:', baseUrl)
+
 const httpUrl = `${baseUrl}/projections/graphql`
 const wsUrl = `${baseUrl.replace('http', 'ws')}/projections/graphql/ws`
 

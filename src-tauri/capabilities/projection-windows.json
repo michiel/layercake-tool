@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "projection-windows",
+  "description": "Allow projection viewer windows to access the embedded backend API on dynamic port.",
+  "windows": ["projection-*"],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:*/*",
+      "http://localhost:*/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:webview:default"
+  ]
+}
