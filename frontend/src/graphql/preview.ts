@@ -50,6 +50,7 @@ export const GET_GRAPH_PREVIEW = gql`
         label
         layer
         weight
+        belongsTo
         isPartition
         attrs
       }
@@ -114,6 +115,7 @@ export interface GraphNodePreview {
   label?: string;
   layer?: string;
   weight?: number;
+  belongsTo?: string | null;
   isPartition: boolean;
   attrs?: Record<string, any>;
 }

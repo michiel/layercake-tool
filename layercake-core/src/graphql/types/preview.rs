@@ -56,6 +56,9 @@ pub struct GraphNodePreview {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    #[graphql(name = "belongsTo")]
+    pub belongs_to: Option<String>,
+    #[graphql(name = "isPartition")]
     pub is_partition: bool,
     /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
@@ -83,6 +86,7 @@ impl From<crate::database::entities::graph_nodes::Model> for GraphNodePreview {
             label: model.label,
             layer: model.layer,
             weight: model.weight,
+            belongs_to: model.belongs_to,
             is_partition: model.is_partition,
             attrs: model.attrs.clone(),
             attributes: model.attrs,
@@ -97,6 +101,7 @@ impl From<crate::database::entities::graph_data_nodes::Model> for GraphNodePrevi
             label: model.label,
             layer: model.layer,
             weight: model.weight,
+            belongs_to: model.belongs_to,
             is_partition: model.is_partition,
             attrs: model.attributes.clone(),
             attributes: model.attributes,

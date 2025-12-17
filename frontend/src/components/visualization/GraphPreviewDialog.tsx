@@ -48,7 +48,7 @@ export const GraphPreviewDialog = ({ opened, onClose, data, title, loading = fal
 
     const hierarchyEdges = data.nodes
       .map(node => {
-        const parent = node.attrs?.belongs_to ?? node.attrs?.belongsTo;
+        const parent = node.attrs?.belongs_to ?? node.attrs?.belongsTo ?? (node as any).belongsTo;
         return { node, parent };
       })
       .filter(({ parent }) => parent && allNodeIds.has(parent))

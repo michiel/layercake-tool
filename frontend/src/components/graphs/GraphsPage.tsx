@@ -84,16 +84,19 @@ const toGraphPreviewData = (graph?: Graph | null): GraphData | null => {
   }
 
   return {
-    nodes: (graph.graphNodes || []).map((node) => ({
-      id: node.id,
-      name: node.label || node.id,
-      layer: node.layer || 'default',
-      attrs: {
-        ...normalizeAttrs(node.attrs),
-        is_partition: node.isPartition ? 'true' : 'false',
-        belongs_to: node.belongsTo ? String(node.belongsTo) : ''
+    nodes: (graph.graphNodes || []).map((node) => {
+      const belongsTo = node.belongsTo ?? (node.attrs as any)?.belongs_to
+      return {
+        id: node.id,
+        name: node.label || node.id,
+        layer: node.layer || 'default',
+        attrs: {
+          ...normalizeAttrs(node.attrs),
+          is_partition: node.isPartition ? 'true' : 'false',
+          belongs_to: belongsTo ? String(belongsTo) : ''
+        }
       }
-    })),
+    }),
     links: (graph.graphEdges || []).map((edge) => ({
       id: edge.id,
       source: edge.source,
