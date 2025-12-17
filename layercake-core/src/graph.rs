@@ -361,14 +361,16 @@ impl Graph {
         }
     }
 
+    /// Get all root nodes (nodes without belongs_to parent)
+    /// This includes both partition roots and unattached flow nodes
     pub fn get_root_nodes(&self) -> Vec<&Node> {
         let mut nodes: Vec<&Node> = self
             .nodes
             .iter()
             .filter(|n| {
                 let belongs_to = n.belongs_to.as_deref();
-                n.is_partition
-                    && (belongs_to.is_none() || belongs_to == Some("synthetic_partition_root"))
+                // Root nodes are those without belongs_to, or with empty belongs_to
+                belongs_to.is_none() || belongs_to == Some("")
             })
             .collect();
         nodes.sort_by(|a, b| a.id.cmp(&b.id));
@@ -408,6 +410,12 @@ impl Graph {
             }
         }
         max_depth
+    }
+
+    /// Check if the graph has any partition structure
+    /// Returns true if there are any partition nodes or any belongs_to relationships
+    pub fn has_partition_structure(&self) -> bool {
+        self.nodes.iter().any(|n| n.is_partition || n.belongs_to.is_some())
     }
 
     pub fn get_hierarchy_nodes(&self) -> Vec<Node> {
