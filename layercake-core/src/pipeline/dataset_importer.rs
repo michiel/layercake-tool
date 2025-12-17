@@ -290,11 +290,17 @@ impl DatasourceImporter {
                 .and_then(|idx| record.get(idx).map(|s| s.to_string()))
                 .filter(|s| !s.is_empty());
 
+            let comment = headers
+                .iter()
+                .position(|h| h == "comment")
+                .and_then(|idx| record.get(idx).map(|s| s.to_string()))
+                .filter(|s| !s.is_empty());
+
             let mut attributes = JsonMap::new();
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
-                    // Skip id/label/layer since they map to dedicated fields
-                    if header == "id" || header == "label" || header == "layer" {
+                    // Skip id/label/layer/comment since they map to dedicated fields
+                    if header == "id" || header == "label" || header == "layer" || header == "comment" {
                         continue;
                     }
                     attributes.insert(header.to_string(), json!(field));
@@ -308,7 +314,7 @@ impl DatasourceImporter {
                 weight: None,
                 is_partition: None,
                 belongs_to: None,
-                comment: None,
+                comment,
                 source_dataset_id: Some(dataset.id),
                 attributes: if attributes.is_empty() {
                     None
@@ -426,10 +432,18 @@ impl DatasourceImporter {
                 .and_then(|idx| record.get(idx))
                 .and_then(|s| s.parse::<f64>().ok());
 
+            let comment = headers
+                .iter()
+                .position(|h| h == "comment")
+                .and_then(|idx| record.get(idx).map(|s| s.to_string()))
+                .filter(|s| !s.is_empty());
+
             let mut attributes = JsonMap::new();
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
-                    if header == "id" || header == "source" || header == "target" {
+                    // Skip id/source/target/label/layer/weight/comment since they map to dedicated fields
+                    if header == "id" || header == "source" || header == "target"
+                        || header == "label" || header == "layer" || header == "weight" || header == "comment" {
                         continue;
                     }
                     attributes.insert(header.to_string(), json!(field));
@@ -443,7 +457,7 @@ impl DatasourceImporter {
                 label,
                 layer,
                 weight,
-                comment: None,
+                comment,
                 source_dataset_id: Some(dataset.id),
                 attributes: if attributes.is_empty() {
                     None

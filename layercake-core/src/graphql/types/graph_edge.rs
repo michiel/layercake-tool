@@ -12,6 +12,7 @@ pub struct GraphEdge {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub comment: Option<String>,
     /// Deprecated: use attributes
     pub attrs: Option<serde_json::Value>,
     pub attributes: Option<serde_json::Value>,
@@ -31,6 +32,7 @@ impl From<crate::database::entities::graph_edges::Model> for GraphEdge {
             label: model.label,
             layer: model.layer,
             weight: model.weight,
+            comment: model.comment,
             attrs: model.attrs.clone(),
             attributes: model.attrs,
             dataset_id: model.dataset_id,
@@ -49,6 +51,7 @@ impl From<graph_data_edges::Model> for GraphEdge {
             label: model.label,
             layer: model.layer,
             weight: model.weight,
+            comment: model.comment,
             attrs: model.attributes.clone(),
             attributes: model.attributes,
             dataset_id: model.source_dataset_id,
