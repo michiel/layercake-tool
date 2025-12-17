@@ -1657,6 +1657,11 @@ impl Graph {
             }
         }
 
+        // Log informative message about partition structure
+        if !self.has_partition_structure() {
+            tracing::info!("Graph has no partition structure - hierarchy features will be unavailable. Add 'is_partition' nodes and 'belongs_to' relationships to use hierarchy features.");
+        }
+
         if errors.is_empty() {
             Ok(())
         } else {
