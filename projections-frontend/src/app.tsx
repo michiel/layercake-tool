@@ -267,6 +267,29 @@ export default function App() {
     return () => cleanupForceGraph()
   }, [])
 
+  // Handle window resize to update ForceGraph3D dimensions
+  useEffect(() => {
+    if (isLayer3d) return
+
+    const handleResize = () => {
+      const fg = fgRef.current
+      if (fg && containerRef.current) {
+        const width = containerRef.current.clientWidth
+        const height = containerRef.current.clientHeight
+        if (typeof fg.width === 'function' && typeof fg.height === 'function') {
+          fg.width(width).height(height)
+          console.log('[ForceGraph] Resized to', width, 'x', height)
+        }
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+    // Also trigger resize on mount to ensure correct initial size
+    handleResize()
+
+    return () => window.removeEventListener('resize', handleResize)
+  }, [isLayer3d])
+
   // Apply data and control updates without tearing down the graph
   useEffect(() => {
     console.log('[ForceGraph] Update effect')

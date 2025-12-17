@@ -102,7 +102,11 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
 
                         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
                         const label = `projection-${config.projectionId}-${Date.now()}`
-                        const win = new WebviewWindow(label, { url })
+                        const win = new WebviewWindow(label, {
+                          url,
+                          maximized: true,
+                          title: `Projection #${config.projectionId}`
+                        })
                         win.once('tauri://created', () => {
                           console.log('Tauri window created successfully')
                           showSuccessNotification('Projection opened', 'New window created.')

@@ -14,8 +14,8 @@
     "windows": [
       {
         "title": "Layercake",
-        "width": 1200,
-        "height": 800,
+        "width": 2400,
+        "height": 1600,
         "resizable": true,
         "fullscreen": false,
         "incognito": false,

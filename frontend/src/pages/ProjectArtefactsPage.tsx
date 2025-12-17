@@ -240,7 +240,11 @@ const ProjectArtefactsPage: React.FC = () => {
 
         const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
         const label = `projection-${projectionId}-${Date.now()}`
-        const win = new WebviewWindow(label, { url })
+        const win = new WebviewWindow(label, {
+          url,
+          maximized: true,
+          title: `Projection #${projectionId}`
+        })
         win.once('tauri://created', () => {
           showSuccessNotification('Projection opened', 'New window created.')
         })
