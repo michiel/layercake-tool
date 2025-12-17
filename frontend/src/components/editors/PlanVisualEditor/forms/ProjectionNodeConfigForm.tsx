@@ -182,7 +182,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   const projection = (projectionData as any)?.projection
   const projectionState = (projectionData as any)?.projectionState
   const stories = (storiesData as any)?.stories ?? []
-  const { data: graphDataLookup } = useQuery(GRAPH_DATA_BY_DAG_NODE, {
+  const { data: graphDataLookup, loading: graphLookupLoading } = useQuery(GRAPH_DATA_BY_DAG_NODE, {
     variables: { dagNodeId: graphSourceNodeIdHint ?? '' },
     skip: !graphSourceNodeIdHint,
     fetchPolicy: 'cache-first',
@@ -432,9 +432,19 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   const busy = loadingProjection || loadingStories || creatingProjection
 
   if (!projectionId && !resolvedGraphDataId) {
+    const hasUpstreamHint = !!graphIdHint || !!graphSourceNodeIdHint
     return (
-      <div className="text-sm text-muted-foreground">
-        Connect this projection node to a graph first so a projection can be created automatically.
+      <div className="text-sm text-muted-foreground flex items-center gap-2">
+        {hasUpstreamHint || graphLookupLoading ? (
+          <>
+            <Spinner className="h-4 w-4" />
+            <span>Preparing projection from connected graph…</span>
+          </>
+        ) : (
+          <span>
+            Connect this projection node to a graph first so a projection can be created automatically.
+          </span>
+        )}
       </div>
     )
   }
