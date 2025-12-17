@@ -101,13 +101,20 @@ impl GraphTransform {
                 if depth <= 0 {
                     return Err(anyhow!("max_partition_depth must be greater than zero"));
                 }
-                let synthesized = graph.ensure_partition_hierarchy();
+
+                // Check if graph has partition structure
+                if !graph.has_partition_structure() {
+                    return Ok(Some(
+                        "### Transform: Partition Depth Limit (Skipped)\n\
+                         No partition structure found in graph. \
+                         Add `belongs_to` relationships to use this transform."
+                            .to_string()
+                    ));
+                }
+
                 graph
                     .modify_graph_limit_partition_depth(depth)
                     .map_err(|e| anyhow!(e))?;
-                if synthesized {
-                    info!("PartitionDepthLimit synthesized hierarchy because no partitions were defined in the source graph");
-                }
                 Some(format!(
                     "### Transform: Partition Depth Limit\n- Max depth: {}\n- Nodes after: {}\n- Edges after: {}",
                     depth,
@@ -122,13 +129,19 @@ impl GraphTransform {
                 if width <= 0 {
                     return Err(anyhow!("max_partition_width must be greater than zero"));
                 }
-                let synthesized = graph.ensure_partition_hierarchy();
+
+                // Check if graph has partition structure
+                if !graph.has_partition_structure() {
+                    return Ok(Some(
+                        "### Transform: Partition Width Limit (Skipped)\n\
+                         No partition structure found in graph."
+                            .to_string()
+                    ));
+                }
+
                 let summary = graph
                     .modify_graph_limit_partition_width(width)
                     .map_err(|e| anyhow!(e))?;
-                if synthesized {
-                    info!("PartitionWidthLimit synthesized hierarchy because no partitions were defined in the source graph");
-                }
 
                 let annotation = if summary.is_empty() {
                     format!(

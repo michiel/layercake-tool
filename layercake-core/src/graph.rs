@@ -841,7 +841,12 @@ impl Graph {
     }
 
     pub fn modify_graph_limit_partition_depth(&mut self, depth: i32) -> Result<(), String> {
-        let mut synthesized = false;
+        // Check if graph has partition structure
+        if !self.has_partition_structure() {
+            tracing::warn!("PartitionDepthLimit transform skipped: no partition structure in graph");
+            return Ok(());
+        }
+
         fn trim_node(
             node_id: &String,
             graph: &mut Graph,
@@ -922,30 +927,16 @@ impl Graph {
             Ok(())
         }
 
-        let root_node_ids: Vec<String> = {
-            let mut roots: Vec<String> = self
-                .get_root_nodes()
-                .iter()
-                .map(|node| node.id.clone())
-                .collect();
-            if roots.is_empty() {
-                synthesized = self.ensure_partition_hierarchy();
-                roots = self
-                    .get_root_nodes()
-                    .iter()
-                    .map(|node| node.id.clone())
-                    .collect();
-            }
-            roots
-        };
+        let root_node_ids: Vec<String> = self
+            .get_root_nodes()
+            .iter()
+            .map(|node| node.id.clone())
+            .collect();
 
         for node_id in &root_node_ids {
             trim_node(node_id, self, 0, depth)?;
         }
 
-        if synthesized {
-            info!("Synthetic partition hierarchy used for depth limiting");
-        }
         Ok(())
     }
 
@@ -953,6 +944,12 @@ impl Graph {
         &mut self,
         max_width: i32,
     ) -> Result<Vec<PartitionWidthAggregation>, String> {
+        // Check if graph has partition structure
+        if !self.has_partition_structure() {
+            tracing::warn!("PartitionWidthLimit transform skipped: no partition structure in graph");
+            return Ok(vec![]);
+        }
+
         fn trim_node(
             node_id: &String,
             graph: &mut Graph,
@@ -1065,32 +1062,17 @@ impl Graph {
             Ok(())
         }
 
-        let mut synthesized = false;
-        let root_node_ids: Vec<String> = {
-            let mut roots: Vec<String> = self
-                .get_root_nodes()
-                .iter()
-                .map(|node| node.id.clone())
-                .collect();
-            if roots.is_empty() {
-                synthesized = self.ensure_partition_hierarchy();
-                roots = self
-                    .get_root_nodes()
-                    .iter()
-                    .map(|node| node.id.clone())
-                    .collect();
-            }
-            roots
-        };
+        let root_node_ids: Vec<String> = self
+            .get_root_nodes()
+            .iter()
+            .map(|node| node.id.clone())
+            .collect();
 
         let mut summaries = Vec::new();
         for node_id in &root_node_ids {
             trim_node(node_id, self, max_width, &mut summaries)?;
         }
 
-        if synthesized {
-            info!("Synthetic partition hierarchy used for width limiting");
-        }
         Ok(summaries)
     }
 
@@ -1319,69 +1301,6 @@ impl Graph {
         }
 
         self.nodes.push(hierarchy_node);
-    }
-
-    /// Ensure the graph has partition metadata. When none exists, synthesize a
-    /// shallow hierarchy rooted at a synthetic partition node so downstream
-    /// transforms (depth/width limits) can operate.
-    pub fn ensure_partition_hierarchy(&mut self) -> bool {
-        if self.nodes.iter().any(|n| n.is_partition) {
-            return false;
-        }
-
-        let root_id = "synthetic_partition_root".to_string();
-        let mut child_counts: HashMap<String, usize> = HashMap::new();
-        let mut parents_by_child: HashMap<String, String> = HashMap::new();
-        for edge in &self.edges {
-            *child_counts.entry(edge.source.clone()).or_insert(0) += 1;
-            parents_by_child
-                .entry(edge.target.clone())
-                .or_insert_with(|| edge.source.clone());
-        }
-
-        for node in &mut self.nodes {
-            if child_counts.contains_key(&node.id) {
-                node.is_partition = true;
-            }
-        }
-
-        if !self.layer_exists("aggregated") {
-            self.add_layer(Layer::new(
-                "aggregated",
-                "Aggregated",
-                "222222",
-                "ffffff",
-                "dddddd",
-            ));
-        }
-
-        if !self.nodes.iter().any(|n| n.id == root_id) {
-            self.nodes.push(Node {
-                id: root_id.clone(),
-                label: "Synthetic Root".to_string(),
-                layer: "aggregated".to_string(),
-                is_partition: true,
-                belongs_to: None,
-                weight: 0,
-                comment: Some("auto-generated".to_string()),
-                dataset: None,
-                attributes: None,
-            });
-        }
-
-        for node in &mut self.nodes {
-            if node.id == root_id || node.belongs_to.is_some() {
-                continue;
-            }
-
-            if let Some(parent) = parents_by_child.get(&node.id) {
-                node.belongs_to = Some(parent.clone());
-            } else {
-                node.belongs_to = Some(root_id.clone());
-            }
-        }
-
-        true
     }
 
     /// Remove nodes that have no edges connected to them (no incoming or outgoing edges)
@@ -2806,73 +2725,6 @@ mod tests {
         if let Some(node) = level2_1 {
             assert!(!node.is_partition);
         }
-    }
-
-    #[test]
-    fn test_ensure_partition_hierarchy_adds_root() {
-        let mut graph = Graph {
-            name: "No Partition Graph".to_string(),
-            nodes: vec![
-                Node {
-                    id: "a".to_string(),
-                    label: "A".to_string(),
-                    layer: "layer".to_string(),
-                    is_partition: false,
-                    belongs_to: None,
-                    weight: 1,
-                    comment: None,
-                    dataset: None,
-                    attributes: None,
-                },
-                Node {
-                    id: "b".to_string(),
-                    label: "B".to_string(),
-                    layer: "layer".to_string(),
-                    is_partition: false,
-                    belongs_to: None,
-                    weight: 1,
-                    comment: None,
-                    dataset: None,
-                    attributes: None,
-                },
-            ],
-            edges: vec![Edge {
-                id: "edge_ab".to_string(),
-                source: "a".to_string(),
-                target: "b".to_string(),
-                label: "".to_string(),
-                layer: "layer".to_string(),
-                weight: 1,
-                comment: None,
-                dataset: None,
-                attributes: None,
-            }],
-            layers: vec![Layer {
-                id: "layer".to_string(),
-                label: "Layer".to_string(),
-                background_color: "FFFFFF".to_string(),
-                text_color: "000000".to_string(),
-                border_color: "000000".to_string(),
-                alias: None,
-                dataset: None,
-                attributes: None,
-            }],
-            annotations: None,
-        };
-
-        assert!(graph.ensure_partition_hierarchy());
-        let synthetic = graph
-            .nodes
-            .iter()
-            .find(|n| n.id == "synthetic_partition_root")
-            .expect("Synthetic root should be created");
-        assert!(synthetic.is_partition);
-        let node_a = graph.get_node_by_id("a").unwrap();
-        assert_eq!(
-            node_a.belongs_to.as_deref(),
-            Some("synthetic_partition_root")
-        );
-        assert!(node_a.is_partition);
     }
 
     #[test]
