@@ -270,6 +270,8 @@ impl GraphTransform {
                 ))
             }
             GraphTransformKind::GenerateHierarchy => {
+                let keep_flow_edges = self.params.keep_flow_edges.unwrap_or(false);
+
                 let root_count = graph
                     .nodes
                     .iter()
@@ -279,25 +281,33 @@ impl GraphTransform {
                     })
                     .count();
 
-                graph.generate_hierarchy();
+                graph.generate_hierarchy(keep_flow_edges);
+
+                let keep_edges_note = if keep_flow_edges {
+                    "\n- Kept original flow edges"
+                } else {
+                    ""
+                };
 
                 let message = if root_count <= 1 {
                     format!(
                         "### Transform: Generate Hierarchy\n\
                          Graph already has single root - no synthetic root needed.\n\
-                         Converting belongs_to references to explicit edges.\n\
+                         Converting belongs_to references to explicit edges.{}\n\
                          - Nodes after: {}\n\
                          - Edges after: {}",
+                        keep_edges_note,
                         graph.nodes.len(),
                         graph.edges.len()
                     )
                 } else {
                     format!(
                         "### Transform: Generate Hierarchy\n\
-                         Graph has {} root nodes - creating synthetic 'Hierarchy' root to unify them.\n\
+                         Graph has {} root nodes - creating synthetic 'Hierarchy' root to unify them.{}\n\
                          - Nodes after: {}\n\
                          - Edges after: {}",
                         root_count,
+                        keep_edges_note,
                         graph.nodes.len(),
                         graph.edges.len()
                     )
@@ -407,6 +417,8 @@ pub struct GraphTransformParams {
     pub layer_connections_threshold: Option<usize>,
     #[serde(alias = "excludePartitionNodes")]
     pub exclude_partition_nodes: Option<bool>,
+    #[serde(alias = "keepFlowEdges")]
+    pub keep_flow_edges: Option<bool>,
 }
 
 /// Wire format for deserializing TransformNodeConfig supporting both v1 and v2 schemas.
@@ -1130,7 +1142,10 @@ mod tests {
 
         let transform = GraphTransform {
             kind: GraphTransformKind::GenerateHierarchy,
-            params: GraphTransformParams::default(),
+            params: GraphTransformParams {
+                keep_flow_edges: Some(false),
+                ..Default::default()
+            },
         };
 
         transform

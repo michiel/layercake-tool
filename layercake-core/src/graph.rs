@@ -1231,7 +1231,10 @@ impl Graph {
 
     /// Generate hierarchy edges from belongs_to relationships.
     /// Conditionally creates synthetic "Hierarchy" root only when multiple roots exist.
-    pub fn generate_hierarchy(&mut self) {
+    ///
+    /// # Arguments
+    /// * `keep_flow_edges` - If true, preserves existing flow edges; if false, replaces them with hierarchy edges only
+    pub fn generate_hierarchy(&mut self, keep_flow_edges: bool) {
         if self.nodes.is_empty() {
             return;
         }
@@ -1248,25 +1251,33 @@ impl Graph {
 
         // If single root or no nodes, just convert belongs_to to edges without synthetic root
         if root_count <= 1 {
-            self.convert_belongs_to_to_edges();
+            self.convert_belongs_to_to_edges(keep_flow_edges);
             return;
         }
 
         // Multiple roots: create synthetic "Hierarchy" root to unify them
-        self.create_hierarchy_with_synthetic_root();
+        self.create_hierarchy_with_synthetic_root(keep_flow_edges);
     }
 
     /// Convert belongs_to relationships to explicit edges without adding synthetic root
-    fn convert_belongs_to_to_edges(&mut self) {
+    fn convert_belongs_to_to_edges(&mut self, keep_flow_edges: bool) {
         let snapshot = self.nodes.clone();
         let snapshot_map: HashMap<String, Node> = snapshot
             .iter()
             .map(|node| (node.id.clone(), node.clone()))
             .collect();
 
+        // Save existing flow edges if requested
+        let saved_edges = if keep_flow_edges {
+            self.edges.clone()
+        } else {
+            Vec::new()
+        };
+
         self.edges.clear();
         let mut edge_counter = 0usize;
 
+        // Add hierarchy edges from belongs_to relationships
         for node in &snapshot {
             if let Some(parent_id) = node.belongs_to.as_ref().filter(|parent| !parent.is_empty()) {
                 if let Some(parent_node) = snapshot_map.get(parent_id) {
@@ -1287,10 +1298,15 @@ impl Graph {
                 }
             }
         }
+
+        // Restore flow edges if requested
+        if keep_flow_edges {
+            self.edges.extend(saved_edges);
+        }
     }
 
     /// Create hierarchy with synthetic root node (used when multiple roots exist)
-    fn create_hierarchy_with_synthetic_root(&mut self) {
+    fn create_hierarchy_with_synthetic_root(&mut self, keep_flow_edges: bool) {
         let snapshot = self.nodes.clone();
         let snapshot_map: HashMap<String, Node> = snapshot
             .iter()
@@ -1322,6 +1338,13 @@ impl Graph {
             ));
         }
 
+        // Save existing flow edges if requested
+        let saved_edges = if keep_flow_edges {
+            self.edges.clone()
+        } else {
+            Vec::new()
+        };
+
         self.edges.clear();
         let mut edge_counter = 0usize;
 
@@ -1345,6 +1368,11 @@ impl Graph {
                     });
                 }
             }
+        }
+
+        // Restore flow edges if requested
+        if keep_flow_edges {
+            self.edges.extend(saved_edges);
         }
 
         // Create synthetic root node
