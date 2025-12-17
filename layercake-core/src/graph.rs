@@ -2789,6 +2789,7 @@ mod tests {
 
     #[test]
     fn test_limit_partition_depth_without_metadata() {
+        // Graph with no partition structure should skip the transform
         let mut graph = Graph {
             name: "Depth No Metadata".to_string(),
             nodes: vec![
@@ -2867,11 +2868,13 @@ mod tests {
         graph
             .modify_graph_limit_partition_depth(1)
             .expect("Depth limit should succeed");
-        assert!(graph.nodes.len() < original_node_count);
+        // Transform should skip when no partition structure exists
+        assert_eq!(graph.nodes.len(), original_node_count);
     }
 
     #[test]
     fn test_limit_partition_width_without_metadata() {
+        // Graph with no partition structure should skip the transform
         let mut graph = Graph {
             name: "Width No Metadata".to_string(),
             nodes: vec![
@@ -2968,16 +2971,12 @@ mod tests {
             annotations: None,
         };
 
+        let original_node_count = graph.nodes.len();
         graph
             .modify_graph_limit_partition_width(2)
             .expect("Width limit should succeed");
-        let root = graph.get_node_by_id("root").unwrap();
-        let children = graph.get_children(root);
-        assert!(children.len() <= 3);
-        assert!(
-            children.iter().any(|n| n.id.starts_with("agg_")),
-            "Aggregated node should be created when trimming width"
-        );
+        // Transform should skip when no partition structure exists
+        assert_eq!(graph.nodes.len(), original_node_count);
     }
 
     #[test]
@@ -3090,9 +3089,9 @@ mod tests {
             }
         };
 
-        // Create a graph with an invalid connection
-        let invalid_graph = Graph {
-            name: "Invalid Graph".to_string(),
+        // Create a graph with edges to/from partition nodes (now allowed)
+        let partition_edge_graph = Graph {
+            name: "Partition Edge Graph".to_string(),
             nodes: vec![
                 // Partition node
                 Node {
@@ -3120,12 +3119,12 @@ mod tests {
                 },
             ],
             edges: vec![
-                // Invalid edge: connects partition to non-partition
+                // Edge connecting partition to non-partition (now allowed)
                 Edge {
                     id: "e1".to_string(),
                     source: "1".to_string(), // Partition node
                     target: "2".to_string(), // Non-partition node
-                    label: "Invalid Edge".to_string(),
+                    label: "Edge".to_string(),
                     layer: "layer1".to_string(),
                     weight: 1,
                     comment: None,
@@ -3146,14 +3145,9 @@ mod tests {
             annotations: None,
         };
 
-        // This should fail verification due to partition to non-partition edge
-        let result = invalid_graph.verify_graph_integrity();
-        assert!(result.is_err());
-
-        // The error should contain information about the invalid edge
-        if let Err(errors) = result {
-            assert!(errors.iter().any(|e| e.contains("partition node")));
-        }
+        // Edges to/from partition nodes are now allowed (validation relaxed)
+        let result = partition_edge_graph.verify_graph_integrity();
+        assert!(result.is_ok(), "Partition edges should be allowed now");
 
         // Create a graph with missing node reference
         let missing_node_graph = Graph {

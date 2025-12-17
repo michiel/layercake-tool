@@ -1078,6 +1078,7 @@ mod tests {
 
     #[test]
     fn generate_hierarchy_creates_root_and_edges() {
+        // Single root case - should NOT create synthetic hierarchy node
         let mut graph = Graph {
             name: "HierarchyGraph".to_string(),
             nodes: vec![
@@ -1115,30 +1116,7 @@ mod tests {
                     attributes: None,
                 },
             ],
-            edges: vec![
-                Edge {
-                    id: "old1".to_string(),
-                    source: "root".to_string(),
-                    target: "child".to_string(),
-                    label: "old".to_string(),
-                    layer: "layer1".to_string(),
-                    weight: 1,
-                    comment: None,
-                    dataset: None,
-                    attributes: None,
-                },
-                Edge {
-                    id: "old2".to_string(),
-                    source: "child".to_string(),
-                    target: "leaf".to_string(),
-                    label: "old".to_string(),
-                    layer: "layer1".to_string(),
-                    weight: 1,
-                    comment: None,
-                    dataset: None,
-                    attributes: None,
-                },
-            ],
+            edges: vec![],
             layers: vec![Layer::new(
                 "layer1", "Layer 1", "ffffff", "000000", "000000",
             )],
@@ -1154,39 +1132,33 @@ mod tests {
             .apply_to(&mut graph)
             .expect("hierarchy transform should succeed");
 
-        // Identify new hierarchy node
-        let hierarchy_node = graph
-            .nodes
-            .iter()
-            .find(|node| node.id.starts_with("hierarchy"))
-            .expect("hierarchy node should exist");
-        assert!(hierarchy_node.is_partition);
-        assert_eq!(hierarchy_node.belongs_to.as_deref(), Some(""));
+        // With single root, NO synthetic hierarchy node should be created
+        assert_eq!(graph.nodes.len(), 3, "Node count should remain 3");
+        assert!(
+            !graph.nodes.iter().any(|n| n.id == "Hierarchy"),
+            "No synthetic Hierarchy node should be created for single-root graphs"
+        );
 
-        // All other nodes now belong to the hierarchy node
-        for node in graph.nodes.iter().filter(|n| n.id != hierarchy_node.id) {
-            assert_eq!(
-                node.belongs_to.as_deref(),
-                Some(hierarchy_node.id.as_str()),
-                "node {} should belong to hierarchy node",
-                node.id
-            );
-            assert!(
-                !node.is_partition,
-                "node {} should no longer be marked as partition",
-                node.id
-            );
-        }
+        // Original nodes should still exist
+        assert!(graph.nodes.iter().any(|n| n.id == "root"));
+        assert!(graph.nodes.iter().any(|n| n.id == "child"));
+        assert!(graph.nodes.iter().any(|n| n.id == "leaf"));
 
-        // Edges represent the former belongs_to relationships
-        assert_eq!(graph.edges.len(), 2);
+        // Edges should be created from belongs_to relationships
+        assert_eq!(graph.edges.len(), 2, "Should have 2 hierarchy edges");
         let edge_pairs: HashSet<(String, String)> = graph
             .edges
             .iter()
             .map(|edge| (edge.source.clone(), edge.target.clone()))
             .collect();
-        assert!(edge_pairs.contains(&("root".to_string(), "child".to_string())));
-        assert!(edge_pairs.contains(&("child".to_string(), "leaf".to_string())));
+        assert!(
+            edge_pairs.contains(&("root".to_string(), "child".to_string())),
+            "Should have edge from root to child"
+        );
+        assert!(
+            edge_pairs.contains(&("child".to_string(), "leaf".to_string())),
+            "Should have edge from child to leaf"
+        );
     }
 
     #[test]
