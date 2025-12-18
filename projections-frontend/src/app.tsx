@@ -5,6 +5,7 @@ import ForceGraph3D from '3d-force-graph'
 import { Leva, useControls, folder } from 'leva'
 import { Group, Mesh, MeshBasicMaterial, SphereGeometry } from 'three'
 import SpriteText from 'three-spritetext'
+import Layer3DScene from './projections/layer3d-projection/Layer3DScene'
 
 // --- GraphQL Queries and Mutations (Unchanged) ---
 const PROJECTION_QUERY = gql`
@@ -453,7 +454,7 @@ export default function App() {
 
   if (isLayer3d) {
     return (
-      <div className="h-screen w-screen bg-slate-900 text-slate-100">
+      <div className="h-screen w-screen bg-slate-900 text-slate-100 flex flex-col">
         <div className="flex items-center justify-between p-3 border-b border-slate-700">
           <div>
             <div className="font-semibold">{projection.name}</div>
@@ -462,13 +463,14 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div className="flex h-full items-center justify-center flex-col gap-4 pb-20">
-          <div className="text-6xl">🏗️</div>
-          <div className="text-2xl font-bold">Layer 3D Coming Soon</div>
-          <div className="text-slate-400 max-w-md text-center">
-            The Layer 3D visualization type is currently under development.
-            Please use Force 3D for now, or check back later for updates.
-          </div>
+        <div className="flex-1 relative">
+          {graph?.nodes && graph?.edges && graph?.layers ? (
+            <Layer3DScene nodes={graph.nodes} edges={graph.edges} layers={graph.layers} />
+          ) : (
+            <div className="flex h-full items-center justify-center">
+              <div className="text-slate-400">No graph data available</div>
+            </div>
+          )}
         </div>
       </div>
     )
