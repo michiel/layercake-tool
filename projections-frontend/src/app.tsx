@@ -314,13 +314,17 @@ export default function App() {
     fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
     fg.linkOpacity(showLinks ? 0.6 : 0)
     fg.linkWidth(showLinks ? 0.3 : 0)
+    fg.linkDirectionalParticles((link: any) => (showLinks ? (link.weight || 1) : 0))
+    fg.linkDirectionalParticleSpeed((link: any) => (link.weight || 1) * 0.001)
+    fg.linkDirectionalArrowLength(3.5)
+    fg.linkDirectionalArrowRelPos(1)
     fg.linkThreeObjectExtend(true)
     fg.linkThreeObject((link: any) => {
       if (!showLabels || !showLinks) return null
       const text = link.name
       if (!text) return null
       const sprite = new SpriteText(text)
-      sprite.color = '#888888'
+      sprite.color = '#DDDDDD'
       sprite.textHeight = Math.max(3, safeNodeSize * 0.7)
       sprite.backgroundColor = 'rgba(0,0,0,0)'
       return sprite
