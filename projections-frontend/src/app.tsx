@@ -17,7 +17,7 @@ const PROJECTION_QUERY = gql`
     }
     projectionGraph(id: $id) {
       nodes { id label layer color labelColor }
-      edges { id source target }
+      edges { id source target label }
       layers { layerId name backgroundColor textColor borderColor }
     }
     projectionState(id: $id) {
@@ -32,7 +32,7 @@ const GRAPH_SUB = gql`
   subscription ProjectionGraphUpdated($id: ID!) {
     projectionGraphUpdated(id: $id) {
       nodes { id label layer color labelColor }
-      edges { id source target }
+      edges { id source target label }
       layers { layerId name backgroundColor textColor borderColor }
     }
   }
