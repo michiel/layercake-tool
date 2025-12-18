@@ -42,6 +42,10 @@ pub struct ProjectionGraphNode {
     pub layer: Option<String>,
     pub color: Option<String>,
     pub label_color: Option<String>,
+    pub weight: Option<f64>,
+    pub is_partition: bool,
+    pub belongs_to: Option<String>,
+    pub attrs: Option<serde_json::Value>,
 }
 
 /// Edge type for projection graph
@@ -50,6 +54,9 @@ pub struct ProjectionGraphEdge {
     pub id: String,
     pub source: String,
     pub target: String,
+    pub label: Option<String>,
+    pub weight: Option<f64>,
+    pub attrs: Option<serde_json::Value>,
 }
 
 /// Layer type for projection graph
@@ -127,6 +134,10 @@ pub async fn build_projection_graph(
                 layer: node.layer,
                 color,
                 label_color,
+                weight: node.weight,
+                is_partition: node.is_partition,
+                belongs_to: node.belongs_to,
+                attrs: node.attributes,
             }
         })
         .collect();
@@ -138,6 +149,9 @@ pub async fn build_projection_graph(
             id: edge.external_id,
             source: edge.source,
             target: edge.target,
+            label: edge.label,
+            weight: edge.weight,
+            attrs: edge.attributes,
         })
         .collect();
 

@@ -17,8 +17,8 @@ const PROJECTION_QUERY = gql`
       graphId
     }
     projectionGraph(id: $id) {
-      nodes { id label layer color labelColor }
-      edges { id source target label }
+      nodes { id label layer color labelColor weight attrs }
+      edges { id source target label weight attrs }
       layers { layerId name backgroundColor textColor borderColor }
     }
     projectionState(id: $id) {
@@ -32,8 +32,8 @@ const PROJECTION_QUERY = gql`
 const GRAPH_SUB = gql`
   subscription ProjectionGraphUpdated($id: ID!) {
     projectionGraphUpdated(id: $id) {
-      nodes { id label layer color labelColor }
-      edges { id source target label }
+      nodes { id label layer color labelColor weight attrs }
+      edges { id source target label weight attrs }
       layers { layerId name backgroundColor textColor borderColor }
     }
   }
@@ -57,6 +57,8 @@ const SAVE_STATE = gql`
 
 const getProjectionId = () => {
   const url = new URL(window.location.href)
+  const searchParam = url.searchParams.get('id')
+  if (searchParam) return searchParam
   const match = url.pathname.match(/\/projections\/viewer\/(\d+)/)
   if (match) return match[1]
   const legacy = url.pathname.match(/\/projections\/(\d+)/)
@@ -121,6 +123,8 @@ export default function App() {
   const graph = (graphUpdates as any)?.projectionGraphUpdated ?? (data as any)?.projectionGraph
   const state =
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
+  const isLayer3d = projection?.projectionType === 'layer3d'
+  const layer3dState = (state?.stateJson as any)?.layer3d ?? {}
 
   // Track last graphData reference so toggles don't reapply data and flicker
   const lastGraphDataRef = useRef<{ nodes: any[]; links: any[] } | null>(null)
@@ -170,6 +174,8 @@ export default function App() {
           id: n.id,
           name: n.label || n.id,
           layer: n.layer,
+          attrs: n.attrs || {},
+          weight: n.weight,
           color:
             (n.layer && layerColors.get(n.layer)?.body) ||
             n.color ||
@@ -186,12 +192,12 @@ export default function App() {
           target: e.target,
           name: e.label,
           layer: e.layer,
+          attrs: e.attrs || {},
+          weight: e.weight,
         })) ?? [],
     }
   }, [graph, layerColors, defaultNodeColor])
 
-  const isLayer3d = projection?.projectionType === 'layer3d'
-  
   console.log('[App] Data state:', {
     loading,
     hasData: !!data,
@@ -466,7 +472,20 @@ export default function App() {
         </div>
         <div className="flex-1 relative">
           {graph?.nodes && graph?.edges && graph?.layers ? (
-            <Layer3DScene nodes={graph.nodes} edges={graph.edges} layers={graph.layers} />
+            <Layer3DScene
+              nodes={graph.nodes}
+              edges={graph.edges}
+              layers={graph.layers}
+              state={layer3dState}
+              onSaveState={(nextState) => {
+                if (!projectionId) return
+                const merged = {
+                  ...(state?.stateJson ?? {}),
+                  layer3d: nextState,
+                }
+                saveState({ variables: { id: projectionId, state: merged } })
+              }}
+            />
           ) : (
             <div className="flex h-full items-center justify-center">
               <div className="text-slate-400">No graph data available</div>

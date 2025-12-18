@@ -8,14 +8,14 @@
  * Phase 1: Simple grid layout with layer stratification
  */
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import 'aframe'
 import { useControls } from 'leva'
 import { useLayercakeLayout } from './hooks/useLayercakeLayout'
 
 interface Layer3DSceneProps {
-  nodes: Array<{ id: string; label: string; layer: string; color?: string; labelColor?: string }>
-  edges: Array<{ id: string; source: string; target: string; label?: string }>
+  nodes: Array<{ id: string; label: string; layer: string; color?: string; labelColor?: string; weight?: number; attrs?: Record<string, any> }>
+  edges: Array<{ id: string; source: string; target: string; label?: string; weight?: number; attrs?: Record<string, any> }>
   layers: Array<{
     layerId: string
     name: string
@@ -23,18 +23,48 @@ interface Layer3DSceneProps {
     textColor: string
     borderColor: string
   }>
+  state?: any
+  onSaveState?: (state: any) => void
 }
 
-export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps) {
+export default function Layer3DScene({ nodes, edges, layers, state, onSaveState }: Layer3DSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneInitialized = useRef(false)
+  const saveTimerRef = useRef<number | null>(null)
+
+  const initialLayoutState = useMemo(
+    () => ({
+      canvasSize: state?.layout?.canvasSize ?? 100,
+      layerSpacing: state?.layout?.layerSpacing ?? 10,
+      partitionPadding: state?.layout?.partitionPadding ?? 2,
+    }),
+    [state]
+  )
 
   // Leva controls for layout configuration
   const controls = useControls('Layer3D Layout', {
-    canvasSize: { value: 100, min: 50, max: 200, step: 10, label: 'Canvas Size' },
-    layerSpacing: { value: 10, min: 5, max: 30, step: 1, label: 'Layer Spacing' },
-    partitionPadding: { value: 2, min: 0, max: 10, step: 0.5, label: 'Partition Padding' },
+    canvasSize: { value: initialLayoutState.canvasSize, min: 50, max: 200, step: 10, label: 'Canvas Size' },
+    layerSpacing: { value: initialLayoutState.layerSpacing, min: 5, max: 30, step: 1, label: 'Layer Spacing' },
+    partitionPadding: { value: initialLayoutState.partitionPadding, min: 0, max: 10, step: 0.5, label: 'Partition Padding' },
   })
+
+  // Persist controls to projection state with debounce
+  useEffect(() => {
+    if (!onSaveState) return
+    if (saveTimerRef.current) {
+      window.clearTimeout(saveTimerRef.current)
+    }
+    saveTimerRef.current = window.setTimeout(() => {
+      onSaveState({
+        layout: {
+          canvasSize: Number(controls.canvasSize),
+          layerSpacing: Number(controls.layerSpacing),
+          partitionPadding: Number(controls.partitionPadding),
+        },
+      })
+      saveTimerRef.current = null
+    }, 400)
+  }, [controls.canvasSize, controls.layerSpacing, controls.partitionPadding, onSaveState])
 
   // Calculate layout using Phase 2 treemap algorithm
   const layout = useLayercakeLayout(nodes, edges, layers, {
@@ -135,9 +165,15 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
     nodesContainer.setAttribute('id', 'layer3d-nodes')
     scene.appendChild(nodesContainer)
 
+    // Create edges container
+    const edgesContainer = document.createElement('a-entity')
+    edgesContainer.setAttribute('id', 'layer3d-edges')
+    scene.appendChild(edgesContainer)
+
     // Create ground plane
     const ground = document.createElement('a-entity')
-    ground.setAttribute('geometry', 'primitive: plane; width: 100; height: 100')
+    ground.setAttribute('id', 'layer3d-ground')
+    ground.setAttribute('geometry', `primitive: plane; width: ${controls.canvasSize}; height: ${controls.canvasSize}`)
     ground.setAttribute('material', 'color: #0b1021; opacity: 0.8; side: double')
     ground.setAttribute('rotation', '-90 0 0')
     ground.setAttribute('position', '0 -1 0')
@@ -157,6 +193,14 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
     }
   }, [])
 
+  // Update ground plane size when canvas changes
+  useEffect(() => {
+    const ground = containerRef.current?.querySelector('#layer3d-ground')
+    if (ground) {
+      ground.setAttribute('geometry', `primitive: plane; width: ${controls.canvasSize}; height: ${controls.canvasSize}`)
+    }
+  }, [controls.canvasSize])
+
   // Update layer planes when layers change
   useEffect(() => {
     if (!containerRef.current) return
@@ -172,16 +216,16 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
     // Add new layer planes
     layers.forEach((layer, index) => {
       const plane = document.createElement('a-plane')
-      plane.setAttribute('position', `0 ${index * 10 - 0.1} 0`)
+      plane.setAttribute('position', `0 ${index * Number(controls.layerSpacing) - 0.1} 0`)
       plane.setAttribute('rotation', '-90 0 0')
-      plane.setAttribute('width', '100')
-      plane.setAttribute('height', '100')
+      plane.setAttribute('width', String(controls.canvasSize))
+      plane.setAttribute('height', String(controls.canvasSize))
       plane.setAttribute('color', layer.backgroundColor)
       plane.setAttribute('opacity', '0.1')
       plane.setAttribute('transparent', 'true')
       container.appendChild(plane)
     })
-  }, [layers])
+  }, [layers, controls.canvasSize, controls.layerSpacing])
 
   // Update camera position from bounding box
   useEffect(() => {
@@ -261,6 +305,35 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
 
     console.log('[Layer3D] Rendered', layout.nodes.length, 'nodes')
   }, [layout.nodes])
+
+  // Render edges with simple orthogonal routing
+  useEffect(() => {
+    if (!containerRef.current) return
+    const container = containerRef.current.querySelector('#layer3d-edges')
+    if (!container) return
+
+    while (container.firstChild) {
+      container.removeChild(container.firstChild)
+    }
+
+    const nodeMap = new Map(layout.nodes.map((n) => [n.id, n]))
+    edges.forEach((edge) => {
+      const source = nodeMap.get(edge.source)
+      const target = nodeMap.get(edge.target)
+      if (!source || !target) return
+
+      const p1 = `${source.x} ${source.y} ${source.z}`
+      const p2 = `${source.x} ${target.y} ${source.z}`
+      const p3 = `${target.x} ${target.y} ${target.z}`
+
+      const seg1 = document.createElement('a-entity')
+      seg1.setAttribute('line', `start: ${p1}; end: ${p2}; color: #888; opacity: 0.6`)
+      const seg2 = document.createElement('a-entity')
+      seg2.setAttribute('line', `start: ${p2}; end: ${p3}; color: #888; opacity: 0.6`)
+      container.appendChild(seg1)
+      container.appendChild(seg2)
+    })
+  }, [edges, layout.nodes])
 
   // Handle WebGL context loss
   useEffect(() => {

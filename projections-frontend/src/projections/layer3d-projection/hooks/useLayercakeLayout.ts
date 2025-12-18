@@ -332,8 +332,8 @@ function calculateTreemapLayout(
     const depth = y1 - y0
 
     // Partition nodes span all layers, leaf nodes are at their layer
-    const y = isPartition ? 0 : layerIndex * layerSpacing
-    const height = isPartition ? layers.length * layerSpacing : 2
+    const y = layerIndex * layerSpacing
+    const height = isPartition ? Math.max(2, layerSpacing * 0.8) : 2
 
     positionedNodes.push({
       id: data.id,
