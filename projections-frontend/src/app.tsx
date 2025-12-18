@@ -455,6 +455,7 @@ export default function App() {
   if (isLayer3d) {
     return (
       <div className="h-screen w-screen bg-slate-900 text-slate-100 flex flex-col">
+        <Leva collapsed />
         <div className="flex items-center justify-between p-3 border-b border-slate-700">
           <div>
             <div className="font-semibold">{projection.name}</div>

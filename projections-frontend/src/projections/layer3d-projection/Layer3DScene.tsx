@@ -10,6 +10,7 @@
 
 import { useEffect, useRef } from 'react'
 import 'aframe'
+import { useControls } from 'leva'
 import { useLayercakeLayout } from './hooks/useLayercakeLayout'
 
 interface Layer3DSceneProps {
@@ -28,11 +29,18 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneInitialized = useRef(false)
 
-  // Calculate layout using Phase 1 grid algorithm
+  // Leva controls for layout configuration
+  const controls = useControls('Layer3D Layout', {
+    canvasSize: { value: 100, min: 50, max: 200, step: 10, label: 'Canvas Size' },
+    layerSpacing: { value: 10, min: 5, max: 30, step: 1, label: 'Layer Spacing' },
+    partitionPadding: { value: 2, min: 0, max: 10, step: 0.5, label: 'Partition Padding' },
+  })
+
+  // Calculate layout using Phase 2 treemap algorithm
   const layout = useLayercakeLayout(nodes, edges, layers, {
-    layerSpacing: 10,
-    nodeSize: 2,
-    gridSpacing: 3,
+    canvasSize: Number(controls.canvasSize),
+    layerSpacing: Number(controls.layerSpacing),
+    partitionPadding: Number(controls.partitionPadding),
   })
 
   // Register A-Frame components once
@@ -224,11 +232,19 @@ export default function Layer3DScene({ nodes, edges, layers }: Layer3DSceneProps
       entity.setAttribute('width', String(node.width))
       entity.setAttribute('height', String(node.height))
       entity.setAttribute('depth', String(node.depth))
-      entity.setAttribute('color', node.color)
-      entity.setAttribute('shadow', 'cast: true; receive: true')
       entity.setAttribute('data-node-id', node.id)
       entity.setAttribute('data-node-label', node.label)
       entity.setAttribute('layer3d-node-interaction', '')
+      entity.setAttribute('shadow', 'cast: true; receive: true')
+
+      // Partition nodes: wireframe pillars with transparency
+      // Leaf nodes: solid boxes
+      if (node.isPartition) {
+        entity.setAttribute('material', `color: ${node.color}; opacity: 0.3; transparent: true; wireframe: true`)
+      } else {
+        entity.setAttribute('color', node.color)
+        entity.setAttribute('material', `opacity: 0.9; transparent: true`)
+      }
 
       // Add text label
       const text = document.createElement('a-text')

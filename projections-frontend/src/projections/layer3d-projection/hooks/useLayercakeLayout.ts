@@ -1,15 +1,15 @@
 /**
  * Layercake Layout Hook
  *
- * Phase 1: Simple grid layout on XZ plane
- * Phase 2: Will upgrade to D3 treemap with hierarchy
+ * Phase 2: D3 treemap layout with hierarchy detection
  *
  * Calculates 3D positions for nodes in Layer3D projection:
- * - X/Z: Grid layout based on sqrt(nodeCount) per layer
+ * - X/Z: Treemap layout with hierarchy or layer-based grouping
  * - Y: Layer stratification (layerIndex * layerSpacing)
  */
 
 import { useMemo } from 'react'
+import { hierarchy, treemap } from 'd3-hierarchy'
 import {
   validateGraphData,
   breakCycles,
@@ -20,9 +20,9 @@ import {
 } from '../lib/layer3d-validation'
 
 export interface LayoutConfiguration {
+  canvasSize: number // Size of the treemap canvas (default: 100)
   layerSpacing: number // Vertical distance between layers (default: 10)
-  nodeSize: number // Base size for nodes (default: 2)
-  gridSpacing: number // Spacing between nodes in grid (default: 3)
+  partitionPadding: number // Padding between treemap partitions (default: 2)
 }
 
 export interface PositionedNode {
@@ -37,7 +37,7 @@ export interface PositionedNode {
   color: string
   labelColor: string
   layerId: string
-  isPartition: boolean // Will be true for container nodes in Phase 2
+  isPartition: boolean // True for container nodes with children
   weight: number
 }
 
@@ -64,15 +64,15 @@ export interface LayoutResult {
 }
 
 const DEFAULT_CONFIG: LayoutConfiguration = {
+  canvasSize: 100,
   layerSpacing: 10,
-  nodeSize: 2,
-  gridSpacing: 3,
+  partitionPadding: 2,
 }
 
 /**
  * Calculate layout for Layer3D projection
  *
- * Phase 1: Simple grid layout per layer
+ * Phase 2: D3 treemap layout with hierarchy detection
  */
 export function useLayercakeLayout(
   nodes: GraphNode[],
@@ -105,10 +105,13 @@ export function useLayercakeLayout(
       validatedEdges = cycleBreakResult.edges
     }
 
-    // 3. Calculate positions using Phase 1 grid layout
-    const positionedNodes = calculateGridLayout(validatedNodes, validatedLayers, fullConfig)
+    // 3. Build hierarchy
+    const hierarchyData = buildHierarchy(validatedNodes, validatedEdges, validatedLayers)
 
-    // 4. Calculate bounding box for camera positioning
+    // 4. Calculate positions using D3 treemap
+    const positionedNodes = calculateTreemapLayout(hierarchyData, validatedLayers, fullConfig)
+
+    // 5. Calculate bounding box for camera positioning
     const boundingBox = calculateBoundingBox(positionedNodes)
 
     return {
@@ -117,80 +120,235 @@ export function useLayercakeLayout(
       warnings: validationResult.warnings.map((w) => w.message),
       errors: [],
     }
-  }, [nodes, edges, layers, fullConfig.layerSpacing, fullConfig.nodeSize, fullConfig.gridSpacing])
+  }, [
+    nodes,
+    edges,
+    layers,
+    fullConfig.canvasSize,
+    fullConfig.layerSpacing,
+    fullConfig.partitionPadding,
+  ])
 }
 
 /**
- * Phase 1: Simple grid layout on XZ plane
+ * Build hierarchy from nodes and edges
  *
- * Each layer gets its own grid. Grid size determined by sqrt(nodeCount).
- * Nodes are evenly spaced in rows and columns.
+ * Strategy:
+ * 1. Check for attrs.parent_id or attrs.belongs_to
+ * 2. Check for edges with semantic relations (contains, parent_of, has, includes)
+ * 3. Fallback: Group by layer with virtual root per layer
  */
-function calculateGridLayout(
+interface HierarchyData {
+  id: string
+  label: string
+  layer: string
+  weight: number
+  color: string
+  labelColor: string
+  children?: HierarchyData[]
+  isVirtual?: boolean // True for synthetic parent nodes
+}
+
+function buildHierarchy(
   nodes: GraphNode[],
+  edges: GraphEdge[],
+  layers: GraphLayer[]
+): HierarchyData {
+  // Build parent map from attributes
+  const parentMap = new Map<string, string>()
+
+  nodes.forEach((node) => {
+    if (node.attrs?.parent_id) {
+      parentMap.set(node.id, node.attrs.parent_id)
+    } else if (node.attrs?.belongs_to) {
+      parentMap.set(node.id, node.attrs.belongs_to)
+    }
+  })
+
+  // Augment with edge-based hierarchy
+  edges.forEach((edge) => {
+    const relation = edge.attrs?.relation
+    if (relation && ['contains', 'parent_of', 'has', 'includes'].includes(relation)) {
+      // Only set if not already defined (attrs take precedence)
+      if (!parentMap.has(edge.target)) {
+        parentMap.set(edge.target, edge.source)
+      }
+    }
+  })
+
+  // Check if we have any hierarchy
+  const hasHierarchy = parentMap.size > 0
+
+  if (hasHierarchy) {
+    // Build tree structure
+    const nodeMap = new Map(
+      nodes.map((n) => [
+        n.id,
+        {
+          id: n.id,
+          label: n.label || n.id,
+          layer: n.layer!,
+          weight: n.weight || 1,
+          color: n.color || '#CCCCCC',
+          labelColor: n.labelColor || '#000000',
+          children: [],
+        } as HierarchyData,
+      ])
+    )
+
+    // Find root nodes (no parent)
+    const rootNodes: HierarchyData[] = []
+    nodes.forEach((node) => {
+      const parent = parentMap.get(node.id)
+      const nodeData = nodeMap.get(node.id)!
+
+      if (!parent || !nodeMap.has(parent)) {
+        // Root node
+        rootNodes.push(nodeData)
+      } else {
+        // Add to parent's children
+        const parentData = nodeMap.get(parent)!
+        if (!parentData.children) {
+          parentData.children = []
+        }
+        parentData.children.push(nodeData)
+      }
+    })
+
+    // Create virtual root if multiple roots
+    if (rootNodes.length === 1) {
+      return rootNodes[0]
+    } else {
+      return {
+        id: '__virtual_root__',
+        label: 'Root',
+        layer: layers[0]?.layerId || 'default',
+        weight: 0,
+        color: '#000000',
+        labelColor: '#FFFFFF',
+        children: rootNodes,
+        isVirtual: true,
+      }
+    }
+  } else {
+    // Fallback: Group by layer
+    const layerGroups = new Map<string, HierarchyData[]>()
+
+    nodes.forEach((node) => {
+      const layerData: HierarchyData = {
+        id: node.id,
+        label: node.label || node.id,
+        layer: node.layer!,
+        weight: node.weight || 1,
+        color: node.color || '#CCCCCC',
+        labelColor: node.labelColor || '#000000',
+      }
+
+      if (!layerGroups.has(node.layer!)) {
+        layerGroups.set(node.layer!, [])
+      }
+      layerGroups.get(node.layer!)!.push(layerData)
+    })
+
+    // Create virtual layer parents
+    const layerParents: HierarchyData[] = layers.map((layer) => ({
+      id: `__layer_${layer.layerId}__`,
+      label: layer.name,
+      layer: layer.layerId,
+      weight: 0,
+      color: layer.backgroundColor || '#CCCCCC',
+      labelColor: layer.textColor || '#000000',
+      children: layerGroups.get(layer.layerId) || [],
+      isVirtual: true,
+    }))
+
+    return {
+      id: '__virtual_root__',
+      label: 'Root',
+      layer: layers[0]?.layerId || 'default',
+      weight: 0,
+      color: '#000000',
+      labelColor: '#FFFFFF',
+      children: layerParents,
+      isVirtual: true,
+    }
+  }
+}
+
+/**
+ * Calculate treemap layout and map to 3D coordinates
+ */
+function calculateTreemapLayout(
+  hierarchyData: HierarchyData,
   layers: GraphLayer[],
   config: LayoutConfiguration
 ): PositionedNode[] {
-  const { layerSpacing, nodeSize, gridSpacing } = config
+  const { canvasSize, layerSpacing, partitionPadding } = config
 
-  // Group nodes by layer
-  const nodesByLayer = new Map<string, GraphNode[]>()
-  nodes.forEach((node) => {
-    const layerNodes = nodesByLayer.get(node.layer!) || []
-    layerNodes.push(node)
-    nodesByLayer.set(node.layer!, layerNodes)
-  })
+  // Create D3 hierarchy
+  const root = hierarchy(hierarchyData)
+    .sum((d: any) => (d.children ? 0 : d.weight || 1)) // Only leaf nodes have weight
+    .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
 
-  // Get layer metadata for colors
-  const layerMetadata = new Map(layers.map((layer) => [layer.layerId, layer]))
+  // Apply treemap layout
+  const layoutFn = (treemap as any)()
+    .size([canvasSize, canvasSize])
+    .paddingOuter(partitionPadding)
+    .paddingInner(partitionPadding / 2)
 
+  layoutFn(root)
+
+  // Create layer index map
+  const layerMap = new Map(layers.map((l, i) => [l.layerId, i]))
+
+  // Convert to PositionedNode array
   const positionedNodes: PositionedNode[] = []
 
-  // Position each layer
-  layers.forEach((layer, layerIndex) => {
-    const layerNodes = nodesByLayer.get(layer.layerId) || []
-    if (layerNodes.length === 0) return
+  root.each((node: any) => {
+    const data = node.data
 
-    // Calculate grid dimensions
-    const gridSize = Math.ceil(Math.sqrt(layerNodes.length))
-    const cellSize = nodeSize + gridSpacing
+    // Skip virtual root
+    if (data.isVirtual && data.id === '__virtual_root__') {
+      return
+    }
 
-    // Calculate offset to center the grid around origin
-    const gridWidth = gridSize * cellSize
-    const gridDepth = gridSize * cellSize
-    const offsetX = -gridWidth / 2 + cellSize / 2
-    const offsetZ = -gridDepth / 2 + cellSize / 2
+    // Skip virtual layer parents
+    if (data.isVirtual && data.id.startsWith('__layer_')) {
+      return
+    }
 
-    // Y position for this layer
-    const y = layerIndex * layerSpacing
+    const layerIndex = layerMap.get(data.layer) || 0
+    const isPartition = (node.children?.length || 0) > 0
 
-    // Position nodes in grid
-    layerNodes.forEach((node, index) => {
-      const row = Math.floor(index / gridSize)
-      const col = index % gridSize
+    // Calculate 3D position from treemap coordinates
+    const x0 = node.x0 || 0
+    const x1 = node.x1 || 0
+    const y0 = node.y0 || 0
+    const y1 = node.y1 || 0
 
-      const x = offsetX + col * cellSize
-      const z = offsetZ + row * cellSize
+    const x = (x0 + x1) / 2 - canvasSize / 2
+    const z = (y0 + y1) / 2 - canvasSize / 2
+    const width = x1 - x0
+    const depth = y1 - y0
 
-      const layerMeta = layerMetadata.get(layer.layerId)
-      const color = node.color || layerMeta?.backgroundColor || '#CCCCCC'
-      const labelColor = node.labelColor || layerMeta?.textColor || '#000000'
+    // Partition nodes span all layers, leaf nodes are at their layer
+    const y = isPartition ? 0 : layerIndex * layerSpacing
+    const height = isPartition ? layers.length * layerSpacing : 2
 
-      positionedNodes.push({
-        id: node.id,
-        label: node.label || node.id,
-        x,
-        y,
-        z,
-        width: nodeSize,
-        height: nodeSize,
-        depth: nodeSize,
-        color,
-        labelColor,
-        layerId: node.layer!,
-        isPartition: false, // Phase 1: no hierarchy, all leaf nodes
-        weight: node.weight || 1,
-      })
+    positionedNodes.push({
+      id: data.id,
+      label: data.label,
+      x,
+      y,
+      z,
+      width,
+      height,
+      depth,
+      color: data.color,
+      labelColor: data.labelColor,
+      layerId: data.layer,
+      isPartition,
+      weight: data.weight,
     })
   })
 
