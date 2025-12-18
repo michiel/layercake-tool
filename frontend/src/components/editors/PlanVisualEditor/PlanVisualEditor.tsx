@@ -171,7 +171,9 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       const incoming = edgesRef.current.find(e => e.target === nodeId)
       if (incoming) {
         const sourceNode = nodesRef.current.find(n => n.id === incoming.source)
-        const graphExecId = (sourceNode as any)?.data?.graphExecution?.graphId
+        const graphExec = (sourceNode as any)?.data?.graphExecution
+        // Prefer graphDataId (graph_data tables) and fall back to legacy graphId
+        const graphExecId = graphExec?.graphDataId ?? graphExec?.graphId
         setConfigGraphIdHint(typeof graphExecId === 'number' ? graphExecId : null)
         setConfigGraphSourceNodeId(sourceNode?.id ?? null)
       } else {
