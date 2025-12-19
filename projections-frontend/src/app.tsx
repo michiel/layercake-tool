@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import { gql } from '@apollo/client/core'
 import { useMutation, useQuery, useSubscription } from '@apollo/client/react'
-import ForceGraph3D from '3d-force-graph'
 import { Leva, useControls, folder } from 'leva'
-import { Group, Mesh, MeshBasicMaterial, SphereGeometry } from 'three'
-import SpriteText from 'three-spritetext'
 import Layer3DScene from './projections/layer3d-projection/Layer3DScene'
+import Force3DViewer from './components/Force3DViewer'
 
 // --- GraphQL Queries and Mutations (Unchanged) ---
 const PROJECTION_QUERY = gql`
@@ -17,8 +15,8 @@ const PROJECTION_QUERY = gql`
       graphId
     }
     projectionGraph(id: $id) {
-      nodes { id label layer color labelColor weight attrs }
-      edges { id source target label weight attrs }
+      nodes { id label layer color labelColor weight attributes }
+      edges { id source target label weight attributes }
       layers { layerId name backgroundColor textColor borderColor }
     }
     projectionState(id: $id) {
@@ -32,8 +30,8 @@ const PROJECTION_QUERY = gql`
 const GRAPH_SUB = gql`
   subscription ProjectionGraphUpdated($id: ID!) {
     projectionGraphUpdated(id: $id) {
-      nodes { id label layer color labelColor weight attrs }
-      edges { id source target label weight attrs }
+      nodes { id label layer color labelColor weight attributes }
+      edges { id source target label weight attributes }
       layers { layerId name backgroundColor textColor borderColor }
     }
   }
@@ -70,9 +68,6 @@ const getProjectionId = () => {
 
 export default function App() {
   const projectionId = getProjectionId()
-  const containerRef = useRef<HTMLDivElement | null>(null)
-  // Ref to hold the single ForceGraph3D instance
-  const fgRef = useRef<any>(null)
 
   // --- Leva Controls (Unchanged) ---
   const controls = useControls(() => ({
@@ -97,15 +92,15 @@ export default function App() {
   const linkDistance = (controls as any).linkDistance ?? 60
   const chargeStrength = (controls as any).chargeStrength ?? -120
 
-  const safeNodeSize = useMemo(() => Number(nodeRelSize) || 4, [nodeRelSize])
-  const safeLinkDistance = useMemo(() => Number(linkDistance) || 60, [linkDistance])
-  const safeChargeStrength = useMemo(() => Number(chargeStrength) || -120, [chargeStrength])
-
   // --- Data Fetching (Unchanged) ---
-  const { data, loading } = useQuery(PROJECTION_QUERY, {
+  const { data, loading, error } = useQuery(PROJECTION_QUERY, {
     variables: { id: projectionId },
     skip: !projectionId,
   })
+
+  if (error) {
+    console.error('[App] GraphQL Query Error:', error)
+  }
 
   const { data: graphUpdates } = useSubscription(GRAPH_SUB, {
     variables: { id: projectionId },
@@ -125,9 +120,6 @@ export default function App() {
     (stateUpdates as any)?.projectionStateUpdated ?? (data as any)?.projectionState
   const isLayer3d = projection?.projectionType === 'layer3d'
   const layer3dState = (state?.stateJson as any)?.layer3d ?? {}
-
-  // Track last graphData reference so toggles don't reapply data and flicker
-  const lastGraphDataRef = useRef<{ nodes: any[]; links: any[] } | null>(null)
 
   // --- Layer Controls (Unchanged) ---
   const layers = graph?.layers ?? []
@@ -174,7 +166,7 @@ export default function App() {
           id: n.id,
           name: n.label || n.id,
           layer: n.layer,
-          attrs: n.attrs || {},
+          attrs: n.attributes || {},
           weight: n.weight,
           color:
             (n.layer && layerColors.get(n.layer)?.body) ||
@@ -192,230 +184,22 @@ export default function App() {
           target: e.target,
           name: e.label,
           layer: e.layer,
-          attrs: e.attrs || {},
+          attrs: e.attributes || {},
           weight: e.weight,
         })) ?? [],
     }
   }, [graph, layerColors, defaultNodeColor])
 
   console.log('[App] Data state:', {
+    projectionId,
     loading,
     hasData: !!data,
-    hasProjection: !!projection,
+    projection: projection ? { id: projection.id, type: projection.projectionType } : null,
     hasGraph: !!graph,
     graphNodes: graph?.nodes?.length,
     graphEdges: graph?.edges?.length,
     isLayer3d,
   })
-
-  const cleanupForceGraph = () => {
-    console.log('[ForceGraph] Cleanup: Component Unmounting')
-    const instance = fgRef.current
-    if (!instance) return
-    try {
-      if (typeof instance.pauseAnimation === 'function') {
-        instance.pauseAnimation()
-      }
-      if (typeof instance.graphData === 'function') {
-        instance.graphData({ nodes: [], links: [] })
-      }
-      if (containerRef.current) {
-        containerRef.current.innerHTML = ''
-      }
-      fgRef.current = null
-      console.log('[ForceGraph] Instance destroyed.')
-    } catch (error) {
-      console.error('[ForceGraph] Error during cleanup:', error)
-    }
-  }
-
-  // Initialize ForceGraph3D once the container is ready
-  // Initialize ForceGraph3D when ready; keep instance alive between renders.
-  useEffect(() => {
-    console.log('[ForceGraph] Init effect')
-    if (isLayer3d) {
-      cleanupForceGraph()
-      console.log('[ForceGraph] Skipping init: isLayer3d is true')
-      return
-    }
-
-    // Wait for data so container is mounted and ready
-    if (loading || !projection) {
-      console.log('[ForceGraph] Skipping init: still loading or missing projection')
-      return
-    }
-
-    const elem = containerRef.current
-    if (!elem) {
-      console.log('[ForceGraph] Skipping init: no container ref')
-      return
-    }
-
-    if (!fgRef.current) {
-      console.log('[ForceGraph] INITIALIZING new ForceGraph3D instance.')
-      fgRef.current = (ForceGraph3D as any)()(elem)
-        .forceEngine('d3')
-        .backgroundColor('#0b1021')
-        .showNavInfo(false)
-        .graphData({ nodes: [], links: [] })
-    }
-  }, [isLayer3d, loading, projection])
-
-  // Cleanup only on unmount
-  useEffect(() => {
-    return () => cleanupForceGraph()
-  }, [])
-
-  // Handle window resize to update ForceGraph3D dimensions
-  useEffect(() => {
-    if (isLayer3d) return
-
-    const handleResize = () => {
-      const fg = fgRef.current
-      if (fg && containerRef.current) {
-        const width = containerRef.current.clientWidth
-        const height = containerRef.current.clientHeight
-        if (typeof fg.width === 'function' && typeof fg.height === 'function') {
-          fg.width(width).height(height)
-          console.log('[ForceGraph] Resized to', width, 'x', height)
-        }
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-    // Also trigger resize on mount to ensure correct initial size
-    handleResize()
-
-    return () => window.removeEventListener('resize', handleResize)
-  }, [isLayer3d])
-
-  // Apply data and control updates without tearing down the graph
-  useEffect(() => {
-    console.log('[ForceGraph] Update effect')
-    if (isLayer3d) {
-      console.log('[ForceGraph] Skipping update: isLayer3d is true')
-      return
-    }
-    const fg = fgRef.current
-    if (!fg || !containerRef.current) {
-      console.log('[ForceGraph] Skipping update: graph not initialized')
-      return
-    }
-
-    if (graphData.nodes.length === 0 && graphData.links.length === 0) {
-      console.log('[ForceGraph] Waiting for graph data before full update.')
-      return
-    }
-
-    const hasGraphChanged = lastGraphDataRef.current !== graphData
-    console.log(
-      `[ForceGraph] UPDATING with ${graphData.nodes.length} nodes.`,
-      { showLinks, showLabels, links: graphData.links.length, rebindData: hasGraphChanged }
-    )
-
-    if (hasGraphChanged) {
-      fg.graphData(graphData)
-      lastGraphDataRef.current = graphData
-    }
-    fg.linkVisibility(() => showLinks)
-    fg.linkColor(() => (showLinks ? linkColor : 'rgba(0,0,0,0)'))
-    fg.linkOpacity(showLinks ? 0.6 : 0)
-    fg.linkWidth(showLinks ? 0.3 : 0)
-    fg.linkDirectionalParticles((link: any) => (showLinks ? (link.weight || 1) : 0))
-    fg.linkDirectionalParticleSpeed((link: any) => (link.weight || 1) * 0.001)
-    fg.linkDirectionalArrowLength(3.5)
-    fg.linkDirectionalArrowRelPos(1)
-    fg.linkThreeObjectExtend(true)
-    fg.linkThreeObject((link: any) => {
-      if (!showLabels || !showLinks) return null
-      const text = link.name
-      if (!text) return null
-      const sprite = new SpriteText(text)
-      sprite.color = '#DDDDDD'
-      sprite.textHeight = Math.max(3, safeNodeSize * 0.7)
-      sprite.backgroundColor = 'rgba(0,0,0,0)'
-      return sprite
-    })
-    fg.linkPositionUpdate((sprite: any, { start, end }: any) => {
-      if (!sprite) return
-      const middle = {
-        x: start.x + (end.x - start.x) / 2,
-        y: start.y + (end.y - start.y) / 2,
-        z: start.z + (end.z - start.z) / 2,
-      }
-      sprite.position.set(middle.x, middle.y, middle.z)
-    })
-    // Disable the built-in tooltip when labels are visible to avoid a black background
-    fg.nodeLabel(showLabels ? () => '' : (n: any) => n.name || n.id)
-
-    const linkForce = fg.d3Force('link')
-    if (linkForce && typeof linkForce.distance === 'function' && Number.isFinite(safeLinkDistance)) {
-      linkForce.distance(safeLinkDistance)
-    }
-
-    const chargeForce = fg.d3Force('charge')
-    if (chargeForce && typeof chargeForce.strength === 'function' && Number.isFinite(safeChargeStrength)) {
-      chargeForce.strength(safeChargeStrength)
-    }
-
-    fg.onNodeClick((node: any) => {
-      const distance = 90
-      const distRatio = 1 + distance / Math.max(Math.hypot(node.x || 0, node.y || 0, node.z || 0), 0.001)
-      const newPos =
-        node.x || node.y || node.z
-          ? { x: (node.x || 0) * distRatio, y: (node.y || 0) * distRatio, z: (node.z || 0) * distRatio }
-          : { x: 0, y: 0, z: distance }
-      fg.cameraPosition(newPos, node, 3000)
-    })
-
-    fg
-      .nodeLabel((n: any) => (showLabels ? '' : n.name || n.id))
-      .nodeRelSize(safeNodeSize)
-      .nodeColor((n: any) => n.color || defaultNodeColor)
-      .nodeThreeObject((n: any) => {
-        const group = new Group()
-
-        const sphereGeom = new SphereGeometry(safeNodeSize * 0.8, 12, 12)
-        const sphereMat = new MeshBasicMaterial({
-          color: n.color || defaultNodeColor,
-        })
-        const sphere = new Mesh(sphereGeom, sphereMat)
-        group.add(sphere)
-
-        if (showLabels) {
-          const label = n.name || n.id
-          const sprite = new SpriteText(label)
-          sprite.color = n.color || defaultNodeColor
-          sprite.backgroundColor = 'rgba(0,0,0,0)'
-          sprite.textHeight = Math.max(8, safeNodeSize * 2.2)
-          sprite.center.set(0.5, 0)
-          sprite.position.set(0, safeNodeSize * 1.6, 0)
-          sprite.renderOrder = 10
-          group.add(sprite)
-        }
-        return group
-      })
-
-    if (typeof fg.d3ReheatSimulation === 'function') {
-      // Defer reheat to next frame so internal layout is ready
-      requestAnimationFrame(() => {
-        if (fgRef.current) {
-          fgRef.current.d3ReheatSimulation()
-          console.log('[ForceGraph] Simulation reheated')
-        }
-      })
-    }
-  }, [
-    graphData,
-    showLinks,
-    linkColor,
-    defaultNodeColor,
-    safeNodeSize,
-    showLabels,
-    safeLinkDistance,
-    safeChargeStrength,
-    isLayer3d,
-  ])
 
   // --- Save State Handler (Unchanged) ---
   const handleSaveState = () => {
@@ -453,7 +237,27 @@ export default function App() {
   if (!projection) {
     return (
       <div className="flex h-full items-center justify-center text-slate-100 bg-slate-900">
-        Projection not found
+        <div className="max-w-md text-center space-y-4">
+          <div className="text-4xl">🔍</div>
+          <div className="text-xl font-semibold">Projection Not Found</div>
+          <div className="text-slate-400 text-sm">
+            Projection #{projectionId} doesn't exist yet.
+            {error && (
+              <div className="mt-2 text-xs text-red-400">
+                {error.message}
+              </div>
+            )}
+          </div>
+          <div className="mt-4 p-4 bg-slate-800 rounded-lg text-left text-sm space-y-2">
+            <div className="font-semibold text-slate-300">To create this projection:</div>
+            <ol className="list-decimal list-inside text-slate-400 space-y-1">
+              <li>Open the Plan DAG editor</li>
+              <li>Add a Projection node and configure it</li>
+              <li>Connect it to a graph computation node</li>
+              <li>Execute the DAG</li>
+            </ol>
+          </div>
+        </div>
       </div>
     )
   }
@@ -497,7 +301,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen bg-slate-900 text-slate-100">
+    <div className="h-screen w-screen bg-slate-900 text-slate-100 flex flex-col">
       <Leva collapsed />
       <div className="flex items-center justify-between p-3 border-b border-slate-700">
         <div>
@@ -515,7 +319,16 @@ export default function App() {
           </button>
         </div>
       </div>
-      <div ref={containerRef} className="h-full w-full" />
+      <Force3DViewer
+        graphData={graphData}
+        showLinks={showLinks}
+        showLabels={showLabels}
+        nodeRelSize={nodeRelSize}
+        linkColor={linkColor}
+        defaultNodeColor={defaultNodeColor}
+        linkDistance={linkDistance}
+        chargeStrength={chargeStrength}
+      />
     </div>
   )
 }

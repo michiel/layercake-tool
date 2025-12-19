@@ -287,19 +287,46 @@ function calculateTreemapLayout(
 
   // Create D3 hierarchy
   const root = hierarchy(hierarchyData)
-    .sum((d: any) => (d.children ? 0 : d.weight || 1)) // Only leaf nodes have weight
+    .sum((d: any) => {
+      // Partition nodes get weight based on their children to make them larger
+      if (d.children && d.children.length > 0) {
+        return d.children.length * 5 // Give partitions substantial weight
+      }
+      return d.weight || 1
+    })
     .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
 
   // Apply treemap layout
   const layoutFn = (treemap as any)()
     .size([canvasSize, canvasSize])
     .paddingOuter(partitionPadding)
-    .paddingInner(partitionPadding / 2)
+    .paddingInner(partitionPadding * 2) // More padding for partitions
 
   layoutFn(root)
 
   // Create layer index map
   const layerMap = new Map(layers.map((l, i) => [l.layerId, i]))
+
+  // First pass: Calculate layer ranges for each partition
+  const partitionLayerRanges = new Map<string, { minLayer: number; maxLayer: number }>()
+
+  root.each((node: any) => {
+    const data = node.data
+    if (node.children && node.children.length > 0) {
+      let minLayer = Infinity
+      let maxLayer = -Infinity
+
+      node.each((descendant: any) => {
+        if (!descendant.data.isVirtual) {
+          const layerIdx = layerMap.get(descendant.data.layer) || 0
+          minLayer = Math.min(minLayer, layerIdx)
+          maxLayer = Math.max(maxLayer, layerIdx)
+        }
+      })
+
+      partitionLayerRanges.set(data.id, { minLayer, maxLayer })
+    }
+  })
 
   // Convert to PositionedNode array
   const positionedNodes: PositionedNode[] = []
@@ -331,9 +358,27 @@ function calculateTreemapLayout(
     const width = x1 - x0
     const depth = y1 - y0
 
-    // Partition nodes span all layers, leaf nodes are at their layer
-    const y = layerIndex * layerSpacing
-    const height = isPartition ? Math.max(2, layerSpacing * 0.8) : 2
+    // Calculate Y position and height based on node type
+    let y: number
+    let height: number
+
+    if (isPartition) {
+      // Partition nodes span vertically from min to max child layer
+      const layerRange = partitionLayerRanges.get(data.id)
+      if (layerRange) {
+        const minY = layerRange.minLayer * layerSpacing
+        const maxY = layerRange.maxLayer * layerSpacing
+        y = (minY + maxY) / 2
+        height = maxY - minY + layerSpacing * 0.4 // Span entire range
+      } else {
+        y = layerIndex * layerSpacing
+        height = layerSpacing * 0.4
+      }
+    } else {
+      // Flow nodes are at their specific layer with small height
+      y = layerIndex * layerSpacing
+      height = 1.5
+    }
 
     positionedNodes.push({
       id: data.id,

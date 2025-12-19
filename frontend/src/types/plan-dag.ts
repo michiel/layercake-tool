@@ -190,7 +190,17 @@ export interface TreeArtefactNodeConfig {
 
 // Projection Node Configuration
 export interface ProjectionNodeConfig {
-  projectionId?: number; // Reference to Projection entity
+  projectionId?: number; // Reference to Projection entity (created after DAG execution)
+  // Pre-execution configuration (stored in DAG before projection is created)
+  name?: string;
+  projectionType?: 'force3d' | 'layer3d';
+  storyMode?: {
+    enabled: boolean;
+    stories: Array<{
+      storyId: number;
+      enabledSequenceIds: number[];
+    }>;
+  };
 }
 
 // Story Node Configuration

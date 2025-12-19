@@ -43,9 +43,11 @@ struct GraphRecordOptions {
 struct ProjectionNodeConfig {
     #[serde(rename = "projectionId")]
     projection_id: Option<i32>,
+    name: Option<String>,
     #[serde(rename = "projectionType")]
     projection_type: Option<String>,
-    settings: Option<JsonValue>,
+    #[serde(rename = "storyMode")]
+    story_mode: Option<JsonValue>,
 }
 
 impl DagExecutor {
@@ -541,10 +543,24 @@ impl DagExecutor {
             return Ok(());
         }
 
+        // Use name from config if provided, otherwise fall back to node metadata label
+        let projection_name = config
+            .name
+            .clone()
+            .unwrap_or_else(|| node_name.to_string());
+
         let projection_type = config
             .projection_type
             .unwrap_or_else(|| "force3d".to_string());
-        let settings_json = config.settings;
+
+        // Build settings_json from storyMode if present
+        let settings_json = if let Some(story_mode) = config.story_mode {
+            Some(json!({
+                "storyMode": story_mode
+            }))
+        } else {
+            None
+        };
 
         let create_projection = |graph_id: i32,
                                  project_id: i32,
@@ -574,9 +590,9 @@ impl DagExecutor {
                 Some(record) if record.project_id == project_id => {
                     let mut active: projections::ActiveModel = record.into();
                     active.graph_id = Set(graph_source_id);
-                    active.name = Set(node_name.to_string());
-                    active.projection_type = Set(projection_type);
-                    active.settings_json = Set(settings_json);
+                    active.name = Set(projection_name.clone());
+                    active.projection_type = Set(projection_type.clone());
+                    active.settings_json = Set(settings_json.clone());
                     active.updated_at = Set(Utc::now());
                     active.update(&self.db).await?
                 }
@@ -588,9 +604,9 @@ impl DagExecutor {
                     create_projection(
                         graph_source_id,
                         project_id,
-                        node_name,
-                        projection_type,
-                        settings_json,
+                        &projection_name,
+                        projection_type.clone(),
+                        settings_json.clone(),
                     )
                     .insert(&self.db)
                     .await?
@@ -603,9 +619,9 @@ impl DagExecutor {
                     create_projection(
                         graph_source_id,
                         project_id,
-                        node_name,
-                        projection_type,
-                        settings_json,
+                        &projection_name,
+                        projection_type.clone(),
+                        settings_json.clone(),
                     )
                     .insert(&self.db)
                     .await?
@@ -616,23 +632,23 @@ impl DagExecutor {
             let maybe_existing = projections::Entity::find()
                 .filter(projections::Column::ProjectId.eq(project_id))
                 .filter(projections::Column::GraphId.eq(graph_source_id))
-                .filter(projections::Column::Name.eq(node_name))
+                .filter(projections::Column::Name.eq(&projection_name))
                 .one(&self.db)
                 .await?;
 
             if let Some(existing) = maybe_existing {
                 let mut active: projections::ActiveModel = existing.into();
                 active.graph_id = Set(graph_source_id);
-                active.name = Set(node_name.to_string());
-                active.projection_type = Set(projection_type);
-                active.settings_json = Set(settings_json);
+                active.name = Set(projection_name.clone());
+                active.projection_type = Set(projection_type.clone());
+                active.settings_json = Set(settings_json.clone());
                 active.updated_at = Set(Utc::now());
                 active.update(&self.db).await?
             } else {
                 create_projection(
                     graph_source_id,
                     project_id,
-                    node_name,
+                    &projection_name,
                     projection_type,
                     settings_json,
                 )
@@ -645,6 +661,23 @@ impl DagExecutor {
             "ProjectionNode {} linked to graph_data {} as projection {}",
             node_id, graph_source_id, projection.id
         );
+
+        // Write projectionId back to node config if it wasn't already set
+        if config.projection_id.is_none() || config.projection_id != Some(projection.id) {
+            let mut updated_config = serde_json::from_str::<serde_json::Value>(&node.config_json)?;
+            if let Some(obj) = updated_config.as_object_mut() {
+                obj.insert("projectionId".to_string(), json!(projection.id));
+            }
+
+            let mut active_node: plan_dag_nodes::ActiveModel = node.clone().into();
+            active_node.config_json = Set(serde_json::to_string(&updated_config)?);
+            active_node.update(&self.db).await?;
+
+            info!(
+                "Updated ProjectionNode {} config with projectionId {}",
+                node_id, projection.id
+            );
+        }
 
         if let Some(ctx) = context {
             ctx.set_graph(node_id.to_string(), graph);

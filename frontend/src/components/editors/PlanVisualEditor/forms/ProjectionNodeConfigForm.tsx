@@ -132,10 +132,13 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
 
   const [localConfig, setLocalConfig] = useState<ProjectionNodeConfig>({
     projectionId: config.projectionId,
+    name: config.name || 'New Projection',
+    projectionType: config.projectionType || 'force3d',
+    storyMode: config.storyMode,
   })
-  const [projectionName, setProjectionName] = useState('')
-  const [projectionType, setProjectionType] = useState<'force3d' | 'layer3d'>('force3d')
-  const [storyModeEnabled, setStoryModeEnabled] = useState(false)
+  const [projectionName, setProjectionName] = useState(config.name || 'New Projection')
+  const [projectionType, setProjectionType] = useState<'force3d' | 'layer3d'>(config.projectionType || 'force3d')
+  const [storyModeEnabled, setStoryModeEnabled] = useState(config.storyMode?.enabled || false)
   const [storySelections, setStorySelections] = useState<Record<number, StorySelection>>({})
   const [sequenceCache, setSequenceCache] = useState<Record<number, SequenceInfo[]>>({})
   const [hydrated, setHydrated] = useState(false)
@@ -182,7 +185,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   const projection = (projectionData as any)?.projection
   const projectionState = (projectionData as any)?.projectionState
   const stories = (storiesData as any)?.stories ?? []
-  const { data: graphDataLookup, loading: graphLookupLoading } = useQuery(GRAPH_DATA_BY_DAG_NODE, {
+  const { data: graphDataLookup } = useQuery(GRAPH_DATA_BY_DAG_NODE, {
     variables: { dagNodeId: graphSourceNodeIdHint ?? '' },
     skip: !graphSourceNodeIdHint,
     fetchPolicy: 'cache-first',
@@ -203,10 +206,8 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     setHydrated(false)
     setStorySelections({})
     setSequenceCache({})
-    setStoryModeEnabled(false)
     setVerificationResult(null)
-    setProjectionName('')
-    setProjectionType('force3d')
+    // Don't reset name/type - those come from config now
   }, [projectionId, resolvedGraphDataId])
 
   const ensureSequences = useCallback(
@@ -220,35 +221,8 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     [loadSequences, sequenceCache]
   )
 
-  // Auto-create a projection for the node if none exists yet
-  useEffect(() => {
-    const createIfNeeded = async () => {
-      if (projectionId || !projectId || !resolvedGraphDataId) return
-      try {
-        const { data } = await createProjection({
-          variables: {
-            input: {
-              projectId,
-              graphId: resolvedGraphDataId,
-              name: `Projection ${resolvedGraphDataId}`,
-              projectionType: 'force3d',
-            },
-          },
-        })
-        const newProjection = (data as any)?.createProjection
-        if (newProjection?.id) {
-          setLocalConfig({ projectionId: Number(newProjection.id) })
-          setProjectionName(newProjection.name)
-          setProjectionType((newProjection.projectionType as 'force3d' | 'layer3d') ?? 'force3d')
-          setIsValid(true)
-          showSuccessNotification('Projection created', 'Projection node is now linked.')
-        }
-      } catch (err: any) {
-        showErrorNotification('Projection creation failed', err?.message || 'Unable to create projection')
-      }
-    }
-    void createIfNeeded()
-  }, [projectionId, projectId, resolvedGraphDataId, createProjection, setIsValid])
+  // Auto-create projection is now disabled - projections are created during DAG execution
+  // This allows users to configure projection settings before the DAG runs
 
   // If the linked projection points at a different graph, recreate and relink
   useEffect(() => {
@@ -288,18 +262,31 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
 
   // Keep parent config in sync
   useEffect(() => {
-    setConfig(localConfig)
-  }, [localConfig, setConfig])
+    const nextConfig: ProjectionNodeConfig = {
+      projectionId: localConfig.projectionId,
+      name: projectionName,
+      projectionType: projectionType,
+      storyMode: storyModeEnabled ? {
+        enabled: true,
+        stories: buildSelectionPayload(storySelections),
+      } : undefined,
+    }
+    setConfig(nextConfig)
+  }, [localConfig.projectionId, projectionName, projectionType, storyModeEnabled, storySelections, setConfig])
 
+  // Node is valid if it has configuration (name, type), even without a projection ID yet
   useEffect(() => {
-    setIsValid(!!localConfig.projectionId)
-  }, [localConfig, setIsValid])
+    setIsValid(!!projectionName && !!projectionType)
+  }, [projectionName, projectionType, setIsValid])
 
   useEffect(() => {
     if (!projection || hydrated) return
-    setProjectionName(projection.name)
+    // Only hydrate from projection if we don't already have a name from config
+    if (!projectionName) {
+      setProjectionName(projection.name)
+    }
     setProjectionType((projection.projectionType as 'force3d' | 'layer3d') ?? 'force3d')
-  }, [projection, hydrated])
+  }, [projection, hydrated, projectionName])
 
   // Hydrate story mode state from saved projection state
   useEffect(() => {
@@ -430,27 +417,30 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   }
 
   const busy = loadingProjection || loadingStories || creatingProjection
-
-  if (!projectionId && !resolvedGraphDataId) {
-    const hasUpstreamHint = !!graphIdHint || !!graphSourceNodeIdHint
-    return (
-      <div className="text-sm text-muted-foreground flex items-center gap-2">
-        {hasUpstreamHint || graphLookupLoading ? (
-          <>
-            <Spinner className="h-4 w-4" />
-            <span>Preparing projection from connected graph…</span>
-          </>
-        ) : (
-          <span>
-            Connect this projection node to a graph first so a projection can be created automatically.
-          </span>
-        )}
-      </div>
-    )
-  }
+  const hasUpstreamNode = !!graphSourceNodeIdHint
 
   return (
     <Stack gap="md">
+      {!projectionId && (
+        <div className="rounded border border-blue-500/50 bg-blue-50 dark:bg-blue-950/20 p-4">
+          <div className="flex items-start gap-2">
+            <svg className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1 space-y-1">
+              <div className="font-semibold text-blue-900 dark:text-blue-100 text-sm">
+                Configure now, create on execution
+              </div>
+              <div className="text-sm text-blue-800 dark:text-blue-200">
+                {hasUpstreamNode
+                  ? "Settings are saved to the DAG. The projection will be created automatically when you execute the DAG."
+                  : "Connect this node to a graph computation node, then configure its projection settings."}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {(busy || updatingProjection || savingState) && (
         <Group gap="xs" align="center" className="text-sm text-muted-foreground">
           <Spinner className="h-4 w-4" />
@@ -490,15 +480,22 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
             </Select>
             <p className="text-xs text-muted-foreground">Projection nodes are created with a dedicated projection entity and inherit their input graph.</p>
           </div>
-          <Group justify="end" gap="sm">
-            <Button variant="outline" onClick={() => refetchProjection()} disabled={busy}>
-              Refresh
-            </Button>
-            <Button onClick={handleSave} disabled={busy || !projectionId}>
-              {(savingState || updatingProjection) && <Spinner className="mr-2 h-4 w-4" />}
-              Save
-            </Button>
-          </Group>
+          {projectionId && (
+            <Group justify="end" gap="sm">
+              <Button variant="outline" onClick={() => refetchProjection()} disabled={busy}>
+                Refresh
+              </Button>
+              <Button onClick={handleSave} disabled={busy}>
+                {(savingState || updatingProjection) && <Spinner className="mr-2 h-4 w-4" />}
+                Save to projection
+              </Button>
+            </Group>
+          )}
+          {!projectionId && (
+            <div className="text-xs text-muted-foreground">
+              Settings are automatically saved to the DAG configuration.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -507,12 +504,23 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
           <CardTitle>Story mode</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!projectionId && (
+            <div className="rounded border border-amber-500/50 bg-amber-50 dark:bg-amber-950/20 p-3 mb-4">
+              <div className="text-sm text-amber-800 dark:text-amber-200">
+                Story mode is only available after the projection is created. Execute the DAG first.
+              </div>
+            </div>
+          )}
           <Group justify="between" align="center">
             <div>
               <div className="font-semibold">Enable story mode</div>
               <div className="text-muted-foreground text-sm">Toggle to attach stories to this projection.</div>
             </div>
-            <Switch checked={storyModeEnabled} onCheckedChange={setStoryModeEnabled} disabled={busy} />
+            <Switch
+              checked={storyModeEnabled}
+              onCheckedChange={setStoryModeEnabled}
+              disabled={busy || !projectionId}
+            />
           </Group>
 
           <div className="rounded border bg-muted/20 p-3">

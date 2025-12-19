@@ -119,12 +119,30 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     scene.setAttribute('stats', '')
     scene.style.width = '100%'
     scene.style.height = '100%'
+    scene.style.position = 'absolute'
+    scene.style.top = '0'
+    scene.style.left = '0'
 
-    // Create camera
+    // Wait for scene to load, then log canvas dimensions
+    scene.addEventListener('loaded', () => {
+      const canvas = scene.querySelector('canvas')
+      if (canvas) {
+        console.log('[Layer3D] Canvas dimensions:', {
+          width: canvas.width,
+          height: canvas.height,
+          clientWidth: canvas.clientWidth,
+          clientHeight: canvas.clientHeight,
+          containerWidth: container.clientWidth,
+          containerHeight: container.clientHeight,
+        })
+      }
+    })
+
+    // Create camera with faster controls
     const camera = document.createElement('a-entity')
     camera.setAttribute('camera', '')
-    camera.setAttribute('look-controls', 'pointerLockEnabled: false')
-    camera.setAttribute('wasd-controls', 'acceleration: 20')
+    camera.setAttribute('look-controls', 'pointerLockEnabled: false; touchEnabled: true; mouseEnabled: true')
+    camera.setAttribute('wasd-controls', 'acceleration: 150; fly: true; easing: 20')
     camera.setAttribute('id', 'layer3d-camera')
     scene.appendChild(camera)
 
@@ -372,5 +390,39 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     console.warn('[Layer3D] Validation warnings:', layout.warnings)
   }
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+  return (
+    <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}>
+      <div ref={containerRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} />
+
+      {/* Controls help overlay */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '20px',
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        color: '#E2E8F0',
+        padding: '12px 16px',
+        borderRadius: '8px',
+        fontSize: '13px',
+        fontFamily: 'monospace',
+        pointerEvents: 'none',
+        backdropFilter: 'blur(8px)',
+        border: '1px solid rgba(148, 163, 184, 0.2)',
+      }}>
+        <div style={{ fontWeight: 'bold', marginBottom: '8px', color: '#94A3B8' }}>
+          🎮 Camera Controls
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 12px', fontSize: '12px' }}>
+          <span style={{ color: '#CBD5E1' }}>W/A/S/D</span>
+          <span style={{ color: '#94A3B8' }}>Move forward/left/back/right</span>
+          <span style={{ color: '#CBD5E1' }}>Q/E</span>
+          <span style={{ color: '#94A3B8' }}>Move down/up</span>
+          <span style={{ color: '#CBD5E1' }}>Mouse</span>
+          <span style={{ color: '#94A3B8' }}>Click + drag to look around</span>
+          <span style={{ color: '#CBD5E1' }}>Shift</span>
+          <span style={{ color: '#94A3B8' }}>Hold to move faster</span>
+        </div>
+      </div>
+    </div>
+  )
 }
