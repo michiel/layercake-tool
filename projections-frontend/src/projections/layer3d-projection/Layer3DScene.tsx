@@ -31,40 +31,61 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneInitialized = useRef(false)
   const saveTimerRef = useRef<number | null>(null)
+  const lastSavedLayoutRef = useRef<{ canvasSize: number; layerSpacing: number; partitionPadding: number } | null>(null)
 
   const initialLayoutState = useMemo(
     () => ({
-      canvasSize: state?.layout?.canvasSize ?? 100,
-      layerSpacing: state?.layout?.layerSpacing ?? 10,
-      partitionPadding: state?.layout?.partitionPadding ?? 2,
+      canvasSize: state?.layout?.canvasSize ?? 200,
+      layerSpacing: state?.layout?.layerSpacing ?? 20,
+      partitionPadding: state?.layout?.partitionPadding ?? 3,
     }),
     [state]
   )
 
   // Leva controls for layout configuration
   const controls = useControls('Layer3D Layout', {
-    canvasSize: { value: initialLayoutState.canvasSize, min: 50, max: 200, step: 10, label: 'Canvas Size' },
-    layerSpacing: { value: initialLayoutState.layerSpacing, min: 5, max: 30, step: 1, label: 'Layer Spacing' },
+    canvasSize: { value: initialLayoutState.canvasSize, min: 50, max: 400, step: 10, label: 'Canvas Size' },
+    layerSpacing: { value: initialLayoutState.layerSpacing, min: 5, max: 50, step: 1, label: 'Layer Spacing' },
     partitionPadding: { value: initialLayoutState.partitionPadding, min: 0, max: 10, step: 0.5, label: 'Partition Padding' },
   })
 
-  // Persist controls to projection state with debounce
+  // Persist controls to projection state with debounce - only when values actually change
   useEffect(() => {
     if (!onSaveState) return
+
+    const currentLayout = {
+      canvasSize: Number(controls.canvasSize),
+      layerSpacing: Number(controls.layerSpacing),
+      partitionPadding: Number(controls.partitionPadding),
+    }
+
+    // Check if values have actually changed
+    if (lastSavedLayoutRef.current) {
+      const hasChanged =
+        lastSavedLayoutRef.current.canvasSize !== currentLayout.canvasSize ||
+        lastSavedLayoutRef.current.layerSpacing !== currentLayout.layerSpacing ||
+        lastSavedLayoutRef.current.partitionPadding !== currentLayout.partitionPadding
+
+      if (!hasChanged) {
+        return // No change, don't save
+      }
+    }
+
+    // Clear existing timer
     if (saveTimerRef.current) {
       window.clearTimeout(saveTimerRef.current)
     }
+
+    // Schedule save
     saveTimerRef.current = window.setTimeout(() => {
+      console.log('[Layer3D] Saving layout state:', currentLayout)
       onSaveState({
-        layout: {
-          canvasSize: Number(controls.canvasSize),
-          layerSpacing: Number(controls.layerSpacing),
-          partitionPadding: Number(controls.partitionPadding),
-        },
+        layout: currentLayout,
       })
+      lastSavedLayoutRef.current = currentLayout
       saveTimerRef.current = null
     }, 400)
-  }, [controls.canvasSize, controls.layerSpacing, controls.partitionPadding, onSaveState])
+  }, [controls.canvasSize, controls.layerSpacing, controls.partitionPadding])
 
   // Calculate layout using Phase 2 treemap algorithm
   const layout = useLayercakeLayout(nodes, edges, layers, {
@@ -101,6 +122,37 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
             this.el.setAttribute('scale', '1 1 1')
           })
         },
+      })
+    }
+
+    // Register vertical movement component for Q/E keys
+    if (!AFRAME.components['vertical-controls']) {
+      AFRAME.registerComponent('vertical-controls', {
+        schema: {
+          speed: { default: 3 }
+        },
+        init() {
+          this.keys = {}
+          this.velocity = new AFRAME.THREE.Vector3()
+
+          window.addEventListener('keydown', (e) => {
+            this.keys[e.key.toLowerCase()] = true
+          })
+          window.addEventListener('keyup', (e) => {
+            this.keys[e.key.toLowerCase()] = false
+          })
+        },
+        tick(_time: number, delta: number) {
+          const speed = this.data.speed * (delta / 1000)
+          const position = this.el.object3D.position
+
+          if (this.keys['q']) {
+            position.y -= speed
+          }
+          if (this.keys['e']) {
+            position.y += speed
+          }
+        }
       })
     }
   }, [])
@@ -142,7 +194,8 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     const camera = document.createElement('a-entity')
     camera.setAttribute('camera', '')
     camera.setAttribute('look-controls', 'pointerLockEnabled: false; touchEnabled: true; mouseEnabled: true')
-    camera.setAttribute('wasd-controls', 'acceleration: 150; fly: true; easing: 20')
+    camera.setAttribute('wasd-controls', 'acceleration: 150; easing: 20')
+    camera.setAttribute('vertical-controls', 'speed: 5') // Q/E for up/down
     camera.setAttribute('id', 'layer3d-camera')
     scene.appendChild(camera)
 
@@ -177,6 +230,11 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     const layerPlanesContainer = document.createElement('a-entity')
     layerPlanesContainer.setAttribute('id', 'layer3d-layer-planes')
     scene.appendChild(layerPlanesContainer)
+
+    // Create layer labels container
+    const layerLabelsContainer = document.createElement('a-entity')
+    layerLabelsContainer.setAttribute('id', 'layer3d-layer-labels')
+    scene.appendChild(layerLabelsContainer)
 
     // Create nodes container
     const nodesContainer = document.createElement('a-entity')
@@ -239,9 +297,52 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
       plane.setAttribute('width', String(controls.canvasSize))
       plane.setAttribute('height', String(controls.canvasSize))
       plane.setAttribute('color', layer.backgroundColor)
-      plane.setAttribute('opacity', '0.1')
+      plane.setAttribute('opacity', '0.25')
       plane.setAttribute('transparent', 'true')
+      plane.setAttribute('material', 'side: double') // Make visible from both sides
       container.appendChild(plane)
+    })
+  }, [layers, controls.canvasSize, controls.layerSpacing])
+
+  // Update layer labels when layers change
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const container = containerRef.current.querySelector('#layer3d-layer-labels')
+    if (!container) return
+
+    // Remove old layer labels
+    while (container.firstChild) {
+      container.removeChild(container.firstChild)
+    }
+
+    // Add new layer labels - positioned to the side of the canvas
+    const labelOffset = Number(controls.canvasSize) / 2 + 15 // Position outside canvas edge
+    layers.forEach((layer, index) => {
+      const label = document.createElement('a-text')
+      label.setAttribute('value', layer.name.toUpperCase())
+      label.setAttribute('align', 'left')
+      label.setAttribute('anchor', 'left')
+      label.setAttribute('baseline', 'center')
+      label.setAttribute('color', '#FFFFFF')
+      label.setAttribute('position', `${-labelOffset} ${index * Number(controls.layerSpacing)} 0`)
+      label.setAttribute('scale', '8 8 8') // Large labels
+      label.setAttribute('side', 'double')
+      label.setAttribute('shader', 'msdf')
+      label.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json')
+      label.setAttribute('wrap-count', '15')
+
+      // Add subtle background for readability
+      const bg = document.createElement('a-plane')
+      bg.setAttribute('position', `${-labelOffset + 8} ${index * Number(controls.layerSpacing)} -0.5`)
+      bg.setAttribute('width', '30')
+      bg.setAttribute('height', '10')
+      bg.setAttribute('color', layer.backgroundColor)
+      bg.setAttribute('opacity', '0.3')
+      bg.setAttribute('transparent', 'true')
+
+      container.appendChild(bg)
+      container.appendChild(label)
     })
   }, [layers, controls.canvasSize, controls.layerSpacing])
 
@@ -256,14 +357,14 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     const fov = 60 // degrees
     const fovRad = (fov * Math.PI) / 180
 
-    // Calculate distance to fit entire graph with 10% padding
+    // Calculate distance to fit entire graph with 30% padding for better overview
     const maxDimension = Math.max(boundingBox.sizeX, boundingBox.sizeY, boundingBox.sizeZ)
-    const distance = (maxDimension / (2 * Math.tan(fovRad / 2))) * 1.1
+    const distance = (maxDimension / (2 * Math.tan(fovRad / 2))) * 1.3
 
-    // Position camera at an angle to see all layers
-    const cameraX = boundingBox.centerX + distance * 0.5
-    const cameraY = boundingBox.centerY + distance * 0.3
-    const cameraZ = boundingBox.centerZ + distance
+    // Position camera at an angle to see all layers with better perspective
+    const cameraX = boundingBox.centerX + distance * 0.6
+    const cameraY = boundingBox.centerY + distance * 0.4
+    const cameraZ = boundingBox.centerZ + distance * 0.8
 
     camera.setAttribute('position', `${cameraX} ${cameraY} ${cameraZ}`)
     ;(camera as any).object3D.lookAt({ x: boundingBox.centerX, y: boundingBox.centerY, z: boundingBox.centerZ })
@@ -308,14 +409,18 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
         entity.setAttribute('material', `opacity: 0.9; transparent: true`)
       }
 
-      // Add text label
+      // Add text label above the node
       const text = document.createElement('a-text')
       text.setAttribute('value', node.label)
       text.setAttribute('align', 'center')
-      text.setAttribute('color', node.labelColor)
-      text.setAttribute('position', `0 ${node.height / 2 + 0.5} 0`)
-      text.setAttribute('scale', '2 2 2')
+      text.setAttribute('anchor', 'center')
+      text.setAttribute('baseline', 'bottom')
+      text.setAttribute('color', '#FFFFFF') // White text for visibility
+      text.setAttribute('position', `0 ${node.height / 2 + 1} 0`)
+      text.setAttribute('scale', '4 4 4') // Larger text
       text.setAttribute('side', 'double')
+      text.setAttribute('shader', 'msdf')
+      text.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json')
       entity.appendChild(text)
 
       container.appendChild(entity)

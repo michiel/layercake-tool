@@ -64,9 +64,9 @@ export interface LayoutResult {
 }
 
 const DEFAULT_CONFIG: LayoutConfiguration = {
-  canvasSize: 100,
-  layerSpacing: 10,
-  partitionPadding: 2,
+  canvasSize: 200, // Larger canvas for better spread
+  layerSpacing: 20, // More vertical separation between layers
+  partitionPadding: 3,
 }
 
 /**
@@ -288,19 +288,21 @@ function calculateTreemapLayout(
   // Create D3 hierarchy
   const root = hierarchy(hierarchyData)
     .sum((d: any) => {
-      // Partition nodes get weight based on their children to make them larger
+      // Leaf nodes contribute their weight
+      // Parent nodes DON'T add their own weight - treemap sums children automatically
       if (d.children && d.children.length > 0) {
-        return d.children.length * 5 // Give partitions substantial weight
+        return 0 // Treemap will sum children's values
       }
-      return d.weight || 1
+      return d.weight || 10 // Give each leaf node more weight for visibility
     })
     .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
 
   // Apply treemap layout
   const layoutFn = (treemap as any)()
     .size([canvasSize, canvasSize])
-    .paddingOuter(partitionPadding)
-    .paddingInner(partitionPadding * 2) // More padding for partitions
+    .paddingOuter(1) // Minimal outer padding
+    .paddingInner(partitionPadding * 2) // More padding between partitions for clear separation
+    .paddingTop(20) // Extra top padding for labels
 
   layoutFn(root)
 
@@ -355,29 +357,36 @@ function calculateTreemapLayout(
 
     const x = (x0 + x1) / 2 - canvasSize / 2
     const z = (y0 + y1) / 2 - canvasSize / 2
-    const width = x1 - x0
-    const depth = y1 - y0
+
+    // Calculate dimensions based on node type
+    const cellWidth = x1 - x0
+    const cellDepth = y1 - y0
+
+    // Partition nodes fill their entire cell to show containment
+    // Leaf nodes use slightly less to show separation from partition borders
+    const width = isPartition ? cellWidth : cellWidth * 0.85
+    const depth = isPartition ? cellDepth : cellDepth * 0.85
 
     // Calculate Y position and height based on node type
     let y: number
     let height: number
 
     if (isPartition) {
-      // Partition nodes span vertically from min to max child layer
+      // Partition nodes span vertically from min to max child layer with extra height
       const layerRange = partitionLayerRanges.get(data.id)
       if (layerRange) {
         const minY = layerRange.minLayer * layerSpacing
         const maxY = layerRange.maxLayer * layerSpacing
         y = (minY + maxY) / 2
-        height = maxY - minY + layerSpacing * 0.4 // Span entire range
+        height = maxY - minY + layerSpacing * 0.8 // Span entire range plus extra
       } else {
         y = layerIndex * layerSpacing
-        height = layerSpacing * 0.4
+        height = layerSpacing * 0.8
       }
     } else {
-      // Flow nodes are at their specific layer with small height
+      // Flow nodes are at their specific layer - make them taller for visibility
       y = layerIndex * layerSpacing
-      height = 1.5
+      height = Math.max(4, layerSpacing * 0.25) // Taller minimum height
     }
 
     positionedNodes.push({
