@@ -15,8 +15,8 @@ const PROJECTION_QUERY = gql`
       graphId
     }
     projectionGraph(id: $id) {
-      nodes { id label layer color labelColor weight attributes }
-      edges { id source target label weight attributes }
+      nodes { id label layer color labelColor weight isPartition belongsTo comment attributes }
+      edges { id source target label layer weight comment attributes }
       layers { layerId name backgroundColor textColor borderColor }
     }
     projectionState(id: $id) {
@@ -30,8 +30,8 @@ const PROJECTION_QUERY = gql`
 const GRAPH_SUB = gql`
   subscription ProjectionGraphUpdated($id: ID!) {
     projectionGraphUpdated(id: $id) {
-      nodes { id label layer color labelColor weight attributes }
-      edges { id source target label weight attributes }
+      nodes { id label layer color labelColor weight isPartition belongsTo comment attributes }
+      edges { id source target label layer weight comment attributes }
       layers { layerId name backgroundColor textColor borderColor }
     }
   }
@@ -166,7 +166,11 @@ export default function App() {
           id: n.id,
           name: n.label || n.id,
           layer: n.layer,
-          attrs: n.attributes || {},
+          attrs: {
+            ...(n.attributes || {}),
+            is_partition: n.isPartition,
+            belongs_to: n.belongsTo,
+          },
           weight: n.weight,
           color:
             (n.layer && layerColors.get(n.layer)?.body) ||
@@ -277,8 +281,28 @@ export default function App() {
         <div className="flex-1 relative">
           {graph?.nodes && graph?.edges && graph?.layers ? (
             <Layer3DScene
-              nodes={graph.nodes}
-              edges={graph.edges}
+              nodes={graph.nodes.map((n: any) => ({
+                id: n.id,
+                label: n.label || n.id,
+                layer: n.layer,
+                color: (n.layer && layerColors.get(n.layer)?.body) || n.color,
+                labelColor: (n.layer && layerColors.get(n.layer)?.label) || n.labelColor,
+                weight: n.weight,
+                attrs: {
+                  ...(n.attributes || {}),
+                  is_partition: n.isPartition,
+                  belongs_to: n.belongsTo,
+                },
+              }))}
+              edges={graph.edges.map((e: any) => ({
+                id: e.id,
+                source: e.source,
+                target: e.target,
+                label: e.label,
+                layer: e.layer,
+                weight: e.weight,
+                attrs: e.attributes || {},
+              }))}
               layers={graph.layers}
               state={layer3dState}
               onSaveState={(nextState) => {

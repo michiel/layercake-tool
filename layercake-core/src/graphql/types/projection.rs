@@ -45,6 +45,7 @@ pub struct ProjectionGraphNode {
     pub weight: Option<f64>,
     pub is_partition: bool,
     pub belongs_to: Option<String>,
+    pub comment: Option<String>,
     pub attrs: Option<serde_json::Value>,
 }
 
@@ -55,7 +56,9 @@ pub struct ProjectionGraphEdge {
     pub source: String,
     pub target: String,
     pub label: Option<String>,
+    pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub comment: Option<String>,
     pub attrs: Option<serde_json::Value>,
 }
 
@@ -137,6 +140,7 @@ pub async fn build_projection_graph(
                 weight: node.weight,
                 is_partition: node.is_partition,
                 belongs_to: node.belongs_to,
+                comment: node.comment,
                 attrs: node.attributes,
             }
         })
@@ -150,7 +154,9 @@ pub async fn build_projection_graph(
             source: edge.source,
             target: edge.target,
             label: edge.label,
+            layer: edge.layer,
             weight: edge.weight,
+            comment: edge.comment,
             attrs: edge.attributes,
         })
         .collect();
