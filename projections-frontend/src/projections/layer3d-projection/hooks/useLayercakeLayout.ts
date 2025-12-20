@@ -105,11 +105,11 @@ export function useLayercakeLayout(
       validatedEdges = cycleBreakResult.edges
     }
 
-    // 3. Build hierarchy
-    const hierarchyData = buildHierarchy(validatedNodes, validatedEdges, validatedLayers)
+    // 3. Build hierarchy and get parent relationships
+    const { hierarchyData, parentMap } = buildHierarchy(validatedNodes, validatedEdges, validatedLayers)
 
     // 4. Calculate positions using D3 treemap
-    const positionedNodes = calculateTreemapLayout(hierarchyData, validatedLayers, fullConfig)
+    const positionedNodes = calculateTreemapLayout(hierarchyData, validatedLayers, fullConfig, parentMap, validatedNodes)
 
     // 5. Calculate bounding box for camera positioning
     const boundingBox = calculateBoundingBox(positionedNodes)
@@ -153,19 +153,21 @@ function buildHierarchy(
   nodes: GraphNode[],
   edges: GraphEdge[],
   layers: GraphLayer[]
-): HierarchyData {
-  // Build parent map from attributes
+): { hierarchyData: HierarchyData; parentMap: Map<string, string> } {
+  // Build parent map from belongs_to attribute
   const parentMap = new Map<string, string>()
 
+  // Log sample of attributes to debug
+  console.log('[Hierarchy] Sample node attrs:', nodes.slice(0, 3).map(n => ({ id: n.id, attrs: n.attrs })))
+
   nodes.forEach((node) => {
-    if (node.attrs?.parent_id) {
-      parentMap.set(node.id, node.attrs.parent_id)
-    } else if (node.attrs?.belongs_to) {
+    if (node.attrs?.belongs_to) {
       parentMap.set(node.id, node.attrs.belongs_to)
+      console.log(`[Hierarchy] Node "${node.id}" belongs_to "${node.attrs.belongs_to}"`)
     }
   })
 
-  // Augment with edge-based hierarchy
+  // Augment with edge-based hierarchy (fallback)
   edges.forEach((edge) => {
     const relation = edge.attrs?.relation
     if (relation && ['contains', 'parent_of', 'has', 'includes'].includes(relation)) {
@@ -175,6 +177,9 @@ function buildHierarchy(
       }
     }
   })
+
+  console.log('[Hierarchy] Built parentMap, size:', parentMap.size)
+  console.log('[Hierarchy] Parent relationships:', Array.from(parentMap.entries()).slice(0, 5))
 
   // Check if we have any hierarchy
   const hasHierarchy = parentMap.size > 0
@@ -216,20 +221,21 @@ function buildHierarchy(
     })
 
     // Create virtual root if multiple roots
-    if (rootNodes.length === 1) {
-      return rootNodes[0]
-    } else {
-      return {
-        id: '__virtual_root__',
-        label: 'Root',
-        layer: layers[0]?.layerId || 'default',
-        weight: 0,
-        color: '#000000',
-        labelColor: '#FFFFFF',
-        children: rootNodes,
-        isVirtual: true,
-      }
-    }
+    const hierarchyData =
+      rootNodes.length === 1
+        ? rootNodes[0]
+        : {
+            id: '__virtual_root__',
+            label: 'Root',
+            layer: layers[0]?.layerId || 'default',
+            weight: 0,
+            color: '#000000',
+            labelColor: '#FFFFFF',
+            children: rootNodes,
+            isVirtual: true,
+          }
+
+    return { hierarchyData, parentMap }
   } else {
     // Fallback: Group by layer
     const layerGroups = new Map<string, HierarchyData[]>()
@@ -262,7 +268,7 @@ function buildHierarchy(
       isVirtual: true,
     }))
 
-    return {
+    const hierarchyData = {
       id: '__virtual_root__',
       label: 'Root',
       layer: layers[0]?.layerId || 'default',
@@ -272,6 +278,8 @@ function buildHierarchy(
       children: layerParents,
       isVirtual: true,
     }
+
+    return { hierarchyData, parentMap }
   }
 }
 
@@ -281,7 +289,9 @@ function buildHierarchy(
 function calculateTreemapLayout(
   hierarchyData: HierarchyData,
   layers: GraphLayer[],
-  config: LayoutConfiguration
+  config: LayoutConfiguration,
+  parentMap: Map<string, string>,
+  nodes: GraphNode[]
 ): PositionedNode[] {
   const { canvasSize, layerSpacing, partitionPadding } = config
 
@@ -304,20 +314,45 @@ function calculateTreemapLayout(
     .paddingInner(partitionPadding * 2) // More padding between partitions for clear separation
     .paddingTop(20) // Extra top padding for labels
 
+  // IMPORTANT: Mark partitions BEFORE layout, because treemap flattens the tree
+  // A node is a partition if:
+  // 1. It has is_partition=true in attributes, OR
+  // 2. It appears as a parent in the parentMap (has children)
+  const partitionIds = new Set<string>()
+
+  // Add nodes marked as partitions
+  nodes.forEach((node) => {
+    if (node.attrs?.is_partition === true || node.attrs?.is_partition === 'true') {
+      partitionIds.add(node.id)
+      console.log(`[Layout] Node "${node.id}" marked as partition from is_partition attribute`)
+    }
+  })
+
+  // Add parent nodes
+  parentMap.forEach((parentId) => {
+    partitionIds.add(parentId)
+  })
+
+  console.log('[Layout] Partition IDs:', Array.from(partitionIds))
+  console.log('[Layout] Sample parent relationships:', Array.from(parentMap.entries()).slice(0, 5))
+
   layoutFn(root)
 
   // Create layer index map
   const layerMap = new Map(layers.map((l, i) => [l.layerId, i]))
 
   // First pass: Calculate layer ranges for each partition
-  const partitionLayerRanges = new Map<string, { minLayer: number; maxLayer: number }>()
+  // Partitions start at their own layer and extend down to deepest child
+  const partitionLayerRanges = new Map<string, { minLayer: number; maxLayer: number; ownLayer: number }>()
 
   root.each((node: any) => {
     const data = node.data
     if (node.children && node.children.length > 0) {
-      let minLayer = Infinity
-      let maxLayer = -Infinity
+      const ownLayerIdx = layerMap.get(data.layer) || 0
+      let minLayer = ownLayerIdx // Start from partition's own layer
+      let maxLayer = ownLayerIdx
 
+      // Find the deepest descendant layer
       node.each((descendant: any) => {
         if (!descendant.data.isVirtual) {
           const layerIdx = layerMap.get(descendant.data.layer) || 0
@@ -326,7 +361,8 @@ function calculateTreemapLayout(
         }
       })
 
-      partitionLayerRanges.set(data.id, { minLayer, maxLayer })
+      partitionLayerRanges.set(data.id, { minLayer, maxLayer, ownLayer: ownLayerIdx })
+      console.log(`[Layout] Partition "${data.label}" spans layers ${minLayer}-${maxLayer}, own layer: ${ownLayerIdx}`)
     }
   })
 
@@ -347,7 +383,9 @@ function calculateTreemapLayout(
     }
 
     const layerIndex = layerMap.get(data.layer) || 0
-    const isPartition = (node.children?.length || 0) > 0
+    const isPartition = partitionIds.has(data.id)
+
+    console.log(`[Layout] Node "${data.label}" id="${data.id}" isPartition: ${isPartition}, inSet: ${partitionIds.has(data.id)}`)
 
     // Calculate 3D position from treemap coordinates
     const x0 = node.x0 || 0

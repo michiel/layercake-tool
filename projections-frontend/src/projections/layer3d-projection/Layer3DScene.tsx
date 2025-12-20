@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import 'aframe'
 import { useControls } from 'leva'
+import SpriteText from 'three-spritetext'
 import { useLayercakeLayout } from './hooks/useLayercakeLayout'
 
 interface Layer3DSceneProps {
@@ -255,6 +256,19 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     ground.setAttribute('position', '0 -1 0')
     scene.appendChild(ground)
 
+    // Wait for scene to be ready, then add THREE.js text
+    scene.addEventListener('loaded', () => {
+      const sceneEl = scene as any
+      const threeScene = sceneEl.object3D
+
+      // DEBUG: Add visible THREE.js sprite text
+      const debugText = new SpriteText('DEBUG TEXT', 10)
+      debugText.color = '#FF0000'
+      debugText.position.set(0, 5, -10)
+      threeScene.add(debugText)
+      console.log('[Layer3D] Added THREE.js DEBUG TEXT at 0, 5, -10')
+    })
+
     // Add to DOM
     container.appendChild(scene)
 
@@ -296,10 +310,8 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
       plane.setAttribute('rotation', '-90 0 0')
       plane.setAttribute('width', String(controls.canvasSize))
       plane.setAttribute('height', String(controls.canvasSize))
-      plane.setAttribute('color', layer.backgroundColor)
-      plane.setAttribute('opacity', '0.25')
-      plane.setAttribute('transparent', 'true')
-      plane.setAttribute('material', 'side: double') // Make visible from both sides
+      // depthWrite: false allows nodes to render through transparent layers
+      plane.setAttribute('material', `color: ${layer.backgroundColor}; opacity: 0.25; transparent: true; side: double; depthWrite: false`)
       container.appendChild(plane)
     })
   }, [layers, controls.canvasSize, controls.layerSpacing])
@@ -309,7 +321,8 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     if (!containerRef.current) return
 
     const container = containerRef.current.querySelector('#layer3d-layer-labels')
-    if (!container) return
+    const sceneEl = containerRef.current.querySelector('a-scene') as any
+    if (!container || !sceneEl || !sceneEl.object3D) return
 
     // Remove old layer labels
     while (container.firstChild) {
@@ -317,32 +330,35 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     }
 
     // Add new layer labels - positioned to the side of the canvas
-    const labelOffset = Number(controls.canvasSize) / 2 + 15 // Position outside canvas edge
+    const labelOffset = Number(controls.canvasSize) / 2 + 20 // Position outside canvas edge
     layers.forEach((layer, index) => {
-      const label = document.createElement('a-text')
-      label.setAttribute('value', layer.name.toUpperCase())
-      label.setAttribute('align', 'left')
-      label.setAttribute('anchor', 'left')
-      label.setAttribute('baseline', 'center')
-      label.setAttribute('color', '#FFFFFF')
-      label.setAttribute('position', `${-labelOffset} ${index * Number(controls.layerSpacing)} 0`)
-      label.setAttribute('scale', '8 8 8') // Large labels
-      label.setAttribute('side', 'double')
-      label.setAttribute('shader', 'msdf')
-      label.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json')
-      label.setAttribute('wrap-count', '15')
-
-      // Add subtle background for readability
+      // Add background plane
       const bg = document.createElement('a-plane')
-      bg.setAttribute('position', `${-labelOffset + 8} ${index * Number(controls.layerSpacing)} -0.5`)
-      bg.setAttribute('width', '30')
-      bg.setAttribute('height', '10')
+      bg.setAttribute('position', `${-labelOffset + 10} ${index * Number(controls.layerSpacing)} -0.5`)
+      bg.setAttribute('width', '40')
+      bg.setAttribute('height', '8')
       bg.setAttribute('color', layer.backgroundColor)
       bg.setAttribute('opacity', '0.3')
       bg.setAttribute('transparent', 'true')
-
       container.appendChild(bg)
-      container.appendChild(label)
+
+      // Add label entity
+      const labelEntity = document.createElement('a-entity')
+      labelEntity.setAttribute('position', `${-labelOffset} ${index * Number(controls.layerSpacing)} 0`)
+      container.appendChild(labelEntity)
+
+      // Add THREE.js text after entity is ready
+      requestAnimationFrame(() => {
+        const entityEl = labelEntity as any
+        if (entityEl.object3D) {
+          const sprite = new SpriteText(layer.name.toUpperCase(), 8)
+          sprite.color = '#FFFFFF'
+          sprite.textHeight = 8
+          sceneEl.object3D.add(sprite)
+          sprite.position.set(-labelOffset, index * Number(controls.layerSpacing), 0)
+          console.log('[Layer3D] Added THREE.js layer label:', layer.name, 'at', -labelOffset, index * Number(controls.layerSpacing))
+        }
+      })
     })
   }, [layers, controls.canvasSize, controls.layerSpacing])
 
@@ -381,7 +397,8 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     if (!containerRef.current) return
 
     const container = containerRef.current.querySelector('#layer3d-nodes')
-    if (!container) return
+    const sceneEl = containerRef.current.querySelector('a-scene') as any
+    if (!container || !sceneEl || !sceneEl.object3D) return
 
     // Remove old nodes
     while (container.firstChild) {
@@ -390,40 +407,64 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
 
     // Add new nodes
     layout.nodes.forEach((node) => {
-      const entity = document.createElement('a-box')
-      entity.setAttribute('position', `${node.x} ${node.y} ${node.z}`)
-      entity.setAttribute('width', String(node.width))
-      entity.setAttribute('height', String(node.height))
-      entity.setAttribute('depth', String(node.depth))
+      console.log('[Layer3D] Rendering node:', node.label, 'isPartition:', node.isPartition, 'height:', node.height)
+      let entity: HTMLElement
+
+      if (node.isPartition) {
+        // Partition nodes: Vertical containers spanning multiple layers
+        entity = document.createElement('a-entity')
+        entity.setAttribute('position', `${node.x} ${node.y} ${node.z}`)
+
+        // Create semi-transparent fill box
+        const fillBox = document.createElement('a-box')
+        fillBox.setAttribute('width', String(node.width))
+        fillBox.setAttribute('height', String(node.height))
+        fillBox.setAttribute('depth', String(node.depth))
+        fillBox.setAttribute('material', `color: ${node.color}; opacity: 0.08; transparent: true`)
+        fillBox.setAttribute('shadow', 'receive: true')
+        entity.appendChild(fillBox)
+
+        // Create wireframe outline for emphasis
+        const wireBox = document.createElement('a-box')
+        wireBox.setAttribute('width', String(node.width))
+        wireBox.setAttribute('height', String(node.height))
+        wireBox.setAttribute('depth', String(node.depth))
+        wireBox.setAttribute('material', `color: ${node.color}; opacity: 0.6; transparent: true; wireframe: true`)
+        entity.appendChild(wireBox)
+
+        console.log('[Layer3D] Partition node:', node.label, 'height:', node.height, 'at Y:', node.y)
+      } else {
+        // Flow nodes: Solid boxes at specific layers
+        entity = document.createElement('a-box')
+        entity.setAttribute('position', `${node.x} ${node.y} ${node.z}`)
+        entity.setAttribute('width', String(node.width))
+        entity.setAttribute('height', String(node.height))
+        entity.setAttribute('depth', String(node.depth))
+        entity.setAttribute('color', node.color)
+        entity.setAttribute('material', `opacity: 0.95; transparent: true`)
+        entity.setAttribute('shadow', 'cast: true; receive: true')
+
+        console.log('[Layer3D] Flow node:', node.label, 'at layer Y:', node.y)
+      }
+
       entity.setAttribute('data-node-id', node.id)
       entity.setAttribute('data-node-label', node.label)
       entity.setAttribute('layer3d-node-interaction', '')
-      entity.setAttribute('shadow', 'cast: true; receive: true')
-
-      // Partition nodes: wireframe pillars with transparency
-      // Leaf nodes: solid boxes
-      if (node.isPartition) {
-        entity.setAttribute('material', `color: ${node.color}; opacity: 0.3; transparent: true; wireframe: true`)
-      } else {
-        entity.setAttribute('color', node.color)
-        entity.setAttribute('material', `opacity: 0.9; transparent: true`)
-      }
-
-      // Add text label above the node
-      const text = document.createElement('a-text')
-      text.setAttribute('value', node.label)
-      text.setAttribute('align', 'center')
-      text.setAttribute('anchor', 'center')
-      text.setAttribute('baseline', 'bottom')
-      text.setAttribute('color', '#FFFFFF') // White text for visibility
-      text.setAttribute('position', `0 ${node.height / 2 + 1} 0`)
-      text.setAttribute('scale', '4 4 4') // Larger text
-      text.setAttribute('side', 'double')
-      text.setAttribute('shader', 'msdf')
-      text.setAttribute('font', 'https://cdn.aframe.io/fonts/Roboto-msdf.json')
-      entity.appendChild(text)
 
       container.appendChild(entity)
+
+      // Add THREE.js text label after entity is added
+      requestAnimationFrame(() => {
+        const entityEl = entity as any
+        if (entityEl.object3D) {
+          const textHeight = node.isPartition ? 7 : 5
+          const sprite = new SpriteText(node.isPartition ? `[${node.label}]` : node.label, textHeight)
+          sprite.color = node.isPartition ? node.color : '#FFFFFF'
+          sprite.position.set(0, node.height / 2 + 3, 0)
+          entityEl.object3D.add(sprite)
+          console.log('[Layer3D] Added THREE.js text for:', node.label)
+        }
+      })
     })
 
     console.log('[Layer3D] Rendered', layout.nodes.length, 'nodes')
