@@ -294,14 +294,17 @@ impl From<ProjectionGraphView> for ProjectionGraph {
 }
 
 #[derive(SimpleObject, Clone)]
+#[graphql(rename_fields = "camelCase")]
 pub struct ProjectionGraphNode {
     pub id: String,
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub is_partition: bool,
+    pub belongs_to: Option<String>,
+    pub comment: Option<String>,
     pub attributes: Option<Json<serde_json::Value>>,
     pub color: Option<String>,
-    #[graphql(name = "labelColor")]
     pub label_color: Option<String>,
 }
 
@@ -312,6 +315,9 @@ impl From<crate::service::ProjectionGraphNode> for ProjectionGraphNode {
             label: node.label,
             layer: node.layer,
             weight: node.weight,
+            is_partition: node.is_partition,
+            belongs_to: node.belongs_to,
+            comment: node.comment,
             attributes: node.attributes.map(Json),
             color: node.color,
             label_color: node.label_color,
@@ -327,6 +333,7 @@ pub struct ProjectionGraphEdge {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub comment: Option<String>,
     pub attributes: Option<Json<serde_json::Value>>,
 }
 
@@ -339,6 +346,7 @@ impl From<crate::service::ProjectionGraphEdge> for ProjectionGraphEdge {
             label: edge.label,
             layer: edge.layer,
             weight: edge.weight,
+            comment: edge.comment,
             attributes: edge.attributes.map(Json),
         }
     }

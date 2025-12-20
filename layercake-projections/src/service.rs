@@ -62,6 +62,9 @@ pub struct ProjectionGraphNode {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub is_partition: bool,
+    pub belongs_to: Option<String>,
+    pub comment: Option<String>,
     pub attributes: Option<serde_json::Value>,
     pub color: Option<String>,
     pub label_color: Option<String>,
@@ -75,6 +78,7 @@ pub struct ProjectionGraphEdge {
     pub label: Option<String>,
     pub layer: Option<String>,
     pub weight: Option<f64>,
+    pub comment: Option<String>,
     pub attributes: Option<serde_json::Value>,
 }
 
@@ -307,6 +311,9 @@ impl ProjectionService {
                         label: n.label,
                         layer: layer_key,
                         weight: n.weight,
+                        is_partition: n.is_partition,
+                        belongs_to: n.belongs_to,
+                        comment: n.comment,
                         attributes: n.attributes,
                         color: layer_colors
                             .as_ref()
@@ -324,6 +331,7 @@ impl ProjectionService {
                     label: e.label,
                     layer: e.layer,
                     weight: e.weight,
+                    comment: e.comment,
                     attributes: e.attributes,
                 })
                 .collect(),
