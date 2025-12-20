@@ -55,23 +55,85 @@ Implement the "Layercake" 3D visualization as the `layer3d` projection type in t
 
 ## Data Model Adaptation
 
-The Layer3D design expects hierarchical data with containment relationships. The GraphQL interface is:
+The Layer3D design expects hierarchical data with containment relationships.
+
+**CRITICAL: Dual GraphQL Schema Architecture**
+
+The system has TWO separate GraphQL schemas with DIFFERENT type definitions:
+
+1. **Main Schema** (`/graphql`): Used by workbench, DAG editor
+   - Location: `layercake-core/src/graphql/types/projection.rs`
+   - Used by main application UI
+
+2. **Projections Schema** (`/projections/graphql`): Used by projection viewers
+   - Location: `layercake-projections/src/graphql.rs` and `service.rs`
+   - **This is what Layer3D frontend connects to**
+   - Must be updated separately from main schema
+
+**IMPORTANT:** Changes to projection types require updates to BOTH schemas.
+
+The GraphQL interface for ProjectionGraph is:
 
 ```graphql
 type ProjectionGraph {
-  nodes: [Node]    # id, label, layer, color?, labelColor?, weight?, attrs?
-  edges: [Edge]    # id, source, target, label, weight?, attrs?
-  layers: [Layer]  # layerId, name, backgroundColor, textColor, borderColor
+  nodes: [ProjectionGraphNode]
+  edges: [ProjectionGraphEdge]
+  layers: [ProjectionGraphLayer]
+}
+
+type ProjectionGraphNode {
+  id: String!
+  label: String
+  layer: String
+  color: String
+  labelColor: String
+  weight: Float
+  isPartition: Boolean!      # Top-level field (NOT in attributes)
+  belongsTo: String          # Top-level field (NOT in attributes)
+  comment: String            # Top-level field (NOT in attributes)
+  attributes: JSON           # Custom key-value pairs
+}
+
+type ProjectionGraphEdge {
+  id: String!
+  source: String!
+  target: String!
+  label: String
+  layer: String              # Top-level field (NOT in attributes)
+  weight: Float
+  comment: String            # Top-level field (NOT in attributes)
+  attributes: JSON           # Custom key-value pairs
 }
 ```
+
+**Field Location Critical for Frontend:**
+- `isPartition`, `belongsTo`, `comment` on nodes: **Top-level fields**
+- `layer`, `comment` on edges: **Top-level fields**
+- Custom data goes in `attributes` JSON object
+
+**Backend Implementation Checklist:**
+- [ ] Update `layercake-projections/src/graphql.rs` GraphQL types
+- [ ] Update `layercake-projections/src/service.rs` service structs
+- [ ] Update field mapping in `load_graph()` function
+- [ ] Rebuild backend: `cargo build`
+- [ ] Restart backend server (schema changes require restart)
+- [ ] Verify with: `curl http://localhost:3001/projections/graphql -d '{"query":"{ __type(name: \"ProjectionGraphNode\") { fields { name } } }"}'`
 
 **Challenges & Solutions:**
 
 1) **Hierarchy inference**
-- Primary: use `attrs.belongs_to` or `attrs.parent_id` if present
-- Secondary: infer from edges with semantic relation (e.g., `attrs.relation in {"contains","parent_of"}`)
-- Fallback: flat hierarchy grouped by layer only; treemap operates per layer with no nesting
+- **Primary:** Use top-level `belongsTo` field (references parent node's ID)
+- **Secondary:** Check `attrs.belongs_to` or `attrs.parent_id` for backward compatibility
+- **Tertiary:** Infer from edges with semantic relation (e.g., `attrs.relation in {"contains","parent_of","has","includes"}`)
+- **Fallback:** Flat hierarchy grouped by layer only; treemap operates per layer with no nesting
 - **Validation:** Detect cycles using DFS; break cycles at arbitrary edge and log warning
+
+**Partition Detection Strategy:**
+- **Method 1:** Node has `isPartition: true` field
+- **Method 2:** Node appears as parent in `belongsTo` relationships (has children)
+- **Method 3:** Check `attrs.is_partition` attribute for backward compatibility
+- **CRITICAL:** Mark partitions BEFORE D3 treemap layout (treemap flattens tree structure)
+- **Implementation:** Build `partitionIds` Set before calling `treemap()` function
 
 2) **Sizing/weight**
 - Use `node.weight` when present; fallback to degree (edge count) or constant 1 for treemap sizing
@@ -415,17 +477,73 @@ return <a-scene ref={sceneRef}>{/* Initial structure */}</a-scene>
    ```
 
 4. **Implement Node Type Differentiation:**
-   - **Partition nodes** (have children): Wireframe pillars with opacity 0.3
-   - **Leaf nodes**: Solid boxes with opacity 0.9
-   - Update `Layer3DNode.tsx` to handle both types
-   - Partition nodes span all layers (Y from 0 to maxLayer * layerSpacing)
-   - Leaf nodes only at their specific layer height
+   - **Partition nodes** (have children): Large vertical containers spanning multiple layers
+     - Semi-transparent fill box (opacity: 0.08)
+     - Wireframe outline for emphasis (opacity: 0.6)
+     - Start at partition's own layer, extend down to deepest child layer
+     - Height calculation: `maxY - minY + layerSpacing * 0.8`
+     - Width/depth: Full cell size from treemap
+   - **Leaf nodes** (flow nodes): Solid boxes at specific layer
+     - Higher opacity (0.95) for visibility
+     - Slightly smaller than cell (width/depth * 0.85) to show separation from partition borders
+     - Height: `layerSpacing * 0.25` with minimum 4 units for visibility
+     - Y position: Centered at layer height
+   - Update `Layer3DNode.tsx` or render inline in `Layer3DScene.tsx`
+
+   **Visual Differentiation:**
+   ```typescript
+   if (node.isPartition) {
+     // Partition: Large container
+     const fillBox = document.createElement('a-box')
+     fillBox.setAttribute('material', `color: ${node.color}; opacity: 0.08; transparent: true`)
+
+     const wireBox = document.createElement('a-box')
+     wireBox.setAttribute('material', `color: ${node.color}; opacity: 0.6; transparent: true; wireframe: true`)
+   } else {
+     // Flow node: Solid box
+     const box = document.createElement('a-box')
+     box.setAttribute('color', node.color)
+     box.setAttribute('material', `opacity: 0.95; transparent: true`)
+   }
+   ```
 
 5. **Add State Persistence:**
    - Sync Leva controls with ProjectionState
    - Use `useLayer3DState.ts` hook to debounce updates (300ms)
    - Mutation: `saveProjectionState(id, { layout: { canvasSize, layerSpacing, partitionPadding } })`
    - Subscription: Listen to `projectionStateUpdated` and update controls
+
+   **CRITICAL: Prevent Redundant State Saves**
+   ```typescript
+   // Track last saved values to avoid unnecessary mutations
+   const lastSavedLayoutRef = useRef<{ canvasSize: number; layerSpacing: number; partitionPadding: number } | null>(null)
+
+   useEffect(() => {
+     const currentLayout = {
+       canvasSize: Number(controls.canvasSize),
+       layerSpacing: Number(controls.layerSpacing),
+       partitionPadding: Number(controls.partitionPadding),
+     }
+
+     // Check if values have actually changed
+     if (lastSavedLayoutRef.current) {
+       const hasChanged =
+         lastSavedLayoutRef.current.canvasSize !== currentLayout.canvasSize ||
+         lastSavedLayoutRef.current.layerSpacing !== currentLayout.layerSpacing ||
+         lastSavedLayoutRef.current.partitionPadding !== currentLayout.partitionPadding
+
+       if (!hasChanged) {
+         return // No change, don't save
+       }
+     }
+
+     // Schedule save with debounce
+     saveTimerRef.current = window.setTimeout(() => {
+       onSaveState({ layout: currentLayout })
+       lastSavedLayoutRef.current = currentLayout
+     }, 400)
+   }, [controls.canvasSize, controls.layerSpacing, controls.partitionPadding])
+   ```
 
 **Success Criteria:**
 - ✅ Nodes with children render as wireframe containers (pillar shape)
@@ -714,10 +832,32 @@ return <a-scene ref={sceneRef}>{/* Initial structure */}</a-scene>
 
 1. **Implement Label Rendering System:**
    - Use `three-spritetext` (same as Force3D for consistency)
+   - **CRITICAL:** A-Frame's `<a-text>` component is unreliable - use THREE.js SpriteText directly
    - Billboard labels (always face camera via `look-at="#rig"`)
    - LOD system: Only show labels for nodes within `labelDistance` threshold
    - Configurable label size based on layer or node importance
    - Label colors from layer textColor or node labelColor
+
+   **Text Rendering Implementation:**
+   ```typescript
+   // Wait for A-Frame entity to be ready
+   scene.addEventListener('loaded', () => {
+     const sceneEl = scene as any
+     const threeScene = sceneEl.object3D
+
+     // Add THREE.js SpriteText directly to scene
+     const sprite = new SpriteText(node.label, textHeight)
+     sprite.color = node.isPartition ? node.color : '#FFFFFF'
+     sprite.position.set(x, y + height/2 + 3, z)
+     threeScene.add(sprite)
+   })
+   ```
+
+   **Why THREE.js instead of A-Frame text:**
+   - A-Frame `<a-text>` component doesn't render reliably
+   - THREE.js SpriteText gives direct control over text rendering
+   - Use `requestAnimationFrame` to ensure entity is ready before adding text
+   - Add text to THREE.js scene via `sceneEl.object3D.add(sprite)`
 
 2. **Implement Lighting & Shadows (A-Frame 1.7 compatible):**
    ```typescript
@@ -756,13 +896,17 @@ return <a-scene ref={sceneRef}>{/* Initial structure */}</a-scene>
 
 4. **Implement Layer Visualization:**
    - **Layer planes:** Semi-transparent planes at each layer Y-position
-     - Color from layer backgroundColor with opacity 0.1
-     - Grid lines for spatial reference
+     - Color from layer backgroundColor with opacity 0.25
+     - Use `depthWrite: false` material property to prevent occlusion of nodes behind layers
+     - Side: double (visible from both sides)
+     - Grid lines for spatial reference (optional)
      - Toggle via Leva control
    - **Layer labels:** 3D text anchored at layer corner
-     - Shows layer name
+     - Shows layer name in UPPERCASE
      - Always visible (not LOD-culled)
-     - Positioned at (canvasSize/2 + 5, layerY, canvasSize/2 + 5)
+     - Use THREE.js SpriteText (not A-Frame text)
+     - Positioned at (canvasSize/2 + labelOffset, layerY, 0)
+     - Background plane with layer color at opacity 0.3 for readability
 
 5. **Add Accessibility Features:**
    - **Keyboard navigation:** Tab through nodes, Enter to select
