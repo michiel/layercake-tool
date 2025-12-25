@@ -33,6 +33,13 @@ Implement the "Layercake" 3D visualization as the `layer3d` projection type in t
 - **Interactivity:** Camera controls, node selection; narrative/story mode deferred
 - **Tech Stack:** A-Frame for 3D rendering, D3 for layout; ProjectionGraph GraphQL as input
 
+## Current Review Findings (to remediate)
+- THREE isolation violation: Layer3DScene imports `three-spritetext` (three@0.182) into the A-Frame (super-three@0.173.5) scene for labels/debug text.
+- Hierarchy inference ignores top-level `belongsTo`/`parent_id`, so nesting falls back to flat-by-layer.
+- Layer labels leak: SpriteText labels are appended on each update without cleanup, leaving duplicates.
+- Edge routing is only two straight segments; no guttered orthogonal routing per design.
+- Treemap sizing falls back to constant weight; should use node degree before constant.
+
 ## Coordinate System Conventions
 
 **Standard 3D Coordinate System:**

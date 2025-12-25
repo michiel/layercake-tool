@@ -285,6 +285,8 @@ export default function App() {
                 id: n.id,
                 label: n.label || n.id,
                 layer: n.layer,
+                belongsTo: n.belongsTo,
+                isPartition: n.isPartition,
                 color: (n.layer && layerColors.get(n.layer)?.body) || n.color,
                 labelColor: (n.layer && layerColors.get(n.layer)?.label) || n.labelColor,
                 weight: n.weight,

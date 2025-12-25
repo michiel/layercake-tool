@@ -109,7 +109,14 @@ export function useLayercakeLayout(
     const { hierarchyData, parentMap } = buildHierarchy(validatedNodes, validatedEdges, validatedLayers)
 
     // 4. Calculate positions using D3 treemap
-    const positionedNodes = calculateTreemapLayout(hierarchyData, validatedLayers, fullConfig, parentMap, validatedNodes)
+    const positionedNodes = calculateTreemapLayout(
+      hierarchyData,
+      validatedLayers,
+      fullConfig,
+      parentMap,
+      validatedNodes,
+      validatedEdges
+    )
 
     // 5. Calculate bounding box for camera positioning
     const boundingBox = calculateBoundingBox(positionedNodes)
@@ -154,16 +161,17 @@ function buildHierarchy(
   edges: GraphEdge[],
   layers: GraphLayer[]
 ): { hierarchyData: HierarchyData; parentMap: Map<string, string> } {
-  // Build parent map from belongs_to attribute
+  // Build parent map from top-level belongsTo/parent_id and attrs.belongs_to (back-compat)
   const parentMap = new Map<string, string>()
 
   // Log sample of attributes to debug
   console.log('[Hierarchy] Sample node attrs:', nodes.slice(0, 3).map(n => ({ id: n.id, attrs: n.attrs })))
 
   nodes.forEach((node) => {
-    if (node.attrs?.belongs_to) {
-      parentMap.set(node.id, node.attrs.belongs_to)
-      console.log(`[Hierarchy] Node "${node.id}" belongs_to "${node.attrs.belongs_to}"`)
+    const explicitParent = (node as any).belongsTo || (node as any).parent_id || node.attrs?.belongs_to || node.attrs?.parent_id
+    if (explicitParent) {
+      parentMap.set(node.id, explicitParent)
+      console.log(`[Hierarchy] Node "${node.id}" belongs_to "${explicitParent}"`)
     }
   })
 
@@ -291,9 +299,11 @@ function calculateTreemapLayout(
   layers: GraphLayer[],
   config: LayoutConfiguration,
   parentMap: Map<string, string>,
-  nodes: GraphNode[]
+  nodes: GraphNode[],
+  edges: GraphEdge[]
 ): PositionedNode[] {
   const { canvasSize, layerSpacing, partitionPadding } = config
+  const degreeMap = computeDegreeMap(nodes, edges)
 
   // Create D3 hierarchy
   const root = hierarchy(hierarchyData)
@@ -303,7 +313,10 @@ function calculateTreemapLayout(
       if (d.children && d.children.length > 0) {
         return 0 // Treemap will sum children's values
       }
-      return d.weight || 10 // Give each leaf node more weight for visibility
+      const hasExplicitWeight = (d as any).__hasWeight === true
+      const fallbackWeight = degreeMap.get(d.id) ?? 1
+      const weight = hasExplicitWeight ? d.weight : fallbackWeight
+      return Math.max(weight || 0, 1) // Never allow zero-sized leaves
     })
     .sort((a: any, b: any) => (b.value || 0) - (a.value || 0))
 
@@ -322,7 +335,13 @@ function calculateTreemapLayout(
 
   // Add nodes marked as partitions
   nodes.forEach((node) => {
-    if (node.attrs?.is_partition === true || node.attrs?.is_partition === 'true') {
+    const isPartitionFlag =
+      (node as any).isPartition === true ||
+      (node as any).isPartition === 'true' ||
+      node.attrs?.is_partition === true ||
+      node.attrs?.is_partition === 'true'
+
+    if (isPartitionFlag) {
       partitionIds.add(node.id)
       console.log(`[Layout] Node "${node.id}" marked as partition from is_partition attribute`)
     }
@@ -427,6 +446,9 @@ function calculateTreemapLayout(
       height = Math.max(4, layerSpacing * 0.25) // Taller minimum height
     }
 
+    const hasExplicitWeight = (data as any).__hasWeight === true
+    const nodeWeight = hasExplicitWeight ? data.weight : degreeMap.get(data.id) ?? data.weight ?? 1
+
     positionedNodes.push({
       id: data.id,
       label: data.label,
@@ -440,7 +462,7 @@ function calculateTreemapLayout(
       labelColor: data.labelColor,
       layerId: data.layer,
       isPartition,
-      weight: data.weight,
+      weight: nodeWeight,
     })
   })
 
@@ -517,4 +539,15 @@ function createEmptyBoundingBox(): BoundingBox {
     sizeY: 0,
     sizeZ: 0,
   }
+}
+
+function computeDegreeMap(nodes: GraphNode[], edges: GraphEdge[]): Map<string, number> {
+  const degree = new Map<string, number>(nodes.map((n) => [n.id, 0]))
+
+  edges.forEach((edge) => {
+    degree.set(edge.source, (degree.get(edge.source) || 0) + 1)
+    degree.set(edge.target, (degree.get(edge.target) || 0) + 1)
+  })
+
+  return degree
 }

@@ -177,6 +177,8 @@ function validateNodes(
 
   return nodes.map((node) => {
     const validated = { ...node }
+    const hasWeight = node.weight !== undefined && node.weight !== null
+    ;(validated as any).__hasWeight = hasWeight
 
     // Validate node ID
     if (!node.id) {
@@ -206,14 +208,17 @@ function validateNodes(
     }
 
     // Validate weight
-    if (node.weight !== undefined) {
-      if (!Number.isFinite(node.weight) || node.weight <= 0) {
+    if (hasWeight) {
+      const weightVal = Number(node.weight)
+      if (!Number.isFinite(weightVal) || weightVal <= 0) {
         warnings.push({
           type: 'invalid_weight',
           message: `Node ${node.id} has invalid weight ${node.weight}, using 1`,
           context: { nodeId: node.id, weight: node.weight },
         })
         validated.weight = 1
+      } else {
+        validated.weight = weightVal
       }
     } else {
       // Default weight if not specified

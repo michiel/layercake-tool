@@ -11,11 +11,10 @@
 import { useEffect, useMemo, useRef } from 'react'
 import 'aframe'
 import { useControls } from 'leva'
-import SpriteText from 'three-spritetext'
 import { useLayercakeLayout } from './hooks/useLayercakeLayout'
 
 interface Layer3DSceneProps {
-  nodes: Array<{ id: string; label: string; layer: string; color?: string; labelColor?: string; weight?: number; attrs?: Record<string, any> }>
+  nodes: Array<{ id: string; label: string; layer: string; belongsTo?: string; isPartition?: boolean; color?: string; labelColor?: string; weight?: number; attrs?: Record<string, any> }>
   edges: Array<{ id: string; source: string; target: string; label?: string; weight?: number; attrs?: Record<string, any> }>
   layers: Array<{
     layerId: string
@@ -256,19 +255,6 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     ground.setAttribute('position', '0 -1 0')
     scene.appendChild(ground)
 
-    // Wait for scene to be ready, then add THREE.js text
-    scene.addEventListener('loaded', () => {
-      const sceneEl = scene as any
-      const threeScene = sceneEl.object3D
-
-      // DEBUG: Add visible THREE.js sprite text
-      const debugText = new SpriteText('DEBUG TEXT', 10)
-      debugText.color = '#FF0000'
-      debugText.position.set(0, 5, -10)
-      threeScene.add(debugText)
-      console.log('[Layer3D] Added THREE.js DEBUG TEXT at 0, 5, -10')
-    })
-
     // Add to DOM
     container.appendChild(scene)
 
@@ -342,23 +328,11 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
       bg.setAttribute('transparent', 'true')
       container.appendChild(bg)
 
-      // Add label entity
+      // Add text label using A-Frame text component
       const labelEntity = document.createElement('a-entity')
       labelEntity.setAttribute('position', `${-labelOffset} ${index * Number(controls.layerSpacing)} 0`)
+      labelEntity.setAttribute('text', `value: ${layer.name.toUpperCase()}; align: right; width: 18; color: #FFFFFF`)
       container.appendChild(labelEntity)
-
-      // Add THREE.js text after entity is ready
-      requestAnimationFrame(() => {
-        const entityEl = labelEntity as any
-        if (entityEl.object3D) {
-          const sprite = new SpriteText(layer.name.toUpperCase(), 8)
-          sprite.color = '#FFFFFF'
-          sprite.textHeight = 8
-          sceneEl.object3D.add(sprite)
-          sprite.position.set(-labelOffset, index * Number(controls.layerSpacing), 0)
-          console.log('[Layer3D] Added THREE.js layer label:', layer.name, 'at', -labelOffset, index * Number(controls.layerSpacing))
-        }
-      })
     })
   }, [layers, controls.canvasSize, controls.layerSpacing])
 
@@ -453,18 +427,17 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
 
       container.appendChild(entity)
 
-      // Add THREE.js text label after entity is added
-      requestAnimationFrame(() => {
-        const entityEl = entity as any
-        if (entityEl.object3D) {
-          const textHeight = node.isPartition ? 7 : 5
-          const sprite = new SpriteText(node.isPartition ? `[${node.label}]` : node.label, textHeight)
-          sprite.color = node.isPartition ? node.color : '#FFFFFF'
-          sprite.position.set(0, node.height / 2 + 3, 0)
-          entityEl.object3D.add(sprite)
-          console.log('[Layer3D] Added THREE.js text for:', node.label)
-        }
-      })
+      // Add in-scene text label without importing THREE
+      const labelEntity = document.createElement('a-entity')
+      labelEntity.setAttribute('position', `0 ${node.height / 2 + 3} 0`)
+      labelEntity.setAttribute(
+        'text',
+        `value: ${node.isPartition ? `[${node.label}]` : node.label}; align: center; width: ${Math.max(
+          8,
+          node.width * 0.6
+        )}; color: ${node.isPartition ? node.color : '#FFFFFF'}`
+      )
+      entity.appendChild(labelEntity)
     })
 
     console.log('[Layer3D] Rendered', layout.nodes.length, 'nodes')
@@ -481,23 +454,47 @@ export default function Layer3DScene({ nodes, edges, layers, state, onSaveState 
     }
 
     const nodeMap = new Map(layout.nodes.map((n) => [n.id, n]))
+    const gutter = Math.max(Number(controls.partitionPadding) || 0, 0.5)
+
+    const buildWaypointSegments = (source: any, target: any) => {
+      const start = { x: source.x, y: source.y, z: source.z }
+      const xClearance = source.width / 2 + gutter
+      const zClearance = source.depth / 2 + gutter
+
+      const exitX = start.x + (Math.sign(target.x - start.x) || 1) * xClearance
+      const exitZ = start.z + (Math.sign(target.z - start.z) || 1) * zClearance
+
+      // Waypoints: exit source along X/Z gutter, rise/fall to target layer, move across, then into target
+      const points = [
+        start,
+        { x: exitX, y: start.y, z: start.z },
+        { x: exitX, y: start.y, z: exitZ },
+        { x: exitX, y: target.y, z: exitZ },
+        { x: exitX, y: target.y, z: target.z },
+        { x: target.x, y: target.y, z: target.z },
+      ]
+
+      return points
+    }
+
     edges.forEach((edge) => {
       const source = nodeMap.get(edge.source)
       const target = nodeMap.get(edge.target)
       if (!source || !target) return
 
-      const p1 = `${source.x} ${source.y} ${source.z}`
-      const p2 = `${source.x} ${target.y} ${source.z}`
-      const p3 = `${target.x} ${target.y} ${target.z}`
-
-      const seg1 = document.createElement('a-entity')
-      seg1.setAttribute('line', `start: ${p1}; end: ${p2}; color: #888; opacity: 0.6`)
-      const seg2 = document.createElement('a-entity')
-      seg2.setAttribute('line', `start: ${p2}; end: ${p3}; color: #888; opacity: 0.6`)
-      container.appendChild(seg1)
-      container.appendChild(seg2)
+      const waypoints = buildWaypointSegments(source, target)
+      for (let i = 0; i < waypoints.length - 1; i++) {
+        const pA = waypoints[i]
+        const pB = waypoints[i + 1]
+        const seg = document.createElement('a-entity')
+        seg.setAttribute(
+          'line',
+          `start: ${pA.x} ${pA.y} ${pA.z}; end: ${pB.x} ${pB.y} ${pB.z}; color: #888; opacity: 0.6`
+        )
+        container.appendChild(seg)
+      }
     })
-  }, [edges, layout.nodes])
+  }, [edges, layout.nodes, controls.partitionPadding])
 
   // Handle WebGL context loss
   useEffect(() => {
