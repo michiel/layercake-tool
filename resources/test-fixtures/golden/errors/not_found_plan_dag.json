@@ -1,0 +1,21 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "extensions": {
+        "code": "NOT_FOUND",
+        "resource": "Project"
+      },
+      "locations": [
+        {
+          "column": 13,
+          "line": 3
+        }
+      ],
+      "message": "Project with id '9999' not found",
+      "path": [
+        "getPlanDag"
+      ]
+    }
+  ]
+}

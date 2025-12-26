@@ -1,3 +1,29 @@
 {
-  "cases": []
+  "cases": [
+    {
+      "description": "Register with invalid email format",
+      "name": "validation_invalid_email",
+      "path": "validation_invalid_email.json"
+    },
+    {
+      "description": "Register with an email that already exists",
+      "name": "conflict_duplicate_email",
+      "path": "conflict_duplicate_email.json"
+    },
+    {
+      "description": "Login with missing user credentials",
+      "name": "unauthorized_login",
+      "path": "unauthorized_login.json"
+    },
+    {
+      "description": "Login with a deactivated account",
+      "name": "forbidden_login_inactive",
+      "path": "forbidden_login_inactive.json"
+    },
+    {
+      "description": "Fetch plan DAG for missing project",
+      "name": "not_found_plan_dag",
+      "path": "not_found_plan_dag.json"
+    }
+  ]
 }

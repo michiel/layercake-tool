@@ -656,7 +656,7 @@ After refactoring, support multiple deployment modes:
 - Completed: service authorization audit draft (`docs/service-authorization-audit.md`).
 - Completed: transaction patterns doc (`layercake-core/docs/transaction-patterns.md`).
 - Completed: `layercake-test-utils` crate + test fixtures skeleton.
-- Completed: golden error baseline harness (`layercake-server/tests/golden_errors.rs` + manifest).
+- Completed: golden error baseline harness + captured cases (see `layercake-server/src/bin/capture_graphql_error_baselines.rs`).
 - Completed: Rig tools registry doc (`layercake-cli/docs/rig-tools-registry.md`).
 - In progress: GraphQL error baseline capture (golden harness added, fixtures pending).
 

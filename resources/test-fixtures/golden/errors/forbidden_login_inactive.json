@@ -1,0 +1,20 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "extensions": {
+        "code": "FORBIDDEN"
+      },
+      "locations": [
+        {
+          "column": 13,
+          "line": 3
+        }
+      ],
+      "message": "Account is deactivated",
+      "path": [
+        "login"
+      ]
+    }
+  ]
+}

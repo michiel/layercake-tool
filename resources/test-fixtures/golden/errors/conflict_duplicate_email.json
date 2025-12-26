@@ -1,0 +1,21 @@
+{
+  "data": null,
+  "errors": [
+    {
+      "extensions": {
+        "code": "CONFLICT",
+        "resource": "User"
+      },
+      "locations": [
+        {
+          "column": 13,
+          "line": 3
+        }
+      ],
+      "message": "User: User with this email already exists",
+      "path": [
+        "register"
+      ]
+    }
+  ]
+}

@@ -110,6 +110,6 @@ impl StdError for CoreError {
 
 impl From<anyhow::Error> for CoreError {
     fn from(err: anyhow::Error) -> Self {
-        CoreError::internal("Unhandled error").with_source(err)
+        CoreError::internal(err.to_string())
     }
 }
