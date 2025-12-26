@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::graphql::chat_manager::ChatManager;
+use layercake_core::auth::Actor;
 use layercake_core::app_context::AppContext;
 use crate::chat::ChatConfig;
 use layercake_core::services::{
@@ -176,5 +177,11 @@ impl GraphQLContext {
     pub async fn chat_config(&self) -> Arc<ChatConfig> {
         let values = self.system_settings.settings_map().await;
         Arc::new(ChatConfig::from_map(&values))
+    }
+
+    pub async fn actor_for_request(&self, ctx: &async_graphql::Context<'_>) -> Actor {
+        let session_id = self.get_session_id(ctx);
+        let session = self.session_manager.get_or_create_session(&session_id).await;
+        Actor::user(session.user_id)
     }
 }

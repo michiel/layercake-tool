@@ -4,6 +4,8 @@ use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder, Set};
 
 use super::{AppContext, ProjectSummary, ProjectUpdate};
 use crate::database::entities::projects;
+use crate::errors::{CoreError, CoreResult};
+use crate::auth::Actor;
 
 impl AppContext {
     // ----- Project helpers -------------------------------------------------
@@ -65,10 +67,11 @@ impl AppContext {
 
     pub async fn create_project(
         &self,
+        _actor: &Actor,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         let now = Utc::now();
         let tags_json =
             serde_json::to_string(&tags.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
@@ -85,7 +88,7 @@ impl AppContext {
         let project = project
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create project: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create project: {}", e)))?;
 
         // Create default "Main plan" for new project if no plans exist
         let _ = self.plan_service.ensure_default_plan(project.id).await;
@@ -93,12 +96,17 @@ impl AppContext {
         Ok(ProjectSummary::from(project))
     }
 
-    pub async fn update_project(&self, id: i32, update: ProjectUpdate) -> Result<ProjectSummary> {
+    pub async fn update_project(
+        &self,
+        _actor: &Actor,
+        id: i32,
+        update: ProjectUpdate,
+    ) -> CoreResult<ProjectSummary> {
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", id, e))?
-            .ok_or_else(|| anyhow!("Project {} not found", id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load project {}: {}", id, e)))?
+            .ok_or_else(|| CoreError::not_found("Project", id.to_string()))?;
 
         let mut active: projects::ActiveModel = project.into();
         if let Some(name) = update.name {
@@ -119,19 +127,19 @@ impl AppContext {
         let project = active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update project {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update project {}: {}", id, e)))?;
 
         Ok(ProjectSummary::from(project))
     }
 
-    pub async fn delete_project(&self, id: i32) -> Result<()> {
+    pub async fn delete_project(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
         let result = projects::Entity::delete_by_id(id)
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete project {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete project {}: {}", id, e)))?;
 
         if result.rows_affected == 0 {
-            return Err(anyhow!("Project {} not found", id));
+            return Err(CoreError::not_found("Project", id.to_string()));
         }
 
         Ok(())

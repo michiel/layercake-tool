@@ -18,11 +18,12 @@ impl ProjectMutation {
         input: CreateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let project = context
             .app
-            .create_project(input.name, input.description, input.tags)
+            .create_project(&actor, input.name, input.description, input.tags)
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }
@@ -54,13 +55,14 @@ impl ProjectMutation {
         input: UpdateProjectInput,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let update =
             ProjectUpdate::new(Some(input.name), input.description, true, input.tags, None);
         let project = context
             .app
-            .update_project(id, update)
+            .update_project(&actor, id, update)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }
@@ -68,11 +70,12 @@ impl ProjectMutation {
     /// Delete a project
     async fn delete_project(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         context
             .app
-            .delete_project(id)
+            .delete_project(&actor, id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }

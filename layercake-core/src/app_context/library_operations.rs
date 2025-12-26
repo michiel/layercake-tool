@@ -758,7 +758,9 @@ impl AppContext {
                 .to_string();
             let update =
                 super::ProjectUpdate::new(None, None, false, None, Some(Some(path_string)));
-            let _ = self.update_project(project_id, update).await?;
+            let _ = self
+                .update_project(&crate::auth::SystemActor::internal(), project_id, update)
+                .await?;
         }
 
         Ok(())
@@ -946,7 +948,8 @@ impl AppContext {
             .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
 
         // Remove the existing project and re-import using the same ID
-        self.delete_project(project_id).await?;
+        self.delete_project(&crate::auth::SystemActor::internal(), project_id)
+            .await?;
 
         let archive_bytes = archive_directory(Path::new(&path))?;
         self.import_project_archive_internal(

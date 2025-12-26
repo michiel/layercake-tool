@@ -349,7 +349,7 @@ impl LibraryMutation {
         // Delete the old project
         context
             .app
-            .delete_project(project_id)
+            .delete_project(&layercake_core::auth::SystemActor::internal(), project_id)
             .await
             .map_err(|e| StructuredError::service("AppContext::delete_project", e))?;
 

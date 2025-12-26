@@ -2,6 +2,7 @@ use anyhow::Result;
 use chrono::Utc;
 use layercake as layercake_core;
 use layercake_core::app_context::{AppContext, PlanDagNodeRequest};
+use layercake_core::auth::SystemActor;
 use layercake_core::database::entities::{
     data_sets, layer_aliases, plan_dag_nodes, plans, project_layers, sequences, stories,
 };
@@ -27,6 +28,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
 
     let project = app
         .create_project(
+            &SystemActor::internal(),
             "Source Project".to_string(),
             Some("contains detached datasets".to_string()),
             None,
@@ -55,6 +57,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         .await?;
 
     app.create_plan_dag_node(
+        &SystemActor::internal(),
         project.id,
         Some(plan.id),
         PlanDagNodeRequest {

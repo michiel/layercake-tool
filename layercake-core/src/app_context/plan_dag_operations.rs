@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use super::{AppContext, PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanDagSnapshot};
 use super::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest};
+use crate::auth::Actor;
 use crate::database::entities::{data_sets, projects};
+use crate::errors::{CoreError, CoreResult};
 use crate::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
@@ -215,22 +217,24 @@ impl AppContext {
 
     pub async fn create_plan_dag_node(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         request: PlanDagNodeRequest,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         let existing_nodes = self
             .plan_dag_service
             .get_nodes(project_id, plan_id)
             .await
             .unwrap_or_default();
 
-        let node_id = generate_node_id(&request.node_type, &existing_nodes)?;
+        let node_id = generate_node_id(&request.node_type, &existing_nodes)
+            .map_err(|e| CoreError::internal(e.to_string()))?;
         let node_type = node_type_storage_name(&request.node_type).to_string();
         let metadata_json = serde_json::to_string(&request.metadata)
-            .map_err(|e| anyhow!("Invalid node metadata: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid node metadata: {}", e)))?;
         let config_json = serde_json::to_string(&request.config)
-            .map_err(|e| anyhow!("Invalid node config: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid node config: {}", e)))?;
 
         self.plan_dag_service
             .create_node(
@@ -243,19 +247,21 @@ impl AppContext {
                 config_json,
             )
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn update_plan_dag_node(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
         updates: PlanDagNodeUpdateRequest,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         let metadata_json = if let Some(metadata) = updates.metadata {
             Some(
                 serde_json::to_string(&metadata)
-                    .map_err(|e| anyhow!("Invalid node metadata: {}", e))?,
+                    .map_err(|e| CoreError::validation(format!("Invalid node metadata: {}", e)))?,
             )
         } else {
             None
@@ -264,7 +270,7 @@ impl AppContext {
         let config_json = if let Some(config) = updates.config {
             Some(
                 serde_json::to_string(&config)
-                    .map_err(|e| anyhow!("Invalid node config: {}", e))?,
+                    .map_err(|e| CoreError::validation(format!("Invalid node config: {}", e)))?,
             )
         } else {
             None
@@ -280,37 +286,43 @@ impl AppContext {
                 config_json,
             )
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn delete_plan_dag_node(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         self.plan_dag_service
             .delete_node(project_id, plan_id, node_id)
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn move_plan_dag_node(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
         position: Position,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         self.plan_dag_service
             .move_node(project_id, plan_id, node_id, position)
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn batch_move_plan_dag_nodes(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         positions: Vec<PlanDagNodePositionRequest>,
-    ) -> Result<Vec<PlanDagNode>> {
+    ) -> CoreResult<Vec<PlanDagNode>> {
         let updates = positions
             .into_iter()
             .map(|p| PlanDagNodePositionUpdate {
@@ -324,17 +336,19 @@ impl AppContext {
         self.plan_dag_service
             .batch_move_nodes(project_id, plan_id, updates)
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn create_plan_dag_edge(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         request: PlanDagEdgeRequest,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         let edge_id = generate_edge_id(&request.source, &request.target);
         let metadata_json = serde_json::to_string(&request.metadata)
-            .map_err(|e| anyhow!("Invalid edge metadata: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid edge metadata: {}", e)))?;
 
         self.plan_dag_service
             .create_edge(
@@ -346,19 +360,21 @@ impl AppContext {
                 metadata_json,
             )
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn update_plan_dag_edge(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         edge_id: String,
         updates: PlanDagEdgeUpdateRequest,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         let metadata_json = if let Some(metadata) = updates.metadata {
             Some(
                 serde_json::to_string(&metadata)
-                    .map_err(|e| anyhow!("Invalid edge metadata: {}", e))?,
+                    .map_err(|e| CoreError::validation(format!("Invalid edge metadata: {}", e)))?,
             )
         } else {
             None
@@ -367,16 +383,19 @@ impl AppContext {
         self.plan_dag_service
             .update_edge(project_id, plan_id, edge_id, metadata_json)
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn delete_plan_dag_edge(
         &self,
+        _actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         edge_id: String,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         self.plan_dag_service
             .delete_edge(project_id, plan_id, edge_id)
             .await
+            .map_err(|e| CoreError::internal(e.to_string()))
     }
 }

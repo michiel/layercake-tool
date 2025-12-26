@@ -28,6 +28,7 @@ impl PlanDagNodesMutation {
         node: PlanDagNodeInput,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let PlanDagNodeInput {
             node_type,
@@ -52,9 +53,9 @@ impl PlanDagNodesMutation {
 
         let created = context
             .app
-            .create_plan_dag_node(project_id, plan_id, request)
+            .create_plan_dag_node(&actor, project_id, plan_id, request)
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_plan_dag_node", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagNode::from(created)))
     }
@@ -69,6 +70,7 @@ impl PlanDagNodesMutation {
         updates: PlanDagNodeUpdateInput,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let PlanDagNodeUpdateInput {
             position,
@@ -100,9 +102,9 @@ impl PlanDagNodesMutation {
 
         let updated = context
             .app
-            .update_plan_dag_node(project_id, plan_id, node_id, request)
+            .update_plan_dag_node(&actor, project_id, plan_id, node_id, request)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_plan_dag_node", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagNode::from(updated)))
     }
@@ -116,12 +118,13 @@ impl PlanDagNodesMutation {
         node_id: String,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let deleted = context
             .app
-            .delete_plan_dag_node(project_id, plan_id, node_id)
+            .delete_plan_dag_node(&actor, project_id, plan_id, node_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_node", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagNode::from(deleted)))
     }
@@ -136,12 +139,13 @@ impl PlanDagNodesMutation {
         position: Position,
     ) -> Result<Option<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let moved = context
             .app
-            .move_plan_dag_node(project_id, plan_id, node_id, position.into())
+            .move_plan_dag_node(&actor, project_id, plan_id, node_id, position.into())
             .await
-            .map_err(|e| StructuredError::service("AppContext::move_plan_dag_node", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagNode::from(moved)))
     }
@@ -155,6 +159,7 @@ impl PlanDagNodesMutation {
         node_positions: Vec<NodePositionInput>,
     ) -> Result<Vec<PlanDagNode>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let requests = node_positions
             .into_iter()
@@ -168,9 +173,9 @@ impl PlanDagNodesMutation {
 
         let moved = context
             .app
-            .batch_move_plan_dag_nodes(project_id, plan_id, requests)
+            .batch_move_plan_dag_nodes(&actor, project_id, plan_id, requests)
             .await
-            .map_err(|e| StructuredError::service("AppContext::batch_move_plan_dag_nodes", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(moved.into_iter().map(PlanDagNode::from).collect())
     }

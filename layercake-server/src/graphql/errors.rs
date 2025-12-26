@@ -1,4 +1,5 @@
 use async_graphql::*;
+use layercake_core::errors::{CoreError, CoreErrorKind};
 
 /// Error codes for structured error handling
 #[derive(Enum, Copy, Clone, Eq, PartialEq, Debug)]
@@ -105,6 +106,29 @@ impl StructuredError {
     pub fn bad_request(message: impl Into<String>) -> Error {
         Error::new(message.into()).extend_with(|_, e| {
             e.set("code", "BAD_REQUEST");
+        })
+    }
+}
+
+impl StructuredError {
+    pub fn from_core_error(err: CoreError) -> Error {
+        let code = match err.kind() {
+            CoreErrorKind::NotFound => "NOT_FOUND",
+            CoreErrorKind::Validation => "VALIDATION_FAILED",
+            CoreErrorKind::Conflict => "CONFLICT",
+            CoreErrorKind::Forbidden => "FORBIDDEN",
+            CoreErrorKind::Unauthorized => "UNAUTHORIZED",
+            CoreErrorKind::Unavailable => "SERVICE_ERROR",
+            CoreErrorKind::Internal => "INTERNAL_ERROR",
+        };
+
+        Error::new(err.message()).extend_with(|_, e| {
+            e.set("code", code);
+            if let Some(fields) = err.fields() {
+                for (key, value) in fields {
+                    e.set(key, value);
+                }
+            }
         })
     }
 }

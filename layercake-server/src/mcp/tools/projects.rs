@@ -102,7 +102,7 @@ pub async fn create_project(
         .map(|s| s.to_string());
 
     let project = app
-        .create_project(name, description, None)
+        .create_project(&layercake_core::auth::SystemActor::internal(), name, description, None)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create project: {}", e),
@@ -141,7 +141,11 @@ pub async fn update_project(
 
     let update = ProjectUpdate::new(name, description, description_is_set, None, None);
     let project = app
-        .update_project(project_id, update)
+        .update_project(
+            &layercake_core::auth::SystemActor::internal(),
+            project_id,
+            update,
+        )
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update project: {}", e),
@@ -184,7 +188,7 @@ pub async fn delete_project(
             message: "Project ID must be a number".to_string(),
         })? as i32;
 
-    app.delete_project(project_id)
+    app.delete_project(&layercake_core::auth::SystemActor::internal(), project_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete project: {}", e),

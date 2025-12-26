@@ -19,6 +19,7 @@ impl PlanDagEdgesMutation {
         edge: PlanDagEdgeInput,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let PlanDagEdgeInput {
             source,
@@ -38,9 +39,9 @@ impl PlanDagEdgesMutation {
 
         let created = context
             .app
-            .create_plan_dag_edge(project_id, plan_id, request)
+            .create_plan_dag_edge(&actor, project_id, plan_id, request)
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_plan_dag_edge", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagEdge::from(created)))
     }
@@ -54,12 +55,13 @@ impl PlanDagEdgesMutation {
         edge_id: String,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let deleted = context
             .app
-            .delete_plan_dag_edge(project_id, plan_id, edge_id)
+            .delete_plan_dag_edge(&actor, project_id, plan_id, edge_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_plan_dag_edge", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagEdge::from(deleted)))
     }
@@ -74,6 +76,7 @@ impl PlanDagEdgesMutation {
         updates: PlanDagEdgeUpdateInput,
     ) -> Result<Option<PlanDagEdge>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let metadata_value = if let Some(metadata) = updates.metadata {
             Some(serde_json::to_value(metadata).map_err(|e| {
@@ -89,9 +92,9 @@ impl PlanDagEdgesMutation {
 
         let updated = context
             .app
-            .update_plan_dag_edge(project_id, plan_id, edge_id, request)
+            .update_plan_dag_edge(&actor, project_id, plan_id, edge_id, request)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_plan_dag_edge", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Some(PlanDagEdge::from(updated)))
     }

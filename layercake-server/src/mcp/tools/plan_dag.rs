@@ -211,8 +211,9 @@ pub async fn add_plan_dag_node(
         config,
     };
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let node = app
-        .create_plan_dag_node(project_id, None, request)
+        .create_plan_dag_node(&actor, project_id, None, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create Plan DAG node: {}", e),
@@ -249,8 +250,9 @@ pub async fn update_plan_dag_node(
         config,
     };
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let node = app
-        .update_plan_dag_node(project_id, None, node_id, request)
+        .update_plan_dag_node(&actor, project_id, None, node_id, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update Plan DAG node: {}", e),
@@ -274,8 +276,9 @@ pub async fn delete_plan_dag_node(
         })?
         .to_string();
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let node = app
-        .delete_plan_dag_node(project_id, None, node_id)
+        .delete_plan_dag_node(&actor, project_id, None, node_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete Plan DAG node: {}", e),
@@ -301,8 +304,9 @@ pub async fn move_plan_dag_node(
     let position_value = get_required_param(&arguments, "position")?;
     let position = parse_position(position_value)?;
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let node = app
-        .move_plan_dag_node(project_id, None, node_id, position)
+        .move_plan_dag_node(&actor, project_id, None, node_id, position)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to move Plan DAG node: {}", e),
@@ -355,8 +359,9 @@ pub async fn batch_move_plan_dag_nodes(
         });
     }
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let nodes = app
-        .batch_move_plan_dag_nodes(project_id, None, requests)
+        .batch_move_plan_dag_nodes(&actor, project_id, None, requests)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to batch move Plan DAG nodes: {}", e),
@@ -395,8 +400,9 @@ pub async fn add_plan_dag_edge(
         metadata,
     };
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let edge = app
-        .create_plan_dag_edge(project_id, None, request)
+        .create_plan_dag_edge(&actor, project_id, None, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create Plan DAG edge: {}", e),
@@ -423,8 +429,9 @@ pub async fn update_plan_dag_edge(
     let metadata = get_optional_param(&arguments, "metadata").cloned();
     let request = PlanDagEdgeUpdateRequest { metadata };
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let edge = app
-        .update_plan_dag_edge(project_id, None, edge_id, request)
+        .update_plan_dag_edge(&actor, project_id, None, edge_id, request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update Plan DAG edge: {}", e),
@@ -448,8 +455,9 @@ pub async fn delete_plan_dag_edge(
         })?
         .to_string();
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let edge = app
-        .delete_plan_dag_edge(project_id, None, edge_id)
+        .delete_plan_dag_edge(&actor, project_id, None, edge_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete Plan DAG edge: {}", e),
