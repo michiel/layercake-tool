@@ -1,4 +1,3 @@
-use anyhow::Result;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     Set,
@@ -10,6 +9,7 @@ use crate::database::entities::{
     graph_data_nodes::{self, Entity as GraphDataNodes},
     graph_edits,
 };
+use crate::errors::{CoreError, CoreResult};
 
 /// Result of applying a single edit
 #[derive(Debug, Clone, PartialEq)]
@@ -35,7 +35,7 @@ impl GraphDataEditApplicator {
     /// Apply a single graph edit to the database
     ///
     /// Returns ApplyResult indicating success, skip, or error
-    pub async fn apply_edit(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    pub async fn apply_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         debug!(
             "Applying edit #{} on {}:{} ({})",
             edit.sequence_number, edit.target_type, edit.target_id, edit.operation
@@ -63,7 +63,7 @@ impl GraphDataEditApplicator {
     }
 
     /// Apply edit to a graph_data node
-    async fn apply_node_edit(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn apply_node_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         match edit.operation.as_str() {
             "create" => self.create_node(edit).await,
             "update" => self.update_node(edit).await,
@@ -74,13 +74,14 @@ impl GraphDataEditApplicator {
         }
     }
 
-    async fn create_node(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn create_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         // Check if node already exists
         let existing = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?;
 
         if existing.is_some() {
             return Ok(ApplyResult::Skipped {
@@ -91,7 +92,7 @@ impl GraphDataEditApplicator {
         let new_value = edit
             .new_value
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
+            .ok_or_else(|| CoreError::validation("Create operation missing new_value"))?;
 
         let label = new_value
             .get("label")
@@ -137,19 +138,22 @@ impl GraphDataEditApplicator {
             created_at: Set(chrono::Utc::now()),
         };
 
-        node.insert(&self.db).await?;
+        node.insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create graph_data node").with_source(e))?;
 
         Ok(ApplyResult::Success {
             message: format!("Created node {}", edit.target_id),
         })
     }
 
-    async fn update_node(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn update_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         let node = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?;
 
         let Some(node) = node else {
             return Ok(ApplyResult::Skipped {
@@ -194,7 +198,10 @@ impl GraphDataEditApplicator {
             }
         }
 
-        active_model.update(&self.db).await?;
+        active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to update graph_data node").with_source(e))?;
 
         Ok(ApplyResult::Success {
             message: format!(
@@ -204,12 +211,13 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn delete_node(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn delete_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         let result = GraphDataNodes::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data node").with_source(e))?;
 
         if result.rows_affected == 0 {
             Ok(ApplyResult::Skipped {
@@ -223,7 +231,7 @@ impl GraphDataEditApplicator {
     }
 
     /// Apply edit to a graph_data edge
-    async fn apply_edge_edit(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn apply_edge_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         match edit.operation.as_str() {
             "create" => self.create_edge(edit).await,
             "update" => self.update_edge(edit).await,
@@ -234,13 +242,14 @@ impl GraphDataEditApplicator {
         }
     }
 
-    async fn create_edge(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn create_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         // Check if edge already exists
         let existing = GraphDataEdges::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data edge").with_source(e))?;
 
         if existing.is_some() {
             return Ok(ApplyResult::Skipped {
@@ -251,18 +260,18 @@ impl GraphDataEditApplicator {
         let new_value = edit
             .new_value
             .as_ref()
-            .ok_or_else(|| anyhow::anyhow!("Create operation missing new_value"))?;
+            .ok_or_else(|| CoreError::validation("Create operation missing new_value"))?;
 
         let source = new_value
             .get("source")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Edge create missing source"))?
+            .ok_or_else(|| CoreError::validation("Edge create missing source"))?
             .to_string();
 
         let target = new_value
             .get("target")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Edge create missing target"))?
+            .ok_or_else(|| CoreError::validation("Edge create missing target"))?
             .to_string();
 
         // Verify source and target nodes exist
@@ -270,14 +279,16 @@ impl GraphDataEditApplicator {
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&source))
             .count(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?
             > 0;
 
         let target_exists = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&target))
             .count(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?
             > 0;
 
         if !source_exists || !target_exists {
@@ -323,19 +334,22 @@ impl GraphDataEditApplicator {
             created_at: Set(chrono::Utc::now()),
         };
 
-        edge.insert(&self.db).await?;
+        edge.insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create graph_data edge").with_source(e))?;
 
         Ok(ApplyResult::Success {
             message: format!("Created edge {}", edit.target_id),
         })
     }
 
-    async fn update_edge(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn update_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         let edge = GraphDataEdges::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data edge").with_source(e))?;
 
         let Some(edge) = edge else {
             return Ok(ApplyResult::Skipped {
@@ -372,7 +386,10 @@ impl GraphDataEditApplicator {
             }
         }
 
-        active_model.update(&self.db).await?;
+        active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to update graph_data edge").with_source(e))?;
 
         Ok(ApplyResult::Success {
             message: format!(
@@ -382,12 +399,13 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn delete_edge(&self, edit: &graph_edits::Model) -> Result<ApplyResult> {
+    async fn delete_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
         let result = GraphDataEdges::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data edge").with_source(e))?;
 
         if result.rows_affected == 0 {
             Ok(ApplyResult::Skipped {
