@@ -49,24 +49,7 @@ fn log_routes(port: u16) {
         info!("  /ws/collaboration/:project_id - WebSocket collaboration endpoint");
     }
 
-    #[cfg(feature = "mcp")]
-    {
-        info!("  /mcp                        - MCP HTTP JSON-RPC API (POST) & Server Info (GET)");
-        info!("  /mcp/sse                    - MCP Server-Sent Events (StreamableHTTP for Claude Desktop)");
-        info!("  /mcp                        - Session cleanup (DELETE)");
-        info!("");
-        info!("🔗 Claude Code/Desktop Integration:");
-        info!("   Transport: HTTP (StreamableHTTP compatible)");
-        info!("   Endpoint: http://localhost:{}/mcp", port);
-        info!("   Features: Tools, Resources, Prompts, layercake:// URI scheme");
-        info!("   Capabilities: Graph analysis, connectivity analysis, pathfinding");
-        info!("");
-        info!(
-            "📋 Available Tools: list_projects, create_project, analyze_connectivity, find_paths"
-        );
-        info!("📊 Available Resources: layercake://projects/{{id}}, layercake://graphs/{{id}}/{{format}}");
-        info!("🤖 Available Prompts: analyze_graph_structure, analyze_paths, recommend_transformations");
-    }
+    let _ = port;
 }
 
 pub async fn migrate_database(database_path: &str, direction: MigrateDirection) -> Result<()> {
