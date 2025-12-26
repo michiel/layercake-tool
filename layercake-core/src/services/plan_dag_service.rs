@@ -1,10 +1,10 @@
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::database::entities::{data_sets, plan_dag_edges, plan_dag_nodes, plans};
+use crate::errors::{CoreError, CoreResult};
 use crate::plan_dag::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
 use serde_json::Value;
@@ -47,13 +47,13 @@ impl PlanDagService {
 
     /// Get or create a plan for a project
     /// Auto-creates a default plan if one doesn't exist
-    pub async fn get_or_create_plan(&self, project_id: i32) -> Result<plans::Model> {
+    pub async fn get_or_create_plan(&self, project_id: i32) -> CoreResult<plans::Model> {
         match plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .order_by_asc(plans::Column::Id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
         {
             Some(plan) => {
                 if Self::needs_default_plan_name(&plan, project_id) {
@@ -63,7 +63,7 @@ impl PlanDagService {
                     let plan = active
                         .update(&self.db)
                         .await
-                        .map_err(|e| anyhow!("Failed to rename plan: {}", e))?;
+                        .map_err(|e| CoreError::internal(format!("Failed to rename plan: {}", e)))?;
                     Ok(plan)
                 } else {
                     Ok(plan)
@@ -87,7 +87,7 @@ impl PlanDagService {
                 new_plan
                     .insert(&self.db)
                     .await
-                    .map_err(|e| anyhow!("Failed to create plan: {}", e))
+                    .map_err(|e| CoreError::internal(format!("Failed to create plan: {}", e)))
             }
         }
     }
@@ -106,20 +106,23 @@ impl PlanDagService {
         trimmed.eq_ignore_ascii_case(&legacy_name)
     }
 
-    async fn resolve_plan(&self, project_id: i32, plan_id: Option<i32>) -> Result<plans::Model> {
+    async fn resolve_plan(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> CoreResult<plans::Model> {
         if let Some(plan_id) = plan_id {
             let plan = plans::Entity::find_by_id(plan_id)
                 .one(&self.db)
                 .await
-                .map_err(|e| anyhow!("Database error: {}", e))?
-                .ok_or_else(|| anyhow!("Plan {} not found", plan_id))?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("Plan", plan_id.to_string()))?;
 
             if plan.project_id != project_id {
-                return Err(anyhow!(
+                return Err(CoreError::validation(format!(
                     "Plan {} does not belong to project {}",
-                    plan_id,
-                    project_id
-                ));
+                    plan_id, project_id
+                )));
             }
 
             Ok(plan)
@@ -131,18 +134,18 @@ impl PlanDagService {
     async fn fetch_current_plan_dag(
         &self,
         plan_id: i32,
-    ) -> Result<(Vec<PlanDagNode>, Vec<PlanDagEdge>)> {
+    ) -> CoreResult<(Vec<PlanDagNode>, Vec<PlanDagEdge>)> {
         let dag_nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan_id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let dag_edges = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan_id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let nodes = dag_nodes.into_iter().map(PlanDagNode::from).collect();
         let edges = dag_edges.into_iter().map(PlanDagEdge::from).collect();
@@ -150,14 +153,14 @@ impl PlanDagService {
         Ok((nodes, edges))
     }
 
-    async fn bump_plan_version(&self, plan_id: i32) -> Result<i32> {
+    async fn bump_plan_version(&self, plan_id: i32) -> CoreResult<i32> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let plan = plans::Entity::find_by_id(plan_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Plan not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Plan", plan_id.to_string()))?;
 
         let new_version = plan.version + 1;
 
@@ -167,7 +170,7 @@ impl PlanDagService {
         plan_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update plan version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update plan version: {}", e)))?;
 
         Ok(new_version)
     }
@@ -182,24 +185,30 @@ impl PlanDagService {
         position: Position,
         metadata_json: String,
         config_json: String,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         // Validate inputs
-        let validated_id = ValidationService::validate_node_id(&node_id)?;
-        let validated_type = ValidationService::validate_plan_dag_node_type(&node_type)?;
+        let validated_id = ValidationService::validate_node_id(&node_id)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_type = ValidationService::validate_plan_dag_node_type(&node_type)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
         let (validated_x, validated_y) =
-            ValidationService::validate_plan_dag_position(position.x, position.y)?;
-        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
-        let validated_config = ValidationService::validate_plan_dag_config(&config_json)?;
+            ValidationService::validate_plan_dag_position(position.x, position.y)
+                .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_config = ValidationService::validate_plan_dag_config(&config_json)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
 
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let (current_nodes, current_edges) = self
             .fetch_current_plan_dag(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to fetch current state: {}", e)))?;
 
         // Validate DAG limits
-        ValidationService::validate_plan_dag_limits(current_nodes.len() + 1, current_edges.len())?;
+        ValidationService::validate_plan_dag_limits(current_nodes.len() + 1, current_edges.len())
+            .map_err(|e| CoreError::validation(e.to_string()))?;
 
         // Create the node with validated values
         let now = Utc::now();
@@ -211,8 +220,14 @@ impl PlanDagService {
             position_y: Set(validated_y),
             source_position: Set(None),
             target_position: Set(None),
-            metadata_json: Set(serde_json::to_string(&validated_metadata)?),
-            config_json: Set(serde_json::to_string(&validated_config)?),
+            metadata_json: Set(
+                serde_json::to_string(&validated_metadata)
+                    .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?,
+            ),
+            config_json: Set(
+                serde_json::to_string(&validated_config)
+                    .map_err(|e| CoreError::validation(format!("Invalid config: {}", e)))?,
+            ),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -220,14 +235,14 @@ impl PlanDagService {
         let created_node = node
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create node: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create node: {}", e)))?;
 
         let result_node = PlanDagNode::from(created_node);
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_node)
     }
@@ -241,7 +256,7 @@ impl PlanDagService {
         position: Option<Position>,
         metadata_json: Option<String>,
         config_json: Option<String>,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Find the node
@@ -253,8 +268,8 @@ impl PlanDagService {
             )
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Node not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDagNode", node_id.clone()))?;
 
         let node_type = node.node_type.clone();
         let mut metadata_json_current = node.metadata_json.clone();
@@ -286,7 +301,10 @@ impl PlanDagService {
                             .one(&self.db)
                             .await
                             .map_err(|e| {
-                                anyhow!("Failed to load data source {}: {}", data_set_id, e)
+                                CoreError::internal(format!(
+                                    "Failed to load data source {}: {}",
+                                    data_set_id, e
+                                ))
                             })?
                         {
                             let mut metadata_obj =
@@ -324,14 +342,14 @@ impl PlanDagService {
         let updated_node = node_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update node: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update node: {}", e)))?;
 
         let result_node = PlanDagNode::from(updated_node);
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_node)
     }
@@ -342,7 +360,7 @@ impl PlanDagService {
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Find the node to delete
@@ -354,8 +372,8 @@ impl PlanDagService {
             )
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Node not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDagNode", node_id.clone()))?;
 
         let result_node = PlanDagNode::from(node);
 
@@ -370,7 +388,9 @@ impl PlanDagService {
             )
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete connected edges: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to delete connected edges: {}", e))
+            })?;
 
         // Delete the node
         plan_dag_nodes::Entity::delete_many()
@@ -381,12 +401,12 @@ impl PlanDagService {
             )
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete node: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete node: {}", e)))?;
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_node)
     }
@@ -398,7 +418,7 @@ impl PlanDagService {
         plan_id: Option<i32>,
         node_id: String,
         position: Position,
-    ) -> Result<PlanDagNode> {
+    ) -> CoreResult<PlanDagNode> {
         self.update_node(project_id, plan_id, node_id, Some(position), None, None)
             .await
     }
@@ -412,15 +432,20 @@ impl PlanDagService {
         source_node_id: String,
         target_node_id: String,
         metadata_json: String,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         // Validate inputs
-        let validated_edge_id = ValidationService::validate_node_id(&edge_id)?;
-        let validated_source = ValidationService::validate_node_id(&source_node_id)?;
-        let validated_target = ValidationService::validate_node_id(&target_node_id)?;
-        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)?;
+        let validated_edge_id = ValidationService::validate_node_id(&edge_id)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_source = ValidationService::validate_node_id(&source_node_id)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_target = ValidationService::validate_node_id(&target_node_id)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
+        let validated_metadata = ValidationService::validate_plan_dag_metadata(&metadata_json)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
 
         // Validate no self-loop
-        ValidationService::validate_edge_no_self_loop(&validated_source, &validated_target)?;
+        ValidationService::validate_edge_no_self_loop(&validated_source, &validated_target)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
 
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
@@ -428,10 +453,11 @@ impl PlanDagService {
         let (current_nodes, current_edges) =
             self.fetch_current_plan_dag(plan.id)
                 .await
-                .map_err(|e| anyhow!("Failed to fetch current state: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to fetch current state: {}", e)))?;
 
         // Validate DAG limits
-        ValidationService::validate_plan_dag_limits(current_nodes.len(), current_edges.len() + 1)?;
+        ValidationService::validate_plan_dag_limits(current_nodes.len(), current_edges.len() + 1)
+            .map_err(|e| CoreError::validation(e.to_string()))?;
 
         // Create the edge with validated values
         let now = Utc::now();
@@ -441,7 +467,10 @@ impl PlanDagService {
             source_node_id: Set(validated_source),
             target_node_id: Set(validated_target),
             // Removed source_handle and target_handle for floating edges
-            metadata_json: Set(serde_json::to_string(&validated_metadata)?),
+            metadata_json: Set(
+                serde_json::to_string(&validated_metadata)
+                    .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?,
+            ),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -449,14 +478,14 @@ impl PlanDagService {
         let created_edge = edge
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create edge: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create edge: {}", e)))?;
 
         let result_edge = PlanDagEdge::from(created_edge);
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_edge)
     }
@@ -467,7 +496,7 @@ impl PlanDagService {
         project_id: i32,
         plan_id: Option<i32>,
         edge_id: String,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Find the edge to delete
@@ -479,8 +508,8 @@ impl PlanDagService {
             )
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Edge not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDagEdge", edge_id.clone()))?;
 
         let result_edge = PlanDagEdge::from(edge);
 
@@ -493,12 +522,12 @@ impl PlanDagService {
             )
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete edge: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete edge: {}", e)))?;
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_edge)
     }
@@ -508,7 +537,7 @@ impl PlanDagService {
         &self,
         project_id: i32,
         plan_id: Option<i32>,
-    ) -> Result<Vec<PlanDagNode>> {
+    ) -> CoreResult<Vec<PlanDagNode>> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let nodes = plan_dag_nodes::Entity::find()
@@ -516,7 +545,7 @@ impl PlanDagService {
             .order_by_asc(plan_dag_nodes::Column::CreatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(nodes.into_iter().map(PlanDagNode::from).collect())
     }
@@ -526,7 +555,7 @@ impl PlanDagService {
         &self,
         project_id: i32,
         plan_id: Option<i32>,
-    ) -> Result<Vec<PlanDagEdge>> {
+    ) -> CoreResult<Vec<PlanDagEdge>> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let edges = plan_dag_edges::Entity::find()
@@ -534,7 +563,7 @@ impl PlanDagService {
             .order_by_asc(plan_dag_edges::Column::CreatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(edges.into_iter().map(PlanDagEdge::from).collect())
     }
@@ -546,7 +575,7 @@ impl PlanDagService {
         plan_id: Option<i32>,
         edge_id: String,
         metadata_json: Option<String>,
-    ) -> Result<PlanDagEdge> {
+    ) -> CoreResult<PlanDagEdge> {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         let edge = plan_dag_edges::Entity::find()
@@ -557,8 +586,8 @@ impl PlanDagService {
             )
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Edge not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDagEdge", edge_id.clone()))?;
 
         let mut edge_active: plan_dag_edges::ActiveModel = edge.into();
         if let Some(metadata) = metadata_json {
@@ -569,14 +598,14 @@ impl PlanDagService {
         let updated_edge = edge_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update edge: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update edge: {}", e)))?;
 
         let result_edge = PlanDagEdge::from(updated_edge);
 
         let _ = self
             .bump_plan_version(plan.id)
             .await
-            .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
 
         Ok(result_edge)
     }
@@ -587,7 +616,7 @@ impl PlanDagService {
         project_id: i32,
         plan_id: Option<i32>,
         node_positions: Vec<PlanDagNodePositionUpdate>,
-    ) -> Result<Vec<PlanDagNode>> {
+    ) -> CoreResult<Vec<PlanDagNode>> {
         if node_positions.is_empty() {
             return Ok(Vec::new());
         }
@@ -604,7 +633,7 @@ impl PlanDagService {
                 )
                 .one(&self.db)
                 .await
-                .map_err(|e| anyhow!("Database error: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             if let Some(node) = node {
                 let mut node_active: plan_dag_nodes::ActiveModel = node.into();
@@ -617,7 +646,7 @@ impl PlanDagService {
                 let updated_node = node_active
                     .update(&self.db)
                     .await
-                    .map_err(|e| anyhow!("Failed to update node: {}", e))?;
+                    .map_err(|e| CoreError::internal(format!("Failed to update node: {}", e)))?;
 
                 updated_nodes.push(PlanDagNode::from(updated_node));
             }
@@ -627,7 +656,7 @@ impl PlanDagService {
             let _ = self
                 .bump_plan_version(plan.id)
                 .await
-                .map_err(|e| anyhow!("Failed to increment version: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to increment version: {}", e)))?;
         }
 
         Ok(updated_nodes)
@@ -638,14 +667,16 @@ impl PlanDagService {
     pub async fn validate_and_migrate_legacy_nodes(
         &self,
         project_id: i32,
-    ) -> Result<PlanDagMigrationOutcome> {
+    ) -> CoreResult<PlanDagMigrationOutcome> {
         let plan = self.get_or_create_plan(project_id).await?;
 
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan DAG nodes: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load plan DAG nodes: {}", e))
+            })?;
 
         let mut outcome = PlanDagMigrationOutcome {
             checked_nodes: nodes.len(),
@@ -676,7 +707,12 @@ impl PlanDagService {
                 active
                     .update(&self.db)
                     .await
-                    .map_err(|e| anyhow!("Failed to migrate node {}: {}", node.id, e))?;
+                    .map_err(|e| {
+                        CoreError::internal(format!(
+                            "Failed to migrate node {}: {}",
+                            node.id, e
+                        ))
+                    })?;
 
                 outcome.migrated_nodes.push(PlanDagMigrationDetail {
                     node_id: node.id.clone(),
@@ -691,7 +727,12 @@ impl PlanDagService {
         if updated_any {
             self.bump_plan_version(plan.id)
                 .await
-                .map_err(|e| anyhow!("Failed to increment plan version after migration: {}", e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!(
+                        "Failed to increment plan version after migration: {}",
+                        e
+                    ))
+                })?;
         }
 
         Ok(outcome)

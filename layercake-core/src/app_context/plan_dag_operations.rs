@@ -107,12 +107,12 @@ impl AppContext {
                 .plan_dag_service
                 .get_nodes(project_id, Some(plan.id))
                 .await
-                .map_err(|e| CoreError::internal(format!("Failed to load Plan DAG nodes: {}", e)))?;
+                ?;
             let edges = self
                 .plan_dag_service
                 .get_edges(project_id, Some(plan.id))
                 .await
-                .map_err(|e| CoreError::internal(format!("Failed to load Plan DAG edges: {}", e)))?;
+                ?;
 
             for idx in 0..nodes.len() {
                 let node_type = nodes[idx].node_type;
@@ -255,7 +255,6 @@ impl AppContext {
                 config_json,
             )
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn update_plan_dag_node(
@@ -294,7 +293,6 @@ impl AppContext {
                 config_json,
             )
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn delete_plan_dag_node(
@@ -307,7 +305,6 @@ impl AppContext {
         self.plan_dag_service
             .delete_node(project_id, plan_id, node_id)
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn move_plan_dag_node(
@@ -321,7 +318,6 @@ impl AppContext {
         self.plan_dag_service
             .move_node(project_id, plan_id, node_id, position)
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn batch_move_plan_dag_nodes(
@@ -344,7 +340,6 @@ impl AppContext {
         self.plan_dag_service
             .batch_move_nodes(project_id, plan_id, updates)
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn create_plan_dag_edge(
@@ -368,7 +363,6 @@ impl AppContext {
                 metadata_json,
             )
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn update_plan_dag_edge(
@@ -391,7 +385,6 @@ impl AppContext {
         self.plan_dag_service
             .update_edge(project_id, plan_id, edge_id, metadata_json)
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 
     pub async fn delete_plan_dag_edge(
@@ -404,6 +397,5 @@ impl AppContext {
         self.plan_dag_service
             .delete_edge(project_id, plan_id, edge_id)
             .await
-            .map_err(|e| CoreError::internal(e.to_string()))
     }
 }
