@@ -2,6 +2,8 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
+use crate::auth::Actor;
+use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_analysis_service::GraphConnectivityReport;
 use crate::services::graph_edit_service::ReplaySummary as GraphEditReplaySummary;
 
@@ -10,13 +12,14 @@ impl AppContext {
 
     pub async fn update_graph_node(
         &self,
+        _actor: &Actor,
         graph_id: i32,
         node_id: String,
         label: Option<String>,
         layer: Option<String>,
         attributes: Option<Value>,
         belongs_to: Option<String>,
-    ) -> Result<crate::database::entities::graph_data_nodes::Model> {
+    ) -> CoreResult<crate::database::entities::graph_data_nodes::Model> {
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
@@ -25,7 +28,7 @@ impl AppContext {
             .filter(NodeColumn::Id.eq(&node_id))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load graph node {}: {}", node_id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load graph node {}: {}", node_id, e)))?;
 
         let belongs_to_param = belongs_to.as_ref().map(|value| {
             if value.is_empty() {
@@ -46,7 +49,7 @@ impl AppContext {
                 belongs_to_param.clone(),
             )
             .await
-            .map_err(|e| anyhow!("Failed to update graph node {}: {}", node_id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update graph node {}: {}", node_id, e)))?;
 
         if let Some(old_node) = old_node {
             if let Some(new_label) = &label {
@@ -136,24 +139,25 @@ impl AppContext {
 
     pub async fn update_layer_properties(
         &self,
+        _actor: &Actor,
         layer_id: i32,
         name: Option<String>,
         alias: Option<String>,
         properties: Option<Value>,
-    ) -> Result<crate::database::entities::graph_layers::Model> {
+    ) -> CoreResult<crate::database::entities::graph_layers::Model> {
         use crate::database::entities::graph_layers::Entity as Layers;
         use sea_orm::EntityTrait;
 
         let old_layer = Layers::find_by_id(layer_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load layer {}: {}", layer_id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load layer {}: {}", layer_id, e)))?;
 
         let updated_layer = self
             .graph_service
             .update_layer_properties(layer_id, name.clone(), alias.clone(), properties.clone())
             .await
-            .map_err(|e| anyhow!("Failed to update layer {}: {}", layer_id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update layer {}: {}", layer_id, e)))?;
 
         if let Some(old_layer) = old_layer {
             if let Some(new_name) = &name {
@@ -221,12 +225,14 @@ impl AppContext {
 
     pub async fn bulk_update_graph_data(
         &self,
+        actor: &Actor,
         graph_id: i32,
         node_updates: Vec<GraphNodeUpdateRequest>,
         layer_updates: Vec<GraphLayerUpdateRequest>,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         for node_update in node_updates {
             self.update_graph_node(
+                actor,
                 graph_id,
                 node_update.node_id,
                 node_update.label,
@@ -239,6 +245,7 @@ impl AppContext {
 
         for layer_update in layer_updates {
             self.update_layer_properties(
+                actor,
                 layer_update.id,
                 layer_update.name,
                 layer_update.alias,

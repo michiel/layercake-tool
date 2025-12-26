@@ -803,6 +803,7 @@ After refactoring, support multiple deployment modes:
 - Added Actor + CoreError mapping scaffolding in GraphQL context (`layercake-server/src/graphql/context.rs`) and error helpers (`layercake-server/src/graphql/errors.rs`).
 - Updated AppContext project/plan DAG mutations to accept Actor and return CoreError (`layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_dag_operations.rs`).
 - Updated GraphQL mutations to pass Actor and map CoreError (`layercake-server/src/graphql/mutations/project.rs`, `layercake-server/src/graphql/mutations/plan_dag_nodes.rs`, `layercake-server/src/graphql/mutations/plan_dag_edges.rs`).
+- Updated graph edit mutations to pass Actor for core graph updates (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph.rs`).
 
 #### Tasks
 

@@ -161,13 +161,14 @@ impl GraphMutation {
         belongs_to: Option<String>,
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         let node = context
             .app
-            .update_graph_node(graph_id, node_id, label, layer, attributes, belongs_to)
+            .update_graph_node(&actor, graph_id, node_id, label, layer, attributes, belongs_to)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_graph_node", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -182,12 +183,13 @@ impl GraphMutation {
         properties: Option<crate::graphql::types::scalars::JSON>,
     ) -> Result<crate::graphql::types::layer::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let layer = context
             .app
-            .update_layer_properties(id, name, alias, properties)
+            .update_layer_properties(&actor, id, name, alias, properties)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_layer_properties", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
@@ -345,6 +347,7 @@ impl GraphMutation {
         layers: Option<Vec<crate::graphql::types::layer::LayerUpdateInput>>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let node_requests = nodes
             .unwrap_or_default()
@@ -376,9 +379,9 @@ impl GraphMutation {
 
         context
             .app
-            .bulk_update_graph_data(graph_id, node_requests, layer_requests)
+            .bulk_update_graph_data(&actor, graph_id, node_requests, layer_requests)
             .await
-            .map_err(|e| StructuredError::service("AppContext::bulk_update_graph_data", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }

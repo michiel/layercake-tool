@@ -100,7 +100,15 @@ pub async fn update_graph_node(
     let belongs_to = parse_optional_string(&arguments, "belongs_to");
 
     let node = app
-        .update_graph_node(graph_id, node_id, label, layer, attrs, belongs_to)
+        .update_graph_node(
+            &layercake_core::auth::SystemActor::internal(),
+            graph_id,
+            node_id,
+            label,
+            layer,
+            attrs,
+            belongs_to,
+        )
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update graph node: {}", e),
@@ -119,7 +127,12 @@ pub async fn bulk_update_graph_data(
     let node_requests = parse_node_updates(&arguments)?;
     let layer_requests = parse_layer_updates(&arguments)?;
 
-    app.bulk_update_graph_data(graph_id, node_requests, layer_requests)
+    app.bulk_update_graph_data(
+        &layercake_core::auth::SystemActor::internal(),
+        graph_id,
+        node_requests,
+        layer_requests,
+    )
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to bulk update graph data: {}", e),
