@@ -51,48 +51,6 @@ impl DataSetService {
         Self { db }
     }
 
-    /// DEPRECATED: Create a new DataSet from uploaded file data (old signature for compatibility)
-    #[allow(dead_code)]
-    pub async fn create_from_file_legacy(
-        &self,
-        project_id: i32,
-        name: String,
-        description: Option<String>,
-        filename: String,
-        file_data: Vec<u8>,
-    ) -> Result<data_sets::Model> {
-        // Auto-detect format from filename
-        let file_format = FileFormat::from_extension(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
-
-        // Auto-detect type from filename (old behavior)
-        let data_type = if filename.to_lowercase().contains("node") {
-            DataType::Nodes
-        } else if filename.to_lowercase().contains("edge") {
-            DataType::Edges
-        } else if filename.to_lowercase().contains("layer") {
-            DataType::Layers
-        } else if filename.to_lowercase().ends_with(".json") {
-            DataType::Graph
-        } else {
-            return Err(anyhow!(
-                "Cannot determine data type from filename: {}",
-                filename
-            ));
-        };
-
-        self.create_from_file(
-            project_id,
-            name,
-            description,
-            filename,
-            file_format,
-            file_data,
-            Some(data_type),
-        )
-        .await
-    }
-
     /// Create a new empty DataSet without file data
     pub async fn create_empty(
         &self,

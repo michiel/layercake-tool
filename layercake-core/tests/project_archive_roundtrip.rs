@@ -45,7 +45,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         .await?;
 
     let plan = app
-        .create_plan(PlanCreateRequest {
+        .create_plan(&SystemActor::internal(), PlanCreateRequest {
             project_id: project.id,
             name: "Roundtrip Plan".to_string(),
             description: Some("plan with detached dataset".to_string()),

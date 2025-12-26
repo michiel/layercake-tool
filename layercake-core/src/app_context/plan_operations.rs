@@ -1,7 +1,9 @@
 use anyhow::{anyhow, Result};
 
 use super::{AppContext, PlanSummary};
+use crate::auth::Actor;
 use crate::database::entities::plans;
+use crate::errors::{CoreError, CoreResult};
 use crate::services::plan_service::{PlanCreateRequest, PlanUpdateRequest};
 use sea_orm::{EntityTrait, QueryOrder};
 
@@ -44,31 +46,31 @@ impl AppContext {
         Ok(plan.map(PlanSummary::from))
     }
 
-    pub async fn create_plan(&self, request: PlanCreateRequest) -> Result<PlanSummary> {
+    pub async fn create_plan(&self, _actor: &Actor, request: PlanCreateRequest) -> CoreResult<PlanSummary> {
         let plan = self
             .plan_service
             .create_plan(request)
             .await
-            .map_err(|e| anyhow!("Failed to create plan: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create plan: {}", e)))?;
 
         Ok(PlanSummary::from(plan))
     }
 
-    pub async fn update_plan(&self, id: i32, update: PlanUpdateRequest) -> Result<PlanSummary> {
+    pub async fn update_plan(&self, _actor: &Actor, id: i32, update: PlanUpdateRequest) -> CoreResult<PlanSummary> {
         let plan = self
             .plan_service
             .update_plan(id, update)
             .await
-            .map_err(|e| anyhow!("Failed to update plan {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update plan {}: {}", id, e)))?;
 
         Ok(PlanSummary::from(plan))
     }
 
-    pub async fn delete_plan(&self, id: i32) -> Result<()> {
+    pub async fn delete_plan(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
         self.plan_service
             .delete_plan(id)
             .await
-            .map_err(|e| anyhow!("Failed to delete plan {}: {}", id, e))
+            .map_err(|e| CoreError::internal(format!("Failed to delete plan {}: {}", id, e)))
     }
 
     pub async fn duplicate_plan(&self, id: i32, name: String) -> Result<PlanSummary> {

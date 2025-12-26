@@ -10,6 +10,8 @@ use super::{BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetFileCreateReque
 use super::{DataSetExportFormat, DataSetExportRequest, DataSetExportResult, DataSetUpdateRequest};
 use super::{DataSetImportFormat, DataSetImportOutcome, DataSetImportRequest};
 use crate::database::entities::data_sets;
+use crate::auth::Actor;
+use crate::errors::{CoreError, CoreResult};
 
 impl AppContext {
     pub async fn list_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
@@ -38,8 +40,9 @@ impl AppContext {
 
     pub async fn create_data_set_from_file(
         &self,
+        _actor: &Actor,
         request: DataSetFileCreateRequest,
-    ) -> Result<DataSetSummary> {
+    ) -> CoreResult<DataSetSummary> {
         let DataSetFileCreateRequest {
             project_id,
             name,
@@ -62,15 +65,16 @@ impl AppContext {
                 tabular_data_type,
             )
             .await
-            .map_err(|e| anyhow!("Failed to create data set from file: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create data set from file: {}", e)))?;
 
         Ok(DataSetSummary::from(created))
     }
 
     pub async fn create_empty_data_set(
         &self,
+        _actor: &Actor,
         request: DataSetEmptyCreateRequest,
-    ) -> Result<DataSetSummary> {
+    ) -> CoreResult<DataSetSummary> {
         let DataSetEmptyCreateRequest {
             project_id,
             name,
@@ -81,16 +85,17 @@ impl AppContext {
             .data_set_service
             .create_empty(project_id, name, description)
             .await
-            .map_err(|e| anyhow!("Failed to create empty data set: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create empty data set: {}", e)))?;
 
         Ok(DataSetSummary::from(created))
     }
 
     pub async fn bulk_upload_data_sets(
         &self,
+        _actor: &Actor,
         project_id: i32,
         uploads: Vec<BulkDataSetUpload>,
-    ) -> Result<Vec<DataSetSummary>> {
+    ) -> CoreResult<Vec<DataSetSummary>> {
         let mut results = Vec::new();
 
         for upload in uploads {
@@ -104,7 +109,7 @@ impl AppContext {
                     upload.file_bytes.clone(),
                 )
                 .await
-                .map_err(|e| anyhow!("Failed to import data set {}: {}", upload.filename, e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to import data set {}: {}", upload.filename, e)))?;
 
             results.push(DataSetSummary::from(created));
         }
@@ -112,7 +117,7 @@ impl AppContext {
         Ok(results)
     }
 
-    pub async fn update_data_set(&self, request: DataSetUpdateRequest) -> Result<DataSetSummary> {
+    pub async fn update_data_set(&self, _actor: &Actor, request: DataSetUpdateRequest) -> CoreResult<DataSetSummary> {
         let DataSetUpdateRequest {
             id,
             name,
@@ -125,14 +130,14 @@ impl AppContext {
                 .data_set_service
                 .update_file(id, file.filename, file.file_bytes)
                 .await
-                .map_err(|e| anyhow!("Failed to update data set file {}: {}", id, e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to update data set file {}: {}", id, e)))?;
             (updated, true)
         } else {
             let updated = self
                 .data_set_service
                 .update(id, name.clone(), description.clone())
                 .await
-                .map_err(|e| anyhow!("Failed to update data set {}: {}", id, e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to update data set {}: {}", id, e)))?;
             (updated, false)
         };
 
@@ -141,7 +146,7 @@ impl AppContext {
                 .data_set_service
                 .update(id, name, description)
                 .await
-                .map_err(|e| anyhow!("Failed to update metadata for data set {}: {}", id, e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to update metadata for data set {}: {}", id, e)))?;
         }
 
         Ok(DataSetSummary::from(model))
@@ -149,24 +154,25 @@ impl AppContext {
 
     pub async fn update_data_set_graph_json(
         &self,
+        _actor: &Actor,
         id: i32,
         graph_json: String,
-    ) -> Result<DataSetSummary> {
+    ) -> CoreResult<DataSetSummary> {
         let model = self
             .data_set_service
             .update_graph_data(id, graph_json)
             .await
-            .map_err(|e| anyhow!("Failed to update graph data for data set {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update graph data for data set {}: {}", id, e)))?;
 
         Ok(DataSetSummary::from(model))
     }
 
-    pub async fn reprocess_data_set(&self, id: i32) -> Result<DataSetSummary> {
+    pub async fn reprocess_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<DataSetSummary> {
         let model = self
             .data_set_service
             .reprocess(id)
             .await
-            .map_err(|e| anyhow!("Failed to reprocess data set {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to reprocess data set {}: {}", id, e)))?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -185,23 +191,26 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to validate graph {}: {}", graph_id, e))
     }
 
-    pub async fn delete_data_set(&self, id: i32) -> Result<()> {
+    pub async fn delete_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
         self.data_set_service
             .delete(id)
             .await
-            .map_err(|e| anyhow!("Failed to delete data set {}: {}", id, e))
+            .map_err(|e| CoreError::internal(format!("Failed to delete data set {}: {}", id, e)))
     }
 
     pub async fn merge_data_sets(
         &self,
+        _actor: &Actor,
         project_id: i32,
         data_set_ids: Vec<i32>,
         name: String,
         sum_weights: bool,
         delete_merged: bool,
-    ) -> Result<DataSetSummary> {
+    ) -> CoreResult<DataSetSummary> {
         if data_set_ids.len() < 2 {
-            return Err(anyhow!("At least 2 data sets are required for merging"));
+            return Err(CoreError::validation(
+                "At least 2 data sets are required for merging",
+            ));
         }
 
         // Load all datasets
@@ -213,10 +222,10 @@ impl AppContext {
             .map_err(|e| anyhow!("Failed to load data sets for merging: {}", e))?;
 
         if models.len() != data_set_ids.len() {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Some data sets were not found or don't belong to project {}",
                 project_id
-            ));
+            )));
         }
 
         // Merge graph JSON data
@@ -224,11 +233,17 @@ impl AppContext {
 
         // Create new dataset with merged data
         let summary = self
-            .create_empty_data_set(DataSetEmptyCreateRequest {
-                project_id,
-                name,
-                description: Some(format!("Merged from {} data sets", data_set_ids.len())),
-            })
+            .create_empty_data_set(
+                &crate::auth::SystemActor::internal(),
+                DataSetEmptyCreateRequest {
+                    project_id,
+                    name,
+                    description: Some(format!(
+                        "Merged from {} data sets",
+                        data_set_ids.len()
+                    )),
+                },
+            )
             .await?;
 
         // Update the new dataset with merged graph data

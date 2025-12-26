@@ -658,7 +658,8 @@ After refactoring, support multiple deployment modes:
 - Completed: `layercake-test-utils` crate + test fixtures skeleton.
 - Completed: golden error baseline harness + captured cases (see `layercake-server/src/bin/capture_graphql_error_baselines.rs`).
 - Completed: Rig tools registry doc (`layercake-cli/docs/rig-tools-registry.md`).
-- In progress: GraphQL error baseline capture (golden harness added, fixtures pending).
+- Completed: GraphQL error baseline capture (fixtures + manifest captured).
+- Completed: `layercake-core` library tests (`cargo test -p layercake-core --lib`).
 
 1. **Audit current modules** (1 day)
    - Categorise each `src/` module as: Core / Server / CLI / Shared

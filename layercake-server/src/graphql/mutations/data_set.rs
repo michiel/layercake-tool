@@ -26,6 +26,7 @@ impl DataSetMutation {
         input: CreateDataSetInput,
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let file_bytes = base64::engine::general_purpose::STANDARD
             .decode(&input.file_content)
@@ -35,7 +36,7 @@ impl DataSetMutation {
 
         let summary = context
             .app
-            .create_data_set_from_file(DataSetFileCreateRequest {
+            .create_data_set_from_file(&actor, DataSetFileCreateRequest {
                 project_id: input.project_id,
                 name: input.name,
                 description: input.description,
@@ -45,7 +46,7 @@ impl DataSetMutation {
                 file_bytes,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_data_set_from_file", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -57,15 +58,16 @@ impl DataSetMutation {
         input: CreateEmptyDataSetInput,
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let summary = context
             .app
-            .create_empty_data_set(DataSetEmptyCreateRequest {
+            .create_empty_data_set(&actor, DataSetEmptyCreateRequest {
                 project_id: input.project_id,
                 name: input.name,
                 description: input.description,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_empty_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -78,6 +80,7 @@ impl DataSetMutation {
         files: Vec<BulkUploadDataSetInput>,
     ) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let mut uploads = Vec::with_capacity(files.len());
         for file_input in files {
@@ -100,9 +103,9 @@ impl DataSetMutation {
 
         let summaries = context
             .app
-            .bulk_upload_data_sets(project_id, uploads)
+            .bulk_upload_data_sets(&actor, project_id, uploads)
             .await
-            .map_err(|e| StructuredError::service("AppContext::bulk_upload_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(summaries.into_iter().map(DataSet::from).collect())
     }
@@ -115,6 +118,7 @@ impl DataSetMutation {
         input: UpdateDataSetInput,
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let new_file = if let Some(file_content_b64) = &input.file_content {
             let file_bytes = base64::engine::general_purpose::STANDARD
@@ -139,14 +143,14 @@ impl DataSetMutation {
 
         let summary = context
             .app
-            .update_data_set(DataSetUpdateRequest {
+            .update_data_set(&actor, DataSetUpdateRequest {
                 id,
                 name: input.name,
                 description: input.description,
                 new_file,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -154,11 +158,12 @@ impl DataSetMutation {
     /// Delete DataSet
     async fn delete_data_set(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         context
             .app
-            .delete_data_set(id)
+            .delete_data_set(&actor, id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -166,11 +171,12 @@ impl DataSetMutation {
     /// Reprocess existing DataSet file
     async fn reprocess_data_set(&self, ctx: &Context<'_>, id: i32) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let summary = context
             .app
-            .reprocess_data_set(id)
+            .reprocess_data_set(&actor, id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::reprocess_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -183,11 +189,12 @@ impl DataSetMutation {
         graph_json: String,
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let summary = context
             .app
-            .update_data_set_graph_json(id, graph_json)
+            .update_data_set_graph_json(&actor, id, graph_json)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_data_set_graph_json", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -282,10 +289,12 @@ impl DataSetMutation {
         input: MergeDataSetsInput,
     ) -> Result<DataSet> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let summary = context
             .app
             .merge_data_sets(
+                &actor,
                 input.project_id,
                 input.data_set_ids,
                 input.name,
@@ -293,7 +302,7 @@ impl DataSetMutation {
                 input.delete_merged,
             )
             .await
-            .map_err(|e| StructuredError::service("AppContext::merge_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSet::from(summary))
     }

@@ -870,7 +870,7 @@ impl AppContext {
                 .await?;
         } else {
             let plan = self
-                .create_plan(PlanCreateRequest {
+                .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
                     project_id: project.id,
                     name: if manifest.plan_name.trim().is_empty() {
                         format!("{} Plan", desired_name)
@@ -1037,7 +1037,7 @@ impl AppContext {
         .map_err(|e| anyhow!("Failed to create project from template: {}", e))?;
 
         let plan = self
-            .create_plan(PlanCreateRequest {
+            .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
                 project_id: project.id,
                 name: if manifest.plan_name.trim().is_empty() {
                     format!("{} Plan", desired_name)
@@ -1452,7 +1452,7 @@ impl AppContext {
             let path = format!("plans/{}", entry.filename);
             let plan_file: ExportedPlanFile = read_template_json(archive, &path)?;
             let plan = self
-                .create_plan(PlanCreateRequest {
+                .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
                     project_id,
                     name: plan_file.metadata.name.clone(),
                     description: plan_file.metadata.description.clone(),

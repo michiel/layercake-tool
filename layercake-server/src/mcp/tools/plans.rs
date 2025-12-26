@@ -232,7 +232,7 @@ pub async fn create_plan(arguments: Option<Value>, app: &AppContext) -> McpResul
     };
 
     let plan = app
-        .create_plan(request)
+        .create_plan(&layercake_core::auth::SystemActor::internal(), request)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to create plan: {}", e),
@@ -285,7 +285,7 @@ pub async fn update_plan(arguments: Option<Value>, app: &AppContext) -> McpResul
     };
 
     let plan = app
-        .update_plan(plan_id, update)
+        .update_plan(&layercake_core::auth::SystemActor::internal(), plan_id, update)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to update plan: {}", e),
@@ -327,7 +327,7 @@ pub async fn delete_plan(arguments: Option<Value>, app: &AppContext) -> McpResul
             message: "Plan ID must be a number".to_string(),
         })? as i32;
 
-    app.delete_plan(plan_id)
+    app.delete_plan(&layercake_core::auth::SystemActor::internal(), plan_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete plan: {}", e),
@@ -382,6 +382,7 @@ pub async fn execute_plan(
 
     // Update status to running
     app.update_plan(
+        &layercake_core::auth::SystemActor::internal(),
         plan_id,
         PlanUpdateRequest {
             name: None,
@@ -414,6 +415,7 @@ pub async fn execute_plan(
 
     // Update status based on execution result
     app.update_plan(
+        &layercake_core::auth::SystemActor::internal(),
         plan_id,
         PlanUpdateRequest {
             name: None,

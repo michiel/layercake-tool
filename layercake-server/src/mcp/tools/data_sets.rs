@@ -303,7 +303,9 @@ pub async fn create_data_set_from_file(
         })?;
 
     let summary = app
-        .create_data_set_from_file(DataSetFileCreateRequest {
+        .create_data_set_from_file(
+            &layercake_core::auth::SystemActor::internal(),
+            DataSetFileCreateRequest {
             project_id,
             name,
             description,
@@ -350,7 +352,9 @@ pub async fn create_empty_data_set(
         .map(str::to_string);
 
     let summary = app
-        .create_empty_data_set(DataSetEmptyCreateRequest {
+        .create_empty_data_set(
+            &layercake_core::auth::SystemActor::internal(),
+            DataSetEmptyCreateRequest {
             project_id,
             name,
             description,
@@ -425,7 +429,9 @@ pub async fn update_data_set(
     };
 
     let summary = app
-        .update_data_set(DataSetUpdateRequest {
+        .update_data_set(
+            &layercake_core::auth::SystemActor::internal(),
+            DataSetUpdateRequest {
             id: data_set_id,
             name,
             description,
@@ -452,7 +458,7 @@ pub async fn delete_data_set(
             message: "data_set_id must be an integer".to_string(),
         })? as i32;
 
-    app.delete_data_set(data_set_id)
+    app.delete_data_set(&layercake_core::auth::SystemActor::internal(), data_set_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to delete data source: {}", e),
@@ -475,7 +481,7 @@ pub async fn reprocess_data_set(
         })? as i32;
 
     let summary = app
-        .reprocess_data_set(data_set_id)
+        .reprocess_data_set(&layercake_core::auth::SystemActor::internal(), data_set_id)
         .await
         .map_err(|e| McpError::Internal {
             message: format!("Failed to reprocess data source: {}", e),

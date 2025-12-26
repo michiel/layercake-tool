@@ -157,37 +157,6 @@ export const getRequiredInputCount = (nodeType: PlanDagNodeType): number => {
 }
 
 /**
- * Gets the display color for a node type
- */
-/**
- * Get node type color (DEPRECATED: Use getNodeColor from nodeStyles.ts instead)
- * Kept for backward compatibility
- */
-export const getNodeTypeColor = (nodeType: PlanDagNodeType): string => {
-  switch (nodeType) {
-    case PlanDagNodeType.DATA_SOURCE:
-      return '#10b981' // Emerald-500
-    case PlanDagNodeType.GRAPH:
-      return '#3b82f6' // Blue-500
-    case PlanDagNodeType.TRANSFORM:
-    case PlanDagNodeType.FILTER:
-    case PlanDagNodeType.MERGE:
-      return '#8b5cf6' // Violet-500
-    case PlanDagNodeType.GRAPH_ARTEFACT:
-    case PlanDagNodeType.SEQUENCE_ARTEFACT:
-      return '#f59e0b' // Amber-500
-    case PlanDagNodeType.TREE_ARTEFACT:
-      return '#845ef7' // Purple
-    case PlanDagNodeType.PROJECTION:
-      return '#f97316' // Orange-500
-    case PlanDagNodeType.STORY:
-      return '#3b82f6' // Blue-500
-    default:
-      return '#868e96' // Gray
-  }
-}
-
-/**
  * Gets the display icon for a node type
  */
 export const getNodeTypeIcon = (nodeType: PlanDagNodeType): string => {

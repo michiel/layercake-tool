@@ -16,6 +16,7 @@ impl PlanMutation {
     /// Create a new plan
     async fn create_plan(&self, ctx: &Context<'_>, input: CreatePlanInput) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let request = PlanCreateRequest {
             project_id: input.project_id,
@@ -29,9 +30,9 @@ impl PlanMutation {
 
         let summary = context
             .app
-            .create_plan(request)
+            .create_plan(&actor, request)
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_plan", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(Plan::from(summary))
     }
 
@@ -43,6 +44,7 @@ impl PlanMutation {
         input: UpdatePlanInput,
     ) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let UpdatePlanInput {
             name,
@@ -65,21 +67,22 @@ impl PlanMutation {
 
         let summary = context
             .app
-            .update_plan(id, update)
+            .update_plan(&actor, id, update)
             .await
-            .map_err(|e| StructuredError::service("AppContext::update_plan", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(Plan::from(summary))
     }
 
     /// Delete a plan
     async fn delete_plan(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         context
             .app
-            .delete_plan(id)
+            .delete_plan(&actor, id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_plan", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
