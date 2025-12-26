@@ -808,6 +808,8 @@ After refactoring, support multiple deployment modes:
 - Removed MCP HTTP routes from server app (`layercake-server/src/server/app.rs`, `layercake-server/src/server/mod.rs`).
 - Updated story import/export operations to accept Actor/CoreError and wired GraphQL story mutations (`layercake-core/src/app_context/story_operations.rs`, `layercake-server/src/graphql/mutations/story.rs`).
 - Updated preview export operations to accept Actor/CoreError and wired MCP tool (`layercake-core/src/app_context/preview_operations.rs`, `layercake-server/src/mcp/tools/graph_data.rs`).
+- Converted `PlanService` to `CoreResult` and propagated through plan operations and Plan DAG loader (`layercake-core/src/services/plan_service.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-core/src/app_context/plan_dag_operations.rs`), with GraphQL mapping updates (`layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/plan.rs`, `layercake-server/src/graphql/types/project.rs`).
+- Converted DataSet listing/validation operations to `CoreResult` and updated GraphQL mappings (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/data_set.rs`, `layercake-server/src/graphql/mutations/graph.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

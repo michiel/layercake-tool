@@ -14,26 +14,36 @@ use crate::auth::Actor;
 use crate::errors::{CoreError, CoreResult};
 
 impl AppContext {
-    pub async fn list_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
+    pub async fn list_data_sets(&self, project_id: i32) -> CoreResult<Vec<DataSetSummary>> {
         let data_sets = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .order_by_asc(data_sets::Column::Name)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list data sets for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to list data sets for project {}: {}",
+                    project_id, e
+                ))
+            })?;
 
         Ok(data_sets.into_iter().map(DataSetSummary::from).collect())
     }
 
-    pub async fn available_data_sets(&self, project_id: i32) -> Result<Vec<DataSetSummary>> {
+    pub async fn available_data_sets(
+        &self,
+        project_id: i32,
+    ) -> CoreResult<Vec<DataSetSummary>> {
         self.list_data_sets(project_id).await
     }
 
-    pub async fn get_data_set(&self, id: i32) -> Result<Option<DataSetSummary>> {
+    pub async fn get_data_set(&self, id: i32) -> CoreResult<Option<DataSetSummary>> {
         let data_set = data_sets::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load data set {}: {}", id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load data set {}: {}", id, e))
+            })?;
 
         Ok(data_set.map(DataSetSummary::from))
     }
@@ -177,18 +187,20 @@ impl AppContext {
         Ok(DataSetSummary::from(model))
     }
 
-    pub async fn validate_data_set(&self, id: i32) -> Result<DataSetValidationSummary> {
+    pub async fn validate_data_set(&self, id: i32) -> CoreResult<DataSetValidationSummary> {
         self.data_set_service
             .validate(id)
             .await
-            .map_err(|e| anyhow!("Failed to validate data set {}: {}", id, e))
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to validate data set {}: {}", id, e))
+            })
     }
 
-    pub async fn validate_graph(&self, graph_id: i32) -> Result<GraphValidationSummary> {
+    pub async fn validate_graph(&self, graph_id: i32) -> CoreResult<GraphValidationSummary> {
         self.graph_service
             .validate_graph(graph_id)
             .await
-            .map_err(|e| anyhow!("Failed to validate graph {}: {}", graph_id, e))
+            .map_err(|e| CoreError::internal(format!("Failed to validate graph {}: {}", graph_id, e)))
     }
 
     pub async fn delete_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
@@ -219,7 +231,7 @@ impl AppContext {
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load data sets for merging: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load data sets for merging: {}", e)))?;
 
         if models.len() != data_set_ids.len() {
             return Err(CoreError::validation(format!(
@@ -251,7 +263,7 @@ impl AppContext {
             .data_set_service
             .update_graph_data(summary.id, merged_json)
             .await
-            .map_err(|e| anyhow!("Failed to update merged data set: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update merged data set: {}", e)))?;
 
         // Delete source datasets if requested
         if delete_merged {

@@ -197,7 +197,7 @@ impl Query {
             .app
             .list_data_sets(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         let total_datasets = datasets.len() as i32;
         let mut by_type = std::collections::HashMap::new();
@@ -240,7 +240,7 @@ impl Query {
             .app
             .get_plan(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::get_plan", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(plan.map(Plan::from))
     }
@@ -252,7 +252,7 @@ impl Query {
             .app
             .list_plans(Some(project_id))
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_plans", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(plans.into_iter().map(Plan::from).collect())
     }
@@ -413,7 +413,7 @@ impl Query {
             .app
             .load_plan_dag(project_id, plan_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::load_plan_dag", e))?
+            .map_err(StructuredError::from_core_error)?
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         Ok(Some(PlanDag::from(snapshot)))
@@ -706,7 +706,7 @@ impl Query {
             .app
             .get_data_set(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::get_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(summary.map(DataSet::from))
     }
@@ -718,7 +718,7 @@ impl Query {
             .app
             .list_data_sets(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(summaries.into_iter().map(DataSet::from).collect())
     }
@@ -863,7 +863,7 @@ impl Query {
             .app
             .available_data_sets(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::available_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(summaries.into_iter().map(DataSetReference::from).collect())
     }

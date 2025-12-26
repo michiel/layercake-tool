@@ -60,7 +60,7 @@ impl Project {
             .app
             .get_plan_for_project(self.id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::get_plan_for_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(plan.map(Plan::from))
     }

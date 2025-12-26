@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -7,6 +6,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
+use crate::errors::{CoreError, CoreResult};
 
 #[derive(Clone)]
 pub struct PlanService {
@@ -40,12 +40,14 @@ impl PlanService {
         Self { db }
     }
 
-    fn serialize_dependencies(dependencies: Option<Vec<i32>>) -> Result<Option<String>> {
+    fn serialize_dependencies(dependencies: Option<Vec<i32>>) -> CoreResult<Option<String>> {
         match dependencies {
             Some(values) => {
-                Ok(Some(serde_json::to_string(&values).map_err(|e| {
-                    anyhow!("Invalid plan dependencies: {}", e)
-                })?))
+                Ok(Some(
+                    serde_json::to_string(&values).map_err(|e| {
+                        CoreError::validation(format!("Invalid plan dependencies: {}", e))
+                    })?,
+                ))
             }
             None => Ok(None),
         }
@@ -89,39 +91,51 @@ impl PlanService {
         format!("edge_{}", short_uuid)
     }
 
-    pub async fn list_plans(&self, project_id: i32) -> Result<Vec<plans::Model>> {
+    pub async fn list_plans(&self, project_id: i32) -> CoreResult<Vec<plans::Model>> {
         let plans = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .order_by_desc(plans::Column::UpdatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list plans for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to list plans for project {}: {}",
+                    project_id, e
+                ))
+            })?;
 
         Ok(plans)
     }
 
-    pub async fn get_plan(&self, id: i32) -> Result<Option<plans::Model>> {
+    pub async fn get_plan(&self, id: i32) -> CoreResult<Option<plans::Model>> {
         let plan = plans::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load plan {}: {}", id, e))
+            })?;
 
         Ok(plan)
     }
 
-    pub async fn get_default_plan(&self, project_id: i32) -> Result<Option<plans::Model>> {
+    pub async fn get_default_plan(&self, project_id: i32) -> CoreResult<Option<plans::Model>> {
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .order_by_desc(plans::Column::UpdatedAt)
             .order_by_desc(plans::Column::Id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to load plan for project {}: {}",
+                    project_id, e
+                ))
+            })?;
 
         Ok(plan)
     }
 
-    pub async fn create_plan(&self, request: PlanCreateRequest) -> Result<plans::Model> {
+    pub async fn create_plan(&self, request: PlanCreateRequest) -> CoreResult<plans::Model> {
         let dependencies_json = Self::serialize_dependencies(request.dependencies)?;
         let tags_json = Self::serialize_tags(request.tags);
         let description = Self::normalize_description(request.description);
@@ -144,17 +158,21 @@ impl PlanService {
         let created = plan
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create plan: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create plan: {}", e)))?;
 
         Ok(created)
     }
 
-    pub async fn update_plan(&self, id: i32, request: PlanUpdateRequest) -> Result<plans::Model> {
+    pub async fn update_plan(
+        &self,
+        id: i32,
+        request: PlanUpdateRequest,
+    ) -> CoreResult<plans::Model> {
         let plan = plans::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?
-            .ok_or_else(|| anyhow!("Plan {} not found", id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan {}: {}", id, e)))?
+            .ok_or_else(|| CoreError::not_found("Plan", id.to_string()))?;
 
         let mut active: plans::ActiveModel = plan.into();
 
@@ -187,50 +205,70 @@ impl PlanService {
         let updated = active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update plan {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update plan {}: {}", id, e)))?;
 
         Ok(updated)
     }
 
-    pub async fn delete_plan(&self, id: i32) -> Result<()> {
-        let txn = self.db.begin().await?;
+    pub async fn delete_plan(&self, id: i32) -> CoreResult<()> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to begin transaction: {}", e)))?;
 
         let plan = plans::Entity::find_by_id(id)
             .one(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?
-            .ok_or_else(|| anyhow!("Plan {} not found", id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan {}: {}", id, e)))?
+            .ok_or_else(|| CoreError::not_found("Plan", id.to_string()))?;
 
         plan_dag_nodes::Entity::delete_many()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .exec(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to delete plan nodes for plan {}: {}", id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to delete plan nodes for plan {}: {}",
+                    id, e
+                ))
+            })?;
 
         plan_dag_edges::Entity::delete_many()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .exec(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to delete plan edges for plan {}: {}", id, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to delete plan edges for plan {}: {}",
+                    id, e
+                ))
+            })?;
 
         plans::Entity::delete_by_id(plan.id)
             .exec(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to delete plan {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete plan {}: {}", id, e)))?;
 
-        txn.commit().await?;
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to commit transaction: {}", e)))?;
 
         Ok(())
     }
 
-    pub async fn duplicate_plan(&self, id: i32, new_name: String) -> Result<plans::Model> {
-        let txn = self.db.begin().await?;
+    pub async fn duplicate_plan(&self, id: i32, new_name: String) -> CoreResult<plans::Model> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to begin transaction: {}", e)))?;
 
         let plan = plans::Entity::find_by_id(id)
             .one(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to load plan {}: {}", id, e))?
-            .ok_or_else(|| anyhow!("Plan {} not found", id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan {}: {}", id, e)))?
+            .ok_or_else(|| CoreError::not_found("Plan", id.to_string()))?;
 
         let now = Utc::now();
 
@@ -249,13 +287,15 @@ impl PlanService {
         }
         .insert(&txn)
         .await
-        .map_err(|e| anyhow!("Failed to duplicate plan {}: {}", id, e))?;
+        .map_err(|e| CoreError::internal(format!("Failed to duplicate plan {}: {}", id, e)))?;
 
         let nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to load plan nodes for duplication: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load plan nodes for duplication: {}", e))
+            })?;
 
         let mut id_map = std::collections::HashMap::new();
 
@@ -280,14 +320,18 @@ impl PlanService {
             duplicate_node
                 .insert(&txn)
                 .await
-                .map_err(|e| anyhow!("Failed to copy node {}: {}", node.id, e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to copy node {}: {}", node.id, e))
+                })?;
         }
 
         let edges = plan_dag_edges::Entity::find()
             .filter(plan_dag_edges::Column::PlanId.eq(plan.id))
             .all(&txn)
             .await
-            .map_err(|e| anyhow!("Failed to load plan edges for duplication: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load plan edges for duplication: {}", e))
+            })?;
 
         for edge in edges {
             let new_edge = plan_dag_edges::ActiveModel {
@@ -309,15 +353,19 @@ impl PlanService {
             new_edge
                 .insert(&txn)
                 .await
-                .map_err(|e| anyhow!("Failed to copy edge {}: {}", edge.id, e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to copy edge {}: {}", edge.id, e))
+                })?;
         }
 
-        txn.commit().await?;
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to commit transaction: {}", e)))?;
 
         Ok(duplicated_plan)
     }
 
-    pub async fn ensure_default_plan(&self, project_id: i32) -> Result<plans::Model> {
+    pub async fn ensure_default_plan(&self, project_id: i32) -> CoreResult<plans::Model> {
         if let Some(plan) = self.get_default_plan(project_id).await? {
             return Ok(plan);
         }

@@ -96,7 +96,7 @@ impl GraphMutation {
             .app
             .validate_graph(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::validate_graph", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(GraphValidationResult::from(summary))
     }

@@ -210,7 +210,7 @@ impl DataSetMutation {
             .app
             .validate_data_set(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::validate_data_set", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(DataSetValidationResult::from(summary))
     }

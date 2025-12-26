@@ -102,7 +102,7 @@ impl PlanMutation {
             let plan = plan_service
                 .get_plan(plan_id)
                 .await
-                .map_err(|e| StructuredError::service("PlanService::get_plan", e))?
+                .map_err(StructuredError::from_core_error)?
                 .ok_or_else(|| StructuredError::not_found("Plan", plan_id))?;
 
             if plan.project_id != project_id {
@@ -117,7 +117,7 @@ impl PlanMutation {
             plan_service
                 .get_default_plan(project_id)
                 .await
-                .map_err(|e| StructuredError::service("PlanService::get_default_plan", e))?
+                .map_err(StructuredError::from_core_error)?
                 .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?
         };
 
@@ -172,7 +172,7 @@ impl PlanMutation {
             .app
             .duplicate_plan(id, name)
             .await
-            .map_err(|e| StructuredError::service("AppContext::duplicate_plan", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Plan::from(summary))
     }

@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use sea_orm::EntityTrait;
 use serde_json::Value;
 use uuid::Uuid;
@@ -48,7 +47,7 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
 fn generate_node_id(
     node_type: &PlanDagNodeType,
     _existing_nodes: &[PlanDagNode],
-) -> Result<String> {
+) -> String {
     // Generate a globally unique ID using UUID to prevent collisions across projects/plans
     // Format: <node_type_prefix>_<uuid>
     let prefix = node_type_prefix(node_type);
@@ -57,7 +56,7 @@ fn generate_node_id(
     // Use first 12 characters of UUID for readability
     let short_uuid = uuid.chars().take(12).collect::<String>();
 
-    Ok(format!("{}_{}", prefix, short_uuid))
+    format!("{}_{}", prefix, short_uuid)
 }
 
 fn generate_edge_id(_source: &str, _target: &str) -> String {
@@ -77,11 +76,13 @@ impl AppContext {
         &self,
         project_id: i32,
         plan_id: Option<i32>,
-    ) -> Result<Option<PlanDagSnapshot>> {
+    ) -> CoreResult<Option<PlanDagSnapshot>> {
         let project = match projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
+            })?
         {
             Some(project) => project,
             None => return Ok(None),
@@ -93,7 +94,12 @@ impl AppContext {
                 .plan_service
                 .get_default_plan(project_id)
                 .await
-                .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?,
+                .map_err(|e| {
+                    CoreError::internal(format!(
+                        "Failed to load plan for project {}: {}",
+                        project_id, e
+                    ))
+                })?,
         };
 
         if let Some(plan) = plan {
@@ -101,12 +107,12 @@ impl AppContext {
                 .plan_dag_service
                 .get_nodes(project_id, Some(plan.id))
                 .await
-                .map_err(|e| anyhow!("Failed to load Plan DAG nodes: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to load Plan DAG nodes: {}", e)))?;
             let edges = self
                 .plan_dag_service
                 .get_edges(project_id, Some(plan.id))
                 .await
-                .map_err(|e| anyhow!("Failed to load Plan DAG edges: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Failed to load Plan DAG edges: {}", e)))?;
 
             for idx in 0..nodes.len() {
                 let node_type = nodes[idx].node_type;
@@ -124,7 +130,10 @@ impl AppContext {
                                     .one(&self.db)
                                     .await
                                     .map_err(|e| {
-                                        anyhow!("Failed to load data set {}: {}", data_set_id, e)
+                                        CoreError::internal(format!(
+                                            "Failed to load data set {}: {}",
+                                            data_set_id, e
+                                        ))
                                     })?
                                 {
                                     let execution_state = match data_set.status.as_str() {
@@ -228,8 +237,7 @@ impl AppContext {
             .await
             .unwrap_or_default();
 
-        let node_id = generate_node_id(&request.node_type, &existing_nodes)
-            .map_err(|e| CoreError::internal(e.to_string()))?;
+        let node_id = generate_node_id(&request.node_type, &existing_nodes);
         let node_type = node_type_storage_name(&request.node_type).to_string();
         let metadata_json = serde_json::to_string(&request.metadata)
             .map_err(|e| CoreError::validation(format!("Invalid node metadata: {}", e)))?;
