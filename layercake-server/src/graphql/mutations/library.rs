@@ -179,7 +179,7 @@ impl LibraryMutation {
             .app
             .export_project_as_template(project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_project_as_template", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(LibraryItem::from(item))
     }
@@ -196,7 +196,7 @@ impl LibraryMutation {
             .app
             .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_project_archive", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         let file_content = general_purpose::STANDARD.encode(archive.bytes);
         Ok(ExportProjectArchivePayload {
@@ -227,7 +227,7 @@ impl LibraryMutation {
             .app
             .import_project_archive(archive_bytes, name)
             .await
-            .map_err(|e| StructuredError::service("AppContext::import_project_archive", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }
@@ -253,7 +253,7 @@ impl LibraryMutation {
                 keep_connection.unwrap_or(false),
             )
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_project_to_directory", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -273,9 +273,7 @@ impl LibraryMutation {
             .app
             .import_project_from_directory(&source, name, keep_connection.unwrap_or(false))
             .await
-            .map_err(|e| {
-                StructuredError::service("AppContext::import_project_from_directory", e)
-            })?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }
@@ -291,9 +289,7 @@ impl LibraryMutation {
             .app
             .reimport_project_from_connection(project_id)
             .await
-            .map_err(|e| {
-                StructuredError::service("AppContext::reimport_project_from_connection", e)
-            })?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }
@@ -310,9 +306,7 @@ impl LibraryMutation {
             .app
             .reexport_project_to_connection(project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(|e| {
-                StructuredError::service("AppContext::reexport_project_to_connection", e)
-            })?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -332,7 +326,7 @@ impl LibraryMutation {
             .app
             .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_project_archive", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         // Get project name before deletion
         let projects = context
@@ -358,7 +352,7 @@ impl LibraryMutation {
             .app
             .import_project_archive(archive.bytes, Some(project_name))
             .await
-            .map_err(|e| StructuredError::service("AppContext::import_project_archive", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(new_project))
     }
@@ -375,7 +369,7 @@ impl LibraryMutation {
             .app
             .create_project_from_library(library_item_id, name)
             .await
-            .map_err(|e| StructuredError::service("AppContext::create_project_from_library", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(Project::from(project))
     }

@@ -27,6 +27,7 @@ use crate::services::data_set_service::DataSetService;
 use crate::services::library_item_service::{
     LibraryItemService, ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
+use crate::errors::{CoreError, CoreResult};
 use crate::services::plan_service::PlanCreateRequest;
 use layercake_genai::entities::{
     file_tags as kb_file_tags, files as kb_files, kb_documents as kb_docs, tags as kb_tags,
@@ -482,34 +483,44 @@ impl AppContext {
     pub async fn export_project_as_template(
         &self,
         project_id: i32,
-    ) -> Result<library_items::Model> {
+    ) -> CoreResult<library_items::Model> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
+            })?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .order_by_desc(plans::Column::UpdatedAt)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} has no plan to export", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to load plan for project {}: {}",
+                    project_id, e
+                ))
+            })?
+            .ok_or_else(|| CoreError::not_found("Plan", project_id.to_string()))?;
 
         let snapshot = self
             .load_plan_dag(project_id, None)
             .await
-            .map_err(|e| anyhow!("Failed to load plan DAG: {}", e))?
-            .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan DAG: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDag", project_id.to_string()))?;
 
         let data_sets = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load data sets for template: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load data sets for template: {}", e))
+            })?;
 
-        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)?;
+        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)
+            .map_err(|e| CoreError::internal(format!("Failed to analyze data sets: {}", e)))?;
         let dataset_index = DatasetBundleIndex {
             datasets: dataset_records.clone(),
         };
@@ -531,17 +542,17 @@ impl AppContext {
         };
 
         let dag_bytes = serde_json::to_vec_pretty(&snapshot)
-            .map_err(|e| anyhow!("Failed to encode DAG snapshot: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode DAG snapshot: {}", e)))?;
         let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-            .map_err(|e| anyhow!("Failed to encode template manifest: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode template manifest: {}", e)))?;
         let project_bytes = serde_json::to_vec_pretty(&project_record)
-            .map_err(|e| anyhow!("Failed to encode project metadata: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode project metadata: {}", e)))?;
         let dataset_index_bytes = serde_json::to_vec_pretty(&dataset_index)
-            .map_err(|e| anyhow!("Failed to encode dataset index: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode dataset index: {}", e)))?;
         let metadata_bytes = serde_json::to_vec_pretty(&json!({
             "layercakeProjectFormatVersion": 1
         }))
-        .map_err(|e| anyhow!("Failed to encode metadata.json: {}", e))?;
+        .map_err(|e| CoreError::internal(format!("Failed to encode metadata.json: {}", e)))?;
 
         let mut cursor = Cursor::new(Vec::new());
         {
@@ -553,21 +564,28 @@ impl AppContext {
                 &project_bytes,
                 &dag_bytes,
                 &dataset_index_bytes,
-            )?;
+            )
+            .map_err(|e| CoreError::internal(format!("Failed to write bundle files: {}", e)))?;
             let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
 
             for descriptor in &dataset_records {
                 if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
                     zip.start_file(path, options)
-                        .map_err(|e| anyhow!("Failed to add dataset file: {}", e))?;
+                        .map_err(|e| {
+                            CoreError::internal(format!("Failed to add dataset file: {}", e))
+                        })?;
                     zip.write_all(graph_json.as_bytes())
-                        .map_err(|e| anyhow!("Failed to write dataset file: {}", e))?;
+                        .map_err(|e| {
+                            CoreError::internal(format!("Failed to write dataset file: {}", e))
+                        })?;
                 }
             }
 
             zip.finish()
-                .map_err(|e| anyhow!("Failed to finalize template archive: {}", e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to finalize template archive: {}", e))
+                })?;
         }
 
         let zip_bytes = cursor.into_inner();
@@ -595,7 +613,7 @@ impl AppContext {
                 zip_bytes,
             )
             .await
-            .map_err(|e| anyhow!("Failed to persist template: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to persist template: {}", e)))?;
 
         Ok(item)
     }
@@ -604,34 +622,44 @@ impl AppContext {
         &self,
         project_id: i32,
         include_knowledge_base: bool,
-    ) -> Result<ProjectArchiveFile> {
+    ) -> CoreResult<ProjectArchiveFile> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
+            })?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let plan = plans::Entity::find()
             .filter(plans::Column::ProjectId.eq(project_id))
             .order_by_desc(plans::Column::UpdatedAt)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load plan for project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} has no plan to export", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to load plan for project {}: {}",
+                    project_id, e
+                ))
+            })?
+            .ok_or_else(|| CoreError::not_found("Plan", project_id.to_string()))?;
 
         let snapshot = self
             .load_plan_dag(project_id, None)
             .await
-            .map_err(|e| anyhow!("Failed to load plan DAG: {}", e))?
-            .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan DAG: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDag", project_id.to_string()))?;
 
         let data_sets = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load data sets for export: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load data sets for export: {}", e))
+            })?;
 
-        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)?;
+        let (dataset_records, dataset_graphs) = analyze_data_sets(&data_sets)
+            .map_err(|e| CoreError::internal(format!("Failed to analyze data sets: {}", e)))?;
         let dataset_index = DatasetBundleIndex {
             datasets: dataset_records.clone(),
         };
@@ -653,28 +681,45 @@ impl AppContext {
         };
 
         let dag_bytes = serde_json::to_vec_pretty(&snapshot)
-            .map_err(|e| anyhow!("Failed to encode DAG snapshot: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode DAG snapshot: {}", e)))?;
         let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-            .map_err(|e| anyhow!("Failed to encode project export manifest: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to encode project export manifest: {}", e))
+            })?;
         let project_bytes = serde_json::to_vec_pretty(&project_record)
-            .map_err(|e| anyhow!("Failed to encode project metadata: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode project metadata: {}", e)))?;
         let dataset_index_bytes = serde_json::to_vec_pretty(&dataset_index)
-            .map_err(|e| anyhow!("Failed to encode dataset index: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to encode dataset index: {}", e)))?;
         let metadata_bytes = serde_json::to_vec_pretty(&json!({
             "layercakeProjectFormatVersion": 1
         }))
-        .map_err(|e| anyhow!("Failed to encode metadata.json: {}", e))?;
+        .map_err(|e| CoreError::internal(format!("Failed to encode metadata.json: {}", e)))?;
 
-        let mut additional_assets = self.collect_plan_assets(project_id).await?;
-        if let Some(asset) = self.collect_stories_asset(project_id).await? {
+        let mut additional_assets = self
+            .collect_plan_assets(project_id)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to collect plan assets: {}", e)))?;
+        if let Some(asset) = self
+            .collect_stories_asset(project_id)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to collect stories asset: {}", e)))?
+        {
             additional_assets.push(asset);
         }
-        if let Some(asset) = self.collect_palette_asset(project_id).await? {
+        if let Some(asset) = self
+            .collect_palette_asset(project_id)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to collect palette asset: {}", e)))?
+        {
             additional_assets.push(asset);
         }
         if include_knowledge_base {
             if let Some((index_asset, mut file_assets)) =
-                self.collect_knowledge_base_assets(project_id).await?
+                self.collect_knowledge_base_assets(project_id)
+                    .await
+                    .map_err(|e| {
+                        CoreError::internal(format!("Failed to collect knowledge base assets: {}", e))
+                    })?
             {
                 additional_assets.push(index_asset);
                 additional_assets.append(&mut file_assets);
@@ -691,28 +736,39 @@ impl AppContext {
                 &project_bytes,
                 &dag_bytes,
                 &dataset_index_bytes,
-            )?;
+            )
+            .map_err(|e| CoreError::internal(format!("Failed to write bundle files: {}", e)))?;
 
             let options = FileOptions::default().compression_method(CompressionMethod::Deflated);
             for descriptor in &dataset_records {
                 if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
                     zip.start_file(path, options)
-                        .map_err(|e| anyhow!("Failed to add dataset file: {}", e))?;
+                        .map_err(|e| {
+                            CoreError::internal(format!("Failed to add dataset file: {}", e))
+                        })?;
                     zip.write_all(graph_json.as_bytes())
-                        .map_err(|e| anyhow!("Failed to write dataset file: {}", e))?;
+                        .map_err(|e| {
+                            CoreError::internal(format!("Failed to write dataset file: {}", e))
+                        })?;
                 }
             }
 
             for asset in additional_assets {
                 zip.start_file(asset.path.clone(), options)
-                    .map_err(|e| anyhow!("Failed to add {}: {}", asset.path, e))?;
+                    .map_err(|e| {
+                        CoreError::internal(format!("Failed to add {}: {}", asset.path, e))
+                    })?;
                 zip.write_all(&asset.bytes)
-                    .map_err(|e| anyhow!("Failed to write {}: {}", asset.path, e))?;
+                    .map_err(|e| {
+                        CoreError::internal(format!("Failed to write {}: {}", asset.path, e))
+                    })?;
             }
 
             zip.finish()
-                .map_err(|e| anyhow!("Failed to finalize project archive: {}", e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to finalize project archive: {}", e))
+                })?;
         }
 
         let filename = format!(
@@ -732,26 +788,26 @@ impl AppContext {
         target_path: &Path,
         include_knowledge_base: bool,
         keep_connection: bool,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if !target_path.is_absolute() {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Export target must be an absolute path, got {:?}",
                 target_path
-            ));
+            )));
         }
 
         fs::create_dir_all(target_path).map_err(|e| {
-            anyhow!(
+            CoreError::internal(format!(
                 "Failed to ensure export directory {:?} exists: {}",
-                target_path,
-                e
-            )
+                target_path, e
+            ))
         })?;
 
         let archive = self
             .export_project_archive(project_id, include_knowledge_base)
             .await?;
-        write_archive_to_directory(&archive.bytes, target_path)?;
+        write_archive_to_directory(&archive.bytes, target_path)
+            .map_err(|e| CoreError::internal(format!("Failed to write archive: {}", e)))?;
 
         if keep_connection {
             let path_string = target_path
@@ -772,7 +828,7 @@ impl AppContext {
         &self,
         archive_bytes: Vec<u8>,
         project_name: Option<String>,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         self.import_project_archive_internal(archive_bytes, project_name, None, None)
             .await
     }
@@ -783,27 +839,40 @@ impl AppContext {
         project_name: Option<String>,
         target_project_id: Option<i32>,
         keep_connection_path: Option<String>,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         let mut archive = ZipArchive::new(Cursor::new(archive_bytes))
-            .map_err(|e| anyhow!("Failed to read project archive: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to read project archive: {}", e)))?;
 
-        let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")?;
-        let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")?;
-        let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")?;
+        let manifest: ProjectBundleManifest =
+            read_template_json(&mut archive, "manifest.json")
+                .map_err(|e| CoreError::internal(format!("Failed to read manifest.json: {}", e)))?;
+        let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read project.json: {}", e)))?;
+        let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read dag.json: {}", e)))?;
         let dataset_index: DatasetBundleIndex =
-            read_template_json(&mut archive, "datasets/index.json")?;
+            read_template_json(&mut archive, "datasets/index.json")
+                .map_err(|e| CoreError::internal(format!("Failed to read datasets index: {}", e)))?;
         let plans_index: Option<PlansIndex> =
-            try_read_template_json(&mut archive, "plans/index.json")?;
+            try_read_template_json(&mut archive, "plans/index.json")
+                .map_err(|e| CoreError::internal(format!("Failed to read plans index: {}", e)))?;
         let stories_export: Option<StoriesExport> =
-            try_read_template_json(&mut archive, "stories/stories.json")?;
+            try_read_template_json(&mut archive, "stories/stories.json").map_err(|e| {
+                CoreError::internal(format!("Failed to read stories export: {}", e))
+            })?;
         let palette_export: Option<PaletteExport> =
-            try_read_template_json(&mut archive, "layers/palette.json")?;
+            try_read_template_json(&mut archive, "layers/palette.json").map_err(|e| {
+                CoreError::internal(format!("Failed to read palette export: {}", e))
+            })?;
         let knowledge_base_index: Option<KnowledgeBaseIndex> =
-            try_read_template_json(&mut archive, "kb/index.json")?;
+            try_read_template_json(&mut archive, "kb/index.json")
+                .map_err(|e| CoreError::internal(format!("Failed to read KB index: {}", e)))?;
         let mut kb_file_blobs: HashMap<String, Vec<u8>> = HashMap::new();
         if let Some(index) = &knowledge_base_index {
             for file_entry in &index.files {
-                let bytes = read_zip_file_bytes(&mut archive, &file_entry.blob_path)?;
+                let bytes = read_zip_file_bytes(&mut archive, &file_entry.blob_path).map_err(
+                    |e| CoreError::internal(format!("Failed to read KB blob: {}", e)),
+                )?;
                 kb_file_blobs.insert(file_entry.id.clone(), bytes);
             }
         }
@@ -826,7 +895,9 @@ impl AppContext {
         let project = project_model
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create project from archive: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to create project from archive: {}", e))
+            })?;
 
         let dataset_service = DataSetService::new(self.db.clone());
         let mut id_map = HashMap::new();
@@ -836,10 +907,18 @@ impl AppContext {
             let file_bytes = {
                 let mut dataset_file = archive
                     .by_name(&dataset_path)
-                    .map_err(|e| anyhow!("Missing dataset file {}: {}", descriptor.filename, e))?;
+                    .map_err(|e| {
+                        CoreError::internal(format!(
+                            "Missing dataset file {}: {}",
+                            descriptor.filename, e
+                        ))
+                    })?;
                 let mut bytes = Vec::new();
                 dataset_file.read_to_end(&mut bytes).map_err(|e| {
-                    anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
+                    CoreError::internal(format!(
+                        "Failed to read dataset {}: {}",
+                        descriptor.filename, e
+                    ))
                 })?;
                 bytes
             };
@@ -857,19 +936,26 @@ impl AppContext {
                     None,
                 )
                 .await
-                .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!(
+                        "Failed to import dataset {}: {}",
+                        descriptor.name, e
+                    ))
+                })?;
 
             id_map.insert(descriptor.original_id, dataset.id);
         }
 
         if let Some(palette) = palette_export {
             self.import_palette_from_export(project.id, palette, &id_map)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to import palette: {}", e)))?;
         }
 
         if let Some(index) = plans_index {
             self.import_plans_from_export(project.id, index, &mut archive, &id_map)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to import plans: {}", e)))?;
         } else {
             let plan = self
                 .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
@@ -889,17 +975,21 @@ impl AppContext {
 
             insert_plan_dag_from_snapshot(&self.db, plan.id, &dag_snapshot, &id_map)
                 .await
-                .map_err(|e| anyhow!("Failed to recreate plan DAG: {}", e))?;
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to recreate plan DAG: {}", e))
+                })?;
         }
 
         if let Some(story_bundle) = stories_export {
             self.import_stories_from_export(project.id, story_bundle, &id_map)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to import stories: {}", e)))?;
         }
 
         if let Some(kb_index) = knowledge_base_index {
             self.import_knowledge_base_from_export(project.id, kb_index, kb_file_blobs)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to import knowledge base: {}", e)))?;
         }
 
         Ok(ProjectSummary::from(project))
@@ -910,20 +1000,23 @@ impl AppContext {
         source_path: &Path,
         project_name: Option<String>,
         keep_connection: bool,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         if !source_path.is_absolute() {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Import source must be an absolute path, got {:?}",
                 source_path
-            ));
+            )));
         }
 
-        let archive_bytes = archive_directory(source_path)?;
+        let archive_bytes = archive_directory(source_path)
+            .map_err(|e| CoreError::internal(format!("Failed to archive directory: {}", e)))?;
         let path_string = if keep_connection {
             Some(
                 source_path
                     .to_str()
-                    .ok_or_else(|| anyhow!("Failed to serialize import path"))?
+                    .ok_or_else(|| {
+                        CoreError::internal("Failed to serialize import path".to_string())
+                    })?
                     .to_string(),
             )
         } else {
@@ -937,23 +1030,31 @@ impl AppContext {
     pub async fn reimport_project_from_connection(
         &self,
         project_id: i32,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
+            })?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let path = project
             .import_export_path
             .clone()
-            .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
+            .ok_or_else(|| {
+                CoreError::validation(format!(
+                    "Project {} has no connected import/export path",
+                    project_id
+                ))
+            })?;
 
         // Remove the existing project and re-import using the same ID
         self.delete_project(&crate::auth::SystemActor::internal(), project_id)
             .await?;
 
-        let archive_bytes = archive_directory(Path::new(&path))?;
+        let archive_bytes = archive_directory(Path::new(&path))
+            .map_err(|e| CoreError::internal(format!("Failed to archive directory: {}", e)))?;
         self.import_project_archive_internal(
             archive_bytes,
             Some(project.name),
@@ -967,17 +1068,24 @@ impl AppContext {
         &self,
         project_id: i32,
         include_knowledge_base: bool,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", project_id, e))?
-            .ok_or_else(|| anyhow!("Project {} not found", project_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
+            })?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let path = project
             .import_export_path
             .clone()
-            .ok_or_else(|| anyhow!("Project {} has no connected import/export path", project_id))?;
+            .ok_or_else(|| {
+                CoreError::validation(format!(
+                    "Project {} has no connected import/export path",
+                    project_id
+                ))
+            })?;
 
         self.export_project_to_directory(
             project_id,
@@ -992,35 +1100,43 @@ impl AppContext {
         &self,
         library_item_id: i32,
         project_name: Option<String>,
-    ) -> Result<ProjectSummary> {
+    ) -> CoreResult<ProjectSummary> {
         let service = LibraryItemService::new(self.db.clone());
         let item = service
             .get(library_item_id)
             .await
-            .map_err(|e| anyhow!("Failed to load library item {}: {}", library_item_id, e))?
-            .ok_or_else(|| anyhow!("Library item {} not found", library_item_id))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to load library item {}: {}",
+                    library_item_id, e
+                ))
+            })?
+            .ok_or_else(|| CoreError::not_found("LibraryItem", library_item_id.to_string()))?;
 
         if item.item_type != ITEM_TYPE_PROJECT && item.item_type != ITEM_TYPE_PROJECT_TEMPLATE {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Library item {} is type {}, expected project or project_template",
-                library_item_id,
-                item.item_type
-            ));
+                library_item_id, item.item_type
+            )));
         }
 
         let mut archive = ZipArchive::new(Cursor::new(item.content_blob.clone())).map_err(|e| {
-            anyhow!(
+            CoreError::internal(format!(
                 "Failed to read template archive for library item {}: {}",
-                library_item_id,
-                e
-            )
+                library_item_id, e
+            ))
         })?;
 
-        let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")?;
-        let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")?;
-        let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")?;
+        let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read manifest.json: {}", e)))?;
+        let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read project.json: {}", e)))?;
+        let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read dag.json: {}", e)))?;
         let dataset_index: DatasetBundleIndex =
-            read_template_json(&mut archive, "datasets/index.json")?;
+            read_template_json(&mut archive, "datasets/index.json").map_err(|e| {
+                CoreError::internal(format!("Failed to read datasets index: {}", e))
+            })?;
 
         let tags = project_record.tags.clone();
         let desired_name = project_name.unwrap_or(project_record.name.clone());
@@ -1036,7 +1152,9 @@ impl AppContext {
         }
         .insert(&self.db)
         .await
-        .map_err(|e| anyhow!("Failed to create project from template: {}", e))?;
+        .map_err(|e| {
+            CoreError::internal(format!("Failed to create project from template: {}", e))
+        })?;
 
         let plan = self
             .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
@@ -1073,11 +1191,17 @@ impl AppContext {
                 let dataset_path = format!("datasets/{}", descriptor.filename);
                 let file_bytes = {
                     let mut dataset_file = archive.by_name(&dataset_path).map_err(|e| {
-                        anyhow!("Missing dataset file {}: {}", descriptor.filename, e)
+                        CoreError::internal(format!(
+                            "Missing dataset file {}: {}",
+                            descriptor.filename, e
+                        ))
                     })?;
                     let mut bytes = Vec::new();
                     dataset_file.read_to_end(&mut bytes).map_err(|e| {
-                        anyhow!("Failed to read dataset {}: {}", descriptor.filename, e)
+                        CoreError::internal(format!(
+                            "Failed to read dataset {}: {}",
+                            descriptor.filename, e
+                        ))
                     })?;
                     bytes
                 };
@@ -1096,14 +1220,19 @@ impl AppContext {
                     )
                     .await
             }
-            .map_err(|e| anyhow!("Failed to import dataset {}: {}", descriptor.name, e))?;
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to import dataset {}: {}",
+                    descriptor.name, e
+                ))
+            })?;
 
             id_map.insert(descriptor.original_id, dataset.id);
         }
 
         insert_plan_dag_from_snapshot(&self.db, plan.id, &dag_snapshot, &id_map)
             .await
-            .map_err(|e| anyhow!("Failed to recreate plan DAG: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to recreate plan DAG: {}", e)))?;
 
         Ok(ProjectSummary::from(project))
     }

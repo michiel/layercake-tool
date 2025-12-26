@@ -813,6 +813,8 @@ After refactoring, support multiple deployment modes:
 - Converted project list/get operations to `CoreResult` and updated GraphQL mappings and library call sites (`layercake-core/src/app_context/project_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-core/src/app_context/library_operations.rs`).
 - Converted graph edit/analysis helpers to `CoreResult` and updated GraphQL mapping (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_edit.rs`).
 - Converted data set import/export to `CoreResult` and updated GraphQL mapping (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-server/src/graphql/mutations/data_set.rs`).
+- Converted project library import/export operations to `CoreResult` and updated GraphQL mapping (`layercake-core/src/app_context/library_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`).
+- Converted `ProjectService` to `CoreResult` for create/update/delete/read and collaborator access (`layercake-core/src/services/project_service.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

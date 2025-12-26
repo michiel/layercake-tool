@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::database::entities::{project_collaborators, projects, users};
+use crate::errors::{CoreError, CoreResult};
 use crate::services::{AuthorizationService, ProjectRole, ValidationService};
 
 #[allow(dead_code)] // Project service reserved for future use
@@ -28,14 +28,14 @@ impl ProjectService {
         user_id: i32,
         name: &str,
         description: Option<&str>,
-    ) -> Result<projects::Model> {
+    ) -> CoreResult<projects::Model> {
         // Validate input
         let validated_name = ValidationService::validate_project_name(name)
-            .map_err(|e| anyhow!("Invalid project name: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid project name: {}", e)))?;
 
         let validated_description = if let Some(desc) = description {
             ValidationService::validate_project_description(desc)
-                .map_err(|e| anyhow!("Invalid project description: {}", e))?
+                .map_err(|e| CoreError::validation(format!("Invalid project description: {}", e)))?
         } else {
             String::new()
         };
@@ -52,7 +52,7 @@ impl ProjectService {
         let project = project
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create project: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create project: {}", e)))?;
 
         // Add creator as owner
         let collaboration = project_collaborators::ActiveModel {
@@ -70,7 +70,7 @@ impl ProjectService {
         collaboration
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to add project owner: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to add project owner: {}", e)))?;
 
         Ok(project)
     }
@@ -82,32 +82,33 @@ impl ProjectService {
         project_id: i32,
         name: Option<&str>,
         description: Option<&str>,
-    ) -> Result<projects::Model> {
+    ) -> CoreResult<projects::Model> {
         // Check write access
         self.auth_service
             .check_project_write_access(user_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Find project
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Project not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let mut active_project: projects::ActiveModel = project.into();
 
         // Update fields if provided
         if let Some(name) = name {
             let validated_name = ValidationService::validate_project_name(name)
-                .map_err(|e| anyhow!("Invalid project name: {}", e))?;
+                .map_err(|e| CoreError::validation(format!("Invalid project name: {}", e)))?;
             active_project.name = Set(validated_name);
         }
 
         if let Some(description) = description {
             let validated_description =
                 ValidationService::validate_project_description(description)
-                    .map_err(|e| anyhow!("Invalid project description: {}", e))?;
+                    .map_err(|e| CoreError::validation(format!("Invalid project description: {}", e)))?;
             active_project.description = Set(Some(validated_description));
         }
 
@@ -116,50 +117,56 @@ impl ProjectService {
         let updated_project = active_project
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update project: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update project: {}", e)))?;
 
         Ok(updated_project)
     }
 
     /// Delete a project (owner only)
-    pub async fn delete_project(&self, user_id: i32, project_id: i32) -> Result<()> {
+    pub async fn delete_project(&self, user_id: i32, project_id: i32) -> CoreResult<()> {
         // Check admin access
         self.auth_service
             .check_project_admin_access(user_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Delete project (cascading deletes should handle collaborators)
         let result = projects::Entity::delete_by_id(project_id)
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete project: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete project: {}", e)))?;
 
         if result.rows_affected == 0 {
-            return Err(anyhow!("Project not found"));
+            return Err(CoreError::not_found("Project", project_id.to_string()));
         }
 
         Ok(())
     }
 
     /// Get project by ID with access check
-    pub async fn get_project(&self, user_id: i32, project_id: i32) -> Result<projects::Model> {
+    pub async fn get_project(
+        &self,
+        user_id: i32,
+        project_id: i32,
+    ) -> CoreResult<projects::Model> {
         // Check read access
         self.auth_service
             .check_project_read_access(user_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Get project
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Project not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         Ok(project)
     }
 
     /// List projects for a user
-    pub async fn list_user_projects(&self, user_id: i32) -> Result<Vec<projects::Model>> {
+    pub async fn list_user_projects(&self, user_id: i32) -> CoreResult<Vec<projects::Model>> {
         // Get all project collaborations for the user
         let collaborations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
@@ -167,7 +174,7 @@ impl ProjectService {
             .filter(project_collaborators::Column::InvitationStatus.eq("accepted"))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let project_ids: Vec<i32> = collaborations.iter().map(|c| c.project_id).collect();
 
@@ -177,7 +184,7 @@ impl ProjectService {
             .order_by_desc(projects::Column::UpdatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(projects)
     }
@@ -187,11 +194,12 @@ impl ProjectService {
         &self,
         user_id: i32,
         project_id: i32,
-    ) -> Result<Vec<(project_collaborators::Model, users::Model)>> {
+    ) -> CoreResult<Vec<(project_collaborators::Model, users::Model)>> {
         // Check read access
         self.auth_service
             .check_project_read_access(user_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Get collaborators with user info
         let collaborators = project_collaborators::Entity::find()
@@ -200,7 +208,7 @@ impl ProjectService {
             .find_also_related(users::Entity)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let result: Vec<(project_collaborators::Model, users::Model)> = collaborators
             .into_iter()
@@ -225,10 +233,20 @@ impl ProjectService {
         &self,
         user_id: i32,
         project_id: i32,
-    ) -> Result<Option<ProjectRole>> {
+    ) -> CoreResult<Option<ProjectRole>> {
         self.auth_service
             .get_user_project_role(user_id, project_id)
             .await
+            .map_err(map_auth_error)
+    }
+}
+
+fn map_auth_error(err: anyhow::Error) -> CoreError {
+    let message = err.to_string();
+    if message.contains("Database error") {
+        CoreError::internal(message)
+    } else {
+        CoreError::forbidden(message)
     }
 }
 
