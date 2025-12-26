@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Result};
 use csv::ReaderBuilder;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::errors::{CoreError, CoreResult};
 use crate::graph::Graph;
 
 /// Shared routines for processing dataset files into graph JSON payloads
@@ -11,7 +11,7 @@ pub async fn process_file(
     file_format: &FileFormat,
     data_type: &DataType,
     file_data: &[u8],
-) -> Result<String> {
+) -> CoreResult<String> {
     match (file_format, data_type) {
         (FileFormat::Csv, DataType::Nodes) => process_delimited_nodes(file_data, b',').await,
         (FileFormat::Csv, DataType::Edges) => process_delimited_edges(file_data, b',').await,
@@ -20,18 +20,22 @@ pub async fn process_file(
         (FileFormat::Tsv, DataType::Edges) => process_delimited_edges(file_data, b'\t').await,
         (FileFormat::Tsv, DataType::Layers) => process_delimited_layers(file_data, b'\t').await,
         (FileFormat::Json, DataType::Graph) => process_json_graph(file_data).await,
-        _ => Err(anyhow!("Invalid format/type combination")),
+        _ => Err(CoreError::validation("Invalid format/type combination")),
     }
 }
 
-async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<String> {
-    let content = String::from_utf8(file_data.to_vec())?;
+async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> CoreResult<String> {
+    let content = String::from_utf8(file_data.to_vec()).map_err(|e| {
+        CoreError::validation(format!("Invalid UTF-8 data: {}", e))
+    })?;
     let mut reader = ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delimiter)
         .from_reader(content.as_bytes());
 
-    let headers = reader.headers()?.clone();
+    let headers = reader.headers().map_err(|e| {
+        CoreError::validation(format!("Failed to read CSV headers: {}", e))
+    })?.clone();
     let mut nodes = Vec::new();
 
     let parse_bool = |value: &str| {
@@ -40,11 +44,15 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
     };
 
     if !headers.iter().any(|h| h == "id") || !headers.iter().any(|h| h == "label") {
-        return Err(anyhow!("CSV must contain 'id' and 'label' columns"));
+        return Err(CoreError::validation(
+            "CSV must contain 'id' and 'label' columns",
+        ));
     }
 
     for result in reader.records() {
-        let record = result?;
+        let record = result.map_err(|e| {
+            CoreError::validation(format!("Failed to read CSV record: {}", e))
+        })?;
         let mut node = HashMap::new();
 
         for (i, field) in record.iter().enumerate() {
@@ -101,28 +109,40 @@ async fn process_delimited_nodes(file_data: &[u8], delimiter: u8) -> Result<Stri
         "layers": []
     });
 
-    sanitize_graph_json(serde_json::to_string(&graph_json)?)
+    let json = serde_json::to_string(&graph_json).map_err(|e| {
+        CoreError::internal("Failed to serialize graph JSON").with_source(e)
+    })?;
+    sanitize_graph_json(json)
 }
 
-async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> Result<String> {
-    let content = String::from_utf8(file_data.to_vec())?;
+async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> CoreResult<String> {
+    let content = String::from_utf8(file_data.to_vec()).map_err(|e| {
+        CoreError::validation(format!("Invalid UTF-8 data: {}", e))
+    })?;
     let mut reader = ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delimiter)
         .from_reader(content.as_bytes());
 
-    let headers = reader.headers()?.clone();
+    let headers = reader.headers().map_err(|e| {
+        CoreError::validation(format!("Failed to read CSV headers: {}", e))
+    })?.clone();
     let mut edges = Vec::new();
 
     let required_headers = ["id", "source", "target"];
     for required in &required_headers {
         if !headers.iter().any(|h| h == *required) {
-            return Err(anyhow!("CSV must contain '{}' column", required));
+            return Err(CoreError::validation(format!(
+                "CSV must contain '{}' column",
+                required
+            )));
         }
     }
 
     for result in reader.records() {
-        let record = result?;
+        let record = result.map_err(|e| {
+            CoreError::validation(format!("Failed to read CSV record: {}", e))
+        })?;
         let mut edge = HashMap::new();
 
         for (i, field) in record.iter().enumerate() {
@@ -161,28 +181,37 @@ async fn process_delimited_edges(file_data: &[u8], delimiter: u8) -> Result<Stri
         "layers": []
     });
 
-    sanitize_graph_json(serde_json::to_string(&graph_json)?)
+    let json = serde_json::to_string(&graph_json).map_err(|e| {
+        CoreError::internal("Failed to serialize graph JSON").with_source(e)
+    })?;
+    sanitize_graph_json(json)
 }
 
-async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> Result<String> {
-    let content = String::from_utf8(file_data.to_vec())?;
+async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> CoreResult<String> {
+    let content = String::from_utf8(file_data.to_vec()).map_err(|e| {
+        CoreError::validation(format!("Invalid UTF-8 data: {}", e))
+    })?;
     let mut reader = ReaderBuilder::new()
         .has_headers(true)
         .delimiter(delimiter)
         .from_reader(content.as_bytes());
 
-    let headers = reader.headers()?.clone();
+    let headers = reader.headers().map_err(|e| {
+        CoreError::validation(format!("Failed to read CSV headers: {}", e))
+    })?.clone();
     let mut layers = Vec::new();
 
     if !headers.iter().any(|h| h == "layer" || h == "id") {
-        return Err(anyhow!("CSV must contain 'layer' column"));
+        return Err(CoreError::validation("CSV must contain 'layer' column"));
     }
     if !headers.iter().any(|h| h == "label") {
-        return Err(anyhow!("CSV must contain 'label' column"));
+        return Err(CoreError::validation("CSV must contain 'label' column"));
     }
 
     for result in reader.records() {
-        let record = result?;
+        let record = result.map_err(|e| {
+            CoreError::validation(format!("Failed to read CSV record: {}", e))
+        })?;
         let mut layer = HashMap::new();
 
         for (i, field) in record.iter().enumerate() {
@@ -240,38 +269,55 @@ async fn process_delimited_layers(file_data: &[u8], delimiter: u8) -> Result<Str
         "layers": layers
     });
 
-    sanitize_graph_json(serde_json::to_string(&graph_json)?)
+    let json = serde_json::to_string(&graph_json).map_err(|e| {
+        CoreError::internal("Failed to serialize graph JSON").with_source(e)
+    })?;
+    sanitize_graph_json(json)
 }
 
-async fn process_json_graph(file_data: &[u8]) -> Result<String> {
-    let content = String::from_utf8(file_data.to_vec())?;
-    let graph_data: Value = serde_json::from_str(&content)?;
+async fn process_json_graph(file_data: &[u8]) -> CoreResult<String> {
+    let content = String::from_utf8(file_data.to_vec()).map_err(|e| {
+        CoreError::validation(format!("Invalid UTF-8 data: {}", e))
+    })?;
+    let graph_data: Value = serde_json::from_str(&content).map_err(|e| {
+        CoreError::validation(format!("Invalid JSON: {}", e))
+    })?;
 
     if !graph_data.is_object() {
-        return Err(anyhow!("JSON must be an object"));
+        return Err(CoreError::validation("JSON must be an object"));
     }
 
     let obj = graph_data
         .as_object()
-        .ok_or_else(|| anyhow!("JSON data is not a valid object"))?;
+        .ok_or_else(|| CoreError::validation("JSON data is not a valid object"))?;
 
     if !obj.contains_key("nodes") || !obj.contains_key("edges") || !obj.contains_key("layers") {
-        return Err(anyhow!(
-            "JSON must contain 'nodes', 'edges', and 'layers' arrays"
+        return Err(CoreError::validation(
+            "JSON must contain 'nodes', 'edges', and 'layers' arrays",
         ));
     }
 
     if !obj["nodes"].is_array() || !obj["edges"].is_array() || !obj["layers"].is_array() {
-        return Err(anyhow!("'nodes', 'edges', and 'layers' must be arrays"));
+        return Err(CoreError::validation(
+            "'nodes', 'edges', and 'layers' must be arrays",
+        ));
     }
 
-    let mut graph: Graph = serde_json::from_value(graph_data)?;
+    let mut graph: Graph = serde_json::from_value(graph_data).map_err(|e| {
+        CoreError::validation(format!("Invalid graph JSON: {}", e))
+    })?;
     graph.sanitize_labels();
-    Ok(serde_json::to_string(&graph)?)
+    serde_json::to_string(&graph).map_err(|e| {
+        CoreError::internal("Failed to serialize graph JSON").with_source(e)
+    })
 }
 
-fn sanitize_graph_json(graph_json: String) -> Result<String> {
-    let mut graph: Graph = serde_json::from_str(&graph_json)?;
+fn sanitize_graph_json(graph_json: String) -> CoreResult<String> {
+    let mut graph: Graph = serde_json::from_str(&graph_json).map_err(|e| {
+        CoreError::validation(format!("Invalid graph JSON: {}", e))
+    })?;
     graph.sanitize_labels();
-    Ok(serde_json::to_string(&graph)?)
+    serde_json::to_string(&graph).map_err(|e| {
+        CoreError::internal("Failed to serialize graph JSON").with_source(e)
+    })
 }
