@@ -34,7 +34,7 @@ impl CodeAnalysisMutation {
                 input.solution_options.clone(),
             )
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::create", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(CodeAnalysisProfile::from(profile))
     }
 
@@ -57,7 +57,7 @@ impl CodeAnalysisMutation {
                 Some(input.solution_options.clone()),
             )
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::update", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(CodeAnalysisProfile::from(profile))
     }
 
@@ -68,7 +68,7 @@ impl CodeAnalysisMutation {
             .code_analysis_service()
             .delete(&id)
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::delete", e))
+            .map_err(StructuredError::from_core_error)
     }
 
     async fn run_code_analysis_profile(
@@ -82,7 +82,7 @@ impl CodeAnalysisMutation {
             .code_analysis_service()
             .run(&id)
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::run", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(CodeAnalysisRunResult {
             profile: CodeAnalysisProfile::from(profile),
         })

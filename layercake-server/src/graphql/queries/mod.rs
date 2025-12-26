@@ -80,7 +80,7 @@ impl Query {
             .code_analysis_service()
             .list(project_id)
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::list", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(profiles
             .into_iter()
             .map(CodeAnalysisProfile::from)
@@ -98,7 +98,7 @@ impl Query {
             .code_analysis_service()
             .get(id)
             .await
-            .map_err(|e| StructuredError::service("CodeAnalysisService::get", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(profile.map(CodeAnalysisProfile::from))
     }
 

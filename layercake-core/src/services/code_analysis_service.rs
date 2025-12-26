@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
 use chrono::{DateTime, Utc};
 use layercake_code_analysis::analyzer::analyze_path;
 use layercake_code_analysis::infra::{analyze_infra, correlate_code_infra};
@@ -16,6 +15,7 @@ use crate::code_analysis_enhanced_solution_graph::analysis_to_enhanced_solution_
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::code_analysis_solution_graph::analysis_to_solution_graph;
 use crate::database::entities::code_analysis_profiles;
+use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
 use crate::services::data_set_service::DataSetService;
@@ -437,7 +437,7 @@ impl CodeAnalysisService {
         result
     }
 
-    async fn ensure_table(&self) -> Result<()> {
+    async fn ensure_table(&self) -> CoreResult<()> {
         let sql = "CREATE TABLE IF NOT EXISTS code_analysis_profiles (
             id TEXT PRIMARY KEY,
             project_id INTEGER NOT NULL,
@@ -455,7 +455,8 @@ impl CodeAnalysisService {
                 self.db.get_database_backend(),
                 sql.to_string(),
             ))
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to ensure code analysis table").with_source(e))?;
 
         // backfill column if missing
         let alter = "ALTER TABLE code_analysis_profiles ADD COLUMN no_infra INTEGER DEFAULT 0";
@@ -503,12 +504,13 @@ impl CodeAnalysisService {
         Ok(())
     }
 
-    pub async fn list(&self, project_id: i32) -> Result<Vec<CodeAnalysisProfile>> {
+    pub async fn list(&self, project_id: i32) -> CoreResult<Vec<CodeAnalysisProfile>> {
         self.ensure_table().await?;
         let results = code_analysis_profiles::Entity::find()
             .filter(code_analysis_profiles::Column::ProjectId.eq(project_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to list code analysis profiles").with_source(e))?;
         Ok(results.into_iter().map(CodeAnalysisProfile::from).collect())
     }
 
@@ -521,7 +523,7 @@ impl CodeAnalysisService {
         options: Option<String>,
         analysis_type: String,
         solution_options: Option<String>,
-    ) -> Result<CodeAnalysisProfile> {
+    ) -> CoreResult<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let id = Uuid::new_v4().to_string();
         let active = code_analysis_profiles::ActiveModel {
@@ -540,12 +542,14 @@ impl CodeAnalysisService {
 
         code_analysis_profiles::Entity::insert(active.clone())
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to create code analysis profile").with_source(e))?;
 
         let model = code_analysis_profiles::Entity::find_by_id(id.clone())
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Failed to find inserted item"))?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load code analysis profile").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("CodeAnalysisProfile", id.clone()))?;
 
         Ok(CodeAnalysisProfile::from(model))
     }
@@ -559,12 +563,13 @@ impl CodeAnalysisService {
         options: Option<Option<String>>,
         analysis_type: Option<String>,
         solution_options: Option<Option<String>>,
-    ) -> Result<CodeAnalysisProfile> {
+    ) -> CoreResult<CodeAnalysisProfile> {
         self.ensure_table().await?;
         let mut model = code_analysis_profiles::Entity::find_by_id(id.to_string())
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Profile not found"))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load code analysis profile").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("CodeAnalysisProfile", id.to_string()))?
             .into_active_model();
 
         if let Some(path) = file_path {
@@ -586,34 +591,40 @@ impl CodeAnalysisService {
             model.solution_options = Set(opts);
         }
 
-        let updated = model.update(&self.db).await?;
+        let updated = model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to update code analysis profile").with_source(e))?;
         Ok(CodeAnalysisProfile::from(updated))
     }
 
-    pub async fn delete(&self, id: &str) -> Result<bool> {
+    pub async fn delete(&self, id: &str) -> CoreResult<bool> {
         self.ensure_table().await?;
         let result = code_analysis_profiles::Entity::delete_by_id(id.to_string())
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete code analysis profile").with_source(e))?;
         Ok(result.rows_affected > 0)
     }
 
-    async fn get_by_id(&self, id: &str) -> Result<code_analysis_profiles::Model> {
+    async fn get_by_id(&self, id: &str) -> CoreResult<code_analysis_profiles::Model> {
         self.ensure_table().await?;
         code_analysis_profiles::Entity::find_by_id(id.to_string())
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Profile not found"))
+            .await
+            .map_err(|e| CoreError::internal("Failed to load code analysis profile").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("CodeAnalysisProfile", id.to_string()))
     }
 
-    pub async fn get(&self, id: String) -> Result<Option<CodeAnalysisProfile>> {
+    pub async fn get(&self, id: String) -> CoreResult<Option<CodeAnalysisProfile>> {
         let model = code_analysis_profiles::Entity::find_by_id(id)
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load code analysis profile").with_source(e))?;
         Ok(model.map(CodeAnalysisProfile::from))
     }
 
-    pub async fn run(&self, id: &str) -> Result<CodeAnalysisProfile> {
+    pub async fn run(&self, id: &str) -> CoreResult<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
         let no_infra_flag = profile.no_infra.unwrap_or(false);
         let analysis_type = profile
@@ -625,13 +636,16 @@ impl CodeAnalysisService {
         let normalized_path = normalize_path(&profile.file_path);
         let path: PathBuf = normalized_path.clone().into();
         if !path.exists() {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Code analysis path does not exist: {}",
                 normalized_path
-            ));
+            )));
         }
         let path_for_task = path.clone();
-        let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task)).await??;
+        let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task))
+            .await
+            .map_err(|e| CoreError::internal("Code analysis task failed").with_source(e))?
+            .map_err(|e| CoreError::internal("Code analysis failed").with_source(e))?;
         let parsed_opts: AnalysisOptions = profile
             .options
             .as_ref()
@@ -691,7 +705,8 @@ impl CodeAnalysisService {
             &layercake_code_analysis::report::ReportMetadata::new(path, analysis.files_scanned),
             infra_graph.as_ref(),
             correlation.as_ref(),
-        )?;
+        )
+        .map_err(|e| CoreError::internal("Failed to render code analysis report").with_source(e))?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
         let dataset_id = match profile.dataset_id {
@@ -965,7 +980,9 @@ impl CodeAnalysisService {
                 opts.coalesce_functions,
             )
         };
-        let graph_json = serde_json::to_string(&combined_graph)?;
+        let graph_json = serde_json::to_string(&combined_graph).map_err(|e| {
+            CoreError::internal("Failed to serialize code analysis graph").with_source(e)
+        })?;
         let annotation_text = cleaned_report.clone();
         let ds_service = DataSetService::new(self.db.clone());
         ds_service.update_graph_data(dataset_id, graph_json).await?;
@@ -979,7 +996,10 @@ impl CodeAnalysisService {
         active.report = Set(Some(cleaned_report));
         active.last_result = Set(serde_json::to_string(&result).ok());
 
-        let updated = active.update(&self.db).await?;
+        let updated = active
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to update code analysis profile").with_source(e))?;
         Ok(CodeAnalysisProfile::from(updated))
     }
 }
