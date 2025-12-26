@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to restructure the Layercake project from a monolithic `layercake-core` crate into three distinct, purpose-built crates:
+This document outlines a comprehensive plan to restructure the Layercake project from a monolithic `layercake-core` crate into three distinct, purpose-built crates, while keeping database ownership in core for now:
 
 - **layercake-core**: Pure business logic, data models, DAG execution, and service layer
 - **layercake-server**: HTTP/GraphQL API, WebSocket collaboration, session management, and ephemeral state
@@ -51,6 +51,7 @@ All functionality is controlled via Cargo features (`server`, `graphql`, `mcp`, 
 ```
 layercake-workspace/
 ├── layercake-core/          ← Pure business logic library
+├── layercake-exports/       ← Import/export tooling (templates + file formats)
 ├── layercake-server/        ← HTTP/GraphQL/WebSocket server
 ├── layercake-cli/           ← CLI binary + interactive console
 ├── layercake-code-analysis/ ← Existing (unchanged)
@@ -64,7 +65,7 @@ layercake-workspace/
 ## 1. layercake-core: Business Logic Library
 
 ### Purpose
-Pure Rust library crate containing all domain logic, data models, and stateless services. Zero HTTP/CLI dependencies. Can be used as a library by other Rust projects.
+Pure Rust library crate containing all domain logic, data models, and stateless services. Zero HTTP/CLI dependencies. Can be used as a library by other Rust projects. Database access remains in core for now, but is explicitly isolated to enable future extraction.
 
 ### Responsibilities
 
@@ -77,7 +78,7 @@ Pure Rust library crate containing all domain logic, data models, and stateless 
 #### DAG Execution Engine
 - **Plan executor**: Parse YAML plans, resolve dependencies, execute steps
 - **Pipeline system**: Data transformation pipeline, step chaining
-- **Export engine**: Template rendering (Handlebars), format conversion
+- **Export orchestration**: Delegates template rendering and file format handling to `layercake-exports`
 - **Validation**: Graph validation, plan validation, schema checks
 
 #### Data Access Layer
@@ -85,6 +86,7 @@ Pure Rust library crate containing all domain logic, data models, and stateless 
 - **Entities**: All SeaORM entity models (projects, graphs, nodes, edges, etc.)
 - **Migrations**: All SeaORM migrations for schema evolution
 - **Repositories** (new): Abstraction over entity queries (optional, for cleaner separation)
+- **Isolation plan**: Keep DB access concentrated in `database/` and repository modules, and route all service access through those boundaries to enable later decoupling if needed.
 
 #### Service Layer (Core Services)
 All services become pure, database-driven business logic without HTTP concerns:
@@ -97,8 +99,8 @@ All services become pure, database-driven business logic without HTTP concerns:
 - `DataSetService`: DataSet CRUD, graph JSON operations
 - `DataSetBulkService`: Bulk upload processing
 - `ProjectService`: Project CRUD, archiving
-- `ExportService`: Graph export to various formats
-- `ImportService`: Graph import from files
+- `ExportService`: Graph export to various formats (delegates to `layercake-exports`)
+- `ImportService`: Graph import from files (delegates to `layercake-exports`)
 - `LibraryItemService`: Library/palette management
 - `CodeAnalysisService`: Code graph operations
 - `ValidationService`: Cross-entity validation
@@ -111,10 +113,9 @@ All services become pure, database-driven business logic without HTTP concerns:
 - No HTTP/session/WebSocket state (moves to server)
 
 #### Utilities
-- **Export utilities**: Template loading, Handlebars helpers
-- **File utilities**: Read/write YAML/JSON/CSV
+- **File utilities**: Read/write YAML/JSON for plans/config (export/import format handling lives in `layercake-exports`)
 - **Graph algorithms**: Traversal, cycle detection, pathfinding
-- **Update system**: Binary update checker/downloader (CLI may use this)
+- **Update system**: Binary update checker/downloader (moved to CLI; core should not own distribution concerns)
 
 ### Dependencies
 **Include:**
@@ -122,9 +123,8 @@ All services become pure, database-driven business logic without HTTP concerns:
 - `serde`, `serde_json`, `serde_yaml`: Serialisation
 - `anyhow`, `thiserror`: Error handling
 - `chrono`, `uuid`: Data types
-- `handlebars`, `regex`: Templating
-- `csv`, `calamine`, `rust_xlsxwriter`, `spreadsheet-ods`: File I/O
 - `indexmap`: Ordered collections
+- `layercake-exports`: Import/export support
 - `layercake-genai`, `layercake-code-analysis`, `layercake-projections`: Domain integrations
 
 **Exclude:**
@@ -132,7 +132,7 @@ All services become pure, database-driven business logic without HTTP concerns:
 - ❌ `async-graphql`, `async-graphql-axum`: GraphQL
 - ❌ `tokio-tungstenite`: WebSockets
 - ❌ `clap`, `clap-repl`: CLI parsing
-- ❌ `rig`, `rmcp`: Chat/agent integration
+- ❌ `rig`: Chat/agent integration
 - ❌ `dashmap`: Concurrent session storage
 
 ### Public API Surface
@@ -155,7 +155,43 @@ pub use database::migrations::Migrator;
 
 ---
 
-## 2. layercake-server: HTTP/GraphQL/WebSocket Server
+## 2. layercake-exports: Import/Export Library
+
+### Purpose
+Dedicated library crate for import/export functionality (XLSX, ODS, CSV) and Handlebars-based rendering. Depends on `layercake-core` types and keeps format-specific dependencies out of core while letting core services delegate to this crate.
+
+### Responsibilities
+- **Template rendering**: Handlebars templates, helpers, and template loading
+- **Export formats**: CSV, XLSX, ODS writers; format selection and options
+- **Import formats**: CSV/XLSX/ODS readers and schema mapping
+- **File adapters**: Read/write helpers for export/import (isolated from core plan/config I/O)
+
+### Dependencies
+**Include:**
+- `layercake-core`: Domain types used in import/export
+- `handlebars`, `regex`: Template rendering
+- `csv`, `calamine`, `rust_xlsxwriter`, `spreadsheet-ods`: File format support
+- `serde`, `serde_json`: Data marshaling
+- `anyhow`, `thiserror`: Error handling
+
+**Exclude:**
+- ❌ `sea-orm`, `sea-orm-migration`: Database access
+- ❌ `axum`, `tower`, `async-graphql`: Server stack
+- ❌ `clap`, `clap-repl`: CLI parsing
+
+### Public API Surface
+```rust
+pub mod export;
+pub mod import;
+pub mod templates;
+
+pub use export::{export_graph, ExportFormat, ExportOptions};
+pub use import::{import_graph, ImportFormat, ImportOptions};
+```
+
+---
+
+## 3. layercake-server: HTTP/GraphQL/WebSocket Server
 
 ### Purpose
 HTTP server binary providing GraphQL API, REST endpoints, WebSocket collaboration, and session/presence management. Depends on `layercake-core` for business logic.
@@ -171,7 +207,7 @@ HTTP server binary providing GraphQL API, REST endpoints, WebSocket collaboratio
 #### GraphQL API
 - **Schema definition**: Queries, Mutations, Subscriptions using `async-graphql`
 - **Resolvers**: Thin wrappers calling `AppContext` services
-- **Error mapping**: Convert `anyhow::Error` to GraphQL errors
+- **Error mapping**: Convert core errors to GraphQL errors with stable codes and user-safe messages (see Error Mapping Contract below)
 - **Context injection**: `GraphQLContext` with database, services, session
 
 **Queries:**
@@ -196,13 +232,11 @@ HTTP server binary providing GraphQL API, REST endpoints, WebSocket collaboratio
 #### Session Management
 - **User sessions**: Session tokens, expiry, CRUD
 - **Authentication middleware**: Token validation, user context injection
-- **Authorization**: Role-based access control (future)
+- **Authorization**: Role-based access control (see Authorization Boundaries below)
 
 #### MCP Server Integration
-- **MCP protocol handler**: Expose Layercake operations to AI agents
-- **Resource providers**: `layercake://projects/{id}`, `layercake://graphs/{id}`
-- **Tool definitions**: `list_projects`, `create_project`, `analyze_connectivity`, `find_paths`
-- **Prompt templates**: Graph analysis prompts for Claude/ChatGPT
+- **Deprecated**: MCP transport and tool definitions will be removed during the migration.
+- **Replacement**: Add tools directly to Rig agents case by case (see Rig Tools Plan below).
 
 #### Chat Management
 - **Chat history service**: Store/retrieve chat messages via `ChatManager`
@@ -221,12 +255,11 @@ HTTP server binary providing GraphQL API, REST endpoints, WebSocket collaboratio
 - `async-graphql`, `async-graphql-axum`: GraphQL
 - `tokio`, `tokio-tungstenite`: Async runtime, WebSockets
 - `dashmap`: Concurrent session storage
-- `axum-mcp`: MCP protocol transport
 - `layercake-projections`: Projections GraphQL schema merge
 
 **Exclude:**
 - ❌ `clap`, `clap-repl`: CLI (not needed for server)
-- ❌ `rig`, `rmcp`: Console chat (not needed for HTTP server)
+- ❌ `rig`: Console chat (not needed for HTTP server)
 
 ### Entry Point
 ```rust
@@ -258,7 +291,6 @@ pub mod app;
 pub mod graphql;
 pub mod websocket;
 pub mod session;
-pub mod mcp;
 pub mod config;
 
 pub use app::create_app;
@@ -267,7 +299,72 @@ pub use config::ServerConfig;
 
 ---
 
-## 3. layercake-cli: Command-Line Interface
+## Error Mapping Contract (Server)
+
+### Goals
+- Keep error shapes stable across the refactor to avoid breaking GraphQL clients.
+- Separate internal diagnostics from user-facing messages.
+
+### Contract
+- Core services return a typed error enum `CoreError` (or structured error) with:
+  - `kind`: stable machine-readable category (`NotFound`, `Validation`, `Conflict`, `Unauthorized`, `Forbidden`, `Internal`, `Unavailable`)
+  - `message`: safe human-readable message
+  - `fields`: optional map of field-level validation errors
+  - `source`: internal error chain for logging
+- GraphQL resolver mapping:
+  - `NotFound` → GraphQL error with `extensions.code = "NOT_FOUND"` and `status = 404`
+  - `Validation` → `extensions.code = "VALIDATION"` and `status = 400`, include `extensions.fields`
+  - `Conflict` → `extensions.code = "CONFLICT"` and `status = 409`
+  - `Unauthorized` → `extensions.code = "UNAUTHORIZED"` and `status = 401`
+  - `Forbidden` → `extensions.code = "FORBIDDEN"` and `status = 403`
+  - `Unavailable` → `extensions.code = "UNAVAILABLE"` and `status = 503`
+  - `Internal` (and unknown) → `extensions.code = "INTERNAL"` and `status = 500`, message defaults to "Internal server error"
+- Logging:
+  - Log full error chains server-side, never expose internal context to GraphQL responses.
+
+### Implementation Details
+- Introduce `core::errors::CoreError` and `CoreErrorKind`.
+- Provide `impl From<CoreError> for async_graphql::Error` in server crate.
+- Add unit tests in `layercake-server/tests/` for resolver error mapping.
+
+### Validation
+- Capture a baseline of current GraphQL error shapes for representative queries/mutations.
+- Add golden tests that assert `extensions.code`, `status`, and optional `extensions.fields`.
+- Compare baseline vs. new mapping before removing legacy error paths.
+- Sample baseline set:
+  - `project(id: "missing")` → NotFound
+  - `createProject(name: "")` → Validation
+  - `applyGraphEdit` with stale version → Conflict
+  - `graph(id: "no-access")` as non-member → Forbidden
+  - `projects` with invalid/expired session → Unauthorized
+
+---
+
+## Authorization Boundaries (Server)
+
+### Goals
+- Ensure authorization decisions are consistent, centralized, and testable.
+- Prevent resolvers or services from bypassing access control.
+
+### Boundaries
+- **Core services**:
+  - Take explicit `Actor`/`UserContext` input for any operation that requires authorization.
+  - Enforce access checks inside services (not only at GraphQL layer).
+  - Provide a `core::auth::Authorizer` trait to decouple policy from service logic.
+- **Server**:
+  - Builds `Actor` from session/auth middleware.
+  - Injects `Actor` into GraphQL context.
+  - Does not perform business logic authorization checks in resolvers beyond basic authentication.
+
+### Implementation Details
+- Add `Actor` (id, roles, scopes) in core.
+- Add `Authorizer` trait in core with methods like `can_read_project`, `can_edit_graph`, `can_manage_users`.
+- Add default implementation in server that uses existing roles/permissions.
+- Add tests in `layercake-core/tests/` for authorization paths.
+
+---
+
+## 4. layercake-cli: Command-Line Interface
 
 ### Purpose
 User-facing CLI binary providing subcommands for plan execution, database management, project generation, and interactive console. Depends on `layercake-core` for domain logic.
@@ -298,8 +395,7 @@ User-facing CLI binary providing subcommands for plan execution, database manage
 
 #### Interactive Console
 - **REPL loop**: `clap-repl` integration for command/chat mode
-- **Chat integration**: `rig` + `rmcp` for LLM interactions
-- **MCP bridge**: Console-side MCP client to call server tools
+- **Chat integration**: `rig` + direct tool bindings for LLM interactions
 - **Command handlers**: `/help`, `/projects`, `/graphs`, etc.
 - **Output formatting**: `nu-ansi-term` for colored terminal output
 
@@ -317,7 +413,7 @@ User-facing CLI binary providing subcommands for plan execution, database manage
 - `layercake-core`: Business logic library
 - `clap`: CLI parsing
 - `clap-repl`: Interactive REPL
-- `rig`, `rmcp`: Chat agent integration (for console)
+- `rig`: Chat agent integration (for console)
 - `nu-ansi-term`, `colored`: Terminal formatting
 - `tokio`: Async runtime (for console WebSocket client)
 - `notify`: File watching (for `run --watch`)
@@ -380,7 +476,7 @@ The interactive console becomes a CLI-only feature:
 - **Database access**: Direct connection to local SQLite (same as server)
 - **Service calls**: Use `AppContext` services directly (no HTTP)
 - **Remote mode** (optional): HTTP client to call `layercake-server` GraphQL API
-- **Chat agent**: `rig` integration with MCP tools, can call local or remote server
+- **Chat agent**: `rig` integration with direct tools, can call local or remote server
 
 ---
 
@@ -430,12 +526,12 @@ The interactive console becomes a CLI-only feature:
 - **Keep migrations in `layercake-core`**: Database schema is core domain logic
 - Export `Migrator` from `layercake-core::database::migrations`
 - Both server and CLI import and run migrations on their connection
+- **Isolation rule**: all DB bootstrapping happens in `layercake-core::database`, other modules do not create connections directly
 
 ### Testing Strategy
 
 **Challenge**: Integration tests currently mix CLI, server, and core logic
 - `tests/integration_test.rs` uses server endpoints and database
-- `tests/e2e_mcp_test.rs` tests MCP server via HTTP
 
 **Solution**:
 - **Core tests**: Move to `layercake-core/tests/` (pure service/domain logic)
@@ -456,7 +552,7 @@ The interactive console becomes a CLI-only feature:
 - **Option B**: Tauri depends only on `layercake-server`
   - Remove console from desktop app (simplify UX)
   - Focus on web UI via embedded server
-- **Recommended**: Option A (preserve feature parity)
+- **Recommended**: Option A (preserve feature parity), but monitor binary size and startup time; if >20% regression, switch to Option B and expose CLI features via server APIs.
 
 ### AppContext Split
 
@@ -482,19 +578,21 @@ The interactive console becomes a CLI-only feature:
 
 ### MCP Server
 
-**Challenge**: MCP server is both protocol (core) and HTTP transport (server)
-- `mcp/tools/` define graph operations (core logic)
-- `mcp/server.rs` hosts Axum routes (server transport)
+**Challenge**: MCP server spans protocol + transport and duplicates logic with console tools.
 
 **Solution**:
-- **Split MCP logic**:
-  - `layercake-core::mcp`: Tool definitions, resource schemas, business logic
-  - `layercake-server::mcp`: Axum HTTP transport, SSE endpoint, session cleanup
-- MCP tools call `AppContext` services (pure logic, no HTTP)
+- **Remove MCP**: delete MCP transport and tool definitions as part of the refactor.
+- **Rig Tools Plan**:
+  - Replace MCP tools with direct Rig tool bindings for each capability.
+  - Initial minimal tool list: `list_projects`, `get_project`, `list_graphs`.
+  - Expand the tool list after the refactor is complete and agent development resumes.
+  - Keep tool definitions near the CLI console modules, backed by `AppContext` services.
+  - For server use, expose equivalent GraphQL/REST endpoints; Rig tools can target these if remote mode is enabled.
+  - Maintain a short tool registry list in `layercake-cli` documenting available tools and their backing services.
 
 ### Console Chat Integration
 
-**Challenge**: Console chat uses `rig` + `rmcp` to call MCP tools
+**Challenge**: Console chat needs consistent tool definitions and a clean local/remote split
 - Can call local functions or remote HTTP server
 - Needs access to both database (local) and server API (remote)
 
@@ -503,6 +601,7 @@ The interactive console becomes a CLI-only feature:
   - **Local mode**: Direct `AppContext` + database connection (default)
   - **Remote mode**: HTTP client to `layercake-server` (optional flag `--remote-url`)
 - REPL commands route to appropriate backend
+- Rig tools live in CLI and map directly to core services; remote mode uses HTTP-backed adapters.
 
 ### Deployment Scenarios
 
@@ -513,7 +612,7 @@ After refactoring, support multiple deployment modes:
 | **Headless server** | `layercake-core` + `layercake-server` | `layercake-server` |
 | **CLI-only** | `layercake-core` + `layercake-cli` | `layercake` |
 | **Desktop app** | All three (via Tauri) | `Layercake.app` |
-| **Library usage** | `layercake-core` only | (imported as dep) |
+| **Library usage** | `layercake-core` + `layercake-exports` | (imported as dep) |
 | **Docker server** | `layercake-server` only | `FROM scratch` + binary |
 
 ---
@@ -533,13 +632,13 @@ After refactoring, support multiple deployment modes:
 
 2. **Create new crate structure** (1 day)
    ```bash
-   mkdir -p layercake-server/src layercake-cli/src
+   mkdir -p layercake-server/src layercake-cli/src layercake-exports/src
    # Copy Cargo.toml templates
    ```
 
 3. **Extract core modules** (3 days)
    - Move pure domain logic to `layercake-core/src/`:
-     - `graph.rs`, `plan.rs`, `plan_execution.rs`, `pipeline/`, `export/`
+     - `graph.rs`, `plan.rs`, `plan_execution.rs`, `pipeline/`
      - `database/` (entities, migrations, connection)
      - `services/` (all service files)
      - `app_context/` (core context only)
@@ -547,13 +646,19 @@ After refactoring, support multiple deployment modes:
    - Remove server/CLI dependencies from these files
    - Fix imports to use `crate::` (not `super::server`)
 
-4. **Define `layercake-core` public API** (2 days)
+4. **Create `layercake-exports` crate** (2 days)
+   - Move import/export modules from core:
+     - `export/`, template helpers, format adapters
+     - XLSX/ODS/CSV readers and writers
+   - Introduce `layercake-exports` public API (`export_*`, `import_*`)
+   - Replace core `ExportService`/`ImportService` internals to call `layercake-exports`
+
+5. **Define `layercake-core` public API** (2 days)
    - Update `layercake-core/src/lib.rs`:
      ```rust
      pub mod graph;
      pub mod plan;
      pub mod pipeline;
-     pub mod export;
      pub mod database;
      pub mod services;
      pub mod app_context;
@@ -567,13 +672,13 @@ After refactoring, support multiple deployment modes:
    - Mark internal modules as `pub(crate)` where appropriate
    - Document expected usage patterns
 
-5. **Update core `Cargo.toml`** (1 day)
+6. **Update core `Cargo.toml`** (1 day)
    - Remove server dependencies (`axum`, `tower`, `async-graphql`)
    - Remove CLI dependencies (`clap`, `clap-repl`, `rig`)
-   - Keep only: `sea-orm`, `serde`, `anyhow`, file I/O, domain integrations
-   - Remove all feature flags (core is unconditional)
+   - Keep only: `sea-orm`, `serde`, `anyhow`, domain integrations
+   - Keep feature flags during migration; remove only in Stage 5
 
-6. **Verify core builds in isolation** (1 day)
+7. **Verify core builds in isolation** (1 day)
    ```bash
    cd layercake-core && cargo build --lib
    cargo test --lib
@@ -583,6 +688,7 @@ After refactoring, support multiple deployment modes:
 
 **Success Criteria**:
 - `layercake-core` builds as standalone library
+- `layercake-exports` builds as standalone library
 - Zero HTTP/CLI dependencies in core
 - All services callable via `AppContext`
 
@@ -626,16 +732,19 @@ After refactoring, support multiple deployment modes:
      }
      ```
    - Remove business logic from resolvers (thin wrappers only)
+   - Implement error mapping contract and add tests
+   - Validate error mapping against baseline GraphQL responses
+   - Wire `Actor` into context and enforce authorization boundaries
 
 4. **Move collaboration coordinator** (2 days)
    - Move `collaboration/coordinator.rs` to `layercake-server/src/collaboration/`
    - Keep `collaboration/types.rs` in core (shared types)
    - Update WebSocket handler to use server-side coordinator
 
-5. **Move MCP server transport** (2 days)
-   - Keep `mcp/tools/`, `mcp/resources.rs`, `mcp/prompts.rs` in core
-   - Move `mcp/server.rs` to `layercake-server/src/mcp/`
-   - Update Axum routes for MCP endpoints
+5. **Remove MCP transport** (2 days)
+   - Delete MCP-related routes and remove `axum-mcp` dependency
+   - Remove MCP tool definitions from core
+   - Update any callers to use Rig tools or GraphQL/REST endpoints
 
 6. **Implement server `main.rs`** (1 day)
    - Parse CLI args (port, database, cors-origin)
@@ -650,13 +759,12 @@ After refactoring, support multiple deployment modes:
    ```
    - Verify GraphQL playground at `/graphql`
    - Test WebSocket collaboration endpoint
-   - Verify MCP endpoints respond
+   - Validate error mapping and authorization behavior
 
 **Success Criteria**:
 - `layercake-server` binary runs standalone
 - GraphQL queries/mutations work
 - WebSocket collaboration functional
-- MCP tools callable via HTTP
 
 ---
 
@@ -688,11 +796,12 @@ After refactoring, support multiple deployment modes:
      ```rust
      use layercake_core::AppContext;
 
-     pub async fn run_console(app_ctx: AppContext) -> Result<()> {
-         // REPL loop
-     }
-     ```
-   - Keep chat integration (`rig`, `rmcp`)
+   pub async fn run_console(app_ctx: AppContext) -> Result<()> {
+        // REPL loop
+    }
+    ```
+   - Keep chat integration (`rig`)
+   - Implement Rig tools case by case and document a tool registry
 
 4. **Move update command** (1 day)
    - Relocate `update/` to `layercake-cli/src/update/`
@@ -756,13 +865,13 @@ After refactoring, support multiple deployment modes:
 2. **Update integration tests** (2 days)
    - Move tests to appropriate crates:
      - `integration_test.rs` → `layercake-core/tests/`
-     - `e2e_mcp_test.rs` → `layercake-server/tests/`
    - Create cross-crate tests in `layercake-integration-tests/`
 
 3. **Update CI/CD** (1 day)
    - Add build jobs for each crate:
      ```yaml
      - cargo build -p layercake-core
+     - cargo build -p layercake-exports
      - cargo build -p layercake-server
      - cargo build -p layercake-cli
      - cargo test --workspace
@@ -840,7 +949,7 @@ After refactoring, support multiple deployment modes:
 ### Deployment Flexibility
 - ✅ Server-only Docker image (~100MB)
 - ✅ CLI-only binary distribution
-- ✅ Core as reusable library (published to crates.io)
+- ✅ Core as reusable library (publish optional)
 - ✅ Tauri desktop app (all features)
 
 ---
@@ -879,6 +988,30 @@ After refactoring, support multiple deployment modes:
 - Use `workspace = true` inheritance
 - Run `cargo update` sparingly, test thoroughly
 
+### Risk: GraphQL Behavior Regression
+**Probability**: Medium
+**Impact**: Medium
+**Mitigation**:
+- Lock error mapping contract before refactor
+- Add resolver behavior tests for error shapes and status codes
+- Add authorization tests at core service boundaries
+
+---
+
+## Workspace Dependency Policy
+
+- Use `[workspace.dependencies]` as the single source of truth for versions.
+- Disallow crate-local versions unless explicitly documented.
+- Add a `cargo tree` check in CI to flag divergent versions.
+
+---
+
+## Test Fixture Strategy
+
+- Keep shared fixtures (CSV/TSV/YAML) in `sample/` and reference from each crate test.
+- Provide a shared `test_utils` crate or module for DB setup and temp directories.
+- Document golden file ownership per crate to avoid duplication.
+
 ---
 
 ## Alternative Approaches Considered
@@ -888,10 +1021,10 @@ After refactoring, support multiple deployment modes:
 **Cons**: Doesn't solve dependency bloat, testing remains complex
 **Decision**: Rejected - feature flags can't enforce compile-time separation
 
-### Alternative 2: Four Crates (Split MCP into Separate Crate)
+### Alternative 2: Keep MCP as Separate Crate
 **Pros**: MCP as standalone library, reusable by other projects
-**Cons**: Adds complexity, MCP is tightly coupled to server transport
-**Decision**: Deferred - can extract MCP later if needed
+**Cons**: Adds complexity, duplicates tooling with Rig, and keeps transport coupling
+**Decision**: Rejected - MCP is removed in favor of direct Rig tools
 
 ### Alternative 3: Two Crates (Core + Unified Binary)
 **Pros**: Simpler, fewer crates to manage
@@ -922,6 +1055,16 @@ After refactoring, support multiple deployment modes:
    - **Option B**: Remove console (focus on visual UI)
    - **Recommendation**: Option A (users may want CLI fallback)
 
+5. **How should service-level transaction boundaries be expressed post-split?**
+   - **Option A**: Expose explicit transaction handles in service methods
+   - **Option B**: Centralize transactions in repository layer and keep services transactional by default
+   - **Recommendation**: Option B (minimizes API churn and keeps services consistent)
+
+6. **Should core become database-agnostic long term?**
+   - **Option A**: Keep SeaORM ownership in core indefinitely
+   - **Option B**: Extract DB interfaces to traits, keep SeaORM adapters in a separate crate
+   - **Recommendation**: Option A for now, revisit after split stabilizes and service boundaries are clean
+
 ---
 
 ## Appendix: File Relocation Map
@@ -931,7 +1074,6 @@ After refactoring, support multiple deployment modes:
 - `src/graph.rs`
 - `src/plan.rs`, `src/plan_execution.rs`
 - `src/pipeline/`
-- `src/export/`
 - `src/database/` (entities, migrations, connection)
 - `src/services/` (all service files)
 - `src/app_context/` (core only)
@@ -945,7 +1087,10 @@ After refactoring, support multiple deployment modes:
 - `src/server/` → `layercake-server/src/`
 - `src/graphql/` → `layercake-server/src/graphql/`
 - `src/collaboration/coordinator.rs` → `layercake-server/src/collaboration/`
-- `src/mcp/server.rs` → `layercake-server/src/mcp/`
+- `src/mcp/` → removed (replaced by Rig tools)
+- `src/export/` → `layercake-exports/src/export/`
+- `src/import/` → `layercake-exports/src/import/`
+- `src/templates/` → `layercake-exports/src/templates/`
 - `src/console/` → `layercake-cli/src/console/`
 - `src/update/` → `layercake-cli/src/update/`
 - `src/chat_credentials_cli/` → `layercake-cli/src/`
@@ -961,9 +1106,15 @@ After refactoring, support multiple deployment modes:
 - `src/middleware/` (from core `server/middleware/`)
 - `src/websocket/` (from core `server/websocket/`)
 - `src/collaboration/` (coordinator from core)
-- `src/mcp/` (server transport from core)
 - `src/session/` (new module for session management)
 - `src/config.rs` (new, server configuration)
+
+### layercake-exports
+**New files**:
+- `src/export/` (format writers, export orchestration)
+- `src/import/` (format readers, schema mapping)
+- `src/templates/` (Handlebars templates and helpers)
+- `src/lib.rs` (public API)
 
 ### layercake-cli
 **New files**:
