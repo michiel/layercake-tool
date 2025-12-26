@@ -1,8 +1,8 @@
-use anyhow::{anyhow, Result};
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
 use crate::database::entities::users;
+use crate::errors::{CoreError, CoreResult};
 use crate::services::auth_service::AuthService;
 use crate::services::authorization::AuthorizationService;
 
@@ -33,7 +33,7 @@ impl McpAgentService {
         project_id: i32,
         name: String,
         _allowed_tools: Option<Vec<String>>, // Reserved for future use
-    ) -> Result<McpAgentCredentials> {
+    ) -> CoreResult<McpAgentCredentials> {
         // 1. Verify creator has admin access to project
         let auth_service = AuthorizationService::new(self.db.clone());
         auth_service
@@ -42,7 +42,8 @@ impl McpAgentService {
 
         // 2. Generate secure API key
         let api_key = Self::generate_api_key();
-        let api_key_hash = AuthService::hash_password(&api_key)?;
+        let api_key_hash = AuthService::hash_password(&api_key)
+            .map_err(|e| CoreError::internal("Failed to hash API key").with_source(e))?;
 
         // 3. Create unique email and username for the agent
         let agent_uuid = Uuid::new_v4();
@@ -70,7 +71,7 @@ impl McpAgentService {
         let saved_agent = agent
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create MCP agent: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to create MCP agent").with_source(e))?;
 
         Ok(McpAgentCredentials {
             user_id: saved_agent.id,
@@ -81,56 +82,58 @@ impl McpAgentService {
     }
 
     /// Authenticate an MCP agent using API key
-    pub async fn authenticate_agent(&self, api_key: &str) -> Result<users::Model> {
+    pub async fn authenticate_agent(&self, api_key: &str) -> CoreResult<users::Model> {
         // Hash the provided key
         let agents = users::Entity::find()
             .filter(users::Column::UserType.eq("mcp_agent"))
             .filter(users::Column::IsActive.eq(true))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to load MCP agents").with_source(e))?;
 
         // Check each agent's hashed key
         for agent in agents {
             if let Some(stored_hash) = &agent.api_key_hash {
-                if AuthService::verify_password(api_key, stored_hash)? {
+                if AuthService::verify_password(api_key, stored_hash)
+                    .map_err(|e| CoreError::internal("Failed to verify API key").with_source(e))?
+                {
                     return Ok(agent);
                 }
             }
         }
 
-        Err(anyhow!("Invalid API key"))
+        Err(CoreError::unauthorized("Invalid API key"))
     }
 
     /// List all MCP agents for a project
-    pub async fn list_agents(&self, project_id: i32) -> Result<Vec<users::Model>> {
+    pub async fn list_agents(&self, project_id: i32) -> CoreResult<Vec<users::Model>> {
         users::Entity::find()
             .filter(users::Column::UserType.eq("mcp_agent"))
             .filter(users::Column::ScopedProjectId.eq(project_id))
             .filter(users::Column::IsActive.eq(true))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list MCP agents: {}", e))
+            .map_err(|e| CoreError::internal("Failed to list MCP agents").with_source(e))
     }
 
     /// Revoke (deactivate) an MCP agent
-    pub async fn revoke_agent(&self, user_id: i32, revoker_id: i32) -> Result<()> {
+    pub async fn revoke_agent(&self, user_id: i32, revoker_id: i32) -> CoreResult<()> {
         // 1. Get the agent
         let agent = users::Entity::find_by_id(user_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Agent not found"))?;
+            .map_err(|e| CoreError::internal("Failed to load MCP agent").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("McpAgent", user_id.to_string()))?;
 
         // 2. Verify it's an MCP agent
         if agent.user_type != "mcp_agent" {
-            return Err(anyhow!("User is not an MCP agent"));
+            return Err(CoreError::validation("User is not an MCP agent"));
         }
 
         // 3. Verify revoker has admin access to the scoped project
         let project_id = agent
             .scoped_project_id
-            .ok_or_else(|| anyhow!("MCP agent has no scoped project"))?;
+            .ok_or_else(|| CoreError::validation("MCP agent has no scoped project"))?;
 
         let auth_service = AuthorizationService::new(self.db.clone());
         auth_service
@@ -144,7 +147,7 @@ impl McpAgentService {
         agent_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to revoke agent: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to revoke agent").with_source(e))?;
 
         Ok(())
     }
@@ -162,23 +165,23 @@ impl McpAgentService {
         &self,
         agent_user_id: i32,
         requester_id: i32,
-    ) -> Result<String> {
+    ) -> CoreResult<String> {
         // Get the agent
         let agent = users::Entity::find_by_id(agent_user_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Agent not found"))?;
+            .map_err(|e| CoreError::internal("Failed to load MCP agent").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("McpAgent", agent_user_id.to_string()))?;
 
         // Verify it's an MCP agent
         if agent.user_type != "mcp_agent" {
-            return Err(anyhow!("User is not an MCP agent"));
+            return Err(CoreError::validation("User is not an MCP agent"));
         }
 
         // Verify requester has admin access
         let project_id = agent
             .scoped_project_id
-            .ok_or_else(|| anyhow!("MCP agent has no scoped project"))?;
+            .ok_or_else(|| CoreError::validation("MCP agent has no scoped project"))?;
 
         let auth_service = AuthorizationService::new(self.db.clone());
         auth_service
@@ -187,7 +190,8 @@ impl McpAgentService {
 
         // Generate new API key
         let new_api_key = Self::generate_api_key();
-        let new_hash = AuthService::hash_password(&new_api_key)?;
+        let new_hash = AuthService::hash_password(&new_api_key)
+            .map_err(|e| CoreError::internal("Failed to hash API key").with_source(e))?;
 
         // Update agent
         let mut agent_active: users::ActiveModel = agent.into();
@@ -196,7 +200,7 @@ impl McpAgentService {
         agent_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to regenerate API key: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to regenerate API key").with_source(e))?;
 
         Ok(new_api_key)
     }
@@ -227,7 +231,7 @@ mod tests_disabled {
     use crate::database::entities::{project_collaborators, projects};
     use crate::database::test_utils::setup_test_db;
 
-    async fn create_test_user(db: &DatabaseConnection, username: &str) -> Result<users::Model> {
+    async fn create_test_user(db: &DatabaseConnection, username: &str) -> CoreResult<users::Model> {
         let user = users::ActiveModel {
             email: Set(format!("{}@example.com", username)),
             username: Set(username.to_string()),
@@ -241,10 +245,12 @@ mod tests_disabled {
             ..Default::default()
         };
 
-        user.insert(db).await.map_err(Into::into)
+        user.insert(db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create test user").with_source(e))
     }
 
-    async fn create_test_project(db: &DatabaseConnection, name: &str) -> Result<projects::Model> {
+    async fn create_test_project(db: &DatabaseConnection, name: &str) -> CoreResult<projects::Model> {
         let project = projects::ActiveModel {
             name: Set(name.to_string()),
             description: Set(Some("Test project".to_string())),
@@ -253,14 +259,17 @@ mod tests_disabled {
             ..Default::default()
         };
 
-        project.insert(db).await.map_err(Into::into)
+        project
+            .insert(db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create test project").with_source(e))
     }
 
     async fn make_project_owner(
         db: &DatabaseConnection,
         project_id: i32,
         user_id: i32,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         let collab = project_collaborators::ActiveModel {
             project_id: Set(project_id),
             user_id: Set(user_id),
@@ -275,7 +284,10 @@ mod tests_disabled {
             ..Default::default()
         };
 
-        collab.insert(db).await?;
+        collab
+            .insert(db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create collaborator").with_source(e))?;
         Ok(())
     }
 

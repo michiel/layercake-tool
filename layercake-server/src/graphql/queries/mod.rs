@@ -1330,7 +1330,7 @@ impl Query {
         let agents = service
             .list_agents(project_id)
             .await
-            .map_err(|e| StructuredError::service("McpAgentService::list_agents", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(agents
             .into_iter()
