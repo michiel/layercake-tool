@@ -1,12 +1,12 @@
 #![allow(dead_code)]
 
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
 use crate::database::entities::{project_collaborators, projects, users};
+use crate::errors::{CoreError, CoreResult};
 use crate::services::{AuthorizationService, ValidationService};
 
 #[allow(dead_code)] // Collaboration service reserved for future use
@@ -29,23 +29,24 @@ impl CollaborationService {
         project_id: i32,
         invitee_email: &str,
         role: &str,
-    ) -> Result<project_collaborators::Model> {
+    ) -> CoreResult<project_collaborators::Model> {
         // Check if inviter has admin access
         self.auth_service
             .check_project_admin_access(inviter_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(role)
-            .map_err(|e| anyhow!("Invalid role: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid role: {}", e)))?;
 
         // Find invitee by email
         let invitee = users::Entity::find()
             .filter(users::Column::Email.eq(invitee_email))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("User not found with that email"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("User", invitee_email.to_string()))?;
 
         // Check if collaboration already exists
         let existing = project_collaborators::Entity::find()
@@ -53,15 +54,17 @@ impl CollaborationService {
             .filter(project_collaborators::Column::ProjectId.eq(project_id))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if let Some(existing_collab) = existing {
             if existing_collab.is_active {
-                return Err(anyhow!("User is already a collaborator on this project"));
+                return Err(CoreError::conflict(
+                    "User is already a collaborator on this project",
+                ));
             }
             if existing_collab.invitation_status == "pending" {
-                return Err(anyhow!(
-                    "User already has a pending invitation for this project"
+                return Err(CoreError::conflict(
+                    "User already has a pending invitation for this project",
                 ));
             }
         }
@@ -82,7 +85,7 @@ impl CollaborationService {
         let collaboration = collaboration
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create invitation: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to create invitation: {}", e)))?;
 
         Ok(collaboration)
     }
@@ -92,22 +95,26 @@ impl CollaborationService {
         &self,
         user_id: i32,
         collaboration_id: i32,
-    ) -> Result<project_collaborators::Model> {
+    ) -> CoreResult<project_collaborators::Model> {
         // Find collaboration
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Invitation not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Invitation", collaboration_id.to_string()))?;
 
         // Check if user is the invitee
         if collaboration.user_id != user_id {
-            return Err(anyhow!("You can only accept your own invitations"));
+            return Err(CoreError::forbidden(
+                "You can only accept your own invitations",
+            ));
         }
 
         // Check if invitation is pending
         if collaboration.invitation_status != "pending" {
-            return Err(anyhow!("This invitation is no longer pending"));
+            return Err(CoreError::validation(
+                "This invitation is no longer pending",
+            ));
         }
 
         // Update collaboration
@@ -119,7 +126,7 @@ impl CollaborationService {
         let updated_collaboration = active_collaboration
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to accept invitation: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to accept invitation: {}", e)))?;
 
         Ok(updated_collaboration)
     }
@@ -129,22 +136,26 @@ impl CollaborationService {
         &self,
         user_id: i32,
         collaboration_id: i32,
-    ) -> Result<project_collaborators::Model> {
+    ) -> CoreResult<project_collaborators::Model> {
         // Find collaboration
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Invitation not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Invitation", collaboration_id.to_string()))?;
 
         // Check if user is the invitee
         if collaboration.user_id != user_id {
-            return Err(anyhow!("You can only decline your own invitations"));
+            return Err(CoreError::forbidden(
+                "You can only decline your own invitations",
+            ));
         }
 
         // Check if invitation is pending
         if collaboration.invitation_status != "pending" {
-            return Err(anyhow!("This invitation is no longer pending"));
+            return Err(CoreError::validation(
+                "This invitation is no longer pending",
+            ));
         }
 
         // Update collaboration
@@ -154,7 +165,7 @@ impl CollaborationService {
         let updated_collaboration = active_collaboration
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to decline invitation: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to decline invitation: {}", e)))?;
 
         Ok(updated_collaboration)
     }
@@ -165,11 +176,12 @@ impl CollaborationService {
         admin_id: i32,
         project_id: i32,
         collaborator_id: i32,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
@@ -178,12 +190,12 @@ impl CollaborationService {
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Collaborator not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Collaborator", collaborator_id.to_string()))?;
 
         // Prevent removing the owner unless they're removing themselves
         if collaboration.role == "owner" && admin_id != collaborator_id {
-            return Err(anyhow!("Cannot remove project owner"));
+            return Err(CoreError::forbidden("Cannot remove project owner"));
         }
 
         // Deactivate collaboration
@@ -194,7 +206,7 @@ impl CollaborationService {
         active_collaboration
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to remove collaborator: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to remove collaborator: {}", e)))?;
 
         Ok(())
     }
@@ -206,15 +218,16 @@ impl CollaborationService {
         project_id: i32,
         collaborator_id: i32,
         new_role: &str,
-    ) -> Result<project_collaborators::Model> {
+    ) -> CoreResult<project_collaborators::Model> {
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(new_role)
-            .map_err(|e| anyhow!("Invalid role: {}", e))?;
+            .map_err(|e| CoreError::validation(format!("Invalid role: {}", e)))?;
 
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
@@ -223,12 +236,14 @@ impl CollaborationService {
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Collaborator not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Collaborator", collaborator_id.to_string()))?;
 
         // Prevent changing owner role unless they're changing their own role
         if collaboration.role == "owner" && admin_id != collaborator_id {
-            return Err(anyhow!("Cannot change project owner's role"));
+            return Err(CoreError::forbidden(
+                "Cannot change project owner's role",
+            ));
         }
 
         // Update collaboration
@@ -238,7 +253,7 @@ impl CollaborationService {
         let updated_collaboration = active_collaboration
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update collaborator role: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update collaborator role: {}", e)))?;
 
         Ok(updated_collaboration)
     }
@@ -247,14 +262,14 @@ impl CollaborationService {
     pub async fn get_pending_invitations(
         &self,
         user_id: i32,
-    ) -> Result<Vec<(project_collaborators::Model, projects::Model)>> {
+    ) -> CoreResult<Vec<(project_collaborators::Model, projects::Model)>> {
         let invitations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::InvitationStatus.eq("pending"))
             .find_also_related(projects::Entity)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let result: Vec<(project_collaborators::Model, projects::Model)> = invitations
             .into_iter()
@@ -268,7 +283,7 @@ impl CollaborationService {
     pub async fn get_user_collaborations(
         &self,
         user_id: i32,
-    ) -> Result<Vec<(project_collaborators::Model, projects::Model)>> {
+    ) -> CoreResult<Vec<(project_collaborators::Model, projects::Model)>> {
         let collaborations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::IsActive.eq(true))
@@ -277,7 +292,7 @@ impl CollaborationService {
             .order_by_desc(project_collaborators::Column::JoinedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let result: Vec<(project_collaborators::Model, projects::Model)> = collaborations
             .into_iter()
@@ -288,7 +303,7 @@ impl CollaborationService {
     }
 
     /// Leave a project (for non-owners)
-    pub async fn leave_project(&self, user_id: i32, project_id: i32) -> Result<()> {
+    pub async fn leave_project(&self, user_id: i32, project_id: i32) -> CoreResult<()> {
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
@@ -296,8 +311,8 @@ impl CollaborationService {
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("You are not a collaborator on this project"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::forbidden("You are not a collaborator on this project"))?;
 
         // Prevent owner from leaving unless they transfer ownership first
         if collaboration.role == "owner" {
@@ -308,13 +323,15 @@ impl CollaborationService {
                 .filter(project_collaborators::Column::UserId.ne(user_id))
                 .all(&self.db)
                 .await
-                .map_err(|e| anyhow!("Database error: {}", e))?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             if other_collaborators.is_empty() {
-                return Err(anyhow!("Cannot leave project as owner. Either transfer ownership or delete the project."));
+                return Err(CoreError::forbidden(
+                    "Cannot leave project as owner. Either transfer ownership or delete the project.",
+                ));
             } else {
-                return Err(anyhow!(
-                    "Cannot leave project as owner. Please transfer ownership first."
+                return Err(CoreError::forbidden(
+                    "Cannot leave project as owner. Please transfer ownership first.",
                 ));
             }
         }
@@ -326,7 +343,7 @@ impl CollaborationService {
         active_collaboration
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to leave project: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to leave project: {}", e)))?;
 
         Ok(())
     }
@@ -337,11 +354,12 @@ impl CollaborationService {
         current_owner_id: i32,
         project_id: i32,
         new_owner_id: i32,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         // Check if current user is the owner
         self.auth_service
             .check_project_admin_access(current_owner_id, project_id)
-            .await?;
+            .await
+            .map_err(map_auth_error)?;
 
         // Find new owner's collaboration
         let new_owner_collaboration = project_collaborators::Entity::find()
@@ -350,8 +368,10 @@ impl CollaborationService {
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("New owner must be an active collaborator"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| {
+                CoreError::validation("New owner must be an active collaborator")
+            })?;
 
         // Find current owner's collaboration
         let current_owner_collaboration = project_collaborators::Entity::find()
@@ -360,8 +380,10 @@ impl CollaborationService {
             .filter(project_collaborators::Column::IsActive.eq(true))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Database error: {}", e))?
-            .ok_or_else(|| anyhow!("Current owner collaboration not found"))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| {
+                CoreError::not_found("Collaborator", current_owner_id.to_string())
+            })?;
 
         // Update new owner
         let mut new_owner_active: project_collaborators::ActiveModel =
@@ -370,7 +392,7 @@ impl CollaborationService {
         new_owner_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update new owner: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update new owner: {}", e)))?;
 
         // Update current owner to editor
         let mut current_owner_active: project_collaborators::ActiveModel =
@@ -379,9 +401,18 @@ impl CollaborationService {
         current_owner_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update current owner: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to update current owner: {}", e)))?;
 
         Ok(())
+    }
+}
+
+fn map_auth_error(err: anyhow::Error) -> CoreError {
+    let message = err.to_string();
+    if message.contains("Database error") {
+        CoreError::internal(message)
+    } else {
+        CoreError::forbidden(message)
     }
 }
 
