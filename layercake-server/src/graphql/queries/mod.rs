@@ -52,7 +52,7 @@ impl Query {
             .app
             .list_projects_filtered(tags)
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_projects_filtered", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(projects.into_iter().map(Project::from).collect())
     }
@@ -64,7 +64,7 @@ impl Query {
             .app
             .get_project(id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::get_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(project.map(Project::from))
     }

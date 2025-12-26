@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use anyhow::{anyhow, Result};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -279,7 +278,7 @@ impl AppContext {
         &self,
         models: &[data_sets::Model],
         sum_weights: bool,
-    ) -> Result<String> {
+    ) -> CoreResult<String> {
         #[derive(Deserialize, Serialize, Default)]
         struct GraphData {
             #[serde(default)]
@@ -384,13 +383,13 @@ impl AppContext {
         merged.layers.extend(layer_map.into_values());
 
         serde_json::to_string(&merged)
-            .map_err(|e| anyhow!("Failed to serialize merged data: {}", e))
+            .map_err(|e| CoreError::internal(format!("Failed to serialize merged data: {}", e)))
     }
 
     pub async fn export_data_sets(
         &self,
         request: DataSetExportRequest,
-    ) -> Result<DataSetExportResult> {
+    ) -> CoreResult<DataSetExportResult> {
         let DataSetExportRequest {
             project_id,
             data_set_ids,
@@ -403,18 +402,17 @@ impl AppContext {
             .count(&self.db)
             .await
             .map_err(|e| {
-                anyhow!(
+                CoreError::internal(format!(
                     "Failed to verify data sets for project {}: {}",
-                    project_id,
-                    e
-                )
+                    project_id, e
+                ))
             })?;
 
         if matching_count != data_set_ids.len() as u64 {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Export request included data sets outside project {}",
                 project_id
-            ));
+            )));
         }
 
         let bytes = match format {
@@ -422,12 +420,16 @@ impl AppContext {
                 .data_set_bulk_service
                 .export_to_xlsx(&data_set_ids)
                 .await
-                .map_err(|e| anyhow!("Failed to export datasets to XLSX: {}", e))?,
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to export datasets to XLSX: {}", e))
+                })?,
             DataSetExportFormat::Ods => self
                 .data_set_bulk_service
                 .export_to_ods(&data_set_ids)
                 .await
-                .map_err(|e| anyhow!("Failed to export datasets to ODS: {}", e))?,
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to export datasets to ODS: {}", e))
+                })?,
         };
 
         let filename = format!(
@@ -446,18 +448,22 @@ impl AppContext {
     pub async fn import_data_sets(
         &self,
         request: DataSetImportRequest,
-    ) -> Result<DataSetImportOutcome> {
+    ) -> CoreResult<DataSetImportOutcome> {
         let result = match request.format {
             DataSetImportFormat::Xlsx => self
                 .data_set_bulk_service
                 .import_from_xlsx(request.project_id, &request.file_bytes)
                 .await
-                .map_err(|e| anyhow!("Failed to import datasets from XLSX: {}", e))?,
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to import datasets from XLSX: {}", e))
+                })?,
             DataSetImportFormat::Ods => self
                 .data_set_bulk_service
                 .import_from_ods(request.project_id, &request.file_bytes)
                 .await
-                .map_err(|e| anyhow!("Failed to import datasets from ODS: {}", e))?,
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to import datasets from ODS: {}", e))
+                })?,
         };
 
         if result.imported_ids.is_empty() {
@@ -473,7 +479,9 @@ impl AppContext {
             .filter(data_sets::Column::Id.is_in(result.imported_ids.clone()))
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load imported datasets: {}", e))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load imported datasets: {}", e))
+            })?;
 
         Ok(DataSetImportOutcome {
             data_sets: models.into_iter().map(DataSetSummary::from).collect(),

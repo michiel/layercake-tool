@@ -810,6 +810,9 @@ After refactoring, support multiple deployment modes:
 - Updated preview export operations to accept Actor/CoreError and wired MCP tool (`layercake-core/src/app_context/preview_operations.rs`, `layercake-server/src/mcp/tools/graph_data.rs`).
 - Converted `PlanService` to `CoreResult` and propagated through plan operations and Plan DAG loader (`layercake-core/src/services/plan_service.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-core/src/app_context/plan_dag_operations.rs`), with GraphQL mapping updates (`layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/plan.rs`, `layercake-server/src/graphql/types/project.rs`).
 - Converted DataSet listing/validation operations to `CoreResult` and updated GraphQL mappings (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/data_set.rs`, `layercake-server/src/graphql/mutations/graph.rs`).
+- Converted project list/get operations to `CoreResult` and updated GraphQL mappings and library call sites (`layercake-core/src/app_context/project_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-core/src/app_context/library_operations.rs`).
+- Converted graph edit/analysis helpers to `CoreResult` and updated GraphQL mapping (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_edit.rs`).
+- Converted data set import/export to `CoreResult` and updated GraphQL mapping (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-server/src/graphql/mutations/data_set.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

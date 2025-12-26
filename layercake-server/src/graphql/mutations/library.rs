@@ -339,7 +339,7 @@ impl LibraryMutation {
             .app
             .list_projects()
             .await
-            .map_err(|e| StructuredError::service("AppContext::list_projects", e))?;
+            .map_err(StructuredError::from_core_error)?;
         let project_name = projects
             .into_iter()
             .find(|p| p.id == project_id)
@@ -351,7 +351,7 @@ impl LibraryMutation {
             .app
             .delete_project(&layercake_core::auth::SystemActor::internal(), project_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::delete_project", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         // Re-import the project
         let new_project = context

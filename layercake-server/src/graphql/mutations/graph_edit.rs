@@ -47,7 +47,7 @@ impl GraphEditMutation {
             .app
             .replay_graph_edits(graph_id)
             .await
-            .map_err(|e| StructuredError::service("AppContext::replay_graph_edits", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ReplaySummary {
             total: summary.total as i32,

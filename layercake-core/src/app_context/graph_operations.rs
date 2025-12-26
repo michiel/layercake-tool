@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
@@ -257,21 +256,23 @@ impl AppContext {
         Ok(())
     }
 
-    pub async fn replay_graph_edits(&self, graph_id: i32) -> Result<GraphEditReplaySummary> {
+    pub async fn replay_graph_edits(&self, graph_id: i32) -> CoreResult<GraphEditReplaySummary> {
         self.graph_edit_service
             .replay_graph_edits(graph_id)
             .await
-            .map_err(|e| anyhow!("Failed to replay graph edits: {}", e))
+            .map_err(|e| CoreError::internal(format!("Failed to replay graph edits: {}", e)))
     }
 
     pub async fn analyze_graph_connectivity(
         &self,
         graph_id: i32,
-    ) -> Result<GraphConnectivityReport> {
+    ) -> CoreResult<GraphConnectivityReport> {
         self.graph_analysis_service
             .analyze_connectivity(graph_id)
             .await
-            .map_err(|e| anyhow!("Failed to analyze graph connectivity: {}", e))
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to analyze graph connectivity: {}", e))
+            })
     }
 
     pub async fn find_graph_paths(
@@ -280,10 +281,10 @@ impl AppContext {
         source_node: String,
         target_node: String,
         max_paths: usize,
-    ) -> Result<Vec<Vec<String>>> {
+    ) -> CoreResult<Vec<Vec<String>>> {
         self.graph_analysis_service
             .find_paths(graph_id, &source_node, &target_node, max_paths)
             .await
-            .map_err(|e| anyhow!("Failed to find graph paths: {}", e))
+            .map_err(|e| CoreError::internal(format!("Failed to find graph paths: {}", e)))
     }
 }

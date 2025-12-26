@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder, Set};
 
@@ -9,12 +8,12 @@ use crate::auth::Actor;
 
 impl AppContext {
     // ----- Project helpers -------------------------------------------------
-    pub async fn list_projects(&self) -> Result<Vec<ProjectSummary>> {
+    pub async fn list_projects(&self) -> CoreResult<Vec<ProjectSummary>> {
         let projects = projects::Entity::find()
             .order_by_desc(projects::Column::UpdatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list projects: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to list projects: {}", e)))?;
 
         Ok(projects.into_iter().map(ProjectSummary::from).collect())
     }
@@ -22,12 +21,12 @@ impl AppContext {
     pub async fn list_projects_filtered(
         &self,
         tags: Option<Vec<String>>,
-    ) -> Result<Vec<ProjectSummary>> {
+    ) -> CoreResult<Vec<ProjectSummary>> {
         let projects = projects::Entity::find()
             .order_by_desc(projects::Column::UpdatedAt)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list projects: {}", e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to list projects: {}", e)))?;
 
         // If tags filter is provided, filter projects by tags
         let filtered_projects = if let Some(filter_tags) = tags {
@@ -56,11 +55,11 @@ impl AppContext {
             .collect())
     }
 
-    pub async fn get_project(&self, id: i32) -> Result<Option<ProjectSummary>> {
+    pub async fn get_project(&self, id: i32) -> CoreResult<Option<ProjectSummary>> {
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to load project {}: {}", id, e))?;
+            .map_err(|e| CoreError::internal(format!("Failed to load project {}: {}", id, e)))?;
 
         Ok(project.map(ProjectSummary::from))
     }

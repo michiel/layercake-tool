@@ -236,7 +236,7 @@ impl DataSetMutation {
                 format,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::export_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(&exported.data);
@@ -273,7 +273,7 @@ impl DataSetMutation {
                 file_bytes,
             })
             .await
-            .map_err(|e| StructuredError::service("AppContext::import_data_sets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ImportDataSetsResult {
             data_sets: outcome.data_sets.into_iter().map(DataSet::from).collect(),

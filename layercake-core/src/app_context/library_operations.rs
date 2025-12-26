@@ -499,7 +499,8 @@ impl AppContext {
 
         let snapshot = self
             .load_plan_dag(project_id, None)
-            .await?
+            .await
+            .map_err(|e| anyhow!("Failed to load plan DAG: {}", e))?
             .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
 
         let data_sets = data_sets::Entity::find()
@@ -620,7 +621,8 @@ impl AppContext {
 
         let snapshot = self
             .load_plan_dag(project_id, None)
-            .await?
+            .await
+            .map_err(|e| anyhow!("Failed to load plan DAG: {}", e))?
             .ok_or_else(|| anyhow!("Project {} has no DAG to export", project_id))?;
 
         let data_sets = data_sets::Entity::find()
@@ -1107,7 +1109,11 @@ impl AppContext {
     }
 
     async fn collect_plan_assets(&self, project_id: i32) -> Result<Vec<ExportAsset>> {
-        let plans = self.plan_service.list_plans(project_id).await?;
+        let plans = self
+            .plan_service
+            .list_plans(project_id)
+            .await
+            .map_err(|e| anyhow!("Failed to list plans: {}", e))?;
         if plans.is_empty() {
             return Ok(Vec::new());
         }
@@ -1116,7 +1122,11 @@ impl AppContext {
         let mut index = PlansIndex::default();
 
         for plan in plans {
-            if let Some(snapshot) = self.load_plan_dag(project_id, Some(plan.id)).await? {
+            if let Some(snapshot) = self
+                .load_plan_dag(project_id, Some(plan.id))
+                .await
+                .map_err(|e| anyhow!("Failed to load plan DAG: {}", e))?
+            {
                 let filename = format!("plan_{}.json", plan.id);
                 let metadata = ExportedPlanMetadata {
                     original_id: plan.id,
