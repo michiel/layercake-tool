@@ -133,6 +133,12 @@ impl StructuredError {
     }
 }
 
+impl From<CoreError> for Error {
+    fn from(err: CoreError) -> Self {
+        StructuredError::from_core_error(err)
+    }
+}
+
 /// Extension trait for Result to add context
 #[allow(dead_code)]
 pub trait ResultExt<T> {
