@@ -109,7 +109,7 @@ impl Query {
             .data_set_service()
             .get_graph_summary(dataset_id)
             .await
-            .map_err(|e| StructuredError::service("DataSetService::get_graph_summary", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(GraphSummary::from(summary))
     }
 
@@ -132,7 +132,7 @@ impl Query {
                 layers,
             )
             .await
-            .map_err(|e| StructuredError::service("DataSetService::get_graph_page", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(GraphPage::from(page))
     }
 
@@ -312,7 +312,7 @@ impl Query {
             .graph_service()
             .list_project_layers(project_id)
             .await
-            .map_err(|e| StructuredError::service("GraphService::list_project_layers", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(layers.into_iter().map(ProjectLayer::from).collect())
     }
@@ -326,7 +326,7 @@ impl Query {
             .graph_service()
             .missing_layers(project_id)
             .await
-            .map_err(|e| StructuredError::service("GraphService::missing_layers", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(missing)
     }
 
@@ -371,7 +371,7 @@ impl Query {
             .system_settings
             .list_settings()
             .await
-            .map_err(|e| StructuredError::service("SystemSettingsService::list_settings", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(settings.into_iter().map(SystemSetting::from).collect())
     }
 
@@ -382,7 +382,7 @@ impl Query {
             .system_settings
             .get_setting(&key)
             .await
-            .map_err(|e| StructuredError::service("SystemSettingsService::get_setting", e))?;
+            .map_err(StructuredError::from_core_error)?;
         Ok(SystemSetting::from(setting))
     }
 
@@ -808,7 +808,7 @@ impl Query {
         let items = service
             .list(params)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::list", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(items.into_iter().map(LibraryItem::from).collect())
     }
@@ -820,7 +820,7 @@ impl Query {
         let item = service
             .get(id)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::get", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(item.map(LibraryItem::from))
     }

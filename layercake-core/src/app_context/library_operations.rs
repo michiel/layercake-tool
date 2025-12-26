@@ -612,8 +612,7 @@ impl AppContext {
                 Some("application/zip".to_string()),
                 zip_bytes,
             )
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to persist template: {}", e)))?;
+            .await?;
 
         Ok(item)
     }
@@ -1104,13 +1103,7 @@ impl AppContext {
         let service = LibraryItemService::new(self.db.clone());
         let item = service
             .get(library_item_id)
-            .await
-            .map_err(|e| {
-                CoreError::internal(format!(
-                    "Failed to load library item {}: {}",
-                    library_item_id, e
-                ))
-            })?
+            .await?
             .ok_or_else(|| CoreError::not_found("LibraryItem", library_item_id.to_string()))?;
 
         if item.item_type != ITEM_TYPE_PROJECT && item.item_type != ITEM_TYPE_PROJECT_TEMPLATE {

@@ -632,13 +632,16 @@ The interactive console becomes a CLI-only feature:
 
 After refactoring, support multiple deployment modes:
 
-| Scenario | Crates Used | Binary |
-|----------|-------------|--------|
-| **Headless server** | `layercake-core` + `layercake-server` | `layercake-server` |
-| **CLI-only** | `layercake-core` + `layercake-cli` | `layercake` |
-| **Desktop app** | All three (via Tauri) | `Layercake.app` |
-| **Library usage** | `layercake-core` only | (imported as dep) |
-| **Docker server** | `layercake-server` only | `FROM scratch` + binary |
+| Scenario | Crates Used | Frontend Projects | Binary/Artifact |
+|----------|-------------|-------------------|-----------------|
+| **Headless server** | `layercake-core` + `layercake-server` | (none) | `layercake-server` |
+| **Server with UI** | `layercake-core` + `layercake-server` | `frontend/` + `projections-frontend/` | `layercake-server` + static assets |
+| **CLI-only** | `layercake-core` + `layercake-cli` | (none) | `layercake` |
+| **Desktop app** | All three (via Tauri) | `frontend/` + `projections-frontend/` | `Layercake.app` |
+| **Library usage** | `layercake-core` only | (none) | (imported as dep) |
+| **Docker server** | `layercake-core` + `layercake-server` | `frontend/` + `projections-frontend/` | `FROM scratch` + binary + static assets |
+
+**Projection export requirement**: keep projection export endpoints enabled and UI export flows available for **Headless server**, **Server with UI**, **Desktop app**, and **Docker server** deployments.
 
 ---
 
@@ -817,8 +820,28 @@ After refactoring, support multiple deployment modes:
 - Converted `ProjectService` to `CoreResult` for create/update/delete/read and collaborator access (`layercake-core/src/services/project_service.rs`).
 - Converted `CollaborationService` to `CoreResult` and mapped authorization errors (`layercake-core/src/services/collaboration_service.rs`).
 - Converted `PlanDagService` to `CoreResult` with structured error mapping (`layercake-core/src/services/plan_dag_service.rs`).
+- Converted `DataSetService` to `CoreResult` and propagated core error mapping for dataset graph summary/page (`layercake-core/src/services/data_set_service.rs`, `layercake-server/src/graphql/queries/mod.rs`).
+- Converted `AuthorizationService` to `CoreResult` and removed auth error adapters in services; GraphQL chat/MCP flows now map `CoreError` directly (`layercake-core/src/services/authorization.rs`, `layercake-core/src/services/project_service.rs`, `layercake-core/src/services/collaboration_service.rs`, `layercake-server/src/graphql/mutations/chat.rs`, `layercake-server/src/graphql/mutations/mcp.rs`).
+- Converted `GraphEditService` + `GraphEditApplicator` to `CoreResult` with structured CoreError mapping (`layercake-core/src/services/graph_edit_service.rs`, `layercake-core/src/services/graph_edit_applicator.rs`).
+- Added AppContext wrappers for graph and layer mutations with Actor + CoreError mapping; GraphQL graph/layer mutations now pass Actor and map CoreError (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph.rs`, `layercake-server/src/graphql/mutations/layer.rs`).
+- Converted `GraphAnalysisService` to `CoreResult` with GraphError mapping and simplified AppContext analysis/path helpers; MCP/GraphQL callers now flow through CoreError (`layercake-core/src/services/graph_analysis_service.rs`, `layercake-core/src/app_context/graph_operations.rs`).
+- Added Actor to graph edit replay mutation path (AppContext + GraphQL + MCP) (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_edit.rs`, `layercake-server/src/mcp/tools/graph_edit.rs`).
+- Converted `GraphService` to `CoreResult` and updated AppContext/GraphQL query usage to map CoreError directly (`layercake-core/src/services/graph_service.rs`, `layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`).
+- Routed graph edit create/clear mutations through AppContext with Actor and CoreError mapping (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_edit.rs`).
+- Routed MCP graph CSV import through AppContext with Actor; MCP graph data tools now operate on graph_data tables and update project palette layers (`layercake-server/src/mcp/tools/graph_data.rs`, `layercake-server/src/mcp/server.rs`).
+- Converted `LayerPaletteService` to `CoreResult` with CoreError mapping (`layercake-core/src/services/layer_palette_service.rs`).
+- Converted `SampleProjectService` to `CoreResult` and added Actor to sample project creation; GraphQL mutation now maps CoreError (`layercake-core/src/services/sample_project_service.rs`, `layercake-server/src/graphql/mutations/project.rs`).
+- Converted `SystemSettingsService` to `CoreResult`, updated server/CLI/test initialization, and mapped GraphQL settings queries/mutation through CoreError (`layercake-core/src/services/system_settings_service.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/system.rs`, `layercake-server/src/server/app.rs`, `layercake-cli/src/console/context.rs`, `layercake-core/tests/parity_smoke_test.rs`).
+- Converted `LibraryItemService` to `CoreResult` and updated AppContext + GraphQL library queries/mutations to map CoreError (`layercake-core/src/services/library_item_service.rs`, `layercake-core/src/app_context/library_operations.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/library.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
+
+**Next steps**
+- Convert remaining services to `CoreResult` (priority: `LibraryItemService`, `ChatHistoryService`, `McpAgentService`, `CodeAnalysisService`, `GraphDataService`, `SystemSettingsService` consumers in GraphQL).
+- Add Actor to remaining mutation paths that still accept raw IDs (focus on library/project/template flows and chat session mutations).
+- Implement `impl From<CoreError> for async_graphql::Error` and remove legacy StructuredError adapters where possible.
+- Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
+- Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).
 
 #### Tasks
 

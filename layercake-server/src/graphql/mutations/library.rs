@@ -115,7 +115,7 @@ impl LibraryMutation {
                     .await
             }
         }
-        .map_err(|e| StructuredError::service("LibraryItemService::upload", e))?;
+        .map_err(StructuredError::from_core_error)?;
 
         Ok(LibraryItem::from(item))
     }
@@ -128,7 +128,7 @@ impl LibraryMutation {
         service
             .delete(id)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::delete", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -146,7 +146,7 @@ impl LibraryMutation {
         let updated = service
             .update_fields(id, input.name, input.description, input.tags)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::update_fields", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(LibraryItem::from(updated))
     }
@@ -163,7 +163,7 @@ impl LibraryMutation {
         let models = service
             .import_many_datasets(input.project_id, &input.library_item_ids)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::import_many_datasets", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(models.into_iter().map(DataSet::from).collect())
     }
@@ -382,7 +382,7 @@ impl LibraryMutation {
         let result = service
             .seed_from_repository()
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::seed_from_repository", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(SeedLibraryItemsResult::from(result))
     }
@@ -401,7 +401,7 @@ impl LibraryMutation {
         let item = service
             .get(id)
             .await
-            .map_err(|e| StructuredError::service("LibraryItemService::get", e))?
+            .map_err(StructuredError::from_core_error)?
             .ok_or_else(|| StructuredError::not_found("Library item", id.to_string()))?;
 
         // Verify it's a dataset
@@ -428,9 +428,7 @@ impl LibraryMutation {
 
         // Infer data type from content
         let inferred_type = infer_data_type(&metadata.filename, &file_format, &item.content_blob)
-            .map_err(|e| {
-            StructuredError::bad_request(format!("Failed to infer data type: {}", e))
-        })?;
+            .map_err(StructuredError::from_core_error)?;
 
         // Update metadata with new data type
         metadata.data_type = inferred_type.as_ref().to_string();
