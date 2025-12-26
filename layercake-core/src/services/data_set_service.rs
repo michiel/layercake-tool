@@ -1,5 +1,4 @@
 use anyhow::{anyhow, Result};
-use async_graphql::SimpleObject;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -18,7 +17,7 @@ use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, Deserialize, SimpleObject)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct DataSetAnnotation {
     pub title: String,
     pub date: chrono::DateTime<chrono::Utc>,

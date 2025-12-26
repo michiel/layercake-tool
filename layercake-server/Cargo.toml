@@ -1,0 +1,67 @@
+[package]
+name = "layercake-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "layercake-server"
+path = "src/main.rs"
+
+[features]
+default = ["graphql", "mcp"]
+graphql = []
+mcp = []
+rmcp = ["dep:rmcp"]
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+base64 = "0.22"
+once_cell = "1.19"
+rig = { workspace = true }
+rmcp = { version = "0.9.1", features = ["client", "transport-streamable-http-client-reqwest"], optional = true }
+
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+async-trait = { workspace = true }
+async-graphql = { workspace = true }
+async-graphql-axum = { workspace = true }
+async-stream = { workspace = true }
+lazy_static = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+dashmap = { workspace = true }
+url = { workspace = true }
+include_dir = { workspace = true }
+handlebars = { workspace = true }
+regex = { workspace = true }
+notify = { workspace = true }
+csv = { workspace = true }
+indexmap = { workspace = true }
+calamine = { workspace = true }
+rust_xlsxwriter = { workspace = true }
+spreadsheet-ods = { workspace = true }
+icu_locid = { workspace = true }
+zip = { workspace = true }
+bcrypt = { workspace = true }
+axum-mcp = { workspace = true }
+tokio-stream = "0.1"
+json-patch = "2.0"
+
+layercake-core = { path = "../layercake-core", package = "layercake-core" }
+layercake-genai = { path = "../layercake-genai" }
+layercake-projections = { path = "../layercake-projections" }

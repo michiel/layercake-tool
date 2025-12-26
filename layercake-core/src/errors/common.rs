@@ -18,7 +18,8 @@
 #[cfg(feature = "graphql")]
 use async_graphql::{Error as GraphQLError, ErrorExtensions};
 
-use super::*;
+#[cfg(feature = "graphql")]
+use super::{GraphError, PlanError};
 
 /// Convert domain errors to GraphQL errors with error codes
 #[cfg(feature = "graphql")]

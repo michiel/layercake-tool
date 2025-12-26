@@ -249,42 +249,6 @@ impl GraphService {
         Ok(())
     }
 
-    async fn get_project_layers_palette(&self, project_id: i32) -> GraphResult<Vec<Layer>> {
-        // Ensure palette exists by seeding from layer datasets if empty
-        self.seed_project_layers_if_empty(project_id).await?;
-
-        // Query enabled layers ordered by priority:
-        // - Manual layers (source_dataset_id = NULL) first (NULLs sort first in ascending order)
-        // - Then dataset layers ordered by dataset ID and insertion time
-        let db_layers = project_layers::Entity::find()
-            .filter(project_layers::Column::ProjectId.eq(project_id))
-            .filter(project_layers::Column::Enabled.eq(true))
-            .order_by_asc(project_layers::Column::SourceDatasetId)
-            .order_by_asc(project_layers::Column::Id)
-            .all(&self.db)
-            .await
-            .map_err(GraphError::Database)?;
-
-        // Deduplication: When multiple sources define the same layer_id, only the first
-        // occurrence is included in the palette. Priority order is determined by the
-        // SQL ORDER BY clause above:
-        // 1. Manual layers (source_dataset_id = NULL) come before dataset layers
-        // 2. Among dataset layers, ordered by source_dataset_id then by insertion order (id)
-        // This means manual layer definitions override dataset-provided ones with the same ID.
-        let mut seen = HashSet::new();
-        let mut palette = Vec::new();
-
-        for db_layer in db_layers {
-            if seen.contains(&db_layer.layer_id) {
-                continue; // Skip duplicate layer_id
-            }
-            seen.insert(db_layer.layer_id.clone());
-            palette.push(self.hydrate_project_layer(project_id, db_layer).await?);
-        }
-
-        Ok(palette)
-    }
-
     /// Get database graph_layers for a graph
     #[allow(dead_code)]
     pub async fn get_layers_for_graph(

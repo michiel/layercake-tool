@@ -6,7 +6,7 @@ use uuid::Uuid;
 use super::{AppContext, PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanDagSnapshot};
 use super::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest, PlanDagNodePositionRequest};
 use crate::database::entities::{data_sets, projects};
-use crate::graphql::types::plan_dag::{
+use crate::plan_dag::{
     DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagEdge, PlanDagMetadata, PlanDagNode,
     PlanDagNodeType, Position,
 };

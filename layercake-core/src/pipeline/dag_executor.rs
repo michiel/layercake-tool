@@ -9,7 +9,7 @@ use tracing::{debug_span, info, warn, Instrument};
 use crate::database::entities::graph_data;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
 use crate::database::entities::{graphs, plan_dag_nodes, projections, sequence_contexts};
-use crate::graphql::types::plan_dag::{
+use crate::plan_dag::{
     config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
 use crate::pipeline::dag_context::DagExecutionContext;

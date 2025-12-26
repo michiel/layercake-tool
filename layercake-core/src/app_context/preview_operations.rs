@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use super::AppContext;
 use crate::export::sequence_renderer::SequenceRenderConfigResolved;
 use crate::export::{to_mermaid_sequence, to_plantuml_sequence};
-use crate::graphql::types::plan_dag::config::SequenceArtefactRenderTarget;
+use crate::plan_dag::config::SequenceArtefactRenderTarget;
 use crate::plan::{ExportFileType, RenderConfig};
 use crate::sequence_context::{apply_render_config, build_story_context};
 

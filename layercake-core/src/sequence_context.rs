@@ -12,8 +12,8 @@ use crate::export::sequence_renderer::{
     SequenceRenderConfigResolved, SequenceRenderContext, SequenceStep, SequenceStorySummary,
     SequenceStoryWithSequences,
 };
-use crate::graphql::types::sequence::{NotePosition, SequenceEdgeRef};
-use crate::graphql::types::story::StoryLayerConfig;
+use crate::sequence_types::{NotePosition, SequenceEdgeRef};
+use crate::story_types::StoryLayerConfig;
 use crate::plan::LayerSourceStyle;
 
 #[derive(Clone, Serialize, Deserialize)]

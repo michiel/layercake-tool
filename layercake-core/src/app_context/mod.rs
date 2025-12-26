@@ -432,7 +432,7 @@ pub struct DataSetImportOutcome {
     pub updated_count: i32,
 }
 
-use crate::graphql::types::plan_dag::{
+use crate::plan_dag::{
     PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position,
 };
 use serde_json::Value;

@@ -19,7 +19,9 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 
 | Path | Purpose |
 |------|---------|
-| `layercake-core/` | Rust workspace crate with the CLI, GraphQL/REST server, plan runtime, exporters, and MCP integration. |
+| `layercake-core/` | Rust library crate with core plan/runtime logic, services, database access, exporters, and MCP primitives. |
+| `layercake-cli/` | Rust CLI binary for plan execution, generators, migrations, updates, and the interactive console. |
+| `layercake-server/` | Rust HTTP/GraphQL server binary for the web UI, collaboration, and MCP endpoints. |
 | `frontend/` | Vite + React + Mantine UI with ReactFlow-based plan and graph editors. |
 | `src-tauri/` | Tauri 2 shell that embeds the backend, manages SQLite files, and ships the desktop app. |
 | `external-modules/` | Optional integrations (e.g. `axum-mcp` transport helpers). |
@@ -47,10 +49,10 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 
 1. Start the backend (defaults shown):
    ```bash
-   cargo run --bin layercake -- serve \
-     --port 3001 \
-     --database layercake.db \
-     --cors-origin http://localhost:1422
+  cargo run --bin layercake -- serve \
+    --port 3001 \
+    --database layercake.db \
+    --cors-origin http://localhost:1422
    ```
 2. Point the frontend at that API by creating `frontend/.env.local` (or exporting before the next step):
    ```bash
@@ -84,6 +86,7 @@ The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scri
 - Run the backend server for remote clients:
   ```bash
   cargo run --bin layercake -- serve --port 8080 --database ./layercake.db
+  cargo run --bin layercake-server -- --port 8080 --database ./layercake.db
   ```
 - Manage migrations:
   ```bash
@@ -110,7 +113,7 @@ The CLI ships optional features for the interactive console and chat credential 
 npm run frontend:install
 
 # Optionally warm the Rust workspace
-cargo build -p layercake-core
+cargo build -p layercake-core -p layercake-cli -p layercake-server
 ```
 
 ### Quick Development Loop
@@ -138,7 +141,7 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
 
 ## Testing & Quality
 
-- Backend: `npm run backend:test` (wraps `cargo test -p layercake-core`)
+- Backend: `npm run backend:test` (wraps `cargo test -p layercake-core -p layercake-cli -p layercake-server`)
 - Frontend type/smoke build: `npm run frontend:build`
 - Formatting & linting:
   ```bash

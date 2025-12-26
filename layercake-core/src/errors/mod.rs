@@ -60,6 +60,7 @@
 
 pub mod auth;
 pub mod common;
+pub mod core_error;
 pub mod data_set;
 pub mod graph;
 pub mod import_export;
@@ -67,6 +68,7 @@ pub mod plan;
 
 // Re-export all error types
 pub use auth::AuthError;
+pub use core_error::{CoreError, CoreErrorKind};
 pub use data_set::DataSetError;
 pub use graph::GraphError;
 pub use import_export::ImportExportError;
@@ -92,6 +94,10 @@ pub type AuthResult<T> = Result<T, AuthError>;
 /// Result type alias for import/export operations
 #[allow(dead_code)]
 pub type ImportExportResult<T> = Result<T, ImportExportError>;
+
+/// Result type alias for core services
+#[allow(dead_code)]
+pub type CoreResult<T> = Result<T, CoreError>;
 
 #[cfg(test)]
 mod tests {

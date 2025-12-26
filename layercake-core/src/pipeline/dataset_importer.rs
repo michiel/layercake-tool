@@ -112,16 +112,6 @@ impl DatasourceImporter {
             })
             .await?;
 
-        // Publish initial execution status (Processing)
-        #[cfg(feature = "graphql")]
-        crate::graphql::execution_events::publish_dataset_status(
-            &self.db,
-            dataset.project_id,
-            &dataset.node_id,
-            &dataset,
-        )
-        .await;
-
         // Use shared content for parsing
         let file_content = String::from_utf8(file_bytes.clone())?;
 
@@ -152,10 +142,6 @@ impl DatasourceImporter {
 
         match result {
             Ok((row_count, column_info, graph_nodes, graph_edges)) => {
-                // Save values before moving dataset
-                let project_id = dataset.project_id;
-                let node_id = dataset.node_id.clone();
-
                 // Persist graph_data contents and mark complete
                 let source_hash = format!("{:x}", Sha256::digest(&file_bytes));
                 if !graph_nodes.is_empty() {
@@ -188,20 +174,9 @@ impl DatasourceImporter {
                 active = active.set_completed(row_count as i32, column_info);
                 let updated = active.update(&self.db).await?;
 
-                // Publish execution status change
-                #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_dataset_status(
-                    &self.db, project_id, &node_id, &updated,
-                )
-                .await;
-
                 Ok(updated)
             }
             Err(e) => {
-                // Save values before moving dataset
-                let project_id = dataset.project_id;
-                let node_id = dataset.node_id.clone();
-
                 // Mark graph_data as error
                 let mut graph_active: graph_data::ActiveModel = graph_data.into();
                 graph_active.status = Set(graph_data::GraphDataStatus::Error.into());
@@ -212,14 +187,7 @@ impl DatasourceImporter {
                 // Update to error state
                 let mut active: datasets::ActiveModel = dataset.into();
                 active = active.set_error(e.to_string());
-                let updated = active.update(&self.db).await?;
-
-                // Publish execution status change
-                #[cfg(feature = "graphql")]
-                crate::graphql::execution_events::publish_dataset_status(
-                    &self.db, project_id, &node_id, &updated,
-                )
-                .await;
+                let _ = active.update(&self.db).await?;
 
                 Err(e)
             }

@@ -650,6 +650,16 @@ After refactoring, support multiple deployment modes:
 
 #### Tasks
 
+**Progress (2025-09-25)**
+- Completed: module placement audit (`docs/separation-of-concerns-module-audit.md`).
+- Completed: CoreError + Actor scaffolding, core exports updated.
+- Completed: service authorization audit draft (`docs/service-authorization-audit.md`).
+- Completed: transaction patterns doc (`layercake-core/docs/transaction-patterns.md`).
+- Completed: `layercake-test-utils` crate + test fixtures skeleton.
+- Completed: golden error baseline harness (`layercake-server/tests/golden_errors.rs` + manifest).
+- Completed: Rig tools registry doc (`layercake-cli/docs/rig-tools-registry.md`).
+- In progress: GraphQL error baseline capture (golden harness added, fixtures pending).
+
 1. **Audit current modules** (1 day)
    - Categorise each `src/` module as: Core / Server / CLI / Shared
    - Document import dependencies between modules

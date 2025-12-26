@@ -11,23 +11,20 @@ pub mod infra_graph;
 pub mod pipeline;
 pub mod plan;
 pub mod plan_execution;
+pub mod plan_dag;
+pub mod sequence_types;
 pub mod sequence_context;
+pub mod story_types;
+pub mod update;
+pub mod auth;
 
 pub mod app_context;
 pub use app_context::AppContext;
-pub mod collaboration;
+pub use auth::{Actor, Authorizer, SystemActor};
+pub use errors::{CoreError, CoreErrorKind};
 pub mod database;
-pub mod server;
 pub mod services;
 pub mod utils;
 
 #[cfg(debug_assertions)]
 pub mod dev_utils;
-
-pub mod graphql;
-
-#[cfg(feature = "mcp")]
-pub mod mcp;
-
-#[cfg(feature = "console")]
-pub mod console;

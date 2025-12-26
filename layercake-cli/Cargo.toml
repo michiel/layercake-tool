@@ -1,0 +1,39 @@
+[package]
+name = "layercake-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "layercake"
+path = "src/main.rs"
+
+[features]
+default = ["console"]
+console = []
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde_yaml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+regex = { workspace = true }
+sea-orm = { workspace = true }
+sea-orm-migration = { workspace = true }
+axum-mcp = { workspace = true }
+rig = { workspace = true }
+rmcp = { version = "0.9.1", features = ["client", "transport-streamable-http-client-reqwest"] }
+clap-repl = "0.3.2"
+nu-ansi-term = "0.49.0"
+
+layercake-code-analysis = { path = "../layercake-code-analysis" }
+layercake-core = { path = "../layercake-core", package = "layercake-core" }
+layercake-server = { path = "../layercake-server" }

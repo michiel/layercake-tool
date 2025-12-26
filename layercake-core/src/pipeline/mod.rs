@@ -2,7 +2,6 @@ mod dag_context;
 mod dag_executor;
 mod dataset_importer;
 #[allow(dead_code)]
-mod graph_builder;
 mod graph_data_builder;
 mod graph_data_persist_utils;
 #[allow(dead_code)]

@@ -2,8 +2,6 @@ use anyhow::{anyhow, Result};
 use serde_json::{json, Value};
 
 use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
-use crate::graphql::types::graph_node::GraphNode as GraphNodeDto;
-use crate::graphql::types::layer::Layer as LayerDto;
 use crate::services::graph_analysis_service::GraphConnectivityReport;
 use crate::services::graph_edit_service::ReplaySummary as GraphEditReplaySummary;
 
@@ -18,7 +16,7 @@ impl AppContext {
         layer: Option<String>,
         attributes: Option<Value>,
         belongs_to: Option<String>,
-    ) -> Result<GraphNodeDto> {
+    ) -> Result<crate::database::entities::graph_data_nodes::Model> {
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
@@ -133,7 +131,7 @@ impl AppContext {
             }
         }
 
-        Ok(GraphNodeDto::from(updated_node))
+        Ok(updated_node)
     }
 
     pub async fn update_layer_properties(
@@ -142,7 +140,7 @@ impl AppContext {
         name: Option<String>,
         alias: Option<String>,
         properties: Option<Value>,
-    ) -> Result<LayerDto> {
+    ) -> Result<crate::database::entities::graph_layers::Model> {
         use crate::database::entities::graph_layers::Entity as Layers;
         use sea_orm::EntityTrait;
 
@@ -218,7 +216,7 @@ impl AppContext {
             }
         }
 
-        Ok(LayerDto::from(updated_layer))
+        Ok(updated_layer)
     }
 
     pub async fn bulk_update_graph_data(

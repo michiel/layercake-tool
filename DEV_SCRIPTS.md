@@ -87,8 +87,7 @@ If database initialization fails:
 
 ```bash
 # Manually initialize
-cd layercake-core
-cargo run -- db init
+cargo run --bin layercake -- db init
 ```
 
 ### Frontend Dependencies
@@ -106,9 +105,8 @@ If backend fails to compile:
 
 ```bash
 # Clean build
-cd layercake-core
 cargo clean
-cargo build
+cargo build -p layercake-core -p layercake-cli -p layercake-server
 ```
 
 ## Development Workflow

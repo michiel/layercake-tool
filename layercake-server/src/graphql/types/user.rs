@@ -1,0 +1,269 @@
+#![allow(dead_code)]
+
+use async_graphql::*;
+use chrono::{DateTime, Utc};
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+use layercake_core::database::entities::{project_collaborators, user_sessions, users};
+use crate::graphql::context::GraphQLContext;
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct User {
+    pub id: i32,
+    pub email: String,
+    pub username: String,
+    pub display_name: String,
+    pub avatar_color: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+impl From<users::Model> for User {
+    fn from(model: users::Model) -> Self {
+        Self {
+            id: model.id,
+            email: model.email,
+            username: model.username,
+            display_name: model.display_name,
+            avatar_color: model.avatar_color,
+            is_active: model.is_active,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+            last_login_at: model.last_login_at,
+        }
+    }
+}
+
+#[ComplexObject]
+impl User {
+    async fn sessions(&self, ctx: &Context<'_>) -> Result<Vec<UserSession>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let sessions = user_sessions::Entity::find()
+            .filter(user_sessions::Column::UserId.eq(self.id))
+            .filter(user_sessions::Column::IsActive.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(sessions.into_iter().map(UserSession::from).collect())
+    }
+
+    async fn collaborations(&self, ctx: &Context<'_>) -> Result<Vec<ProjectCollaborator>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let collaborations = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::UserId.eq(self.id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .all(&context.db)
+            .await?;
+
+        Ok(collaborations
+            .into_iter()
+            .map(ProjectCollaborator::from)
+            .collect())
+    }
+
+    // REMOVED: presence method - user presence now handled via WebSocket only (memory-only storage)
+    // Real-time presence data is available through the WebSocket collaboration system at /ws/collaboration
+}
+
+#[derive(SimpleObject)]
+pub struct UserSession {
+    pub id: i32,
+    pub session_id: String,
+    pub user_id: i32,
+    pub user_name: String,
+    pub project_id: i32,
+    pub layercake_graph_id: Option<i32>,
+    pub cursor_position: Option<String>,
+    pub selected_node_id: Option<String>,
+    pub last_activity: DateTime<Utc>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+impl From<user_sessions::Model> for UserSession {
+    fn from(model: user_sessions::Model) -> Self {
+        Self {
+            id: model.id,
+            session_id: model.session_id,
+            user_id: model.user_id,
+            user_name: model.user_name,
+            project_id: model.project_id,
+            layercake_graph_id: model.layercake_graph_id,
+            cursor_position: model.cursor_position,
+            selected_node_id: model.selected_node_id,
+            last_activity: model.last_activity,
+            is_active: model.is_active,
+            created_at: model.created_at,
+            expires_at: model.expires_at,
+        }
+    }
+}
+
+#[derive(SimpleObject)]
+#[graphql(complex)]
+pub struct ProjectCollaborator {
+    pub id: i32,
+    pub project_id: i32,
+    pub user_id: i32,
+    pub role: String,
+    pub permissions: String,
+    pub invited_by: Option<i32>,
+    pub invitation_status: String,
+    pub invited_at: DateTime<Utc>,
+    pub joined_at: Option<DateTime<Utc>>,
+    pub last_active_at: Option<DateTime<Utc>>,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl From<project_collaborators::Model> for ProjectCollaborator {
+    fn from(model: project_collaborators::Model) -> Self {
+        Self {
+            id: model.id,
+            project_id: model.project_id,
+            user_id: model.user_id,
+            role: model.role,
+            permissions: model.permissions,
+            invited_by: model.invited_by,
+            invitation_status: model.invitation_status,
+            invited_at: model.invited_at,
+            joined_at: model.joined_at,
+            last_active_at: model.last_active_at,
+            is_active: model.is_active,
+            created_at: model.created_at,
+            updated_at: model.updated_at,
+        }
+    }
+}
+
+#[ComplexObject]
+impl ProjectCollaborator {
+    async fn user(&self, ctx: &Context<'_>) -> Result<Option<User>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let user = users::Entity::find_by_id(self.user_id)
+            .one(&context.db)
+            .await?;
+
+        Ok(user.map(User::from))
+    }
+
+    async fn invited_by_user(&self, ctx: &Context<'_>) -> Result<Option<User>> {
+        if let Some(invited_by_id) = self.invited_by {
+            let context = ctx.data::<GraphQLContext>()?;
+            let user = users::Entity::find_by_id(invited_by_id)
+                .one(&context.db)
+                .await?;
+
+            Ok(user.map(User::from))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+// REMOVED: UserPresence type - user presence now handled via WebSocket only (memory-only storage)
+// WebSocket presence data is available through the WebSocket collaboration system at /ws/collaboration
+
+// Input types for queries
+#[derive(InputObject)]
+pub struct UserFilter {
+    pub id: Option<i32>,
+    pub email: Option<String>,
+    pub username: Option<String>,
+    pub session_id: Option<String>,
+}
+
+// Input types for mutations
+#[derive(InputObject)]
+pub struct RegisterUserInput {
+    pub email: String,
+    pub username: String,
+    pub display_name: String,
+    pub password: String,
+}
+
+#[derive(InputObject)]
+pub struct LoginInput {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(InputObject)]
+pub struct UpdateUserInput {
+    pub display_name: Option<String>,
+    pub email: Option<String>,
+}
+
+#[derive(InputObject)]
+pub struct InviteCollaboratorInput {
+    pub project_id: i32,
+    pub email: String,
+    pub role: String,
+}
+
+#[derive(InputObject)]
+pub struct UpdateCollaboratorRoleInput {
+    pub collaborator_id: i32,
+    pub role: String,
+}
+
+// REMOVED: UpdateUserPresenceInput - user presence updates now handled via WebSocket only
+
+#[derive(InputObject)]
+pub struct CursorPositionInput {
+    pub x: f64,
+    pub y: f64,
+}
+
+#[derive(InputObject)]
+pub struct ViewportPositionInput {
+    pub x: f64,
+    pub y: f64,
+    pub zoom: f64,
+}
+
+// Response types
+#[derive(SimpleObject)]
+pub struct LoginResponse {
+    pub user: User,
+    pub session_id: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(SimpleObject)]
+pub struct RegisterResponse {
+    pub user: User,
+    pub session_id: String,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum ProjectRole {
+    Owner,
+    Editor,
+    Viewer,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum InvitationStatus {
+    Pending,
+    Accepted,
+    Declined,
+    Revoked,
+}
+
+#[derive(Enum, Copy, Clone, Eq, PartialEq)]
+pub enum UserStatus {
+    Active,
+    Idle,
+    Away,
+    Offline,
+}
+
+// REMOVED: UserPresenceInfo and CursorPosition types - user presence now handled via WebSocket only
+// Real-time collaboration data is available through the WebSocket system at /ws/collaboration

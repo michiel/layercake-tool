@@ -12,7 +12,8 @@ repository.workspace = true
 tauri-build = { workspace = true }
 
 [dependencies]
-layercake_core = { path = "../layercake-core", package = "layercake-core", features = ["server", "graphql"] }
+layercake_core = { path = "../layercake-core", package = "layercake-core" }
+layercake-server = { path = "../layercake-server" }
 tauri = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

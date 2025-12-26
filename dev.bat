@@ -7,7 +7,7 @@ setlocal EnableDelayedExpansion
 REM Configuration
 set BACKEND_PORT=8080
 set FRONTEND_PORT=1420
-set BACKEND_DIR=layercake-core
+set BACKEND_DIR=.
 set FRONTEND_DIR=frontend
 if "%LOG_LEVEL%"=="" set LOG_LEVEL=info
 
@@ -35,7 +35,7 @@ REM Initialize database if it doesn't exist
 if not exist "layercake.db" (
     echo [DEV] Initializing database...
     cd "%BACKEND_DIR%"
-    cargo run -- db init
+    cargo run --bin layercake -- db init
     cd ..
     echo [SUCCESS] Database initialized
 )
@@ -43,7 +43,7 @@ if not exist "layercake.db" (
 REM Start backend server
 echo [DEV] Starting backend server...
 cd "%BACKEND_DIR%"
-start /b cmd /c "cargo run -- serve --port %BACKEND_PORT% --log-level %LOG_LEVEL% --cors-origin http://localhost:%FRONTEND_PORT% > ../backend.log 2>&1"
+start /b cmd /c "cargo run --bin layercake -- serve --port %BACKEND_PORT% --log-level %LOG_LEVEL% --cors-origin http://localhost:%FRONTEND_PORT% > backend.log 2>&1"
 cd ..
 
 REM Wait for backend to start

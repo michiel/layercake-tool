@@ -7,7 +7,7 @@ use tracing::info;
 
 use layercake_core::database::connection::{establish_connection, get_database_url};
 use layercake_core::database::migrations::Migrator;
-use layercake_core::server::app::create_app;
+use layercake_server::server::app::create_app;
 use sea_orm_migration::prelude::*;
 
 pub struct ServerHandle {

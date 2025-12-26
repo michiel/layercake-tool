@@ -6,10 +6,7 @@ use once_cell::sync::Lazy;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use tokio::sync::RwLock;
 
-use crate::{
-    console::chat::{ChatConfig, ChatProvider},
-    database::entities::system_settings,
-};
+use crate::database::entities::system_settings;
 
 static DESCRIPTORS: Lazy<HashMap<&'static str, &'static SettingDescriptor>> = Lazy::new(|| {
     let mut map = HashMap::new();
@@ -348,7 +345,6 @@ pub struct SystemSettingView {
 pub struct SystemSettingsService {
     db: DatabaseConnection,
     cache: Arc<RwLock<HashMap<String, system_settings::Model>>>,
-    chat_config: Arc<RwLock<Arc<ChatConfig>>>,
 }
 
 impl SystemSettingsService {
@@ -356,7 +352,6 @@ impl SystemSettingsService {
         let service = Self {
             db: db.clone(),
             cache: Arc::new(RwLock::new(HashMap::new())),
-            chat_config: Arc::new(RwLock::new(Arc::new(ChatConfig::from_map(&HashMap::new())))),
         };
         service.sync_defaults().await?;
         Ok(service)
@@ -428,20 +423,6 @@ impl SystemSettingsService {
             entries.insert(record.key.clone(), record);
         }
         *self.cache.write().await = entries.clone();
-        self.recompute_chat_config(&entries).await?;
-        Ok(())
-    }
-
-    async fn recompute_chat_config(
-        &self,
-        entries: &HashMap<String, system_settings::Model>,
-    ) -> Result<()> {
-        let mut values = HashMap::new();
-        for (key, record) in entries {
-            values.insert(key.clone(), record.value.clone());
-        }
-        let new_config = Arc::new(ChatConfig::from_map(&values));
-        *self.chat_config.write().await = new_config;
         Ok(())
     }
 
@@ -551,17 +532,15 @@ impl SystemSettingsService {
             _ => {}
         }
 
-        if descriptor.key == "LAYERCAKE_CHAT_PROVIDER" && !value.is_empty() {
-            value
-                .parse::<ChatProvider>()
-                .context("invalid chat provider value")?;
-        }
-
         Ok(())
     }
 
-    pub async fn chat_config(&self) -> Arc<ChatConfig> {
-        self.chat_config.read().await.clone()
+    pub async fn settings_map(&self) -> HashMap<String, String> {
+        let cache = self.cache.read().await;
+        cache
+            .iter()
+            .map(|(key, record)| (key.clone(), record.value.clone()))
+            .collect()
     }
 
     pub async fn raw_value(&self, key: &str) -> Option<String> {

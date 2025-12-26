@@ -3574,6 +3574,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "507460a910eb7b32ee961886ff48539633b788a36b65692b95f225b844c82553"
 
 [[package]]
+name = "layercake-cli"
+version = "0.3.7"
+dependencies = [
+ "anyhow",
+ "axum-mcp",
+ "chrono",
+ "clap 4.5.48",
+ "clap-repl",
+ "layercake-code-analysis",
+ "layercake-core",
+ "layercake-server",
+ "nu-ansi-term 0.49.0",
+ "regex",
+ "rig-core",
+ "rmcp",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "layercake-code-analysis"
 version = "0.3.7"
 dependencies = [
@@ -3604,38 +3631,25 @@ name = "layercake-core"
 version = "0.3.7"
 dependencies = [
  "anyhow",
- "async-graphql",
- "async-graphql-axum",
- "async-stream",
  "async-trait",
- "axum",
- "axum-mcp",
  "base64 0.22.1",
  "bcrypt",
  "calamine",
  "chrono",
- "clap 4.5.48",
- "clap-repl",
  "colored",
  "csv",
- "dashmap 6.1.0",
  "futures-util",
  "handlebars 4.5.0",
  "icu_locid",
  "include_dir",
  "indexmap 2.11.4",
- "json-patch 2.0.0",
  "layercake-code-analysis",
  "layercake-genai",
  "layercake-projections",
- "lazy_static",
  "notify",
- "nu-ansi-term 0.49.0",
  "once_cell",
  "regex",
  "reqwest",
- "rig-core",
- "rmcp",
  "rust_xlsxwriter",
  "sea-orm",
  "sea-orm-migration",
@@ -3648,15 +3662,10 @@ dependencies = [
  "strum 0.26.3",
  "thiserror 1.0.69",
  "tokio",
- "tokio-stream",
  "tokio-test",
  "tokio-tungstenite 0.26.2",
  "toml 0.5.11",
- "tower",
- "tower-http",
  "tracing",
- "tracing-subscriber",
- "tracing-tree",
  "url",
  "uuid",
  "zip 0.6.6",
@@ -3725,12 +3734,65 @@ dependencies = [
 ]
 
 [[package]]
+name = "layercake-server"
+version = "0.3.7"
+dependencies = [
+ "anyhow",
+ "async-graphql",
+ "async-graphql-axum",
+ "async-stream",
+ "async-trait",
+ "axum",
+ "axum-mcp",
+ "base64 0.22.1",
+ "bcrypt",
+ "calamine",
+ "chrono",
+ "clap 4.5.48",
+ "csv",
+ "dashmap 6.1.0",
+ "futures-util",
+ "handlebars 4.5.0",
+ "icu_locid",
+ "include_dir",
+ "indexmap 2.11.4",
+ "json-patch 2.0.0",
+ "layercake-core",
+ "layercake-genai",
+ "layercake-projections",
+ "lazy_static",
+ "notify",
+ "once_cell",
+ "regex",
+ "rig-core",
+ "rmcp",
+ "rust_xlsxwriter",
+ "sea-orm",
+ "sea-orm-migration",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "spreadsheet-ods",
+ "tokio",
+ "tokio-stream",
+ "tokio-tungstenite 0.26.2",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "uuid",
+ "zip 0.6.6",
+]
+
+[[package]]
 name = "layercake-tauri"
 version = "0.3.7"
 dependencies = [
  "anyhow",
  "axum",
  "layercake-core",
+ "layercake-server",
  "rand 0.8.5",
  "reqwest",
  "sea-orm",
@@ -3746,6 +3808,15 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "layercake-test-utils"
+version = "0.3.7"
+dependencies = [
+ "anyhow",
+ "sea-orm",
+ "uuid",
 ]
 
 [[package]]
@@ -4262,16 +4333,6 @@ name = "notify-types"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e0826a989adedc2a244799e823aece04662b66609d96af8dff7ac6df9a8925d"
-
-[[package]]
-name = "nu-ansi-term"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
-dependencies = [
- "overload",
- "winapi",
-]
 
 [[package]]
 name = "nu-ansi-term"
@@ -4814,12 +4875,6 @@ dependencies = [
  "quote",
  "syn 2.0.106",
 ]
-
-[[package]]
-name = "overload"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "pango"
@@ -8447,17 +8502,6 @@ dependencies = [
 
 [[package]]
 name = "tracing-log"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f751112709b4e791d8ce53e32c4ed2d353565a795ce84da2285393f41557bdf2"
-dependencies = [
- "log",
- "once_cell",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-log"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
@@ -8482,19 +8526,7 @@ dependencies = [
  "thread_local",
  "tracing",
  "tracing-core",
- "tracing-log 0.2.0",
-]
-
-[[package]]
-name = "tracing-tree"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ec6adcab41b1391b08a308cc6302b79f8095d1673f6947c2dc65ffb028b0b2d"
-dependencies = [
- "nu-ansi-term 0.46.0",
- "tracing-core",
- "tracing-log 0.1.4",
- "tracing-subscriber",
+ "tracing-log",
 ]
 
 [[package]]

@@ -83,7 +83,7 @@ struct ExportedSequence {
     name: String,
     description: Option<String>,
     enabled_dataset_ids: Vec<i32>,
-    edge_order: Vec<crate::graphql::types::sequence::SequenceEdgeRef>,
+    edge_order: Vec<crate::sequence_types::SequenceEdgeRef>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -299,9 +299,9 @@ fn sanitize_relative_path(path: &str) -> Result<PathBuf> {
 }
 
 fn node_type_storage_name(
-    node_type: &crate::graphql::types::plan_dag::PlanDagNodeType,
+    node_type: &crate::plan_dag::PlanDagNodeType,
 ) -> &'static str {
-    use crate::graphql::types::plan_dag::PlanDagNodeType;
+    use crate::plan_dag::PlanDagNodeType;
     match node_type {
         PlanDagNodeType::DataSet => "DataSetNode",
         PlanDagNodeType::Graph => "GraphNode",
@@ -808,7 +808,7 @@ impl AppContext {
         let desired_name = project_name.unwrap_or(project_record.name.clone());
         let now = Utc::now();
 
-        let mut project_model = projects::ActiveModel {
+        let project_model = projects::ActiveModel {
             id: target_project_id.map(Set).unwrap_or(NotSet),
             name: Set(desired_name.clone()),
             description: Set(project_record.description.clone()),

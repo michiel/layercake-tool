@@ -6,8 +6,8 @@ use serde_json::Value;
 
 use super::{AppContext, StoryExportResult, StoryImportResult, StoryImportSummary};
 use crate::database::entities::{data_sets, sequences, stories};
-use crate::graphql::types::sequence::{NotePosition, SequenceEdgeRef};
-use crate::graphql::types::story::StoryLayerConfig;
+use crate::sequence_types::{NotePosition, SequenceEdgeRef};
+use crate::story_types::StoryLayerConfig;
 
 // ===== CSV Export =====
 
