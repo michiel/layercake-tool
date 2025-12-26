@@ -59,13 +59,13 @@ impl GraphDataMutation {
         let _summary = service
             .replay_edits(graph_data_id)
             .await
-            .map_err(|e| StructuredError::service("GraphDataService::replay_edits", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         // Fetch updated graph_data
         let graph_data = service
             .get_by_id(graph_data_id)
             .await
-            .map_err(|e| StructuredError::service("GraphDataService::get_by_id", e))?
+            .map_err(StructuredError::from_core_error)?
             .ok_or_else(|| StructuredError::not_found("GraphData", graph_data_id))?;
 
         Ok(GraphData::from(graph_data))
@@ -79,7 +79,7 @@ impl GraphDataMutation {
         service
             .clear_edits(graph_data_id)
             .await
-            .map_err(|e| StructuredError::service("GraphDataService::clear_edits", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }

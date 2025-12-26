@@ -836,6 +836,7 @@ After refactoring, support multiple deployment modes:
 - Converted `ChatHistoryService` to `CoreResult` and updated GraphQL and chat session flows to map CoreError at boundaries (`layercake-core/src/services/chat_history_service.rs`, `layercake-server/src/graphql/mutations/chat.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/chat/session.rs`, `layercake-server/src/chat/session_old_llm.rs`).
 - Converted `McpAgentService` to `CoreResult` and updated GraphQL MCP mutations/queries to map CoreError (`layercake-core/src/services/mcp_agent_service.rs`, `layercake-server/src/graphql/mutations/mcp.rs`, `layercake-server/src/graphql/queries/mod.rs`).
 - Converted `CodeAnalysisService` to `CoreResult` and updated GraphQL code analysis queries/mutations to map CoreError (`layercake-core/src/services/code_analysis_service.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/code_analysis.rs`).
+- Converted `GraphDataService` to `CoreResult` and updated GraphQL graph_data mutations to map CoreError (`layercake-core/src/services/graph_data_service.rs`, `layercake-server/src/graphql/mutations/graph_data.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

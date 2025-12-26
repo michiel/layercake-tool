@@ -4,6 +4,7 @@ use crate::database::entities::{
     graph_data_edges, graph_data_nodes,
     graph_edits::{self, Entity as GraphEdits},
 };
+use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_data_edit_applicator::{ApplyResult, GraphDataEditApplicator};
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
@@ -26,7 +27,7 @@ impl GraphDataService {
     pub async fn create(
         &self,
         input: GraphDataCreate,
-    ) -> Result<graph_data::Model, sea_orm::DbErr> {
+    ) -> CoreResult<graph_data::Model> {
         let now = Utc::now();
         let active = graph_data::ActiveModel {
             project_id: Set(input.project_id),
@@ -58,41 +59,52 @@ impl GraphDataService {
         graph_data::Entity::insert(active)
             .exec_with_returning(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to create graph_data").with_source(e))
     }
 
-    pub async fn get_by_id(&self, id: i32) -> Result<Option<graph_data::Model>, sea_orm::DbErr> {
-        graph_data::Entity::find_by_id(id).one(&self.db).await
+    pub async fn get_by_id(&self, id: i32) -> CoreResult<Option<graph_data::Model>> {
+        graph_data::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))
     }
 
     pub async fn list_by_project_and_source(
         &self,
         project_id: i32,
         source_type: &str,
-    ) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_data::Model>> {
         graph_data::Entity::find()
             .filter(graph_data::Column::ProjectId.eq(project_id))
             .filter(graph_data::Column::SourceType.eq(source_type))
             .all(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to list graph_data").with_source(e))
     }
 
     pub async fn replace_nodes(
         &self,
         graph_data_id: i32,
         nodes: Vec<GraphDataNodeInput>,
-    ) -> Result<(), sea_orm::DbErr> {
-        let txn = self.db.begin().await?;
+    ) -> CoreResult<()> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal("Failed to begin graph_data transaction").with_source(e))?;
 
         // Remove edges first to satisfy FK constraints on graph_data_edges
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
             .exec(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data edges").with_source(e))?;
 
         graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .exec(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data nodes").with_source(e))?;
 
         let now = Utc::now();
         for node in nodes.iter() {
@@ -110,7 +122,10 @@ impl GraphDataService {
                 created_at: Set(node.created_at.unwrap_or(now)),
                 ..Default::default()
             };
-            graph_data_nodes::Entity::insert(active).exec(&txn).await?;
+            graph_data_nodes::Entity::insert(active)
+                .exec(&txn)
+                .await
+                .map_err(|e| CoreError::internal("Failed to insert graph_data node").with_source(e))?;
         }
 
         graph_data::ActiveModel {
@@ -121,23 +136,31 @@ impl GraphDataService {
             ..Default::default()
         }
         .update(&txn)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to update graph_data counts").with_source(e))?;
 
-        txn.commit().await
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit graph_data nodes").with_source(e))
     }
 
     pub async fn replace_edges(
         &self,
         graph_data_id: i32,
         edges: Vec<GraphDataEdgeInput>,
-    ) -> Result<(), sea_orm::DbErr> {
-        let txn = self.db.begin().await?;
+    ) -> CoreResult<()> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal("Failed to begin graph_data transaction").with_source(e))?;
 
         // Gather node ids for informational logging about external references
         let node_ids: std::collections::HashSet<String> = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .all(&txn)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data nodes").with_source(e))?
             .into_iter()
             .map(|n| n.external_id)
             .collect();
@@ -145,7 +168,8 @@ impl GraphDataService {
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
             .exec(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data edges").with_source(e))?;
 
         let now = Utc::now();
         let mut external_ref_count = 0;
@@ -175,7 +199,10 @@ impl GraphDataService {
                 created_at: Set(edge.created_at.unwrap_or(now)),
                 ..Default::default()
             };
-            graph_data_edges::Entity::insert(active).exec(&txn).await?;
+            graph_data_edges::Entity::insert(active)
+                .exec(&txn)
+                .await
+                .map_err(|e| CoreError::internal("Failed to insert graph_data edge").with_source(e))?;
         }
 
         if external_ref_count > 0 {
@@ -193,39 +220,45 @@ impl GraphDataService {
             ..Default::default()
         }
         .update(&txn)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to update graph_data counts").with_source(e))?;
 
-        txn.commit().await
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit graph_data edges").with_source(e))
     }
 
     pub async fn load_nodes(
         &self,
         graph_data_id: i32,
-    ) -> Result<Vec<graph_data_nodes::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_data_nodes::Model>> {
         graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .all(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data nodes").with_source(e))
     }
 
     pub async fn load_edges(
         &self,
         graph_data_id: i32,
-    ) -> Result<Vec<graph_data_edges::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_data_edges::Model>> {
         graph_data_edges::Entity::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
             .all(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data edges").with_source(e))
     }
 
     pub async fn get_by_dag_node(
         &self,
         dag_node_id: &str,
-    ) -> Result<Option<graph_data::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Option<graph_data::Model>> {
         graph_data::Entity::find()
             .filter(graph_data::Column::DagNodeId.eq(dag_node_id))
             .one(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))
     }
 
     pub async fn mark_status(
@@ -233,14 +266,12 @@ impl GraphDataService {
         graph_data_id: i32,
         status: GraphDataStatus,
         source_hash: Option<String>,
-    ) -> Result<(), sea_orm::DbErr> {
+    ) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.status = Set(status.into());
@@ -248,54 +279,57 @@ impl GraphDataService {
             model.source_hash = Set(Some(hash));
         }
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to update graph_data status").with_source(e))
     }
 
     pub async fn mark_complete(
         &self,
         graph_data_id: i32,
         source_hash: String,
-    ) -> Result<(), sea_orm::DbErr> {
+    ) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.status = Set(GraphDataStatus::Active.into());
         model.source_hash = Set(Some(source_hash));
         model.computed_date = Set(Some(Utc::now()));
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to complete graph_data").with_source(e))
     }
 
     pub async fn load_full(
         &self,
         graph_data_id: i32,
-    ) -> Result<
+    ) -> CoreResult<
         (
             graph_data::Model,
             Vec<graph_data_nodes::Model>,
             Vec<graph_data_edges::Model>,
         ),
-        sea_orm::DbErr,
     > {
         let graph = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?;
 
         if let Some(graph) = graph {
             let nodes = self.load_nodes(graph.id).await?;
             let edges = self.load_edges(graph.id).await?;
             Ok((graph, nodes, edges))
         } else {
-            Err(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))
+            Err(CoreError::not_found("GraphData", graph_data_id.to_string()))
         }
     }
 
@@ -303,7 +337,7 @@ impl GraphDataService {
     pub async fn list_datasets(
         &self,
         project_id: i32,
-    ) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_data::Model>> {
         self.list_by_project_and_source(project_id, "dataset").await
     }
 
@@ -311,13 +345,13 @@ impl GraphDataService {
     pub async fn list_computed(
         &self,
         project_id: i32,
-    ) -> Result<Vec<graph_data::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_data::Model>> {
         self.list_by_project_and_source(project_id, "computed")
             .await
     }
 
     /// Mark a graph_data as processing (transitional status)
-    pub async fn mark_processing(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+    pub async fn mark_processing(&self, graph_data_id: i32) -> CoreResult<()> {
         self.mark_status(graph_data_id, GraphDataStatus::Processing, None)
             .await
     }
@@ -327,20 +361,22 @@ impl GraphDataService {
         &self,
         graph_data_id: i32,
         error: String,
-    ) -> Result<(), sea_orm::DbErr> {
+    ) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.status = Set(GraphDataStatus::Error.into());
         model.error_message = Set(Some(error));
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to mark graph_data error").with_source(e))
     }
 
     /// Create a computed graph_data entry (convenience wrapper)
@@ -349,7 +385,7 @@ impl GraphDataService {
         project_id: i32,
         dag_node_id: String,
         name: String,
-    ) -> Result<graph_data::Model, sea_orm::DbErr> {
+    ) -> CoreResult<graph_data::Model> {
         self.create(GraphDataCreate {
             project_id,
             name,
@@ -379,7 +415,7 @@ impl GraphDataService {
         project_id: i32,
         name: String,
         metadata: Option<Value>,
-    ) -> Result<graph_data::Model, sea_orm::DbErr> {
+    ) -> CoreResult<graph_data::Model> {
         self.create(GraphDataCreate {
             project_id,
             name,
@@ -411,14 +447,12 @@ impl GraphDataService {
         graph_data_id: i32,
         sequence_number: i32,
         applied: bool,
-    ) -> Result<(), sea_orm::DbErr> {
+    ) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.last_edit_sequence = Set(sequence_number);
@@ -427,7 +461,11 @@ impl GraphDataService {
             model.has_pending_edits = Set(true);
         }
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to update edit metadata").with_source(e))
     }
 
     /// Set the pending edits state for a graph_data
@@ -435,53 +473,59 @@ impl GraphDataService {
         &self,
         graph_data_id: i32,
         has_pending: bool,
-    ) -> Result<(), sea_orm::DbErr> {
+    ) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.has_pending_edits = Set(has_pending);
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to update pending state").with_source(e))
     }
 
     /// Update last_replay_at timestamp for a graph_data
-    pub async fn mark_replayed(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+    pub async fn mark_replayed(&self, graph_data_id: i32) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.last_replay_at = Set(Some(Utc::now()));
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to mark graph_data replayed").with_source(e))
     }
 
     /// Reset edit metadata for a graph_data (used when clearing edits)
-    pub async fn reset_edit_metadata(&self, graph_data_id: i32) -> Result<(), sea_orm::DbErr> {
+    pub async fn reset_edit_metadata(&self, graph_data_id: i32) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!(
-                "graph_data {}",
-                graph_data_id
-            )))?
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))?
             .into();
 
         model.last_edit_sequence = Set(0);
         model.has_pending_edits = Set(false);
         model.last_replay_at = Set(None);
         model.updated_at = Set(Utc::now());
-        model.update(&self.db).await.map(|_| ())
+        model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to reset edit metadata").with_source(e))
     }
 
     /// Get all edits for a graph_data in sequence order
@@ -493,7 +537,7 @@ impl GraphDataService {
         &self,
         graph_data_id: i32,
         unapplied_only: bool,
-    ) -> Result<Vec<graph_edits::Model>, sea_orm::DbErr> {
+    ) -> CoreResult<Vec<graph_edits::Model>> {
         let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_data_id));
 
         if unapplied_only {
@@ -504,18 +548,24 @@ impl GraphDataService {
             .order_by_asc(graph_edits::Column::SequenceNumber)
             .all(&self.db)
             .await
+            .map_err(|e| CoreError::internal("Failed to load graph edits").with_source(e))
     }
 
     /// Mark an edit as applied
-    pub async fn mark_edit_applied(&self, edit_id: i32) -> Result<(), sea_orm::DbErr> {
+    pub async fn mark_edit_applied(&self, edit_id: i32) -> CoreResult<()> {
         let edit = GraphEdits::find_by_id(edit_id)
             .one(&self.db)
-            .await?
-            .ok_or(sea_orm::DbErr::RecordNotFound(format!("Edit {}", edit_id)))?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph edit").with_source(e))?
+            .ok_or_else(|| CoreError::not_found("GraphEdit", edit_id.to_string()))?;
 
         let mut active_model: graph_edits::ActiveModel = edit.into();
         active_model.applied = Set(true);
-        active_model.update(&self.db).await.map(|_| ())
+        active_model
+            .update(&self.db)
+            .await
+            .map(|_| ())
+            .map_err(|e| CoreError::internal("Failed to mark edit applied").with_source(e))
     }
 
     /// Get edit count for a graph_data
@@ -523,7 +573,7 @@ impl GraphDataService {
         &self,
         graph_data_id: i32,
         unapplied_only: bool,
-    ) -> Result<u64, sea_orm::DbErr> {
+    ) -> CoreResult<u64> {
         use sea_orm::PaginatorTrait;
 
         let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_data_id));
@@ -532,13 +582,16 @@ impl GraphDataService {
             query = query.filter(graph_edits::Column::Applied.eq(false));
         }
 
-        query.count(&self.db).await
+        query
+            .count(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to count graph edits").with_source(e))
     }
 
     /// Replay all unapplied edits for a graph_data
     ///
     /// Returns a summary of the replay operation
-    pub async fn replay_edits(&self, graph_data_id: i32) -> Result<ReplaySummary, sea_orm::DbErr> {
+    pub async fn replay_edits(&self, graph_data_id: i32) -> CoreResult<ReplaySummary> {
         info!("Starting replay of edits for graph_data {}", graph_data_id);
 
         // Get all unapplied edits in sequence order
@@ -638,12 +691,13 @@ impl GraphDataService {
     }
 
     /// Clear all edits for a graph_data
-    pub async fn clear_edits(&self, graph_data_id: i32) -> Result<u64, sea_orm::DbErr> {
+    pub async fn clear_edits(&self, graph_data_id: i32) -> CoreResult<u64> {
         // Delete all edits
         let result = GraphEdits::delete_many()
             .filter(graph_edits::Column::GraphId.eq(graph_data_id))
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal("Failed to clear graph edits").with_source(e))?;
 
         // Reset metadata
         self.reset_edit_metadata(graph_data_id).await?;
