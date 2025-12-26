@@ -2,13 +2,15 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to restructure the Layercake project from a monolithic `layercake-core` crate into three distinct, purpose-built crates, while keeping database ownership in core for now:
+This document outlines a comprehensive plan to restructure the Layercake project from a monolithic `layercake-core` crate into a set of distinct, purpose-built crates focused on separation of concerns:
 
-- **layercake-core**: Pure business logic, data models, DAG execution, and service layer
+- **layercake-core**: Pure business logic, data models, DAG execution, service layer, and export/import functionality
 - **layercake-server**: HTTP/GraphQL API, WebSocket collaboration, session management, and ephemeral state
 - **layercake-cli**: Command-line interface, interactive console, and user-facing tooling
 
 This separation will improve modularity, testability, and maintainability while enabling independent deployment scenarios (headless server, CLI-only, library usage).
+
+**Note**: Export/import functionality (templates, file formats) will initially remain in `layercake-core` to keep refactor scope contained. A separate `layercake-exports` crate may be extracted in a future refactoring once the core API stabilizes.
 
 ---
 
@@ -50,13 +52,13 @@ All functionality is controlled via Cargo features (`server`, `graphql`, `mcp`, 
 
 ```
 layercake-workspace/
-├── layercake-core/          ← Pure business logic library
-├── layercake-exports/       ← Import/export tooling (templates + file formats)
+├── layercake-core/          ← Pure business logic library (includes export/import for now)
 ├── layercake-server/        ← HTTP/GraphQL/WebSocket server
 ├── layercake-cli/           ← CLI binary + interactive console
 ├── layercake-code-analysis/ ← Existing (unchanged)
 ├── layercake-genai/         ← Existing (unchanged)
 ├── layercake-projections/   ← Existing (unchanged)
+├── layercake-test-utils/    ← Shared test utilities (dev-dependency only)
 └── layercake-integration-tests/
 ```
 
@@ -78,8 +80,10 @@ Pure Rust library crate containing all domain logic, data models, and stateless 
 #### DAG Execution Engine
 - **Plan executor**: Parse YAML plans, resolve dependencies, execute steps
 - **Pipeline system**: Data transformation pipeline, step chaining
-- **Export orchestration**: Delegates template rendering and file format handling to `layercake-exports`
+- **Export/Import**: Template rendering (Handlebars), file format conversion (CSV, XLSX, ODS)
 - **Validation**: Graph validation, plan validation, schema checks
+
+**Note**: Export/import functionality remains in core for the initial refactoring. May be extracted to separate crate in future iterations once dependency patterns stabilize.
 
 #### Data Access Layer
 - **Database connection**: SeaORM connection pool management, URL configuration
@@ -99,8 +103,8 @@ All services become pure, database-driven business logic without HTTP concerns:
 - `DataSetService`: DataSet CRUD, graph JSON operations
 - `DataSetBulkService`: Bulk upload processing
 - `ProjectService`: Project CRUD, archiving
-- `ExportService`: Graph export to various formats (delegates to `layercake-exports`)
-- `ImportService`: Graph import from files (delegates to `layercake-exports`)
+- `ExportService`: Graph export to various formats (CSV, XLSX, ODS, templates)
+- `ImportService`: Graph import from files (CSV, XLSX, ODS)
 - `LibraryItemService`: Library/palette management
 - `CodeAnalysisService`: Code graph operations
 - `ValidationService`: Cross-entity validation
@@ -113,9 +117,10 @@ All services become pure, database-driven business logic without HTTP concerns:
 - No HTTP/session/WebSocket state (moves to server)
 
 #### Utilities
-- **File utilities**: Read/write YAML/JSON for plans/config (export/import format handling lives in `layercake-exports`)
+- **File utilities**: Read/write YAML/JSON for plans/config
 - **Graph algorithms**: Traversal, cycle detection, pathfinding
-- **Update system**: Binary update checker/downloader (moved to CLI; core should not own distribution concerns)
+- **Template utilities**: Handlebars helpers, template loading
+- **Format converters**: CSV/XLSX/ODS readers and writers
 
 ### Dependencies
 **Include:**
@@ -124,7 +129,8 @@ All services become pure, database-driven business logic without HTTP concerns:
 - `anyhow`, `thiserror`: Error handling
 - `chrono`, `uuid`: Data types
 - `indexmap`: Ordered collections
-- `layercake-exports`: Import/export support
+- `handlebars`, `regex`: Template rendering
+- `csv`, `calamine`, `rust_xlsxwriter`, `spreadsheet-ods`: File format support
 - `layercake-genai`, `layercake-code-analysis`, `layercake-projections`: Domain integrations
 
 **Exclude:**
@@ -134,6 +140,8 @@ All services become pure, database-driven business logic without HTTP concerns:
 - ❌ `clap`, `clap-repl`: CLI parsing
 - ❌ `rig`: Chat/agent integration
 - ❌ `dashmap`: Concurrent session storage
+- ❌ `notify`: File watching (CLI concern)
+- ❌ `reqwest`: HTTP client (CLI/server concern)
 
 ### Public API Surface
 ```rust
@@ -142,56 +150,24 @@ pub mod graph;
 pub mod plan;
 pub mod pipeline;
 pub mod export;
+pub mod import;
 pub mod database;
 pub mod services;
 pub mod app_context;
 pub mod errors;
 pub mod common;
+pub mod auth;
 
 pub use app_context::AppContext;
+pub use auth::{Actor, Authorizer, SystemActor};
+pub use errors::{CoreError, CoreErrorKind};
 pub use database::connection::{establish_connection, get_database_url};
 pub use database::migrations::Migrator;
 ```
 
 ---
 
-## 2. layercake-exports: Import/Export Library
-
-### Purpose
-Dedicated library crate for import/export functionality (XLSX, ODS, CSV) and Handlebars-based rendering. Depends on `layercake-core` types and keeps format-specific dependencies out of core while letting core services delegate to this crate.
-
-### Responsibilities
-- **Template rendering**: Handlebars templates, helpers, and template loading
-- **Export formats**: CSV, XLSX, ODS writers; format selection and options
-- **Import formats**: CSV/XLSX/ODS readers and schema mapping
-- **File adapters**: Read/write helpers for export/import (isolated from core plan/config I/O)
-
-### Dependencies
-**Include:**
-- `layercake-core`: Domain types used in import/export
-- `handlebars`, `regex`: Template rendering
-- `csv`, `calamine`, `rust_xlsxwriter`, `spreadsheet-ods`: File format support
-- `serde`, `serde_json`: Data marshaling
-- `anyhow`, `thiserror`: Error handling
-
-**Exclude:**
-- ❌ `sea-orm`, `sea-orm-migration`: Database access
-- ❌ `axum`, `tower`, `async-graphql`: Server stack
-- ❌ `clap`, `clap-repl`: CLI parsing
-
-### Public API Surface
-```rust
-pub mod export;
-pub mod import;
-pub mod templates;
-
-pub use export::{export_graph, ExportFormat, ExportOptions};
-pub use import::{import_graph, ImportFormat, ImportOptions};
-```
-
----
-
-## 3. layercake-server: HTTP/GraphQL/WebSocket Server
+## 2. layercake-server: HTTP/GraphQL/WebSocket Server
 
 ### Purpose
 HTTP server binary providing GraphQL API, REST endpoints, WebSocket collaboration, and session/presence management. Depends on `layercake-core` for business logic.
@@ -306,11 +282,30 @@ pub use config::ServerConfig;
 - Separate internal diagnostics from user-facing messages.
 
 ### Contract
-- Core services return a typed error enum `CoreError` (or structured error) with:
-  - `kind`: stable machine-readable category (`NotFound`, `Validation`, `Conflict`, `Unauthorized`, `Forbidden`, `Internal`, `Unavailable`)
-  - `message`: safe human-readable message
-  - `fields`: optional map of field-level validation errors
-  - `source`: internal error chain for logging
+- **Core service signatures**: All services return `Result<T, CoreError>` (not `anyhow::Result`)
+- **CoreError structure**:
+  ```rust
+  #[non_exhaustive]
+  pub struct CoreError {
+      pub kind: CoreErrorKind,
+      pub message: String,
+      pub fields: Option<HashMap<String, String>>, // field-level validation errors
+      source: Option<Box<dyn std::error::Error + Send + Sync>>, // internal only
+  }
+
+  #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+  pub enum CoreErrorKind {
+      NotFound,
+      Validation,
+      Conflict,
+      Unauthorized,
+      Forbidden,
+      Internal,
+      Unavailable,
+  }
+  ```
+- **Error constructors**: Provide helpers like `CoreError::not_found()`, `CoreError::validation()`, etc.
+- **Conversion from anyhow**: Internal service code can still use `anyhow::Result`, but public service boundaries convert via `map_err` before returning
 - GraphQL resolver mapping:
   - `NotFound` → GraphQL error with `extensions.code = "NOT_FOUND"` and `status = 404`
   - `Validation` → `extensions.code = "VALIDATION"` and `status = 400`, include `extensions.fields`
@@ -323,20 +318,23 @@ pub use config::ServerConfig;
   - Log full error chains server-side, never expose internal context to GraphQL responses.
 
 ### Implementation Details
-- Introduce `core::errors::CoreError` and `CoreErrorKind`.
-- Provide `impl From<CoreError> for async_graphql::Error` in server crate.
-- Add unit tests in `layercake-server/tests/` for resolver error mapping.
+- **Stage 1**: Define `CoreError` and `CoreErrorKind` in `layercake-core/src/errors/`
+- **Stage 1**: Capture error baseline (golden tests) for existing GraphQL responses
+- **Stage 2**: Update service signatures to return `Result<T, CoreError>`
+- **Stage 2**: Implement `impl From<CoreError> for async_graphql::Error` in server crate
+- **Stage 2**: Add unit tests in `layercake-server/tests/` for error mapping
+- **Stage 2**: Validate new errors match baseline golden tests
 
 ### Validation
 - Capture a baseline of current GraphQL error shapes for representative queries/mutations.
 - Add golden tests that assert `extensions.code`, `status`, and optional `extensions.fields`.
 - Compare baseline vs. new mapping before removing legacy error paths.
-- Sample baseline set:
-  - `project(id: "missing")` → NotFound
-  - `createProject(name: "")` → Validation
-  - `applyGraphEdit` with stale version → Conflict
-  - `graph(id: "no-access")` as non-member → Forbidden
-  - `projects` with invalid/expired session → Unauthorized
+- Sample baseline set (anchored to current endpoints):
+  - `downloadDataSetRaw(id: -1)` → NotFound
+  - `updateIngestedFile(input: { projectId: 1, fileId: "not-a-uuid" })` → Validation
+  - `register(input: { email: "existing@example.com", username: "new", ... })` → Conflict (requires seeded user)
+  - `login(input: { email: "missing@example.com", password: "bad" })` → Unauthorized
+  - `login(input: { email: "inactive@example.com", password: "ok" })` → Forbidden (requires inactive user)
 
 ---
 
@@ -348,23 +346,50 @@ pub use config::ServerConfig;
 
 ### Boundaries
 - **Core services**:
-  - Take explicit `Actor`/`UserContext` input for any operation that requires authorization.
-  - Enforce access checks inside services (not only at GraphQL layer).
-  - Provide a `core::auth::Authorizer` trait to decouple policy from service logic.
+  - **Mutation operations** (create, update, delete) accept `actor: &Actor` as first parameter
+  - **Query operations** (read, list) accept `actor: &Actor` for project-scoped resources
+  - **Public operations** (health checks, schema introspection) require no actor
+  - Enforce access checks inside services using `Authorizer` trait
+  - Return `CoreError::Forbidden` when authorization fails
 - **Server**:
-  - Builds `Actor` from session/auth middleware.
-  - Injects `Actor` into GraphQL context.
-  - Does not perform business logic authorization checks in resolvers beyond basic authentication.
+  - Builds `Actor` from session/auth middleware
+  - Injects `Actor` into GraphQL context
+  - Resolvers extract actor and pass to services
+  - Does not perform business logic authorization (only authentication)
+- **Internal operations**:
+  - Migrations, background jobs use `SystemActor::internal()` (unrestricted access)
+  - Tests can create `Actor::test_user(id)` for controlled access
 
 ### Implementation Details
-- Add `Actor` (id, roles, scopes) in core.
-- Add `Authorizer` trait in core with methods like `can_read_project`, `can_edit_graph`, `can_manage_users`.
-- Add default implementation in server that uses existing roles/permissions.
-- Add tests in `layercake-core/tests/` for authorization paths.
+- **Stage 1**: Define `Actor`, `Authorizer` trait, and `SystemActor` in `layercake-core/src/auth/`
+  ```rust
+  pub struct Actor {
+      pub user_id: i32,
+      pub roles: Vec<String>,
+      pub scopes: Vec<String>,
+  }
+
+  pub trait Authorizer {
+      fn can_read_project(&self, actor: &Actor, project_id: i32) -> Result<(), CoreError>;
+      fn can_edit_graph(&self, actor: &Actor, graph_id: i32) -> Result<(), CoreError>;
+      // ... etc
+  }
+
+  pub struct SystemActor;
+  impl SystemActor {
+      pub fn internal() -> Actor {
+          Actor { user_id: 0, roles: vec!["system".into()], scopes: vec!["*".into()] }
+      }
+  }
+  ```
+- **Stage 1**: Audit service methods, categorize which need `Actor` parameter
+- **Stage 2**: Update service signatures incrementally (mutations first, queries second)
+- **Stage 2**: Implement `DefaultAuthorizer` in server with role checks
+- **Stage 2**: Add tests in `layercake-core/tests/auth/` for authorization logic
 
 ---
 
-## 4. layercake-cli: Command-Line Interface
+## 3. layercake-cli: Command-Line Interface
 
 ### Purpose
 User-facing CLI binary providing subcommands for plan execution, database management, project generation, and interactive console. Depends on `layercake-core` for domain logic.
@@ -612,16 +637,16 @@ After refactoring, support multiple deployment modes:
 | **Headless server** | `layercake-core` + `layercake-server` | `layercake-server` |
 | **CLI-only** | `layercake-core` + `layercake-cli` | `layercake` |
 | **Desktop app** | All three (via Tauri) | `Layercake.app` |
-| **Library usage** | `layercake-core` + `layercake-exports` | (imported as dep) |
+| **Library usage** | `layercake-core` only | (imported as dep) |
 | **Docker server** | `layercake-server` only | `FROM scratch` + binary |
 
 ---
 
 ## Implementation Plan
 
-### Stage 1: Preparation & Core Extraction (Week 1-2)
+### Stage 1: Preparation & Core Extraction (Week 1-3)
 
-**Goal**: Extract pure business logic into clean `layercake-core` library without breaking existing builds.
+**Goal**: Extract pure business logic, define error/auth contracts, capture baselines, and audit existing architecture.
 
 #### Tasks
 
@@ -630,30 +655,74 @@ After refactoring, support multiple deployment modes:
    - Document import dependencies between modules
    - Identify circular dependencies to break
 
-2. **Create new crate structure** (1 day)
+2. **Capture GraphQL error baseline** (1 day)
+   - **Critical**: Must happen before any code changes
+   - Run representative GraphQL queries/mutations against current system
+   - Save JSON responses to `resources/test-fixtures/golden/errors/`
+   - Include: NotFound, Validation, Conflict, Forbidden, Unauthorized cases
+   - Document expected `extensions.code`, `extensions.status`, `extensions.fields`
+   - Create golden test framework in `layercake-server/tests/golden/`
+
+3. **MCP Audit & Rig Migration Plan** (1 day)
+   - List all current MCP tools and their GraphQL/service equivalents
+   - Categorize: Critical (needed immediately) vs Deferred
+   - **Critical tools for Stage 3**:
+     - `list_projects()` → `ProjectService::list_projects`
+     - `get_project(id)` → `ProjectService::get_project`
+     - `list_graphs(project_id)` → `GraphService::list_graphs`
+     - `get_graph(id)` → `GraphService::get_graph`
+   - **Deferred tools (post-Stage 5)**:
+     - `analyze_connectivity`, `find_paths`, `recommend_transformations`
+   - Document in `layercake-cli/docs/rig-tools-registry.md`
+
+4. **Define CoreError and Actor types** (2 days)
+   - Create `layercake-core/src/errors/mod.rs`:
+     - `CoreError` struct with `kind`, `message`, `fields`, `source`
+     - `CoreErrorKind` enum
+     - Helper constructors: `CoreError::not_found()`, etc.
+     - `impl std::error::Error for CoreError`
+   - Create `layercake-core/src/auth/mod.rs`:
+     - `Actor` struct with `user_id`, `roles`, `scopes`
+     - `Authorizer` trait
+     - `SystemActor::internal()` for background operations
+   - Document service signature patterns
+
+5. **Audit service authorization requirements** (1 day)
+   - Review each service method in `services/`
+   - Categorize: Requires Actor / Public / Internal-only
+   - Document which methods need authorization checks
+   - Create spreadsheet: Service → Method → Actor Required → Roles Allowed
+
+6. **Database Transaction Strategy** (1 day)
+   - Audit current transaction usage in services
+   - **Decision**: Services accept `&DatabaseConnection` (may be transaction or pool)
+   - Callers manage transaction lifecycle:
+     ```rust
+     let tx = db.begin().await?;
+     service.update_nodes(&tx, actor, nodes).await?;
+     service.update_edges(&tx, actor, edges).await?;
+     tx.commit().await?;
+     ```
+   - Document pattern in `layercake-core/docs/transaction-patterns.md`
+
+7. **Create new crate structure** (1 day)
    ```bash
-   mkdir -p layercake-server/src layercake-cli/src layercake-exports/src
+   mkdir -p layercake-server/src layercake-cli/src layercake-test-utils/src
    # Copy Cargo.toml templates
    ```
 
-3. **Extract core modules** (3 days)
+8. **Extract core modules** (3 days)
    - Move pure domain logic to `layercake-core/src/`:
      - `graph.rs`, `plan.rs`, `plan_execution.rs`, `pipeline/`
      - `database/` (entities, migrations, connection)
      - `services/` (all service files)
      - `app_context/` (core context only)
-     - `common/`, `errors/`, `utils/`
+     - `common/`, `errors/`, `auth/`, `utils/`
+     - `export/` (keep in core for now, NOT extracted)
    - Remove server/CLI dependencies from these files
    - Fix imports to use `crate::` (not `super::server`)
 
-4. **Create `layercake-exports` crate** (2 days)
-   - Move import/export modules from core:
-     - `export/`, template helpers, format adapters
-     - XLSX/ODS/CSV readers and writers
-   - Introduce `layercake-exports` public API (`export_*`, `import_*`)
-   - Replace core `ExportService`/`ImportService` internals to call `layercake-exports`
-
-5. **Define `layercake-core` public API** (2 days)
+9. **Define `layercake-core` public API** (2 days)
    - Update `layercake-core/src/lib.rs`:
      ```rust
      pub mod graph;
@@ -672,13 +741,32 @@ After refactoring, support multiple deployment modes:
    - Mark internal modules as `pub(crate)` where appropriate
    - Document expected usage patterns
 
-6. **Update core `Cargo.toml`** (1 day)
+10. **Create layercake-test-utils crate** (1 day)
+   - Create `layercake-test-utils/src/lib.rs`:
+     ```rust
+     pub mod db;      // TestDb::new(), in-memory SQLite helpers
+     pub mod fixtures; // load_fixture("sample.csv"), golden file helpers
+     pub mod temp;    // TempDir::new(), cleanup on drop
+     ```
+   - Organize fixtures:
+     ```
+     resources/test-fixtures/
+     ├── graphs/           # Sample graph JSON files
+     ├── datasets/         # CSV/XLSX/ODS files
+     ├── plans/           # YAML plan files
+     └── golden/          # Expected outputs
+         ├── errors/      # GraphQL error baselines (captured in task 2)
+         └── exports/     # Export format outputs
+     ```
+   - Document fixture ownership in README
+
+11. **Update core `Cargo.toml`** (1 day)
    - Remove server dependencies (`axum`, `tower`, `async-graphql`)
    - Remove CLI dependencies (`clap`, `clap-repl`, `rig`)
-   - Keep only: `sea-orm`, `serde`, `anyhow`, domain integrations
+   - Keep: `sea-orm`, `serde`, `anyhow`, `handlebars`, `csv`, `calamine`, etc.
    - Keep feature flags during migration; remove only in Stage 5
 
-7. **Verify core builds in isolation** (1 day)
+12. **Verify core builds in isolation** (1 day)
    ```bash
    cd layercake-core && cargo build --lib
    cargo test --lib
@@ -688,13 +776,16 @@ After refactoring, support multiple deployment modes:
 
 **Success Criteria**:
 - `layercake-core` builds as standalone library
-- `layercake-exports` builds as standalone library
+- `layercake-test-utils` builds and is usable by other crates
 - Zero HTTP/CLI dependencies in core
 - All services callable via `AppContext`
+- `CoreError` and `Actor` types defined (but not yet integrated into services)
+- GraphQL error baseline captured in golden tests
+- MCP→Rig migration plan documented
 
 ---
 
-### Stage 2: Server Crate Extraction (Week 2-3)
+### Stage 2: Server Crate Extraction (Week 3-5)
 
 **Goal**: Move HTTP/GraphQL/WebSocket infrastructure to `layercake-server` crate.
 
@@ -720,39 +811,50 @@ After refactoring, support multiple deployment modes:
      - `server/websocket/` → `websocket/`
    - Update imports: `use layercake_core::services::*;`
 
-3. **Move GraphQL schema** (3 days)
+3. **Update core services with CoreError and Actor** (4 days)
+   - **CRITICAL**: This changes many service signatures, proceed incrementally
+   - Update service return types: `Result<T>` → `Result<T, CoreError>`
+   - Add `actor: &Actor` parameter to mutation methods
+   - Add authorization checks via `Authorizer` trait
+   - Convert `anyhow::Error` to `CoreError` at service boundaries
+   - Update tests to pass `SystemActor::internal()` where needed
+   - **Incremental approach**: Update one service at a time, test after each
+
+4. **Move GraphQL schema** (3 days)
    - Relocate `graphql/` module to `layercake-server/src/graphql/`
    - Update resolvers to call `AppContext` from core:
      ```rust
-     use layercake_core::AppContext;
+     use layercake_core::{AppContext, Actor, CoreError};
 
-     async fn projects(ctx: &Context<'_>) -> Vec<Project> {
+     async fn projects(ctx: &Context<'_>) -> Result<Vec<Project>, CoreError> {
          let app_ctx = ctx.data_unchecked::<AppContext>();
-         app_ctx.project_operations().list_projects().await
+         let actor = ctx.data_unchecked::<Actor>();
+         app_ctx.project_operations().list_projects(actor).await
      }
      ```
    - Remove business logic from resolvers (thin wrappers only)
-   - Implement error mapping contract and add tests
-   - Validate error mapping against baseline GraphQL responses
-   - Wire `Actor` into context and enforce authorization boundaries
+   - Implement `impl From<CoreError> for async_graphql::Error`
+   - Add unit tests for error mapping (extensions.code, status)
+   - Validate error mapping against baseline golden tests
+   - Wire `Actor` into GraphQL context via middleware
 
-4. **Move collaboration coordinator** (2 days)
+5. **Move collaboration coordinator** (2 days)
    - Move `collaboration/coordinator.rs` to `layercake-server/src/collaboration/`
    - Keep `collaboration/types.rs` in core (shared types)
    - Update WebSocket handler to use server-side coordinator
 
-5. **Remove MCP transport** (2 days)
+6. **Remove MCP transport** (2 days)
    - Delete MCP-related routes and remove `axum-mcp` dependency
    - Remove MCP tool definitions from core
    - Update any callers to use Rig tools or GraphQL/REST endpoints
 
-6. **Implement server `main.rs`** (1 day)
+7. **Implement server `main.rs`** (1 day)
    - Parse CLI args (port, database, cors-origin)
    - Establish database connection via core
    - Create `AppContext` from core
    - Build Axum app, start server
 
-7. **Test server binary** (1 day)
+8. **Test server binary** (1 day)
    ```bash
    cd layercake-server
    cargo run -- --port 3001 --database ../layercake.db
@@ -765,10 +867,12 @@ After refactoring, support multiple deployment modes:
 - `layercake-server` binary runs standalone
 - GraphQL queries/mutations work
 - WebSocket collaboration functional
+- Error shapes match golden test baselines
+- Authorization enforced at service layer
 
 ---
 
-### Stage 3: CLI Crate Extraction (Week 3-4)
+### Stage 3: CLI Crate Extraction (Week 5-6)
 
 **Goal**: Move CLI commands and interactive console to `layercake-cli` crate.
 
@@ -845,13 +949,22 @@ After refactoring, support multiple deployment modes:
 
 ---
 
-### Stage 4: Integration & Testing (Week 4-5)
+### Stage 4: Integration & Testing (Week 6-7)
 
 **Goal**: Update dependent crates, fix integration tests, verify all deployment scenarios.
 
 #### Tasks
 
-1. **Update Tauri app** (2 days)
+1. **Benchmark Tauri integration** (0.5 days)
+   - **Before refactoring**: Measure baseline metrics
+     - Binary size (MB)
+     - Cold start time (ms)
+     - Memory usage at idle (MB)
+   - **After refactoring**: Re-measure with new crates
+   - **Threshold**: If binary size increases >20%, remove CLI from Tauri (Option B)
+   - Document results in `docs/benchmarks/tauri-metrics.md`
+
+2. **Update Tauri app** (2 days)
    - Update `src-tauri/Cargo.toml`:
      ```toml
      [dependencies]
@@ -861,29 +974,30 @@ After refactoring, support multiple deployment modes:
      ```
    - Update `src-tauri/src/server.rs` to use `layercake_server::create_app`
    - Test desktop app launches, server starts
+   - Verify benchmarks are within threshold
 
-2. **Update integration tests** (2 days)
+3. **Update integration tests** (2 days)
    - Move tests to appropriate crates:
      - `integration_test.rs` → `layercake-core/tests/`
    - Create cross-crate tests in `layercake-integration-tests/`
 
-3. **Update CI/CD** (1 day)
+4. **Update CI/CD** (1 day)
    - Add build jobs for each crate:
      ```yaml
      - cargo build -p layercake-core
-     - cargo build -p layercake-exports
      - cargo build -p layercake-server
      - cargo build -p layercake-cli
      - cargo test --workspace
      ```
+   - Add `cargo tree` check to flag divergent dependency versions
    - Remove feature flag matrix (no longer needed)
 
-4. **Update documentation** (2 days)
+5. **Update documentation** (2 days)
    - Update `README.md` with new build instructions
    - Document deployment scenarios
    - Update `BUILD.md` with crate architecture
 
-5. **Compatibility testing** (2 days)
+6. **Compatibility testing** (2 days)
    - Test server-only Docker build
    - Test CLI-only installation
    - Test Tauri desktop app
@@ -897,7 +1011,7 @@ After refactoring, support multiple deployment modes:
 
 ---
 
-### Stage 5: Cleanup & Optimisation (Week 5-6)
+### Stage 5: Cleanup & Optimisation (Week 7-8)
 
 **Goal**: Remove deprecated code, optimise builds, finalise public APIs.
 
@@ -992,25 +1106,60 @@ After refactoring, support multiple deployment modes:
 **Probability**: Medium
 **Impact**: Medium
 **Mitigation**:
-- Lock error mapping contract before refactor
+- **Stage 1**: Capture error baseline BEFORE any changes (golden tests)
+- **Stage 2**: Validate new error mapping against baseline
 - Add resolver behavior tests for error shapes and status codes
 - Add authorization tests at core service boundaries
+
+### Risk: Production Issues During Migration
+**Probability**: Medium
+**Impact**: High (rollback needed)
+**Mitigation**:
+- Use feature flags to toggle new vs old code paths during Stages 2-4
+- Keep both old monolith and new crates buildable until Stage 5
+- Tag each stage completion as potential rollback point (`v0.4.0-stage-2`, etc.)
+- Maintain old imports as deprecated re-exports until Stage 5
+- Document rollback procedure: revert to previous tag, rebuild monolith
 
 ---
 
 ## Workspace Dependency Policy
 
 - Use `[workspace.dependencies]` as the single source of truth for versions.
-- Disallow crate-local versions unless explicitly documented.
+- Disallow crate-local versions unless explicitly documented with comment.
 - Add a `cargo tree` check in CI to flag divergent versions.
+
+**Allowed exceptions** (must document in `Cargo.toml` with comment):
+```toml
+# Exception: Server needs newer axum for streaming support
+axum = { version = "0.8.5", features = [...] } # Diverges from workspace 0.8.4
+```
 
 ---
 
 ## Test Fixture Strategy
 
-- Keep shared fixtures (CSV/TSV/YAML) in `sample/` and reference from each crate test.
-- Provide a shared `test_utils` crate or module for DB setup and temp directories.
-- Document golden file ownership per crate to avoid duplication.
+### Shared Test Utilities
+- Create `layercake-test-utils/` workspace crate (dev-dependency only)
+- Provides: `TestDb::new()`, `temp_dir()`, `load_fixture("sample.csv")`
+- Each crate adds: `layercake-test-utils = { path = "../layercake-test-utils" }`
+
+### Fixture Organization
+```
+resources/test-fixtures/
+├── graphs/           # Sample graph JSON files
+├── datasets/         # CSV/XLSX/ODS files
+├── plans/           # YAML plan files
+└── golden/          # Expected outputs
+    ├── errors/      # GraphQL error responses (Stage 1 baseline)
+    └── exports/     # Export format outputs
+```
+
+### Golden File Ownership
+- `errors/`: Owned by `layercake-server/tests/golden/`
+- `exports/`: Owned by `layercake-core/tests/`
+- Each golden file has corresponding test that fails on mismatch
+- Update command: `UPDATE_GOLDEN=1 cargo test` to regenerate
 
 ---
 
@@ -1083,14 +1232,16 @@ After refactoring, support multiple deployment modes:
 - `src/sequence_context.rs`
 - `src/data_loader.rs`
 
+**Keep (in core for now, may extract later)**:
+- `src/export/` (template rendering, format conversion)
+- `src/services/export_service.rs` (Handlebars logic, CSV/XLSX writers)
+- `src/services/import_service.rs` (CSV/XLSX readers, schema mapping)
+
 **Move out**:
 - `src/server/` → `layercake-server/src/`
 - `src/graphql/` → `layercake-server/src/graphql/`
 - `src/collaboration/coordinator.rs` → `layercake-server/src/collaboration/`
-- `src/mcp/` → removed (replaced by Rig tools)
-- `src/export/` → `layercake-exports/src/export/`
-- `src/import/` → `layercake-exports/src/import/`
-- `src/templates/` → `layercake-exports/src/templates/`
+- `src/mcp/` → **deleted** (replaced by Rig tools in CLI)
 - `src/console/` → `layercake-cli/src/console/`
 - `src/update/` → `layercake-cli/src/update/`
 - `src/chat_credentials_cli/` → `layercake-cli/src/`
@@ -1109,12 +1260,12 @@ After refactoring, support multiple deployment modes:
 - `src/session/` (new module for session management)
 - `src/config.rs` (new, server configuration)
 
-### layercake-exports
+### layercake-test-utils
 **New files**:
-- `src/export/` (format writers, export orchestration)
-- `src/import/` (format readers, schema mapping)
-- `src/templates/` (Handlebars templates and helpers)
-- `src/lib.rs` (public API)
+- `src/lib.rs` (public API for test utilities)
+- `src/db.rs` (`TestDb::new()`, in-memory SQLite setup)
+- `src/fixtures.rs` (`load_fixture()`, golden file helpers)
+- `src/temp.rs` (`TempDir::new()`, auto-cleanup temp directories)
 
 ### layercake-cli
 **New files**:
@@ -1130,12 +1281,14 @@ After refactoring, support multiple deployment modes:
 
 | Stage | Duration | Key Deliverables |
 |-------|----------|------------------|
-| **Stage 1**: Core Extraction | 1-2 weeks | `layercake-core` library builds standalone |
-| **Stage 2**: Server Extraction | 1-2 weeks | `layercake-server` binary runs, GraphQL works |
-| **Stage 3**: CLI Extraction | 1 week | `layercake-cli` binary runs, console works |
-| **Stage 4**: Integration & Testing | 1 week | Tauri app works, CI passes, docs updated |
-| **Stage 5**: Cleanup & Optimisation | 1 week | APIs finalised, release-ready |
-| **Total** | **5-6 weeks** | Three independent crates, all scenarios working |
+| **Stage 1**: Preparation & Core Extraction | 2-3 weeks | Error baseline, Actor types, core library builds standalone |
+| **Stage 2**: Server Extraction | 2-3 weeks | Server binary runs, error/auth integrated, GraphQL works |
+| **Stage 3**: CLI Extraction | 1-2 weeks | CLI binary runs, Rig tools implemented, console works |
+| **Stage 4**: Integration & Testing | 1-2 weeks | Tauri benchmarked, all crates tested, CI passes |
+| **Stage 5**: Cleanup & Optimisation | 1 week | Feature flags removed, APIs finalized, release-ready |
+| **Total** | **7-11 weeks** | Three independent crates, all scenarios working |
+
+**Note**: Timeline extended from original 5-6 weeks to account for error/auth contract work and validation.
 
 ---
 
