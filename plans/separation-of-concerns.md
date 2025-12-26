@@ -839,6 +839,7 @@ After refactoring, support multiple deployment modes:
 - Converted `GraphDataService` to `CoreResult` and updated GraphQL graph_data mutations to map CoreError (`layercake-core/src/services/graph_data_service.rs`, `layercake-server/src/graphql/mutations/graph_data.rs`).
 - Implemented `impl From<CoreError> for async_graphql::Error` to centralize CoreError mapping (`layercake-server/src/graphql/errors.rs`).
 - Converted `GraphDataEditApplicator` to `CoreResult` for consistent graph_data edit replay error handling (`layercake-core/src/services/graph_data_edit_applicator.rs`).
+- Converted `file_type_detection` helpers to `CoreResult` for consistent validation errors (`layercake-core/src/services/file_type_detection.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

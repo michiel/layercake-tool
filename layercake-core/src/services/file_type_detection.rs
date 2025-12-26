@@ -1,32 +1,34 @@
-use anyhow::Result;
 use csv::ReaderBuilder;
 use serde_json::Value;
 use std::collections::HashSet;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
+use crate::errors::{CoreError, CoreResult};
 
 /// Detect data type from file content using heuristics
-pub fn detect_data_type(file_format: &FileFormat, file_data: &[u8]) -> Result<DataType> {
+pub fn detect_data_type(file_format: &FileFormat, file_data: &[u8]) -> CoreResult<DataType> {
     match file_format {
         FileFormat::Csv => detect_from_csv(file_data, b','),
         FileFormat::Tsv => detect_from_csv(file_data, b'\t'),
         FileFormat::Json => detect_from_json(file_data),
         FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
-            anyhow::bail!(
+            Err(CoreError::validation(format!(
                 "File format {:?} is not supported for data type detection",
                 file_format
-            )
+            )))
         }
     }
 }
 
 /// Detect data type from CSV/TSV headers
-fn detect_from_csv(file_data: &[u8], delimiter: u8) -> Result<DataType> {
+fn detect_from_csv(file_data: &[u8], delimiter: u8) -> CoreResult<DataType> {
     let mut reader = ReaderBuilder::new()
         .delimiter(delimiter)
         .from_reader(file_data);
 
-    let headers = reader.headers()?;
+    let headers = reader.headers().map_err(|e| {
+        CoreError::validation(format!("Failed to read CSV headers: {}", e))
+    })?;
     let header_set: HashSet<String> = headers.iter().map(|h| h.trim().to_lowercase()).collect();
 
     // Check for edges: must have id, source, target
@@ -66,15 +68,17 @@ fn detect_from_csv(file_data: &[u8], delimiter: u8) -> Result<DataType> {
         return Ok(DataType::Nodes);
     }
 
-    Err(anyhow::anyhow!(
+    Err(CoreError::validation(format!(
         "Cannot determine data type from CSV headers: {:?}",
         headers.iter().collect::<Vec<_>>()
-    ))
+    )))
 }
 
 /// Detect data type from JSON structure
-fn detect_from_json(file_data: &[u8]) -> Result<DataType> {
-    let json: Value = serde_json::from_slice(file_data)?;
+fn detect_from_json(file_data: &[u8]) -> CoreResult<DataType> {
+    let json: Value = serde_json::from_slice(file_data).map_err(|e| {
+        CoreError::validation(format!("Invalid JSON: {}", e))
+    })?;
 
     // Check for graph structure (has both nodes and edges)
     if let Some(obj) = json.as_object() {
@@ -120,8 +124,8 @@ fn detect_from_json(file_data: &[u8]) -> Result<DataType> {
         }
     }
 
-    Err(anyhow::anyhow!(
-        "Cannot determine data type from JSON structure"
+    Err(CoreError::validation(
+        "Cannot determine data type from JSON structure",
     ))
 }
 
