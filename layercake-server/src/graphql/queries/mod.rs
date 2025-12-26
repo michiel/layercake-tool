@@ -1252,7 +1252,7 @@ impl Query {
         let sessions = service
             .list_sessions(project_id, None, include_archived, limit, offset)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::list_sessions", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(sessions
             .into_iter()
@@ -1273,7 +1273,7 @@ impl Query {
         let session = service
             .get_session(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::get_session", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(session.map(crate::graphql::types::ChatSession::from))
     }
@@ -1293,7 +1293,7 @@ impl Query {
         let messages = service
             .get_history(&session_id, limit, offset)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::get_history", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(messages
             .into_iter()
@@ -1310,7 +1310,7 @@ impl Query {
         let count = service
             .get_message_count(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::get_message_count", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(count as i32)
     }

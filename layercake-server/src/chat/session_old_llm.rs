@@ -109,7 +109,8 @@ impl ChatSession {
         // Load message history
         let messages_history = history_service
             .get_history(&session.session_id, 1000, 0)
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         // Convert provider string to enum
         let provider = match session.provider.as_str() {
@@ -194,7 +195,8 @@ impl ChatSession {
                 None,
                 Some(self.system_prompt.clone()),
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         self.session_id = Some(session.session_id.clone());
         Ok(session.session_id)
@@ -271,7 +273,8 @@ impl ChatSession {
                 None,
                 None,
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         self.resolve_conversation(observer).await
     }
@@ -320,7 +323,8 @@ impl ChatSession {
                         None,
                         None,
                     )
-                    .await?;
+                    .await
+                    .map_err(anyhow::Error::from)?;
             }
 
             break;
@@ -365,7 +369,8 @@ impl ChatSession {
                         Some(call.id.clone()),
                         Some(call.function.arguments.clone()),
                     )
-                    .await?;
+                    .await
+                    .map_err(anyhow::Error::from)?;
             }
         }
 
@@ -434,7 +439,8 @@ impl ChatSession {
                         Some(call_id.clone()),
                         Some(metadata_json.clone()),
                     )
-                    .await?;
+                    .await
+                    .map_err(anyhow::Error::from)?;
             }
         }
 

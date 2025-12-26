@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set,
@@ -6,6 +5,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 use crate::database::entities::{chat_messages, chat_sessions};
+use crate::errors::{CoreError, CoreResult};
 
 /// Service for managing chat history (sessions and messages)
 #[derive(Clone)]
@@ -27,7 +27,7 @@ impl ChatHistoryService {
         model_name: String,
         title: Option<String>,
         system_prompt: Option<String>,
-    ) -> Result<chat_sessions::Model> {
+    ) -> CoreResult<chat_sessions::Model> {
         let session_id = Uuid::new_v4().to_string();
         let now = chrono::Utc::now();
 
@@ -49,7 +49,7 @@ impl ChatHistoryService {
         session
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to create chat session: {}", e))
+            .map_err(|e| CoreError::internal("Failed to create chat session").with_source(e))
     }
 
     /// List chat sessions for a project
@@ -60,7 +60,7 @@ impl ChatHistoryService {
         include_archived: bool,
         limit: u64,
         offset: u64,
-    ) -> Result<Vec<chat_sessions::Model>> {
+    ) -> CoreResult<Vec<chat_sessions::Model>> {
         let mut query =
             chat_sessions::Entity::find().filter(chat_sessions::Column::ProjectId.eq(project_id));
 
@@ -78,25 +78,25 @@ impl ChatHistoryService {
             .limit(limit)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to list chat sessions: {}", e))
+            .map_err(|e| CoreError::internal("Failed to list chat sessions").with_source(e))
     }
 
     /// Get a specific chat session by session_id
-    pub async fn get_session(&self, session_id: &str) -> Result<Option<chat_sessions::Model>> {
+    pub async fn get_session(&self, session_id: &str) -> CoreResult<Option<chat_sessions::Model>> {
         chat_sessions::Entity::find()
             .filter(chat_sessions::Column::SessionId.eq(session_id))
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to get chat session: {}", e))
+            .map_err(|e| CoreError::internal("Failed to get chat session").with_source(e))
     }
 
     /// Get a specific chat session by internal id
     #[allow(dead_code)]
-    pub async fn get_session_by_id(&self, id: i32) -> Result<Option<chat_sessions::Model>> {
+    pub async fn get_session_by_id(&self, id: i32) -> CoreResult<Option<chat_sessions::Model>> {
         chat_sessions::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to get chat session by id: {}", e))
+            .map_err(|e| CoreError::internal("Failed to get chat session by id").with_source(e))
     }
 
     /// Store a new message in a chat session
@@ -108,12 +108,12 @@ impl ChatHistoryService {
         tool_name: Option<String>,
         tool_call_id: Option<String>,
         metadata_json: Option<String>,
-    ) -> Result<chat_messages::Model> {
+    ) -> CoreResult<chat_messages::Model> {
         // Get session to update last_activity_at
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         // Create message
         let message_id = Uuid::new_v4().to_string();
@@ -134,7 +134,7 @@ impl ChatHistoryService {
         let saved_message = message
             .insert(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to store chat message: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to store chat message").with_source(e))?;
 
         // Update session's last_activity_at
         let mut session_active: chat_sessions::ActiveModel = session.into();
@@ -143,7 +143,7 @@ impl ChatHistoryService {
         session_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update session activity: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to update session activity").with_source(e))?;
 
         Ok(saved_message)
     }
@@ -154,12 +154,12 @@ impl ChatHistoryService {
         session_id: &str,
         limit: u64,
         offset: u64,
-    ) -> Result<Vec<chat_messages::Model>> {
+    ) -> CoreResult<Vec<chat_messages::Model>> {
         // Get session first to get internal id
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         chat_messages::Entity::find()
             .filter(chat_messages::Column::SessionId.eq(session.id))
@@ -168,31 +168,31 @@ impl ChatHistoryService {
             .limit(limit)
             .all(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to get chat history: {}", e))
+            .map_err(|e| CoreError::internal("Failed to get chat history").with_source(e))
     }
 
     /// Get message count for a session
-    pub async fn get_message_count(&self, session_id: &str) -> Result<usize> {
+    pub async fn get_message_count(&self, session_id: &str) -> CoreResult<usize> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         let count = chat_messages::Entity::find()
             .filter(chat_messages::Column::SessionId.eq(session.id))
             .count(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to count messages: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to count messages").with_source(e))?;
 
         Ok(count as usize)
     }
 
     /// Update session title
-    pub async fn update_session_title(&self, session_id: &str, title: String) -> Result<()> {
+    pub async fn update_session_title(&self, session_id: &str, title: String) -> CoreResult<()> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         let mut session_active: chat_sessions::ActiveModel = session.into();
         session_active.title = Set(Some(title));
@@ -200,17 +200,17 @@ impl ChatHistoryService {
         session_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update session title: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to update session title").with_source(e))?;
 
         Ok(())
     }
 
     /// Archive a session
-    pub async fn archive_session(&self, session_id: &str) -> Result<()> {
+    pub async fn archive_session(&self, session_id: &str) -> CoreResult<()> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         let mut session_active: chat_sessions::ActiveModel = session.into();
         session_active.is_archived = Set(true);
@@ -218,17 +218,17 @@ impl ChatHistoryService {
         session_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to archive session: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to archive session").with_source(e))?;
 
         Ok(())
     }
 
     /// Unarchive a session
-    pub async fn unarchive_session(&self, session_id: &str) -> Result<()> {
+    pub async fn unarchive_session(&self, session_id: &str) -> CoreResult<()> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         let mut session_active: chat_sessions::ActiveModel = session.into();
         session_active.is_archived = Set(false);
@@ -236,32 +236,36 @@ impl ChatHistoryService {
         session_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to unarchive session: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to unarchive session").with_source(e))?;
 
         Ok(())
     }
 
     /// Delete a session and all its messages (cascade)
-    pub async fn delete_session(&self, session_id: &str) -> Result<()> {
+    pub async fn delete_session(&self, session_id: &str) -> CoreResult<()> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         chat_sessions::Entity::delete_by_id(session.id)
             .exec(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to delete session: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to delete session").with_source(e))?;
 
         Ok(())
     }
 
     /// Update RAG settings for a chat session
-    pub async fn update_rag_settings(&self, session_id: &str, enable_rag: bool) -> Result<()> {
+    pub async fn update_rag_settings(
+        &self,
+        session_id: &str,
+        enable_rag: bool,
+    ) -> CoreResult<()> {
         let session = self
             .get_session(session_id)
             .await?
-            .ok_or_else(|| anyhow!("Chat session not found: {}", session_id))?;
+            .ok_or_else(|| CoreError::not_found("ChatSession", session_id.to_string()))?;
 
         let mut session_active: chat_sessions::ActiveModel = session.into();
         session_active.enable_rag = Set(enable_rag);
@@ -269,7 +273,7 @@ impl ChatHistoryService {
         session_active
             .update(&self.db)
             .await
-            .map_err(|e| anyhow!("Failed to update RAG settings: {}", e))?;
+            .map_err(|e| CoreError::internal("Failed to update RAG settings").with_source(e))?;
 
         Ok(())
     }
@@ -284,7 +288,7 @@ mod tests_disabled {
     use crate::database::entities::{projects, users};
     use crate::database::test_utils::setup_test_db;
 
-    async fn create_test_user(db: &DatabaseConnection) -> Result<users::Model> {
+    async fn create_test_user(db: &DatabaseConnection) -> CoreResult<users::Model> {
         let user = users::ActiveModel {
             email: Set(format!("test{}@example.com", Uuid::new_v4())),
             username: Set(format!("user{}", Uuid::new_v4())),
@@ -298,10 +302,12 @@ mod tests_disabled {
             ..Default::default()
         };
 
-        user.insert(db).await.map_err(Into::into)
+        user.insert(db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create test user").with_source(e))
     }
 
-    async fn create_test_project(db: &DatabaseConnection) -> Result<projects::Model> {
+    async fn create_test_project(db: &DatabaseConnection) -> CoreResult<projects::Model> {
         let project = projects::ActiveModel {
             name: Set(format!("Test Project {}", Uuid::new_v4())),
             description: Set(Some("Test description".to_string())),
@@ -310,7 +316,10 @@ mod tests_disabled {
             ..Default::default()
         };
 
-        project.insert(db).await.map_err(Into::into)
+        project
+            .insert(db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create test project").with_source(e))
     }
 
     //#[tokio::test]

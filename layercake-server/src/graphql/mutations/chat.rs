@@ -41,7 +41,7 @@ impl ChatMutation {
         auth_service
             .check_project_read_access(user.id, project_id)
             .await
-            .map_err(|err| StructuredError::forbidden(err.to_string()))?;
+            .map_err(StructuredError::from_core_error)?;
 
         let chat_config = context.chat_config().await;
         let mut resolved_provider = provider
@@ -53,7 +53,7 @@ impl ChatMutation {
             let existing = history_service
                 .get_session(&existing_id)
                 .await
-                .map_err(|e| StructuredError::service("ChatHistoryService::get_session", e))?
+                .map_err(StructuredError::from_core_error)?
                 .ok_or_else(|| StructuredError::not_found("ChatSession", existing_id.clone()))?;
 
             if existing.project_id != project_id {
@@ -138,7 +138,7 @@ impl ChatMutation {
         let chat_session = history_service
             .get_session(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::get_session", e))?
+            .map_err(StructuredError::from_core_error)?
             .ok_or_else(|| StructuredError::not_found("ChatSession", session_id.clone()))?;
 
         let auth_service = AuthorizationService::new(context.db.clone());
@@ -159,7 +159,7 @@ impl ChatMutation {
         auth_service
             .check_project_read_access(user.id, chat_session.project_id)
             .await
-            .map_err(|err| StructuredError::forbidden(err.to_string()))?;
+            .map_err(StructuredError::from_core_error)?;
 
         if !context.chat_manager.is_session_active(&session_id).await {
             context
@@ -198,7 +198,7 @@ impl ChatMutation {
         service
             .update_session_title(&session_id, title)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::update_session_title", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -212,7 +212,7 @@ impl ChatMutation {
         service
             .archive_session(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::archive_session", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -226,7 +226,7 @@ impl ChatMutation {
         service
             .unarchive_session(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::unarchive_session", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -240,7 +240,7 @@ impl ChatMutation {
         service
             .delete_session(&session_id)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::delete_session", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
@@ -259,7 +259,7 @@ impl ChatMutation {
         service
             .update_rag_settings(&session_id, enable_rag)
             .await
-            .map_err(|e| StructuredError::service("ChatHistoryService::update_rag_settings", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         // If session is active, update the in-memory session
         if context.chat_manager.is_session_active(&session_id).await {

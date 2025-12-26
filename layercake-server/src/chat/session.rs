@@ -341,7 +341,8 @@ impl ChatSession {
         // Load session metadata
         let session = history_service
             .get_session(&session_id)
-            .await?
+            .await
+            .map_err(anyhow::Error::from)?
             .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
 
         let provider: ChatProvider = session.provider.parse()?;
@@ -478,7 +479,8 @@ impl ChatSession {
                 None,                             // title
                 Some(self.system_prompt.clone()), // system_prompt
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         self.session_id = Some(session.session_id.clone());
         Ok(session.session_id)
@@ -551,7 +553,8 @@ impl ChatSession {
                 None,
                 None,
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         self.resolve_conversation(observer).await
     }
@@ -1154,7 +1157,8 @@ impl ChatSession {
                 tool_call_id,
                 metadata_json,
             )
-            .await?;
+            .await
+            .map_err(anyhow::Error::from)?;
 
         Ok(())
     }
