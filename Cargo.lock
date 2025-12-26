@@ -3816,6 +3816,8 @@ version = "0.3.7"
 dependencies = [
  "anyhow",
  "sea-orm",
+ "serde",
+ "serde_json",
  "uuid",
 ]
 

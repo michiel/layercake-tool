@@ -145,18 +145,19 @@ impl StoryMutation {
         format: StoryExportFormat,
     ) -> Result<StoryExport> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let export_result = match format {
             StoryExportFormat::Csv => context
                 .app
-                .export_story_csv(story_id)
+                .export_story_csv(&actor, story_id)
                 .await
-                .map_err(|e| StructuredError::service("AppContext::export_story_csv", e))?,
+                .map_err(StructuredError::from_core_error)?,
             StoryExportFormat::Json => context
                 .app
-                .export_story_json(story_id)
+                .export_story_json(&actor, story_id)
                 .await
-                .map_err(|e| StructuredError::service("AppContext::export_story_json", e))?,
+                .map_err(StructuredError::from_core_error)?,
         };
 
         let content_base64 =
@@ -178,18 +179,19 @@ impl StoryMutation {
         content: String,
     ) -> Result<GqlStoryImportResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let import_result = match format {
             StoryImportFormat::Csv => context
                 .app
-                .import_story_csv(project_id, &content)
+                .import_story_csv(&actor, project_id, &content)
                 .await
-                .map_err(|e| StructuredError::service("AppContext::import_story_csv", e))?,
+                .map_err(StructuredError::from_core_error)?,
             StoryImportFormat::Json => context
                 .app
-                .import_story_json(project_id, &content)
+                .import_story_json(&actor, project_id, &content)
                 .await
-                .map_err(|e| StructuredError::service("AppContext::import_story_json", e))?,
+                .map_err(StructuredError::from_core_error)?,
         };
 
         Ok(GqlStoryImportResult {

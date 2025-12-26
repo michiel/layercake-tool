@@ -212,7 +212,13 @@ pub async fn export_graph(
     } else {
         let export_format =
             parse_export_format(format_str).map_err(|message| McpError::Validation { message })?;
-        app.preview_graph_export(graph.id, export_format, None, preview_limit)
+        app.preview_graph_export(
+            &layercake_core::auth::SystemActor::internal(),
+            graph.id,
+            export_format,
+            None,
+            preview_limit,
+        )
             .await
             .map_err(|e| internal_error("Failed to render graph content", e))?
     };

@@ -806,6 +806,10 @@ After refactoring, support multiple deployment modes:
 - Updated GraphQL mutations to pass Actor and map CoreError (`layercake-server/src/graphql/mutations/project.rs`, `layercake-server/src/graphql/mutations/plan_dag_nodes.rs`, `layercake-server/src/graphql/mutations/plan_dag_edges.rs`).
 - Updated graph edit mutations to pass Actor for core graph updates (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph.rs`).
 - Removed MCP HTTP routes from server app (`layercake-server/src/server/app.rs`, `layercake-server/src/server/mod.rs`).
+- Updated story import/export operations to accept Actor/CoreError and wired GraphQL story mutations (`layercake-core/src/app_context/story_operations.rs`, `layercake-server/src/graphql/mutations/story.rs`).
+- Updated preview export operations to accept Actor/CoreError and wired MCP tool (`layercake-core/src/app_context/preview_operations.rs`, `layercake-server/src/mcp/tools/graph_data.rs`).
+- Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
+- Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 
 #### Tasks
 
