@@ -850,7 +850,6 @@ After refactoring, support multiple deployment modes:
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 
 **Next steps**
-- Convert remaining services to `CoreResult` (priority: `dataset_bulk_service`, `import_service`, `export_service`, `graph_data_edit_applicator`, `file_type_detection`, `source_processing`, `validation`, `auth_service`).
 - Add Actor to remaining mutation paths that still accept raw IDs (audit remaining GraphQL mutations and MCP tool entrypoints).
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
