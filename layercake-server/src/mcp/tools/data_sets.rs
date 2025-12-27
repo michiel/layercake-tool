@@ -541,8 +541,9 @@ pub async fn export_data_sets(
         }
     };
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let exported = app
-        .export_data_sets(DataSetExportRequest {
+        .export_data_sets(&actor, DataSetExportRequest {
             project_id,
             data_set_ids: ids,
             format,
@@ -602,8 +603,9 @@ pub async fn import_data_sets(
             message: "Only .xlsx and .ods filenames are supported for import".to_string(),
         })?;
 
+    let actor = layercake_core::auth::SystemActor::internal();
     let outcome = app
-        .import_data_sets(DataSetImportRequest {
+        .import_data_sets(&actor, DataSetImportRequest {
             project_id,
             format,
             file_bytes,

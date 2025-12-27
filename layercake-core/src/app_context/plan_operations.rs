@@ -64,7 +64,12 @@ impl AppContext {
         self.plan_service.delete_plan(id).await
     }
 
-    pub async fn duplicate_plan(&self, id: i32, name: String) -> CoreResult<PlanSummary> {
+    pub async fn duplicate_plan(
+        &self,
+        _actor: &Actor,
+        id: i32,
+        name: String,
+    ) -> CoreResult<PlanSummary> {
         let plan = self
             .plan_service
             .duplicate_plan(id, name)

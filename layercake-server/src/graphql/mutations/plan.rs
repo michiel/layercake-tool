@@ -167,10 +167,11 @@ impl PlanMutation {
     /// Duplicate a plan with all DAG nodes and edges
     async fn duplicate_plan(&self, ctx: &Context<'_>, id: i32, name: String) -> Result<Plan> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let summary = context
             .app
-            .duplicate_plan(id, name)
+            .duplicate_plan(&actor, id, name)
             .await
             .map_err(StructuredError::from_core_error)?;
 

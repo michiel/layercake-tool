@@ -73,8 +73,7 @@ impl AppContext {
                 file_bytes,
                 tabular_data_type,
             )
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to create data set from file: {}", e)))?;
+            .await?;
 
         Ok(DataSetSummary::from(created))
     }
@@ -93,8 +92,7 @@ impl AppContext {
         let created = self
             .data_set_service
             .create_empty(project_id, name, description)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to create empty data set: {}", e)))?;
+            .await?;
 
         Ok(DataSetSummary::from(created))
     }
@@ -117,8 +115,7 @@ impl AppContext {
                     upload.filename.clone(),
                     upload.file_bytes.clone(),
                 )
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to import data set {}: {}", upload.filename, e)))?;
+                .await?;
 
             results.push(DataSetSummary::from(created));
         }
@@ -138,15 +135,13 @@ impl AppContext {
             let updated = self
                 .data_set_service
                 .update_file(id, file.filename, file.file_bytes)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update data set file {}: {}", id, e)))?;
+                .await?;
             (updated, true)
         } else {
             let updated = self
                 .data_set_service
                 .update(id, name.clone(), description.clone())
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update data set {}: {}", id, e)))?;
+                .await?;
             (updated, false)
         };
 
@@ -154,8 +149,7 @@ impl AppContext {
             model = self
                 .data_set_service
                 .update(id, name, description)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update metadata for data set {}: {}", id, e)))?;
+                .await?;
         }
 
         Ok(DataSetSummary::from(model))
@@ -170,8 +164,7 @@ impl AppContext {
         let model = self
             .data_set_service
             .update_graph_data(id, graph_json)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to update graph data for data set {}: {}", id, e)))?;
+            .await?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -180,8 +173,7 @@ impl AppContext {
         let model = self
             .data_set_service
             .reprocess(id)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to reprocess data set {}: {}", id, e)))?;
+            .await?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -203,10 +195,7 @@ impl AppContext {
     }
 
     pub async fn delete_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
-        self.data_set_service
-            .delete(id)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to delete data set {}: {}", id, e)))
+        self.data_set_service.delete(id).await
     }
 
     pub async fn merge_data_sets(
@@ -245,7 +234,7 @@ impl AppContext {
         // Create new dataset with merged data
         let summary = self
             .create_empty_data_set(
-                &crate::auth::SystemActor::internal(),
+                actor,
                 DataSetEmptyCreateRequest {
                     project_id,
                     name,
@@ -261,13 +250,12 @@ impl AppContext {
         let summary = self
             .data_set_service
             .update_graph_data(summary.id, merged_json)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to update merged data set: {}", e)))?;
+            .await?;
 
         // Delete source datasets if requested
         if delete_merged {
             for id in &data_set_ids {
-                self.data_set_service.delete(*id).await.ok();
+                let _ = self.delete_data_set(actor, *id).await;
             }
         }
 
@@ -388,6 +376,7 @@ impl AppContext {
 
     pub async fn export_data_sets(
         &self,
+        _actor: &Actor,
         request: DataSetExportRequest,
     ) -> CoreResult<DataSetExportResult> {
         let DataSetExportRequest {
@@ -447,6 +436,7 @@ impl AppContext {
 
     pub async fn import_data_sets(
         &self,
+        _actor: &Actor,
         request: DataSetImportRequest,
     ) -> CoreResult<DataSetImportOutcome> {
         let result = match request.format {

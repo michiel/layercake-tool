@@ -848,9 +848,10 @@ After refactoring, support multiple deployment modes:
 - Converted `DataSetBulkService` to `CoreResult` with consistent export/import error handling (`layercake-core/src/services/dataset_bulk_service.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
+- Added Actor to project archive/template import/export and reset flows, dataset import/export, and plan duplication paths; updated GraphQL/MCP entrypoints and core tests (`layercake-core/src/app_context/library_operations.rs`, `layercake-core/src/app_context/data_set_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-server/src/graphql/mutations/data_set.rs`, `layercake-server/src/graphql/mutations/plan.rs`, `layercake-server/src/mcp/tools/data_sets.rs`, `layercake-core/tests/project_archive_roundtrip.rs`).
 
 **Next steps**
-- Add Actor to remaining mutation paths that still accept raw IDs (audit remaining GraphQL mutations and MCP tool entrypoints).
+- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for code analysis, graph data edits, library item management, collaboration, projection, and sequence flows).
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).

@@ -142,7 +142,10 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
     .insert(&db)
     .await?;
 
-    let archive = app.export_project_archive(project.id, false).await?;
+    let actor = layercake_core::auth::SystemActor::internal();
+    let archive = app
+        .export_project_archive(&actor, project.id, false)
+        .await?;
     let archive_bytes = archive.bytes.clone();
     let mut archive_reader = ZipArchive::new(Cursor::new(archive_bytes.clone()))?;
     {
@@ -197,7 +200,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
     }
 
     let imported = app
-        .import_project_archive(archive_bytes, Some("Imported Copy".to_string()))
+        .import_project_archive(&actor, archive_bytes, Some("Imported Copy".to_string()))
         .await?;
 
     let imported_datasets = data_sets::Entity::find()

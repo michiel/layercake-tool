@@ -222,6 +222,7 @@ impl DataSetMutation {
         input: ExportDataSetsInput,
     ) -> Result<ExportDataSetsResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let format = match input.format {
             crate::graphql::types::SpreadsheetFormat::XLSX => DataSetExportFormat::Xlsx,
@@ -230,7 +231,7 @@ impl DataSetMutation {
 
         let exported = context
             .app
-            .export_data_sets(DataSetExportRequest {
+            .export_data_sets(&actor, DataSetExportRequest {
                 project_id: input.project_id,
                 data_set_ids: input.data_set_ids,
                 format,
@@ -255,6 +256,7 @@ impl DataSetMutation {
         input: ImportDataSetsInput,
     ) -> Result<ImportDataSetsResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         use base64::{engine::general_purpose, Engine as _};
         let file_bytes = general_purpose::STANDARD
@@ -267,7 +269,7 @@ impl DataSetMutation {
 
         let outcome = context
             .app
-            .import_data_sets(DataSetImportRequest {
+            .import_data_sets(&actor, DataSetImportRequest {
                 project_id: input.project_id,
                 format,
                 file_bytes,

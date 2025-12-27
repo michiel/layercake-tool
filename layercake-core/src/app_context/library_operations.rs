@@ -18,6 +18,7 @@ use zip::{result::ZipError, write::FileOptions, CompressionMethod, ZipArchive, Z
 
 use super::PlanDagSnapshot;
 use super::{summarize_graph_counts, AppContext, ProjectArchiveFile, ProjectSummary};
+use crate::auth::Actor;
 use crate::database::entities::common_types::FileFormat as DataSetFileFormat;
 use crate::database::entities::{
     data_sets, layer_aliases, library_items, plan_dag_edges, plan_dag_nodes, plans, project_layers,
@@ -482,6 +483,7 @@ fn archive_directory(source_dir: &Path) -> Result<Vec<u8>> {
 impl AppContext {
     pub async fn export_project_as_template(
         &self,
+        _actor: &Actor,
         project_id: i32,
     ) -> CoreResult<library_items::Model> {
         let project = projects::Entity::find_by_id(project_id)
@@ -619,6 +621,7 @@ impl AppContext {
 
     pub async fn export_project_archive(
         &self,
+        _actor: &Actor,
         project_id: i32,
         include_knowledge_base: bool,
     ) -> CoreResult<ProjectArchiveFile> {
@@ -783,6 +786,7 @@ impl AppContext {
 
     pub async fn export_project_to_directory(
         &self,
+        actor: &Actor,
         project_id: i32,
         target_path: &Path,
         include_knowledge_base: bool,
@@ -803,7 +807,7 @@ impl AppContext {
         })?;
 
         let archive = self
-            .export_project_archive(project_id, include_knowledge_base)
+            .export_project_archive(actor, project_id, include_knowledge_base)
             .await?;
         write_archive_to_directory(&archive.bytes, target_path)
             .map_err(|e| CoreError::internal(format!("Failed to write archive: {}", e)))?;
@@ -815,9 +819,7 @@ impl AppContext {
                 .to_string();
             let update =
                 super::ProjectUpdate::new(None, None, false, None, Some(Some(path_string)));
-            let _ = self
-                .update_project(&crate::auth::SystemActor::internal(), project_id, update)
-                .await?;
+            let _ = self.update_project(actor, project_id, update).await?;
         }
 
         Ok(())
@@ -825,15 +827,17 @@ impl AppContext {
 
     pub async fn import_project_archive(
         &self,
+        actor: &Actor,
         archive_bytes: Vec<u8>,
         project_name: Option<String>,
     ) -> CoreResult<ProjectSummary> {
-        self.import_project_archive_internal(archive_bytes, project_name, None, None)
+        self.import_project_archive_internal(actor, archive_bytes, project_name, None, None)
             .await
     }
 
     async fn import_project_archive_internal(
         &self,
+        actor: &Actor,
         archive_bytes: Vec<u8>,
         project_name: Option<String>,
         target_project_id: Option<i32>,
@@ -952,12 +956,12 @@ impl AppContext {
         }
 
         if let Some(index) = plans_index {
-            self.import_plans_from_export(project.id, index, &mut archive, &id_map)
+            self.import_plans_from_export(actor, project.id, index, &mut archive, &id_map)
                 .await
                 .map_err(|e| CoreError::internal(format!("Failed to import plans: {}", e)))?;
         } else {
             let plan = self
-                .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
+                .create_plan(actor, PlanCreateRequest {
                     project_id: project.id,
                     name: if manifest.plan_name.trim().is_empty() {
                         format!("{} Plan", desired_name)
@@ -996,6 +1000,7 @@ impl AppContext {
 
     pub async fn import_project_from_directory(
         &self,
+        actor: &Actor,
         source_path: &Path,
         project_name: Option<String>,
         keep_connection: bool,
@@ -1022,12 +1027,13 @@ impl AppContext {
             None
         };
 
-        self.import_project_archive_internal(archive_bytes, project_name, None, path_string)
+        self.import_project_archive_internal(actor, archive_bytes, project_name, None, path_string)
             .await
     }
 
     pub async fn reimport_project_from_connection(
         &self,
+        actor: &Actor,
         project_id: i32,
     ) -> CoreResult<ProjectSummary> {
         let project = projects::Entity::find_by_id(project_id)
@@ -1049,12 +1055,12 @@ impl AppContext {
             })?;
 
         // Remove the existing project and re-import using the same ID
-        self.delete_project(&crate::auth::SystemActor::internal(), project_id)
-            .await?;
+        self.delete_project(actor, project_id).await?;
 
         let archive_bytes = archive_directory(Path::new(&path))
             .map_err(|e| CoreError::internal(format!("Failed to archive directory: {}", e)))?;
         self.import_project_archive_internal(
+            actor,
             archive_bytes,
             Some(project.name),
             Some(project_id),
@@ -1065,6 +1071,7 @@ impl AppContext {
 
     pub async fn reexport_project_to_connection(
         &self,
+        actor: &Actor,
         project_id: i32,
         include_knowledge_base: bool,
     ) -> CoreResult<()> {
@@ -1087,6 +1094,7 @@ impl AppContext {
             })?;
 
         self.export_project_to_directory(
+            actor,
             project_id,
             Path::new(&path),
             include_knowledge_base,
@@ -1097,6 +1105,7 @@ impl AppContext {
 
     pub async fn create_project_from_library(
         &self,
+        actor: &Actor,
         library_item_id: i32,
         project_name: Option<String>,
     ) -> CoreResult<ProjectSummary> {
@@ -1150,7 +1159,7 @@ impl AppContext {
         })?;
 
         let plan = self
-            .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
+            .create_plan(actor, PlanCreateRequest {
                 project_id: project.id,
                 name: if manifest.plan_name.trim().is_empty() {
                     format!("{} Plan", desired_name)
@@ -1571,6 +1580,7 @@ impl AppContext {
 
     async fn import_plans_from_export(
         &self,
+        actor: &Actor,
         project_id: i32,
         plans_index: PlansIndex,
         archive: &mut ZipArchive<Cursor<Vec<u8>>>,
@@ -1584,7 +1594,7 @@ impl AppContext {
             let path = format!("plans/{}", entry.filename);
             let plan_file: ExportedPlanFile = read_template_json(archive, &path)?;
             let plan = self
-                .create_plan(&crate::auth::SystemActor::internal(), PlanCreateRequest {
+                .create_plan(actor, PlanCreateRequest {
                     project_id,
                     name: plan_file.metadata.name.clone(),
                     description: plan_file.metadata.description.clone(),

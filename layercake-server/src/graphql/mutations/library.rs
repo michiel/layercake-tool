@@ -175,9 +175,10 @@ impl LibraryMutation {
         #[graphql(name = "projectId")] project_id: i32,
     ) -> Result<LibraryItem> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let item = context
             .app
-            .export_project_as_template(project_id)
+            .export_project_as_template(&actor, project_id)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -192,9 +193,10 @@ impl LibraryMutation {
         #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<ExportProjectArchivePayload> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let archive = context
             .app
-            .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
+            .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -213,6 +215,7 @@ impl LibraryMutation {
         name: Option<String>,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let archive_bytes = general_purpose::STANDARD
             .decode(&file_content)
@@ -225,7 +228,7 @@ impl LibraryMutation {
 
         let project = context
             .app
-            .import_project_archive(archive_bytes, name)
+            .import_project_archive(&actor, archive_bytes, name)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -242,11 +245,13 @@ impl LibraryMutation {
         #[graphql(name = "keepConnection")] keep_connection: Option<bool>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let target = PathBuf::from(&path);
 
         context
             .app
             .export_project_to_directory(
+                &actor,
                 project_id,
                 &target,
                 include_knowledge_base.unwrap_or(false),
@@ -267,11 +272,12 @@ impl LibraryMutation {
         #[graphql(name = "keepConnection")] keep_connection: Option<bool>,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let source = PathBuf::from(&path);
 
         let project = context
             .app
-            .import_project_from_directory(&source, name, keep_connection.unwrap_or(false))
+            .import_project_from_directory(&actor, &source, name, keep_connection.unwrap_or(false))
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -285,9 +291,10 @@ impl LibraryMutation {
         #[graphql(name = "projectId")] project_id: i32,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let project = context
             .app
-            .reimport_project_from_connection(project_id)
+            .reimport_project_from_connection(&actor, project_id)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -302,9 +309,10 @@ impl LibraryMutation {
         #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         context
             .app
-            .reexport_project_to_connection(project_id, include_knowledge_base.unwrap_or(false))
+            .reexport_project_to_connection(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -320,11 +328,12 @@ impl LibraryMutation {
         #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         // Export the project
         let archive = context
             .app
-            .export_project_archive(project_id, include_knowledge_base.unwrap_or(false))
+            .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -343,14 +352,14 @@ impl LibraryMutation {
         // Delete the old project
         context
             .app
-            .delete_project(&layercake_core::auth::SystemActor::internal(), project_id)
+            .delete_project(&actor, project_id)
             .await
             .map_err(StructuredError::from_core_error)?;
 
         // Re-import the project
         let new_project = context
             .app
-            .import_project_archive(archive.bytes, Some(project_name))
+            .import_project_archive(&actor, archive.bytes, Some(project_name))
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -365,9 +374,10 @@ impl LibraryMutation {
         name: Option<String>,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let project = context
             .app
-            .create_project_from_library(library_item_id, name)
+            .create_project_from_library(&actor, library_item_id, name)
             .await
             .map_err(StructuredError::from_core_error)?;
 
