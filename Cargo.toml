@@ -65,8 +65,7 @@ lazy_static = "1.4"
 # Authentication dependencies
 bcrypt = "0.15"
 
-# MCP dependencies
-axum-mcp = { path = "external-modules/axum-mcp" }
+# WebSocket dependencies
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 url = "2.0"

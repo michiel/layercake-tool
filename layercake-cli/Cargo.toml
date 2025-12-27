@@ -28,7 +28,6 @@ uuid = { workspace = true }
 regex = { workspace = true }
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
-axum-mcp = { workspace = true }
 rig = { workspace = true }
 rmcp = { version = "0.9.1", features = ["client", "transport-streamable-http-client-reqwest"] }
 clap-repl = "0.3.2"

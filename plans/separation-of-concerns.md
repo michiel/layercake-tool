@@ -865,9 +865,11 @@ After refactoring, support multiple deployment modes:
 - Added AuthorizationService session/role integration coverage and actor role resolution tests (`layercake-core/tests/auth/authorization_service_tests.rs`, `layercake-server/src/graphql/context.rs`).
 - Removed legacy StructuredError CoreError adapter in favor of `core_error_to_graphql_error` (`layercake-server/src/graphql/errors.rs`).
 - Validated GraphQL golden error baselines after auth updates (`cargo test -p layercake-server --test golden_errors`).
+- Reviewed Stage 2 task list: remaining work is MCP transport removal + manual server binary smoke run.
+- Removed MCP transport scaffolding, axum-mcp dependency, and MCP parity tests; chat tool bridge now returns disabled-tool responses (`layercake-server/src/chat/mcp_bridge.rs`, `layercake-server/src/chat/session.rs`, `layercake-server/src/lib.rs`, `layercake-server/Cargo.toml`, `Cargo.toml`, `layercake-cli/Cargo.toml`, `layercake-core/tests/parity_smoke_test.rs`, `layercake-core/tests/e2e_mcp_test.rs`).
 
 **Next steps**
-- Review remaining Stage 2 tasks and queue follow-up items if needed.
+- Run a manual server binary smoke check after MCP removal (`cargo run -p layercake-server -- --port 3001 --database ../layercake.db`).
 
 #### Tasks
 

@@ -10,7 +10,6 @@
 use std::{collections::BTreeMap, fmt::Write as FmtWrite, sync::Arc};
 
 use anyhow::{anyhow, Context, Result};
-use axum_mcp::prelude::{ClientContext, SecurityContext};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -48,13 +47,12 @@ use layercake_core::app_context::summarize_graph_counts;
 use layercake_core::database::entities::{
     data_sets, graph_data, plan_dag_edges, plan_dag_nodes, plans, projects, users,
 };
-use crate::mcp::security::build_user_security_context;
 use layercake_core::services::system_settings_service::SystemSettingsService;
 use layercake_genai::services::DataAcquisitionService;
 
 use super::{
     config::{ChatConfig, ChatCredentialStore},
-    ChatProvider, McpBridge, RagContextBuilder,
+    mcp_bridge::ToolContext, ChatProvider, McpBridge, RagContextBuilder,
 };
 
 const MAX_TOOL_ITERATIONS: usize = 5;
@@ -158,7 +156,7 @@ pub struct ChatSession {
     system_prompt: String,
     messages: Vec<ChatMessage>,
     bridge: McpBridge,
-    security: SecurityContext,
+    security: ToolContext,
     tool_use_enabled: bool,
     agent: RigAgent,
     credentials: ChatCredentialStore,
@@ -231,12 +229,11 @@ impl ChatSession {
     ) -> Result<Self> {
         let credentials = ChatCredentialStore::with_settings(db.clone(), settings.clone());
         let bridge = McpBridge::new(db.clone());
-        let security = build_user_security_context(
-            ClientContext::default(),
-            user.id,
-            &user.user_type,
-            Some(project_id),
-        );
+        let security = ToolContext {
+            user_id: user.id,
+            user_name: user.display_name.clone(),
+            project_id,
+        };
 
         // Initialize DataAcquisitionService for RAG
         let embedding_provider = settings
@@ -368,12 +365,11 @@ impl ChatSession {
             .await?
             .ok_or_else(|| anyhow!("User not found"))?;
 
-        let security = build_user_security_context(
-            ClientContext::default(),
-            user.id,
-            &user.user_type,
-            Some(session.project_id),
-        );
+        let security = ToolContext {
+            user_id: user.id,
+            user_name: user.display_name.clone(),
+            project_id: session.project_id,
+        };
 
         let agent = match provider {
             ChatProvider::OpenAi => RigAgent::OpenAI(session.model_name.clone()),
