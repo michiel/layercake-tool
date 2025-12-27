@@ -1,4 +1,3 @@
-use anyhow::Result;
 use csv::ReaderBuilder;
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 use serde_json::Value;
@@ -6,6 +5,7 @@ use std::collections::HashMap;
 use tracing::warn;
 
 use crate::database::entities::graph_layers;
+use crate::errors::{CoreError, CoreResult};
 
 pub struct ImportService {
     db: DatabaseConnection,
@@ -17,17 +17,25 @@ impl ImportService {
     }
 
     /// Import layers from CSV content (convenience method for MCP)
-    pub async fn import_layers_from_csv(&self, graph_id: i32, csv_content: &str) -> Result<usize> {
+    pub async fn import_layers_from_csv(
+        &self,
+        graph_id: i32,
+        csv_content: &str,
+    ) -> CoreResult<usize> {
         self.import_layers(graph_id, csv_content).await
     }
 
-    async fn import_layers(&self, graph_id: i32, csv_data: &str) -> Result<usize> {
+    async fn import_layers(&self, graph_id: i32, csv_data: &str) -> CoreResult<usize> {
         let mut reader = ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let headers = reader.headers()?.clone();
+        let headers = reader.headers().map_err(|e| {
+            CoreError::validation(format!("Invalid CSV headers: {}", e))
+        })?.clone();
 
         let mut count = 0;
         for record in reader.records() {
-            let record = record?;
+            let record = record.map_err(|e| {
+                CoreError::validation(format!("Invalid CSV record: {}", e))
+            })?;
 
             let layer_id = record.get(0).unwrap_or("").to_string();
             let name = record.get(1).unwrap_or(&layer_id).to_string();
@@ -73,7 +81,9 @@ impl ImportService {
             let properties_json = if properties.is_empty() {
                 None
             } else {
-                Some(serde_json::to_string(&properties)?)
+                Some(serde_json::to_string(&properties).map_err(|e| {
+                    CoreError::internal("Failed to serialize layer properties").with_source(e)
+                })?)
             };
 
             let layer = graph_layers::ActiveModel {
@@ -89,7 +99,10 @@ impl ImportService {
                 ..Default::default()
             };
 
-            layer.insert(&self.db).await?;
+            layer
+                .insert(&self.db)
+                .await
+                .map_err(|e| CoreError::internal("Failed to insert layer").with_source(e))?;
             count += 1;
         }
 
