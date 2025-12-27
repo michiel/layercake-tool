@@ -18,10 +18,12 @@ impl CodeAnalysisMutation {
         input: CreateCodeAnalysisProfileInput,
     ) -> Result<CodeAnalysisProfile> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let profile = context
             .app
             .code_analysis_service()
             .create(
+                &actor,
                 input.project_id,
                 input.file_path,
                 input.dataset_id,
@@ -44,10 +46,12 @@ impl CodeAnalysisMutation {
         input: UpdateCodeAnalysisProfileInput,
     ) -> Result<CodeAnalysisProfile> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let profile = context
             .app
             .code_analysis_service()
             .update(
+                &actor,
                 &input.id,
                 input.file_path,
                 Some(input.dataset_id),
@@ -63,10 +67,11 @@ impl CodeAnalysisMutation {
 
     async fn delete_code_analysis_profile(&self, ctx: &Context<'_>, id: String) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         context
             .app
             .code_analysis_service()
-            .delete(&id)
+            .delete(&actor, &id)
             .await
             .map_err(StructuredError::from_core_error)
     }
@@ -77,10 +82,11 @@ impl CodeAnalysisMutation {
         id: String,
     ) -> Result<CodeAnalysisRunResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let profile = context
             .app
             .code_analysis_service()
-            .run(&id)
+            .run(&actor, &id)
             .await
             .map_err(StructuredError::from_core_error)?;
         Ok(CodeAnalysisRunResult {

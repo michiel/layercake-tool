@@ -15,6 +15,7 @@ use crate::code_analysis_enhanced_solution_graph::analysis_to_enhanced_solution_
 use crate::code_analysis_graph::analysis_to_graph;
 use crate::code_analysis_solution_graph::analysis_to_solution_graph;
 use crate::database::entities::code_analysis_profiles;
+use crate::auth::Actor;
 use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer};
 use crate::infra_graph::infra_to_graph;
@@ -516,6 +517,7 @@ impl CodeAnalysisService {
 
     pub async fn create(
         &self,
+        _actor: &Actor,
         project_id: i32,
         file_path: String,
         dataset_id: Option<i32>,
@@ -556,6 +558,7 @@ impl CodeAnalysisService {
 
     pub async fn update(
         &self,
+        _actor: &Actor,
         id: &str,
         file_path: Option<String>,
         dataset_id: Option<Option<i32>>,
@@ -598,7 +601,7 @@ impl CodeAnalysisService {
         Ok(CodeAnalysisProfile::from(updated))
     }
 
-    pub async fn delete(&self, id: &str) -> CoreResult<bool> {
+    pub async fn delete(&self, _actor: &Actor, id: &str) -> CoreResult<bool> {
         self.ensure_table().await?;
         let result = code_analysis_profiles::Entity::delete_by_id(id.to_string())
             .exec(&self.db)
@@ -624,7 +627,7 @@ impl CodeAnalysisService {
         Ok(model.map(CodeAnalysisProfile::from))
     }
 
-    pub async fn run(&self, id: &str) -> CoreResult<CodeAnalysisProfile> {
+    pub async fn run(&self, _actor: &Actor, id: &str) -> CoreResult<CodeAnalysisProfile> {
         let profile = self.get_by_id(id).await?;
         let no_infra_flag = profile.no_infra.unwrap_or(false);
         let analysis_type = profile
