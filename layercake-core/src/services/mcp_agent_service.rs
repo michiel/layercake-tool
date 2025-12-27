@@ -42,8 +42,7 @@ impl McpAgentService {
 
         // 2. Generate secure API key
         let api_key = Self::generate_api_key();
-        let api_key_hash = AuthService::hash_password(&api_key)
-            .map_err(|e| CoreError::internal("Failed to hash API key").with_source(e))?;
+        let api_key_hash = AuthService::hash_password(&api_key)?;
 
         // 3. Create unique email and username for the agent
         let agent_uuid = Uuid::new_v4();
@@ -94,9 +93,7 @@ impl McpAgentService {
         // Check each agent's hashed key
         for agent in agents {
             if let Some(stored_hash) = &agent.api_key_hash {
-                if AuthService::verify_password(api_key, stored_hash)
-                    .map_err(|e| CoreError::internal("Failed to verify API key").with_source(e))?
-                {
+                if AuthService::verify_password(api_key, stored_hash)? {
                     return Ok(agent);
                 }
             }
@@ -190,8 +187,7 @@ impl McpAgentService {
 
         // Generate new API key
         let new_api_key = Self::generate_api_key();
-        let new_hash = AuthService::hash_password(&new_api_key)
-            .map_err(|e| CoreError::internal("Failed to hash API key").with_source(e))?;
+        let new_hash = AuthService::hash_password(&new_api_key)?;
 
         // Update agent
         let mut agent_active: users::ActiveModel = agent.into();

@@ -2,6 +2,7 @@
 
 use layercake_core::database::entities::users;
 use crate::mcp::tools::{create_success_response, get_optional_param, get_required_param};
+use layercake_core::errors::{CoreError, CoreErrorKind};
 use layercake_core::services::auth_service::AuthService;
 use axum_mcp::prelude::*;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
@@ -38,17 +39,11 @@ pub async fn register_user(
         .unwrap_or_else(|| username.clone());
 
     // Validate input using auth service
-    AuthService::validate_email(&email).map_err(|e| McpError::Validation {
-        message: e.to_string(),
-    })?;
+    AuthService::validate_email(&email).map_err(mcp_error_from_core)?;
 
-    AuthService::validate_username(&username).map_err(|e| McpError::Validation {
-        message: e.to_string(),
-    })?;
+    AuthService::validate_username(&username).map_err(mcp_error_from_core)?;
 
-    AuthService::validate_display_name(&display_name).map_err(|e| McpError::Validation {
-        message: e.to_string(),
-    })?;
+    AuthService::validate_display_name(&display_name).map_err(mcp_error_from_core)?;
 
     // Check if user already exists
     let existing_user = users::Entity::find()
@@ -80,9 +75,7 @@ pub async fn register_user(
     }
 
     // Hash password
-    let password_hash = AuthService::hash_password(password).map_err(|e| McpError::Internal {
-        message: format!("Failed to hash password: {}", e),
-    })?;
+    let password_hash = AuthService::hash_password(password).map_err(mcp_error_from_core)?;
 
     // Create user
     let new_user = users::ActiveModel {
@@ -146,11 +139,7 @@ pub async fn login_user(
 
     // Verify password
     let password_valid =
-        AuthService::verify_password(password, &user.password_hash).map_err(|e| {
-            McpError::Internal {
-                message: format!("Password verification failed: {}", e),
-            }
-        })?;
+        AuthService::verify_password(password, &user.password_hash).map_err(mcp_error_from_core)?;
 
     if !password_valid {
         return Err(McpError::Validation {
@@ -283,10 +272,9 @@ pub async fn change_password(
         })?;
 
     // Verify current password
-    let password_valid = AuthService::verify_password(current_password, &user.password_hash)
-        .map_err(|e| McpError::Internal {
-            message: format!("Password verification failed: {}", e),
-        })?;
+    let password_valid =
+        AuthService::verify_password(current_password, &user.password_hash)
+            .map_err(mcp_error_from_core)?;
 
     if !password_valid {
         return Err(McpError::Validation {
@@ -296,9 +284,7 @@ pub async fn change_password(
 
     // Hash new password
     let new_password_hash =
-        AuthService::hash_password(new_password).map_err(|e| McpError::Internal {
-            message: format!("Failed to hash new password: {}", e),
-        })?;
+        AuthService::hash_password(new_password).map_err(mcp_error_from_core)?;
 
     // Update password
     let mut user_active: users::ActiveModel = user.into();
@@ -318,4 +304,15 @@ pub async fn change_password(
     });
 
     create_success_response(&result)
+}
+
+fn mcp_error_from_core(err: CoreError) -> McpError {
+    match err.kind() {
+        CoreErrorKind::Validation => McpError::Validation {
+            message: err.message().to_string(),
+        },
+        _ => McpError::Internal {
+            message: err.message().to_string(),
+        },
+    }
 }

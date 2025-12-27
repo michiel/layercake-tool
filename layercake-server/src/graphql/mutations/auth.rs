@@ -25,12 +25,12 @@ impl AuthMutation {
 
         // Validate input
         AuthService::validate_email(&input.email)
-            .map_err(|e| StructuredError::bad_request(format!("Email validation failed: {}", e)))?;
+            .map_err(StructuredError::from_core_error)?;
         AuthService::validate_username(&input.username).map_err(|e| {
-            StructuredError::bad_request(format!("Username validation failed: {}", e))
+            StructuredError::from_core_error(e)
         })?;
         AuthService::validate_display_name(&input.display_name).map_err(|e| {
-            StructuredError::bad_request(format!("Display name validation failed: {}", e))
+            StructuredError::from_core_error(e)
         })?;
 
         // Check if user already exists
@@ -59,7 +59,7 @@ impl AuthMutation {
 
         // Hash password using bcrypt
         let password_hash = AuthService::hash_password(&input.password)
-            .map_err(|e| StructuredError::service("AuthService::hash_password", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         // Create user
         let mut user = users::ActiveModel::new();
@@ -102,7 +102,7 @@ impl AuthMutation {
 
         // Verify password using bcrypt
         let is_valid = AuthService::verify_password(&input.password, &user.password_hash)
-            .map_err(|e| StructuredError::service("AuthService::verify_password", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         if !is_valid {
             return Err(StructuredError::unauthorized("Invalid email or password"));

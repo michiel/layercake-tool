@@ -842,6 +842,7 @@ After refactoring, support multiple deployment modes:
 - Converted `file_type_detection` helpers to `CoreResult` for consistent validation errors (`layercake-core/src/services/file_type_detection.rs`).
 - Converted `source_processing` helpers to `CoreResult` for consistent dataset import error handling (`layercake-core/src/services/source_processing.rs`).
 - Converted validation helpers to `CoreResult` with CoreError semantics (`layercake-core/src/services/validation.rs`).
+- Converted `AuthService` to `CoreResult` and updated GraphQL/MCP auth flows to map CoreError (`layercake-core/src/services/auth_service.rs`, `layercake-server/src/graphql/mutations/auth.rs`, `layercake-server/src/mcp/tools/auth.rs`, `layercake-core/src/services/mcp_agent_service.rs`).
 - Completed test utilities golden helpers (`layercake-test-utils/src/fixtures.rs`).
 - Completed server main entry point (`layercake-server/src/main.rs`) and collaboration coordinator placement (`layercake-server/src/collaboration/`).
 

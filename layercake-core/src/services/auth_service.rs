@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use anyhow::{anyhow, Result};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Duration, Utc};
 use sea_orm::DatabaseConnection;
 use uuid::Uuid;
 
+use crate::errors::{CoreError, CoreResult};
 /// Service for handling authentication operations
 #[allow(dead_code)] // Authentication service reserved for future use
 #[derive(Clone)]
@@ -19,21 +19,25 @@ impl AuthService {
     }
 
     /// Hash a password using bcrypt
-    pub fn hash_password(password: &str) -> Result<String> {
+    pub fn hash_password(password: &str) -> CoreResult<String> {
         if password.is_empty() {
-            return Err(anyhow!("Password cannot be empty"));
+            return Err(CoreError::validation("Password cannot be empty"));
         }
 
         if password.len() < 8 {
-            return Err(anyhow!("Password must be at least 8 characters long"));
+            return Err(CoreError::validation(
+                "Password must be at least 8 characters long",
+            ));
         }
 
-        hash(password, DEFAULT_COST).map_err(|e| anyhow!("Failed to hash password: {}", e))
+        hash(password, DEFAULT_COST)
+            .map_err(|e| CoreError::internal("Failed to hash password").with_source(e))
     }
 
     /// Verify a password against a hash
-    pub fn verify_password(password: &str, hash: &str) -> Result<bool> {
-        verify(password, hash).map_err(|e| anyhow!("Failed to verify password: {}", e))
+    pub fn verify_password(password: &str, hash: &str) -> CoreResult<bool> {
+        verify(password, hash)
+            .map_err(|e| CoreError::internal("Failed to verify password").with_source(e))
     }
 
     /// Generate a secure session ID
@@ -47,57 +51,69 @@ impl AuthService {
     }
 
     /// Validate email format
-    pub fn validate_email(email: &str) -> Result<()> {
+    pub fn validate_email(email: &str) -> CoreResult<()> {
         if email.is_empty() {
-            return Err(anyhow!("Email cannot be empty"));
+            return Err(CoreError::validation("Email cannot be empty"));
         }
 
         let parts: Vec<&str> = email.split('@').collect();
         if parts.len() != 2 {
-            return Err(anyhow!("Invalid email format: must contain exactly one @"));
+            return Err(CoreError::validation(
+                "Invalid email format: must contain exactly one @",
+            ));
         }
 
         let local_part = parts[0];
         let domain_part = parts[1];
 
         if local_part.is_empty() {
-            return Err(anyhow!("Invalid email format: local part cannot be empty"));
+            return Err(CoreError::validation(
+                "Invalid email format: local part cannot be empty",
+            ));
         }
 
         if domain_part.is_empty() {
-            return Err(anyhow!("Invalid email format: domain part cannot be empty"));
+            return Err(CoreError::validation(
+                "Invalid email format: domain part cannot be empty",
+            ));
         }
 
         if !domain_part.contains('.') {
-            return Err(anyhow!("Invalid email format: domain must contain a dot"));
+            return Err(CoreError::validation(
+                "Invalid email format: domain must contain a dot",
+            ));
         }
 
         if domain_part.starts_with('.') || domain_part.ends_with('.') {
-            return Err(anyhow!(
-                "Invalid email format: domain cannot start or end with a dot"
+            return Err(CoreError::validation(
+                "Invalid email format: domain cannot start or end with a dot",
             ));
         }
 
         // Check for reasonable length
         if email.len() > 254 {
-            return Err(anyhow!("Email is too long"));
+            return Err(CoreError::validation("Email is too long"));
         }
 
         Ok(())
     }
 
     /// Validate username format
-    pub fn validate_username(username: &str) -> Result<()> {
+    pub fn validate_username(username: &str) -> CoreResult<()> {
         if username.is_empty() {
-            return Err(anyhow!("Username cannot be empty"));
+            return Err(CoreError::validation("Username cannot be empty"));
         }
 
         if username.len() < 3 {
-            return Err(anyhow!("Username must be at least 3 characters long"));
+            return Err(CoreError::validation(
+                "Username must be at least 3 characters long",
+            ));
         }
 
         if username.len() > 50 {
-            return Err(anyhow!("Username is too long (max 50 characters)"));
+            return Err(CoreError::validation(
+                "Username is too long (max 50 characters)",
+            ));
         }
 
         // Check for valid characters (alphanumeric, underscore, hyphen)
@@ -105,8 +121,8 @@ impl AuthService {
             .chars()
             .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
         {
-            return Err(anyhow!(
-                "Username can only contain letters, numbers, underscores, and hyphens"
+            return Err(CoreError::validation(
+                "Username can only contain letters, numbers, underscores, and hyphens",
             ));
         }
 
@@ -114,19 +130,23 @@ impl AuthService {
     }
 
     /// Validate display name
-    pub fn validate_display_name(display_name: &str) -> Result<()> {
+    pub fn validate_display_name(display_name: &str) -> CoreResult<()> {
         if display_name.is_empty() {
-            return Err(anyhow!("Display name cannot be empty"));
+            return Err(CoreError::validation("Display name cannot be empty"));
         }
 
         if display_name.len() > 100 {
-            return Err(anyhow!("Display name is too long (max 100 characters)"));
+            return Err(CoreError::validation(
+                "Display name is too long (max 100 characters)",
+            ));
         }
 
         // Trim whitespace and check if still valid
         let trimmed = display_name.trim();
         if trimmed.is_empty() {
-            return Err(anyhow!("Display name cannot be only whitespace"));
+            return Err(CoreError::validation(
+                "Display name cannot be only whitespace",
+            ));
         }
 
         Ok(())
