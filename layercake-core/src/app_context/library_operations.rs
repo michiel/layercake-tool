@@ -483,7 +483,7 @@ fn archive_directory(source_dir: &Path) -> Result<Vec<u8>> {
 impl AppContext {
     pub async fn export_project_as_template(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
     ) -> CoreResult<library_items::Model> {
         let project = projects::Entity::find_by_id(project_id)
@@ -606,6 +606,7 @@ impl AppContext {
 
         let item = service
             .create_binary_item(
+                actor,
                 ITEM_TYPE_PROJECT_TEMPLATE.to_string(),
                 format!("{} Template", project.name),
                 project.description.clone(),

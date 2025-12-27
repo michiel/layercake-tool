@@ -11,6 +11,7 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use crate::auth::Actor;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::{data_sets, library_items, projects};
 use crate::errors::{CoreError, CoreResult};
@@ -105,6 +106,7 @@ impl LibraryItemService {
 
     pub async fn update_fields(
         &self,
+        _actor: &Actor,
         id: i32,
         name: Option<String>,
         description: Option<String>,
@@ -139,6 +141,7 @@ impl LibraryItemService {
 
     pub async fn create_dataset_item(
         &self,
+        _actor: &Actor,
         name: String,
         description: Option<String>,
         tags: Vec<String>,
@@ -184,6 +187,7 @@ impl LibraryItemService {
 
     pub async fn create_binary_item(
         &self,
+        _actor: &Actor,
         item_type: String,
         name: String,
         description: Option<String>,
@@ -214,7 +218,7 @@ impl LibraryItemService {
         Ok(model)
     }
 
-    pub async fn seed_from_repository(&self) -> CoreResult<SeedLibraryResult> {
+    pub async fn seed_from_repository(&self, actor: &Actor) -> CoreResult<SeedLibraryResult> {
         let mut result = SeedLibraryResult {
             total_remote_files: 0,
             created_count: 0,
@@ -265,7 +269,7 @@ impl LibraryItemService {
                     continue;
                 }
 
-                match self.seed_local_file(&path, &filename).await {
+                match self.seed_local_file(actor, &path, &filename).await {
                     Ok(_) => {
                         result.created_count += 1;
                         existing_filenames.insert(filename);
@@ -323,7 +327,7 @@ impl LibraryItemService {
                     continue;
                 }
 
-                match self.seed_prompt_file(&path, &filename).await {
+                match self.seed_prompt_file(actor, &path, &filename).await {
                     Ok(_) => {
                         result.created_count += 1;
                     }
@@ -337,7 +341,12 @@ impl LibraryItemService {
         Ok(result)
     }
 
-    async fn seed_local_file(&self, path: &PathBuf, filename: &str) -> CoreResult<()> {
+    async fn seed_local_file(
+        &self,
+        actor: &Actor,
+        path: &PathBuf,
+        filename: &str,
+    ) -> CoreResult<()> {
         let file_bytes = fs::read(path).map_err(|e| {
             CoreError::internal(format!("Failed to read {}: {}", path.display(), e))
         })?;
@@ -352,6 +361,7 @@ impl LibraryItemService {
         let description = Some("Seeded from resources/library".to_string());
 
         self.create_dataset_item(
+            actor,
             name,
             description,
             vec![],
@@ -366,7 +376,12 @@ impl LibraryItemService {
         Ok(())
     }
 
-    async fn seed_prompt_file(&self, path: &PathBuf, filename: &str) -> CoreResult<()> {
+    async fn seed_prompt_file(
+        &self,
+        actor: &Actor,
+        path: &PathBuf,
+        filename: &str,
+    ) -> CoreResult<()> {
         let file_bytes = fs::read(path).map_err(|e| {
             CoreError::internal(format!("Failed to read {}: {}", path.display(), e))
         })?;
@@ -387,6 +402,7 @@ impl LibraryItemService {
         });
 
         self.create_binary_item(
+            actor,
             ITEM_TYPE_PROMPT.to_string(),
             name,
             description,
@@ -400,7 +416,7 @@ impl LibraryItemService {
         Ok(())
     }
 
-    pub async fn delete(&self, id: i32) -> CoreResult<()> {
+    pub async fn delete(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
         library_items::Entity::delete_by_id(id)
             .exec(&self.db)
             .await
@@ -410,6 +426,7 @@ impl LibraryItemService {
 
     pub async fn import_dataset_into_project(
         &self,
+        _actor: &Actor,
         project_id: i32,
         library_item_id: i32,
     ) -> CoreResult<data_sets::Model> {
@@ -492,12 +509,13 @@ impl LibraryItemService {
 
     pub async fn import_many_datasets(
         &self,
+        actor: &Actor,
         project_id: i32,
         ids: &[i32],
     ) -> CoreResult<Vec<data_sets::Model>> {
         let mut imported = Vec::new();
         for id in ids {
-            imported.push(self.import_dataset_into_project(project_id, *id).await?);
+            imported.push(self.import_dataset_into_project(actor, project_id, *id).await?);
         }
         Ok(imported)
     }

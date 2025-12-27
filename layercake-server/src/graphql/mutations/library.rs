@@ -58,6 +58,7 @@ impl LibraryMutation {
         input: UploadLibraryItemInput,
     ) -> Result<LibraryItem> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
         let tags = input.tags.unwrap_or_default();
 
@@ -75,6 +76,7 @@ impl LibraryMutation {
 
                 service
                     .create_dataset_item(
+                        &actor,
                         input.name,
                         input.description,
                         tags,
@@ -104,6 +106,7 @@ impl LibraryMutation {
 
                 service
                     .create_binary_item(
+                        &actor,
                         item_type,
                         input.name,
                         input.description,
@@ -123,10 +126,11 @@ impl LibraryMutation {
     /// Delete a library item
     async fn delete_library_item(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
 
         service
-            .delete(id)
+            .delete(&actor, id)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -141,10 +145,11 @@ impl LibraryMutation {
         input: UpdateLibraryItemInput,
     ) -> Result<LibraryItem> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
 
         let updated = service
-            .update_fields(id, input.name, input.description, input.tags)
+            .update_fields(&actor, id, input.name, input.description, input.tags)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -158,10 +163,11 @@ impl LibraryMutation {
         input: ImportLibraryDatasetsInput,
     ) -> Result<Vec<DataSet>> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
 
         let models = service
-            .import_many_datasets(input.project_id, &input.library_item_ids)
+            .import_many_datasets(&actor, input.project_id, &input.library_item_ids)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -387,10 +393,11 @@ impl LibraryMutation {
     /// Seed the dataset library from the bundled resources
     async fn seed_library_items(&self, ctx: &Context<'_>) -> Result<SeedLibraryItemsResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
 
         let result = service
-            .seed_from_repository()
+            .seed_from_repository(&actor)
             .await
             .map_err(StructuredError::from_core_error)?;
 
@@ -405,6 +412,7 @@ impl LibraryMutation {
         id: i32,
     ) -> Result<LibraryItem> {
         let context = ctx.data::<GraphQLContext>()?;
+        let _actor = context.actor_for_request(ctx).await;
         let service = LibraryItemService::new(context.db.clone());
 
         // Get the library item

@@ -851,9 +851,10 @@ After refactoring, support multiple deployment modes:
 - Added Actor to project archive/template import/export and reset flows, dataset import/export, and plan duplication paths; updated GraphQL/MCP entrypoints and core tests (`layercake-core/src/app_context/library_operations.rs`, `layercake-core/src/app_context/data_set_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-server/src/graphql/mutations/data_set.rs`, `layercake-server/src/graphql/mutations/plan.rs`, `layercake-server/src/mcp/tools/data_sets.rs`, `layercake-core/tests/project_archive_roundtrip.rs`).
 - Added Actor to code analysis mutation paths in core service + GraphQL (`layercake-core/src/services/code_analysis_service.rs`, `layercake-server/src/graphql/mutations/code_analysis.rs`).
 - Added Actor to GraphQL graph_data mutations via AppContext wrappers (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_data.rs`).
+- Added Actor to library item management paths (uploads, updates, deletes, imports, seeding) in core service + GraphQL and server handler (`layercake-core/src/services/library_item_service.rs`, `layercake-core/src/app_context/library_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-server/src/server/handlers/library.rs`).
 
 **Next steps**
-- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for library item management, collaboration, projection, and sequence flows).
+- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for collaboration, projection, and sequence flows).
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).

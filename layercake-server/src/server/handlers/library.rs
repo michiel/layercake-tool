@@ -130,6 +130,7 @@ pub async fn upload_library_item(
     let file_bytes = file_bytes.ok_or(StatusCode::BAD_REQUEST)?;
 
     let service = LibraryItemService::new(state.db.clone());
+    let actor = layercake_core::auth::SystemActor::internal();
     let tags_vec = tags;
 
     let result = match item_type.as_str() {
@@ -137,6 +138,7 @@ pub async fn upload_library_item(
             let file_format = file_format.ok_or(StatusCode::BAD_REQUEST)?;
             service
                 .create_dataset_item(
+                    &actor,
                     name,
                     description,
                     tags_vec,
@@ -151,6 +153,7 @@ pub async fn upload_library_item(
         ITEM_TYPE_PROJECT_TEMPLATE => {
             service
                 .create_binary_item(
+                    &actor,
                     ITEM_TYPE_PROJECT_TEMPLATE.to_string(),
                     name,
                     description,
