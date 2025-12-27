@@ -857,9 +857,10 @@ After refactoring, support multiple deployment modes:
 - Began removing legacy `StructuredError::from_core_error` adapters by switching collaboration mutations to use `Error::from(CoreError)` (`layercake-server/src/graphql/mutations/collaboration.rs`).
 - Replaced remaining `StructuredError::from_core_error` uses in GraphQL queries/mutations with the centralized `core_error_to_graphql_error` helper (`layercake-server/src/graphql/errors.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/*.rs`, `layercake-server/src/graphql/types/project.rs`).
 - Added server tests to validate CoreError → GraphQL error code/field mapping (`layercake-server/tests/core_error_mapping.rs`) and validated golden error baselines (`cargo test -p layercake-server --test core_error_mapping --test golden_errors`).
+- Implemented `DefaultAuthorizer` in server and added core Actor auth tests (`layercake-server/src/auth/mod.rs`, `layercake-server/src/lib.rs`, `layercake-core/tests/auth/actor_tests.rs`).
 
 **Next steps**
-- Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).
+- Decide on additional authorization coverage for project-scoped checks (e.g., `AuthorizationService` integration tests) and wire authorizer into service entrypoints.
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).
