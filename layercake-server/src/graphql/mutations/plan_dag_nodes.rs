@@ -55,7 +55,7 @@ impl PlanDagNodesMutation {
             .app
             .create_plan_dag_node(&actor, project_id, plan_id, request)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagNode::from(created)))
     }
@@ -104,7 +104,7 @@ impl PlanDagNodesMutation {
             .app
             .update_plan_dag_node(&actor, project_id, plan_id, node_id, request)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagNode::from(updated)))
     }
@@ -124,7 +124,7 @@ impl PlanDagNodesMutation {
             .app
             .delete_plan_dag_node(&actor, project_id, plan_id, node_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagNode::from(deleted)))
     }
@@ -145,7 +145,7 @@ impl PlanDagNodesMutation {
             .app
             .move_plan_dag_node(&actor, project_id, plan_id, node_id, position.into())
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagNode::from(moved)))
     }
@@ -175,7 +175,7 @@ impl PlanDagNodesMutation {
             .app
             .batch_move_plan_dag_nodes(&actor, project_id, plan_id, requests)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(moved.into_iter().map(PlanDagNode::from).collect())
     }

@@ -26,14 +26,14 @@ impl McpMutation {
         let user = auth_service
             .get_user_from_session(session.as_str())
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         let service = McpAgentService::new(context.db.clone());
 
         let credentials = service
             .create_agent(user.id, project_id, name, None)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::McpAgentCredentials::from(
             credentials,
@@ -52,14 +52,14 @@ impl McpMutation {
         let user = auth_service
             .get_user_from_session(session.as_str())
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         let service = McpAgentService::new(context.db.clone());
 
         service
             .revoke_agent(user_id, user.id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -76,14 +76,14 @@ impl McpMutation {
         let user = auth_service
             .get_user_from_session(session.as_str())
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         let service = McpAgentService::new(context.db.clone());
 
         let new_key = service
             .regenerate_api_key(user_id, user.id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(new_key)
     }

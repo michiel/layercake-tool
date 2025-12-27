@@ -23,7 +23,7 @@ impl GraphDataMutation {
             .app
             .update_graph_data_metadata(&actor, id, input.name, input.metadata)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(GraphData::from(updated))
     }
@@ -41,7 +41,7 @@ impl GraphDataMutation {
             .app
             .replay_graph_data_edits(&actor, graph_data_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(GraphData::from(graph_data))
     }
@@ -55,7 +55,7 @@ impl GraphDataMutation {
             .app
             .clear_graph_data_edits(&actor, graph_data_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }

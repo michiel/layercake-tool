@@ -855,9 +855,11 @@ After refactoring, support multiple deployment modes:
 - Added Actor to collaboration mutations by routing GraphQL resolvers through `CollaborationService` and using session actors for presence events (`layercake-core/src/services/collaboration_service.rs`, `layercake-server/src/graphql/mutations/collaboration.rs`).
 - Added Actor checks to projection and sequence mutations to enforce authenticated access (`layercake-server/src/graphql/mutations/projection.rs`, `layercake-server/src/graphql/mutations/sequence.rs`).
 - Began removing legacy `StructuredError::from_core_error` adapters by switching collaboration mutations to use `Error::from(CoreError)` (`layercake-server/src/graphql/mutations/collaboration.rs`).
+- Replaced remaining `StructuredError::from_core_error` uses in GraphQL queries/mutations with `Error::from(CoreError)` for centralized error conversion (`layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/*.rs`, `layercake-server/src/graphql/types/project.rs`).
 
 **Next steps**
-- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for any remaining projection/sequence-related paths).
+- Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
+- Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).

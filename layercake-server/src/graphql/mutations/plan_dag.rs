@@ -900,7 +900,7 @@ impl PlanDagMutation {
             .app
             .export_service()
             .export_to_string(&graph, &export_format, Some(render_config.clone()))
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         let content = apply_preview_limit(raw_content, &export_format, preview_limit);
 

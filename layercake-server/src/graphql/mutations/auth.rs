@@ -25,12 +25,12 @@ impl AuthMutation {
 
         // Validate input
         AuthService::validate_email(&input.email)
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
         AuthService::validate_username(&input.username).map_err(|e| {
-            StructuredError::from_core_error(e)
+            Error::from(e)
         })?;
         AuthService::validate_display_name(&input.display_name).map_err(|e| {
-            StructuredError::from_core_error(e)
+            Error::from(e)
         })?;
 
         // Check if user already exists
@@ -59,7 +59,7 @@ impl AuthMutation {
 
         // Hash password using bcrypt
         let password_hash = AuthService::hash_password(&input.password)
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         // Create user
         let mut user = users::ActiveModel::new();
@@ -102,7 +102,7 @@ impl AuthMutation {
 
         // Verify password using bcrypt
         let is_valid = AuthService::verify_password(&input.password, &user.password_hash)
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         if !is_valid {
             return Err(StructuredError::unauthorized("Invalid email or password"));

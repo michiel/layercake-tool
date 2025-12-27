@@ -118,7 +118,7 @@ impl LibraryMutation {
                     .await
             }
         }
-        .map_err(StructuredError::from_core_error)?;
+        .map_err(Error::from)?;
 
         Ok(LibraryItem::from(item))
     }
@@ -132,7 +132,7 @@ impl LibraryMutation {
         service
             .delete(&actor, id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -151,7 +151,7 @@ impl LibraryMutation {
         let updated = service
             .update_fields(&actor, id, input.name, input.description, input.tags)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(LibraryItem::from(updated))
     }
@@ -169,7 +169,7 @@ impl LibraryMutation {
         let models = service
             .import_many_datasets(&actor, input.project_id, &input.library_item_ids)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(models.into_iter().map(DataSet::from).collect())
     }
@@ -186,7 +186,7 @@ impl LibraryMutation {
             .app
             .export_project_as_template(&actor, project_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(LibraryItem::from(item))
     }
@@ -204,7 +204,7 @@ impl LibraryMutation {
             .app
             .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         let file_content = general_purpose::STANDARD.encode(archive.bytes);
         Ok(ExportProjectArchivePayload {
@@ -236,7 +236,7 @@ impl LibraryMutation {
             .app
             .import_project_archive(&actor, archive_bytes, name)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -264,7 +264,7 @@ impl LibraryMutation {
                 keep_connection.unwrap_or(false),
             )
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -285,7 +285,7 @@ impl LibraryMutation {
             .app
             .import_project_from_directory(&actor, &source, name, keep_connection.unwrap_or(false))
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -302,7 +302,7 @@ impl LibraryMutation {
             .app
             .reimport_project_from_connection(&actor, project_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -320,7 +320,7 @@ impl LibraryMutation {
             .app
             .reexport_project_to_connection(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -341,14 +341,14 @@ impl LibraryMutation {
             .app
             .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         // Get project name before deletion
         let projects = context
             .app
             .list_projects()
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
         let project_name = projects
             .into_iter()
             .find(|p| p.id == project_id)
@@ -360,14 +360,14 @@ impl LibraryMutation {
             .app
             .delete_project(&actor, project_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         // Re-import the project
         let new_project = context
             .app
             .import_project_archive(&actor, archive.bytes, Some(project_name))
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(new_project))
     }
@@ -385,7 +385,7 @@ impl LibraryMutation {
             .app
             .create_project_from_library(&actor, library_item_id, name)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -399,7 +399,7 @@ impl LibraryMutation {
         let result = service
             .seed_from_repository(&actor)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(SeedLibraryItemsResult::from(result))
     }
@@ -419,7 +419,7 @@ impl LibraryMutation {
         let item = service
             .get(id)
             .await
-            .map_err(StructuredError::from_core_error)?
+            .map_err(Error::from)?
             .ok_or_else(|| StructuredError::not_found("Library item", id.to_string()))?;
 
         // Verify it's a dataset
@@ -446,7 +446,7 @@ impl LibraryMutation {
 
         // Infer data type from content
         let inferred_type = infer_data_type(&metadata.filename, &file_format, &item.content_blob)
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         // Update metadata with new data type
         metadata.data_type = inferred_type.as_ref().to_string();

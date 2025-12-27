@@ -5,8 +5,6 @@ use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edit::{
     CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
 };
-use layercake_core::services::graph_edit_service::GraphEditService;
-
 #[derive(Default)]
 pub struct GraphEditMutation;
 
@@ -19,10 +17,12 @@ impl GraphEditMutation {
         input: CreateGraphEditInput,
     ) -> Result<GraphEdit> {
         let context = ctx.data::<GraphQLContext>()?;
-        let service = GraphEditService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
-        let edit = service
-            .create_edit(
+        let edit = context
+            .app
+            .create_graph_edit(
+                &actor,
                 input.graph_id,
                 input.target_type,
                 input.target_id,
@@ -34,7 +34,7 @@ impl GraphEditMutation {
                 false, // External edit - not yet applied, will be replayed
             )
             .await
-            .map_err(|e| StructuredError::service("GraphEditService::create_edit", e))?;
+            .map_err(Error::from)?;
 
         Ok(GraphEdit::from(edit))
     }
@@ -42,12 +42,13 @@ impl GraphEditMutation {
     /// Replay all unapplied edits for a graph
     async fn replay_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<ReplaySummary> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
         let summary = context
             .app
-            .replay_graph_edits(graph_id)
+            .replay_graph_edits(&actor, graph_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(ReplaySummary {
             total: summary.total as i32,
@@ -72,12 +73,13 @@ impl GraphEditMutation {
     /// Clear all edits for a graph
     async fn clear_graph_edits(&self, ctx: &Context<'_>, graph_id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        let service = GraphEditService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
-        service
-            .clear_graph_edits(graph_id)
+        context
+            .app
+            .clear_graph_edits(&actor, graph_id)
             .await
-            .map_err(|e| StructuredError::service("GraphEditService::clear_graph_edits", e))?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }

@@ -20,7 +20,7 @@ impl SystemMutation {
             .system_settings
             .update_setting(&input.key, input.value)
             .await
-            .map_err(|e| StructuredError::service("SystemSettingsService::update_setting", e))?;
+            .map_err(Error::from)?;
 
         Ok(SystemSetting::from(updated))
     }

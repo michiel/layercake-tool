@@ -152,12 +152,12 @@ impl StoryMutation {
                 .app
                 .export_story_csv(&actor, story_id)
                 .await
-                .map_err(StructuredError::from_core_error)?,
+                .map_err(Error::from)?,
             StoryExportFormat::Json => context
                 .app
                 .export_story_json(&actor, story_id)
                 .await
-                .map_err(StructuredError::from_core_error)?,
+                .map_err(Error::from)?,
         };
 
         let content_base64 =
@@ -186,12 +186,12 @@ impl StoryMutation {
                 .app
                 .import_story_csv(&actor, project_id, &content)
                 .await
-                .map_err(StructuredError::from_core_error)?,
+                .map_err(Error::from)?,
             StoryImportFormat::Json => context
                 .app
                 .import_story_json(&actor, project_id, &content)
                 .await
-                .map_err(StructuredError::from_core_error)?,
+                .map_err(Error::from)?,
         };
 
         Ok(GqlStoryImportResult {

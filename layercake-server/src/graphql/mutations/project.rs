@@ -23,7 +23,7 @@ impl ProjectMutation {
             .app
             .create_project(&actor, input.name, input.description, input.tags)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -35,14 +35,13 @@ impl ProjectMutation {
         #[graphql(name = "sampleKey")] sample_key: String,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
         let service = SampleProjectService::new(context.db.clone());
 
         let project = service
-            .create_sample_project(&sample_key)
+            .create_sample_project(&actor, &sample_key)
             .await
-            .map_err(|e| {
-                StructuredError::service("SampleProjectService::create_sample_project", e)
-            })?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -62,7 +61,7 @@ impl ProjectMutation {
             .app
             .update_project(&actor, id, update)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Project::from(project))
     }
@@ -75,7 +74,7 @@ impl ProjectMutation {
             .app
             .delete_project(&actor, id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }

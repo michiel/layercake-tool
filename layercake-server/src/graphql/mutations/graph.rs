@@ -6,8 +6,6 @@ use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::{
     CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
 };
-use layercake_core::services::graph_service::GraphService;
-use sea_orm::{ActiveModelTrait, Set};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -61,12 +59,13 @@ impl GraphMutation {
     /// Create a new Graph
     async fn create_graph(&self, ctx: &Context<'_>, input: CreateGraphInput) -> Result<Graph> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph_service = GraphService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
-        let graph = graph_service
-            .create_graph(input.project_id, input.name, None)
+        let graph = context
+            .app
+            .create_graph(&actor, input.project_id, input.name, None)
             .await
-            .map_err(|e| StructuredError::service("GraphService::create_graph", e))?;
+            .map_err(Error::from)?;
 
         Ok(Graph::from(graph))
     }
@@ -79,12 +78,13 @@ impl GraphMutation {
         input: UpdateGraphInput,
     ) -> Result<Graph> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph_service = GraphService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
-        let graph = graph_service
-            .update_graph(id, input.name)
+        let graph = context
+            .app
+            .update_graph(&actor, id, input.name)
             .await
-            .map_err(|e| StructuredError::service("GraphService::update_graph", e))?;
+            .map_err(Error::from)?;
 
         Ok(Graph::from(graph))
     }
@@ -96,7 +96,7 @@ impl GraphMutation {
             .app
             .validate_graph(id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(GraphValidationResult::from(summary))
     }
@@ -104,12 +104,13 @@ impl GraphMutation {
     /// Delete Graph
     async fn delete_graph(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph_service = GraphService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
-        graph_service
-            .delete_graph(id)
+        context
+            .app
+            .delete_graph(&actor, id)
             .await
-            .map_err(|e| StructuredError::service("GraphService::delete_graph", e))?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -121,27 +122,13 @@ impl GraphMutation {
         input: CreateLayerInput,
     ) -> Result<crate::graphql::types::Layer> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
-        use layercake_core::database::entities::graph_layers;
-
-        let layer = graph_layers::ActiveModel {
-            id: sea_orm::ActiveValue::NotSet,
-            graph_id: Set(input.graph_id),
-            layer_id: Set(input.layer_id),
-            name: Set(input.name),
-            background_color: Set(None),
-            text_color: Set(None),
-            border_color: Set(None),
-            alias: Set(None),
-            comment: Set(None),
-            properties: Set(None),
-            dataset_id: Set(None),
-        };
-
-        let inserted_layer = layer
-            .insert(&context.db)
+        let inserted_layer = context
+            .app
+            .create_layer(&actor, input.graph_id, input.layer_id, input.name)
             .await
-            .map_err(|e| StructuredError::database("graph_layers::Entity::insert", e))?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::Layer::from(inserted_layer))
     }
@@ -168,7 +155,7 @@ impl GraphMutation {
             .app
             .update_graph_node(&actor, graph_id, node_id, label, layer, attributes, belongs_to)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -189,7 +176,7 @@ impl GraphMutation {
             .app
             .update_layer_properties(&actor, id, name, alias, properties)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
@@ -211,13 +198,15 @@ impl GraphMutation {
         >,
     ) -> Result<crate::graphql::types::graph_node::GraphNode> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph_service = GraphService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
         let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         // Create the new node
-        let node = graph_service
+        let node = context
+            .app
             .add_graph_node(
+                &actor,
                 graph_id,
                 id.clone(),
                 label.clone(),
@@ -228,7 +217,7 @@ impl GraphMutation {
                 attributes.clone(),
             )
             .await
-            .map_err(|e| StructuredError::service("GraphService::add_graph_node", e))?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -250,32 +239,26 @@ impl GraphMutation {
         >,
     ) -> Result<crate::graphql::types::graph_edge::GraphEdge> {
         let context = ctx.data::<GraphQLContext>()?;
-        use layercake_core::database::entities::graph_data_edges::ActiveModel as GraphEdgeActiveModel;
-        use sea_orm::{ActiveModelTrait, ActiveValue::Set};
+        let actor = context.actor_for_request(ctx).await;
 
         let attributes = merge_and_validate_attributes(attrs, attributes_arg)?;
 
         // Create the new edge
-        let now = chrono::Utc::now();
-        let edge_model = GraphEdgeActiveModel {
-            id: sea_orm::ActiveValue::NotSet,
-            graph_data_id: Set(graph_id),
-            external_id: Set(id.clone()),
-            source: Set(source.clone()),
-            target: Set(target.clone()),
-            label: Set(label.clone()),
-            layer: Set(layer.clone()),
-            weight: Set(weight),
-            attributes: Set(attributes.clone()),
-            source_dataset_id: Set(None),
-            comment: Set(None),
-            created_at: Set(now),
-        };
-
-        let inserted = edge_model
-            .insert(&context.db)
+        let inserted = context
+            .app
+            .add_graph_edge(
+                &actor,
+                graph_id,
+                id,
+                source,
+                target,
+                label,
+                layer,
+                weight,
+                attributes,
+            )
             .await
-            .map_err(|e| StructuredError::database("graph_data_edges::Entity::insert", e))?;
+            .map_err(Error::from)?;
 
         Ok(crate::graphql::types::graph_edge::GraphEdge::from(inserted))
     }
@@ -288,35 +271,13 @@ impl GraphMutation {
         edge_id: String,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
 
-        use layercake_core::database::entities::graph_data_edges::{
-            Column as EdgeColumn, Entity as GraphEdges,
-        };
-        use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-
-        // Fetch current edge to get old values for edit record
-        let old_edge = GraphEdges::find()
-            .filter(EdgeColumn::GraphDataId.eq(graph_id))
-            .filter(EdgeColumn::ExternalId.eq(&edge_id))
-            .one(&context.db)
+        context
+            .app
+            .delete_graph_edge(&actor, graph_id, edge_id)
             .await
-            .map_err(|e| StructuredError::database("graph_data_edges::Entity::find", e))?;
-
-        if let Some(_old_edge) = old_edge {
-            // Delete the edge
-            GraphEdges::delete_many()
-                .filter(EdgeColumn::GraphDataId.eq(graph_id))
-                .filter(EdgeColumn::ExternalId.eq(&edge_id))
-                .exec(&context.db)
-                .await
-                .map_err(|e| {
-                    StructuredError::database("graph_data_edges::Entity::delete_many", e)
-                })?;
-
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+            .map_err(Error::from)
     }
 
     /// Delete a node from a graph
@@ -327,13 +288,14 @@ impl GraphMutation {
         node_id: String,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
-        let graph_service = GraphService::new(context.db.clone());
+        let actor = context.actor_for_request(ctx).await;
 
         // Fetch current node to get old values for edit record
-        let _old_node = graph_service
-            .delete_graph_node(graph_id, node_id.clone())
+        let _old_node = context
+            .app
+            .delete_graph_node(&actor, graph_id, node_id.clone())
             .await
-            .map_err(|e| StructuredError::service("GraphService::delete_graph_node", e))?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }
@@ -381,7 +343,7 @@ impl GraphMutation {
             .app
             .bulk_update_graph_data(&actor, graph_id, node_requests, layer_requests)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }

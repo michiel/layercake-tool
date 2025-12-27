@@ -41,7 +41,7 @@ impl PlanDagEdgesMutation {
             .app
             .create_plan_dag_edge(&actor, project_id, plan_id, request)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagEdge::from(created)))
     }
@@ -61,7 +61,7 @@ impl PlanDagEdgesMutation {
             .app
             .delete_plan_dag_edge(&actor, project_id, plan_id, edge_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagEdge::from(deleted)))
     }
@@ -94,7 +94,7 @@ impl PlanDagEdgesMutation {
             .app
             .update_plan_dag_edge(&actor, project_id, plan_id, edge_id, request)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(Some(PlanDagEdge::from(updated)))
     }
