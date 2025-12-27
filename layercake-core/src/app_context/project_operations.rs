@@ -102,7 +102,7 @@ impl AppContext {
         id: i32,
         update: ProjectUpdate,
     ) -> CoreResult<ProjectSummary> {
-        self.authorize(actor, "write:project")?;
+        self.authorize_project_write(actor, id).await?;
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -134,7 +134,7 @@ impl AppContext {
     }
 
     pub async fn delete_project(&self, actor: &Actor, id: i32) -> CoreResult<()> {
-        self.authorize(actor, "write:project")?;
+        self.authorize_project_admin(actor, id).await?;
         let result = projects::Entity::delete_by_id(id)
             .exec(&self.db)
             .await

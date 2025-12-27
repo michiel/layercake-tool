@@ -52,7 +52,6 @@ impl AppContext {
         actor: &Actor,
         request: DataSetFileCreateRequest,
     ) -> CoreResult<DataSetSummary> {
-        self.authorize(actor, "write:data_set")?;
         let DataSetFileCreateRequest {
             project_id,
             name,
@@ -62,6 +61,7 @@ impl AppContext {
             tabular_data_type,
             file_bytes,
         } = request;
+        self.authorize_project_write(actor, project_id).await?;
 
         let created = self
             .data_set_service
@@ -84,12 +84,12 @@ impl AppContext {
         actor: &Actor,
         request: DataSetEmptyCreateRequest,
     ) -> CoreResult<DataSetSummary> {
-        self.authorize(actor, "write:data_set")?;
         let DataSetEmptyCreateRequest {
             project_id,
             name,
             description,
         } = request;
+        self.authorize_project_write(actor, project_id).await?;
 
         let created = self
             .data_set_service
@@ -105,7 +105,7 @@ impl AppContext {
         project_id: i32,
         uploads: Vec<BulkDataSetUpload>,
     ) -> CoreResult<Vec<DataSetSummary>> {
-        self.authorize(actor, "write:data_set")?;
+        self.authorize_project_write(actor, project_id).await?;
         let mut results = Vec::new();
 
         for upload in uploads {
@@ -131,13 +131,14 @@ impl AppContext {
         actor: &Actor,
         request: DataSetUpdateRequest,
     ) -> CoreResult<DataSetSummary> {
-        self.authorize(actor, "write:data_set")?;
         let DataSetUpdateRequest {
             id,
             name,
             description,
             new_file,
         } = request;
+        let project_id = self.project_id_for_data_set(id).await?;
+        self.authorize_project_write(actor, project_id).await?;
 
         let (mut model, had_new_file) = if let Some(file) = new_file {
             let updated = self
@@ -169,7 +170,7 @@ impl AppContext {
         id: i32,
         graph_json: String,
     ) -> CoreResult<DataSetSummary> {
-        self.authorize(actor, "write:data_set")?;
+        self.authorize_data_set_write(actor, id).await?;
         let model = self
             .data_set_service
             .update_graph_data(id, graph_json)
@@ -183,7 +184,7 @@ impl AppContext {
         actor: &Actor,
         id: i32,
     ) -> CoreResult<DataSetSummary> {
-        self.authorize(actor, "write:data_set")?;
+        self.authorize_data_set_write(actor, id).await?;
         let model = self
             .data_set_service
             .reprocess(id)
@@ -209,7 +210,7 @@ impl AppContext {
     }
 
     pub async fn delete_data_set(&self, actor: &Actor, id: i32) -> CoreResult<()> {
-        self.authorize(actor, "write:data_set")?;
+        self.authorize_data_set_write(actor, id).await?;
         self.data_set_service.delete(id).await
     }
 
@@ -222,6 +223,7 @@ impl AppContext {
         sum_weights: bool,
         delete_merged: bool,
     ) -> CoreResult<DataSetSummary> {
+        self.authorize_project_write(actor, project_id).await?;
         if data_set_ids.len() < 2 {
             return Err(CoreError::validation(
                 "At least 2 data sets are required for merging",
@@ -394,12 +396,12 @@ impl AppContext {
         actor: &Actor,
         request: DataSetExportRequest,
     ) -> CoreResult<DataSetExportResult> {
-        self.authorize(actor, "read:data_set")?;
         let DataSetExportRequest {
             project_id,
             data_set_ids,
             format,
         } = request;
+        self.authorize_project_read(actor, project_id).await?;
 
         let matching_count = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
@@ -455,7 +457,7 @@ impl AppContext {
         actor: &Actor,
         request: DataSetImportRequest,
     ) -> CoreResult<DataSetImportOutcome> {
-        self.authorize(actor, "write:data_set")?;
+        self.authorize_project_write(actor, request.project_id).await?;
         let result = match request.format {
             DataSetImportFormat::Xlsx => self
                 .data_set_bulk_service

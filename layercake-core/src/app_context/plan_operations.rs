@@ -38,7 +38,7 @@ impl AppContext {
         actor: &Actor,
         request: PlanCreateRequest,
     ) -> CoreResult<PlanSummary> {
-        self.authorize(actor, "write:plan")?;
+        self.authorize_project_write(actor, request.project_id).await?;
         let plan = self
             .plan_service
             .create_plan(request)
@@ -53,7 +53,8 @@ impl AppContext {
         id: i32,
         update: PlanUpdateRequest,
     ) -> CoreResult<PlanSummary> {
-        self.authorize(actor, "write:plan")?;
+        let project_id = self.project_id_for_plan(id).await?;
+        self.authorize_project_write(actor, project_id).await?;
         let plan = self
             .plan_service
             .update_plan(id, update)
@@ -63,16 +64,19 @@ impl AppContext {
     }
 
     pub async fn delete_plan(&self, actor: &Actor, id: i32) -> CoreResult<()> {
-        self.authorize(actor, "write:plan")?;
+        let project_id = self.project_id_for_plan(id).await?;
+        self.authorize_project_write(actor, project_id).await?;
         self.plan_service.delete_plan(id).await
     }
 
     pub async fn duplicate_plan(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         name: String,
     ) -> CoreResult<PlanSummary> {
+        let project_id = self.project_id_for_plan(id).await?;
+        self.authorize_project_write(actor, project_id).await?;
         let plan = self
             .plan_service
             .duplicate_plan(id, name)

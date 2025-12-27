@@ -861,9 +861,9 @@ After refactoring, support multiple deployment modes:
 - Wired authorizer into core AppContext with default allow-all, added write checks for project/plan mutations, and configured server to use `DefaultAuthorizer` with session actors marked as editors (`layercake-core/src/auth/mod.rs`, `layercake-core/src/app_context/mod.rs`, `layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-server/src/server/app.rs`, `layercake-server/src/graphql/context.rs`).
 - Extended authorizer enforcement across dataset and graph mutation entrypoints in core AppContext (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-core/src/app_context/graph_operations.rs`).
 - Mapped GraphQL actors to roles derived from authenticated project collaborators (with session header support) instead of default editor roles (`layercake-server/src/graphql/context.rs`).
+- Added project-scoped authorization checks across project/plan/plan DAG/graph/dataset mutations using `AuthorizationService` to prevent cross-project access (`layercake-core/src/app_context/mod.rs`, `layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-core/src/app_context/plan_dag_operations.rs`, `layercake-core/src/app_context/graph_operations.rs`, `layercake-core/src/app_context/data_set_operations.rs`).
 
 **Next steps**
-- Add project-scoped authorization checks (roles/scopes tied to project IDs) to avoid cross-project privilege leakage.
 - Add integration tests around `AuthorizationService` session handling and actor role resolution.
 - Remove remaining legacy StructuredError adapters where `core_error_to_graphql_error` is sufficient.
 - Re-validate golden error baselines after auth changes (`cargo test -p layercake-server --test golden_errors`).

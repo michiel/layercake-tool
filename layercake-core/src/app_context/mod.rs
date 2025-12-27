@@ -4,15 +4,16 @@ use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 
-use crate::auth::{AllowAllAuthorizer, Authorizer};
-use crate::database::entities::{data_sets, plans, projects};
+use crate::auth::{Actor, AllowAllAuthorizer, Authorizer};
+use crate::database::entities::{data_sets, graph_data, plans, projects};
+use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_analysis_service::GraphAnalysisService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::plan_service::PlanService;
 use crate::services::{
     code_analysis_service::CodeAnalysisService, data_set_service::DataSetService,
-    dataset_bulk_service::DataSetBulkService, ExportService, GraphService, ImportService,
-    PlanDagService,
+    dataset_bulk_service::DataSetBulkService, AuthorizationService, ExportService, GraphService,
+    ImportService, PlanDagService, ProjectRole,
 };
 use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
 
@@ -119,6 +120,87 @@ impl AppContext {
         action: &str,
     ) -> crate::errors::CoreResult<()> {
         self.authorizer.authorize(actor, action)
+    }
+
+    async fn authorize_project_role(
+        &self,
+        actor: &Actor,
+        project_id: i32,
+        required_role: ProjectRole,
+        action: &str,
+    ) -> CoreResult<()> {
+        self.authorize(actor, action)?;
+
+        if actor.is_system() {
+            return Ok(());
+        }
+
+        let user_id = actor
+            .user_id
+            .ok_or_else(|| CoreError::unauthorized("User is not authenticated"))?;
+        let auth_service = AuthorizationService::new(self.db.clone());
+        auth_service
+            .check_project_access(user_id, project_id, Some(required_role))
+            .await?;
+
+        Ok(())
+    }
+
+    async fn authorize_project_read(&self, actor: &Actor, project_id: i32) -> CoreResult<()> {
+        self.authorize_project_role(actor, project_id, ProjectRole::Viewer, "read:project")
+            .await
+    }
+
+    async fn authorize_project_write(&self, actor: &Actor, project_id: i32) -> CoreResult<()> {
+        self.authorize_project_role(actor, project_id, ProjectRole::Editor, "write:project")
+            .await
+    }
+
+    async fn authorize_project_admin(&self, actor: &Actor, project_id: i32) -> CoreResult<()> {
+        self.authorize_project_role(actor, project_id, ProjectRole::Owner, "admin:project")
+            .await
+    }
+
+    async fn authorize_graph_write(&self, actor: &Actor, graph_id: i32) -> CoreResult<()> {
+        let project_id = self.project_id_for_graph(graph_id).await?;
+        self.authorize_project_write(actor, project_id).await
+    }
+
+    async fn authorize_data_set_write(&self, actor: &Actor, data_set_id: i32) -> CoreResult<()> {
+        let project_id = self.project_id_for_data_set(data_set_id).await?;
+        self.authorize_project_write(actor, project_id).await
+    }
+
+    async fn project_id_for_graph(&self, graph_id: i32) -> CoreResult<i32> {
+        let graph = graph_data::Entity::find_by_id(graph_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph {}: {}", graph_id, e)))?
+            .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
+
+        Ok(graph.project_id)
+    }
+
+    async fn project_id_for_data_set(&self, data_set_id: i32) -> CoreResult<i32> {
+        let data_set = data_sets::Entity::find_by_id(data_set_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load data set {}: {}", data_set_id, e))
+            })?
+            .ok_or_else(|| CoreError::not_found("DataSet", data_set_id.to_string()))?;
+
+        Ok(data_set.project_id)
+    }
+
+    async fn project_id_for_plan(&self, plan_id: i32) -> CoreResult<i32> {
+        let plan = plans::Entity::find_by_id(plan_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load plan {}: {}", plan_id, e)))?
+            .ok_or_else(|| CoreError::not_found("Plan", plan_id.to_string()))?;
+
+        Ok(plan.project_id)
     }
 
     pub fn import_service(&self) -> &Arc<ImportService> {

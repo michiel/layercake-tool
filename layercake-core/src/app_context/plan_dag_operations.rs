@@ -226,11 +226,12 @@ impl AppContext {
 
     pub async fn create_plan_dag_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         request: PlanDagNodeRequest,
     ) -> CoreResult<PlanDagNode> {
+        self.authorize_project_write(actor, project_id).await?;
         let existing_nodes = self
             .plan_dag_service
             .get_nodes(project_id, plan_id)
@@ -259,12 +260,13 @@ impl AppContext {
 
     pub async fn update_plan_dag_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
         updates: PlanDagNodeUpdateRequest,
     ) -> CoreResult<PlanDagNode> {
+        self.authorize_project_write(actor, project_id).await?;
         let metadata_json = if let Some(metadata) = updates.metadata {
             Some(
                 serde_json::to_string(&metadata)
@@ -297,11 +299,12 @@ impl AppContext {
 
     pub async fn delete_plan_dag_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
     ) -> CoreResult<PlanDagNode> {
+        self.authorize_project_write(actor, project_id).await?;
         self.plan_dag_service
             .delete_node(project_id, plan_id, node_id)
             .await
@@ -309,12 +312,13 @@ impl AppContext {
 
     pub async fn move_plan_dag_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         node_id: String,
         position: Position,
     ) -> CoreResult<PlanDagNode> {
+        self.authorize_project_write(actor, project_id).await?;
         self.plan_dag_service
             .move_node(project_id, plan_id, node_id, position)
             .await
@@ -322,11 +326,12 @@ impl AppContext {
 
     pub async fn batch_move_plan_dag_nodes(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         positions: Vec<PlanDagNodePositionRequest>,
     ) -> CoreResult<Vec<PlanDagNode>> {
+        self.authorize_project_write(actor, project_id).await?;
         let updates = positions
             .into_iter()
             .map(|p| PlanDagNodePositionUpdate {
@@ -344,11 +349,12 @@ impl AppContext {
 
     pub async fn create_plan_dag_edge(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         request: PlanDagEdgeRequest,
     ) -> CoreResult<PlanDagEdge> {
+        self.authorize_project_write(actor, project_id).await?;
         let edge_id = generate_edge_id(&request.source, &request.target);
         let metadata_json = serde_json::to_string(&request.metadata)
             .map_err(|e| CoreError::validation(format!("Invalid edge metadata: {}", e)))?;
@@ -367,12 +373,13 @@ impl AppContext {
 
     pub async fn update_plan_dag_edge(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         edge_id: String,
         updates: PlanDagEdgeUpdateRequest,
     ) -> CoreResult<PlanDagEdge> {
+        self.authorize_project_write(actor, project_id).await?;
         let metadata_json = if let Some(metadata) = updates.metadata {
             Some(
                 serde_json::to_string(&metadata)
@@ -389,11 +396,12 @@ impl AppContext {
 
     pub async fn delete_plan_dag_edge(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         plan_id: Option<i32>,
         edge_id: String,
     ) -> CoreResult<PlanDagEdge> {
+        self.authorize_project_write(actor, project_id).await?;
         self.plan_dag_service
             .delete_edge(project_id, plan_id, edge_id)
             .await
