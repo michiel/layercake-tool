@@ -35,9 +35,10 @@ impl AppContext {
 
     pub async fn create_plan(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         request: PlanCreateRequest,
     ) -> CoreResult<PlanSummary> {
+        self.authorize(actor, "write:plan")?;
         let plan = self
             .plan_service
             .create_plan(request)
@@ -48,10 +49,11 @@ impl AppContext {
 
     pub async fn update_plan(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         update: PlanUpdateRequest,
     ) -> CoreResult<PlanSummary> {
+        self.authorize(actor, "write:plan")?;
         let plan = self
             .plan_service
             .update_plan(id, update)
@@ -60,7 +62,8 @@ impl AppContext {
         Ok(PlanSummary::from(plan))
     }
 
-    pub async fn delete_plan(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
+    pub async fn delete_plan(&self, actor: &Actor, id: i32) -> CoreResult<()> {
+        self.authorize(actor, "write:plan")?;
         self.plan_service.delete_plan(id).await
     }
 

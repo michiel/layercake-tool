@@ -63,3 +63,11 @@ impl SystemActor {
 pub trait Authorizer {
     fn authorize(&self, actor: &Actor, action: &str) -> Result<(), CoreError>;
 }
+
+pub struct AllowAllAuthorizer;
+
+impl Authorizer for AllowAllAuthorizer {
+    fn authorize(&self, _actor: &Actor, _action: &str) -> Result<(), CoreError> {
+        Ok(())
+    }
+}

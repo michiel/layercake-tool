@@ -45,7 +45,11 @@ pub struct AppState {
 }
 
 pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
-    let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
+    let system_settings = Arc::new(
+        SystemSettingsService::new(db.clone())
+            .await
+            .map_err(anyhow::Error::from)?,
+    );
 
     let provider_hint = {
         let explicit = system_settings
@@ -108,9 +112,10 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         provider_hint,
         embedding_config,
     ));
-    let app_context = Arc::new(AppContext::with_data_acquisition(
+    let app_context = Arc::new(AppContext::with_data_acquisition_and_authorizer(
         db.clone(),
         data_acquisition_service.clone(),
+        Arc::new(crate::auth::DefaultAuthorizer),
     ));
 
     let projection_service = Arc::new(ProjectionService::new(db.clone()));

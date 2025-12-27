@@ -66,11 +66,12 @@ impl AppContext {
 
     pub async fn create_project(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         name: String,
         description: Option<String>,
         tags: Option<Vec<String>>,
     ) -> CoreResult<ProjectSummary> {
+        self.authorize(actor, "write:project")?;
         let now = Utc::now();
         let tags_json =
             serde_json::to_string(&tags.unwrap_or_default()).unwrap_or_else(|_| "[]".to_string());
@@ -97,10 +98,11 @@ impl AppContext {
 
     pub async fn update_project(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         update: ProjectUpdate,
     ) -> CoreResult<ProjectSummary> {
+        self.authorize(actor, "write:project")?;
         let project = projects::Entity::find_by_id(id)
             .one(&self.db)
             .await
@@ -131,7 +133,8 @@ impl AppContext {
         Ok(ProjectSummary::from(project))
     }
 
-    pub async fn delete_project(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
+    pub async fn delete_project(&self, actor: &Actor, id: i32) -> CoreResult<()> {
+        self.authorize(actor, "write:project")?;
         let result = projects::Entity::delete_by_id(id)
             .exec(&self.db)
             .await

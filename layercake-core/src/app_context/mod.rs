@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use sea_orm::DatabaseConnection;
 use serde::{Deserialize, Serialize};
 
+use crate::auth::{AllowAllAuthorizer, Authorizer};
 use crate::database::entities::{data_sets, plans, projects};
 use crate::services::graph_analysis_service::GraphAnalysisService;
 use crate::services::graph_edit_service::GraphEditService;
@@ -28,6 +29,7 @@ mod story_operations;
 #[derive(Clone)]
 pub struct AppContext {
     db: DatabaseConnection,
+    authorizer: Arc<dyn Authorizer + Send + Sync>,
     import_service: Arc<ImportService>,
     export_service: Arc<ExportService>,
     graph_service: Arc<GraphService>,
@@ -52,12 +54,28 @@ impl AppContext {
             provider_hint,
             provider_config,
         ));
-        Self::with_data_acquisition(db, data_acquisition_service)
+        Self::with_data_acquisition_and_authorizer(
+            db,
+            data_acquisition_service,
+            Arc::new(AllowAllAuthorizer),
+        )
     }
 
     pub fn with_data_acquisition(
         db: DatabaseConnection,
         data_acquisition_service: Arc<DataAcquisitionService>,
+    ) -> Self {
+        Self::with_data_acquisition_and_authorizer(
+            db,
+            data_acquisition_service,
+            Arc::new(AllowAllAuthorizer),
+        )
+    }
+
+    pub fn with_data_acquisition_and_authorizer(
+        db: DatabaseConnection,
+        data_acquisition_service: Arc<DataAcquisitionService>,
+        authorizer: Arc<dyn Authorizer + Send + Sync>,
     ) -> Self {
         let import_service = Arc::new(ImportService::new(db.clone()));
         let export_service = Arc::new(ExportService::new(db.clone()));
@@ -72,6 +90,7 @@ impl AppContext {
 
         Self {
             db,
+            authorizer,
             import_service,
             export_service,
             graph_service,
@@ -88,6 +107,18 @@ impl AppContext {
 
     pub fn db(&self) -> &DatabaseConnection {
         &self.db
+    }
+
+    pub fn authorizer(&self) -> &Arc<dyn Authorizer + Send + Sync> {
+        &self.authorizer
+    }
+
+    pub fn authorize(
+        &self,
+        actor: &crate::auth::Actor,
+        action: &str,
+    ) -> crate::errors::CoreResult<()> {
+        self.authorizer.authorize(actor, action)
     }
 
     pub fn import_service(&self) -> &Arc<ImportService> {
