@@ -8,33 +8,36 @@ impl AppContext {
     // ----- Graph editing helpers ------------------------------------------
     pub async fn create_graph(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         name: String,
         node_id: Option<String>,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .create_graph(project_id, name, node_id)
             .await
     }
     pub async fn update_graph(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         name: Option<String>,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .update_graph(id, name)
             .await
     }
-    pub async fn delete_graph(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
+    pub async fn delete_graph(&self, actor: &Actor, id: i32) -> CoreResult<()> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .delete_graph(id)
             .await
     }
     pub async fn add_graph_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         node_id: String,
         label: Option<String>,
@@ -44,6 +47,7 @@ impl AppContext {
         weight: Option<f64>,
         attrs: Option<Value>,
     ) -> CoreResult<crate::database::entities::graph_data_nodes::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .add_graph_node(
                 graph_id,
@@ -59,21 +63,23 @@ impl AppContext {
     }
     pub async fn delete_graph_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         node_id: String,
     ) -> CoreResult<crate::database::entities::graph_data_nodes::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .delete_graph_node(graph_id, node_id)
             .await
     }
     pub async fn create_layer(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         layer_id: String,
         name: String,
     ) -> CoreResult<crate::database::entities::graph_layers::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_layers;
         use sea_orm::{ActiveModelTrait, Set};
         let layer = graph_layers::ActiveModel {
@@ -96,7 +102,7 @@ impl AppContext {
     }
     pub async fn add_graph_edge(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         id: String,
         source: String,
@@ -106,6 +112,7 @@ impl AppContext {
         weight: Option<f64>,
         attributes: Option<Value>,
     ) -> CoreResult<crate::database::entities::graph_data_edges::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_data_edges::ActiveModel as GraphEdgeActiveModel;
         use sea_orm::{ActiveModelTrait, ActiveValue::Set};
         let now = chrono::Utc::now();
@@ -130,10 +137,11 @@ impl AppContext {
     }
     pub async fn delete_graph_edge(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         edge_id: String,
     ) -> CoreResult<bool> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_data_edges::{
             Column as EdgeColumn, Entity as GraphEdges,
         };
@@ -160,7 +168,7 @@ impl AppContext {
     }
     pub async fn upsert_project_layer(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         layer_id: String,
         name: String,
@@ -171,6 +179,7 @@ impl AppContext {
         source_dataset_id: Option<i32>,
         enabled: bool,
     ) -> CoreResult<crate::database::entities::project_layers::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .upsert_project_layer(
                 project_id,
@@ -187,42 +196,46 @@ impl AppContext {
     }
     pub async fn delete_project_layer(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         layer_id: String,
         source_dataset_id: Option<i32>,
     ) -> CoreResult<u64> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .delete_project_layer(project_id, layer_id, source_dataset_id)
             .await
     }
     pub async fn set_layer_dataset_enabled(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         dataset_id: i32,
         enabled: bool,
     ) -> CoreResult<usize> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .set_layer_dataset_enabled(project_id, dataset_id, enabled)
             .await
     }
     pub async fn reset_project_layers(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
     ) -> CoreResult<()> {
+        self.authorize(actor, "write:graph")?;
         self.graph_service
             .reset_project_layers(project_id)
             .await
     }
     pub async fn create_layer_alias(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         alias_layer_id: String,
         target_layer_id: i32,
     ) -> CoreResult<crate::database::entities::layer_aliases::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::{layer_aliases, project_layers};
         use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
         let target_layer = project_layers::Entity::find_by_id(target_layer_id)
@@ -250,10 +263,11 @@ impl AppContext {
     }
     pub async fn remove_layer_alias(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         alias_layer_id: String,
     ) -> CoreResult<bool> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::layer_aliases;
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let result = layer_aliases::Entity::delete_many()
@@ -266,10 +280,11 @@ impl AppContext {
     }
     pub async fn remove_layer_aliases(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         target_layer_id: i32,
     ) -> CoreResult<i32> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::layer_aliases;
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let result = layer_aliases::Entity::delete_many()
@@ -282,7 +297,7 @@ impl AppContext {
     }
     pub async fn update_graph_node(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         node_id: String,
         label: Option<String>,
@@ -290,6 +305,7 @@ impl AppContext {
         attributes: Option<Value>,
         belongs_to: Option<String>,
     ) -> CoreResult<crate::database::entities::graph_data_nodes::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
         let old_node = GraphNodes::find()
@@ -400,12 +416,13 @@ impl AppContext {
     }
     pub async fn update_layer_properties(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         layer_id: i32,
         name: Option<String>,
         alias: Option<String>,
         properties: Option<Value>,
     ) -> CoreResult<crate::database::entities::graph_layers::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_layers::Entity as Layers;
         use sea_orm::EntityTrait;
         let old_layer = Layers::find_by_id(layer_id)
@@ -483,6 +500,7 @@ impl AppContext {
         node_updates: Vec<GraphNodeUpdateRequest>,
         layer_updates: Vec<GraphLayerUpdateRequest>,
     ) -> CoreResult<()> {
+        self.authorize(actor, "write:graph")?;
         for node_update in node_updates {
             self.update_graph_node(
                 actor,
@@ -510,11 +528,12 @@ impl AppContext {
 
     pub async fn update_graph_data_metadata(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         name: Option<String>,
         metadata: Option<serde_json::Value>,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
+        self.authorize(actor, "write:graph")?;
         use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
@@ -541,9 +560,10 @@ impl AppContext {
 
     pub async fn replay_graph_data_edits(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_data_id: i32,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
+        self.authorize(actor, "write:graph")?;
         let service = crate::services::GraphDataService::new(self.db.clone());
         service.replay_edits(graph_data_id).await?;
         service
@@ -554,18 +574,20 @@ impl AppContext {
 
     pub async fn clear_graph_data_edits(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_data_id: i32,
     ) -> CoreResult<u64> {
+        self.authorize(actor, "write:graph")?;
         let service = crate::services::GraphDataService::new(self.db.clone());
         service.clear_edits(graph_data_id).await
     }
 
     pub async fn replay_graph_edits(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
     ) -> CoreResult<GraphEditReplaySummary> {
+        self.authorize(actor, "write:graph")?;
         self.graph_edit_service
             .replay_graph_edits(graph_id)
             .await
@@ -574,7 +596,7 @@ impl AppContext {
 
     pub async fn create_graph_edit(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
         target_type: String,
         target_id: String,
@@ -585,6 +607,7 @@ impl AppContext {
         created_by: Option<i32>,
         applied: bool,
     ) -> CoreResult<crate::database::entities::graph_edits::Model> {
+        self.authorize(actor, "write:graph")?;
         self.graph_edit_service
             .create_edit(
                 graph_id,
@@ -602,9 +625,10 @@ impl AppContext {
 
     pub async fn clear_graph_edits(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         graph_id: i32,
     ) -> CoreResult<u64> {
+        self.authorize(actor, "write:graph")?;
         self.graph_edit_service.clear_graph_edits(graph_id).await
     }
     pub async fn analyze_graph_connectivity(

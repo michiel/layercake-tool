@@ -49,9 +49,10 @@ impl AppContext {
 
     pub async fn create_data_set_from_file(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         request: DataSetFileCreateRequest,
     ) -> CoreResult<DataSetSummary> {
+        self.authorize(actor, "write:data_set")?;
         let DataSetFileCreateRequest {
             project_id,
             name,
@@ -80,9 +81,10 @@ impl AppContext {
 
     pub async fn create_empty_data_set(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         request: DataSetEmptyCreateRequest,
     ) -> CoreResult<DataSetSummary> {
+        self.authorize(actor, "write:data_set")?;
         let DataSetEmptyCreateRequest {
             project_id,
             name,
@@ -99,10 +101,11 @@ impl AppContext {
 
     pub async fn bulk_upload_data_sets(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         uploads: Vec<BulkDataSetUpload>,
     ) -> CoreResult<Vec<DataSetSummary>> {
+        self.authorize(actor, "write:data_set")?;
         let mut results = Vec::new();
 
         for upload in uploads {
@@ -123,7 +126,12 @@ impl AppContext {
         Ok(results)
     }
 
-    pub async fn update_data_set(&self, _actor: &Actor, request: DataSetUpdateRequest) -> CoreResult<DataSetSummary> {
+    pub async fn update_data_set(
+        &self,
+        actor: &Actor,
+        request: DataSetUpdateRequest,
+    ) -> CoreResult<DataSetSummary> {
+        self.authorize(actor, "write:data_set")?;
         let DataSetUpdateRequest {
             id,
             name,
@@ -157,10 +165,11 @@ impl AppContext {
 
     pub async fn update_data_set_graph_json(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         id: i32,
         graph_json: String,
     ) -> CoreResult<DataSetSummary> {
+        self.authorize(actor, "write:data_set")?;
         let model = self
             .data_set_service
             .update_graph_data(id, graph_json)
@@ -169,7 +178,12 @@ impl AppContext {
         Ok(DataSetSummary::from(model))
     }
 
-    pub async fn reprocess_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<DataSetSummary> {
+    pub async fn reprocess_data_set(
+        &self,
+        actor: &Actor,
+        id: i32,
+    ) -> CoreResult<DataSetSummary> {
+        self.authorize(actor, "write:data_set")?;
         let model = self
             .data_set_service
             .reprocess(id)
@@ -194,7 +208,8 @@ impl AppContext {
             .map_err(|e| CoreError::internal(format!("Failed to validate graph {}: {}", graph_id, e)))
     }
 
-    pub async fn delete_data_set(&self, _actor: &Actor, id: i32) -> CoreResult<()> {
+    pub async fn delete_data_set(&self, actor: &Actor, id: i32) -> CoreResult<()> {
+        self.authorize(actor, "write:data_set")?;
         self.data_set_service.delete(id).await
     }
 
@@ -376,9 +391,10 @@ impl AppContext {
 
     pub async fn export_data_sets(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         request: DataSetExportRequest,
     ) -> CoreResult<DataSetExportResult> {
+        self.authorize(actor, "read:data_set")?;
         let DataSetExportRequest {
             project_id,
             data_set_ids,
@@ -436,9 +452,10 @@ impl AppContext {
 
     pub async fn import_data_sets(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         request: DataSetImportRequest,
     ) -> CoreResult<DataSetImportOutcome> {
+        self.authorize(actor, "write:data_set")?;
         let result = match request.format {
             DataSetImportFormat::Xlsx => self
                 .data_set_bulk_service
