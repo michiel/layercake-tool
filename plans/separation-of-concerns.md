@@ -858,11 +858,11 @@ After refactoring, support multiple deployment modes:
 - Replaced remaining `StructuredError::from_core_error` uses in GraphQL queries/mutations with the centralized `core_error_to_graphql_error` helper (`layercake-server/src/graphql/errors.rs`, `layercake-server/src/graphql/queries/mod.rs`, `layercake-server/src/graphql/mutations/*.rs`, `layercake-server/src/graphql/types/project.rs`).
 - Added server tests to validate CoreError → GraphQL error code/field mapping (`layercake-server/tests/core_error_mapping.rs`) and validated golden error baselines (`cargo test -p layercake-server --test core_error_mapping --test golden_errors`).
 - Implemented `DefaultAuthorizer` in server and added core Actor auth tests (`layercake-server/src/auth/mod.rs`, `layercake-server/src/lib.rs`, `layercake-core/tests/auth/actor_tests.rs`).
-- Wired authorizer into core AppContext with default allow-all, added write checks for project/plan mutations, and configured server to use `DefaultAuthorizer` with session actors marked as owners (`layercake-core/src/auth/mod.rs`, `layercake-core/src/app_context/mod.rs`, `layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-server/src/server/app.rs`, `layercake-server/src/graphql/context.rs`).
+- Wired authorizer into core AppContext with default allow-all, added write checks for project/plan mutations, and configured server to use `DefaultAuthorizer` with session actors marked as editors (`layercake-core/src/auth/mod.rs`, `layercake-core/src/app_context/mod.rs`, `layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-server/src/server/app.rs`, `layercake-server/src/graphql/context.rs`).
 - Extended authorizer enforcement across dataset and graph mutation entrypoints in core AppContext (`layercake-core/src/app_context/data_set_operations.rs`, `layercake-core/src/app_context/graph_operations.rs`).
 
 **Next steps**
-- Decide on additional authorization coverage for project-scoped checks (e.g., `AuthorizationService` integration tests) and ensure GraphQL actors carry real role/scopes instead of the default owner role.
+- Decide on additional authorization coverage for project-scoped checks (e.g., `AuthorizationService` integration tests) and map GraphQL actors to real project roles/scopes instead of the current editor default.
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).

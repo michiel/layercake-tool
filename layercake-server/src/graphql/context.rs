@@ -182,6 +182,6 @@ impl GraphQLContext {
     pub async fn actor_for_request(&self, ctx: &async_graphql::Context<'_>) -> Actor {
         let session_id = self.get_session_id(ctx);
         let session = self.session_manager.get_or_create_session(&session_id).await;
-        Actor::user(session.user_id).with_role("owner")
+        Actor::user(session.user_id).with_role("editor")
     }
 }
