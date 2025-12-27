@@ -1,4 +1,3 @@
-use anyhow::Result;
 use sea_orm::DatabaseConnection;
 
 use crate::export::{
@@ -6,6 +5,7 @@ use crate::export::{
     to_mermaid_treemap, to_plantuml, to_plantuml_mindmap, to_plantuml_wbs,
 };
 use crate::graph::Graph;
+use crate::errors::{CoreError, CoreResult};
 use crate::plan::{
     ExportFileType, NotePosition, Plan, RenderConfig, RenderConfigBuiltInStyle,
     RenderConfigOrientation, RenderTargetOptions,
@@ -24,7 +24,7 @@ impl ExportService {
         graph: &Graph,
         format: &ExportFileType,
         render_config_override: Option<RenderConfig>,
-    ) -> Result<String> {
+    ) -> CoreResult<String> {
         // Default render config
         let default_render_config = RenderConfig {
             contain_nodes: true,
@@ -45,38 +45,43 @@ impl ExportService {
 
         match format {
             ExportFileType::DOT => {
-                Ok(to_dot::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+                Ok(to_dot::render(graph, &render_config)
+                    .map_err(|e| CoreError::internal("DOT render failed").with_source(e))?)
             }
             ExportFileType::GML => {
-                Ok(to_gml::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+                Ok(to_gml::render(graph, &render_config)
+                    .map_err(|e| CoreError::internal("GML render failed").with_source(e))?)
             }
             ExportFileType::JSON => {
-                Ok(to_json::render(graph, &render_config).map_err(|e| anyhow::anyhow!("{}", e))?)
+                Ok(to_json::render(graph, &render_config)
+                    .map_err(|e| CoreError::internal("JSON render failed").with_source(e))?)
             }
             ExportFileType::Mermaid => {
                 Ok(to_mermaid::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+                    .map_err(|e| CoreError::internal("Mermaid render failed").with_source(e))?)
             }
             ExportFileType::PlantUML => {
                 Ok(to_plantuml::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+                    .map_err(|e| CoreError::internal("PlantUML render failed").with_source(e))?)
             }
             ExportFileType::PlantUmlMindmap => {
                 Ok(to_plantuml_mindmap::render(graph, &render_config)
-                    .map_err(|e| anyhow::anyhow!("{}", e))?)
+                    .map_err(|e| {
+                        CoreError::internal("PlantUML mindmap render failed").with_source(e)
+                    })?)
             }
             ExportFileType::PlantUmlWbs => Ok(to_plantuml_wbs::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
+                .map_err(|e| CoreError::internal("PlantUML WBS render failed").with_source(e))?),
             ExportFileType::MermaidMindmap => Ok(to_mermaid_mindmap::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
+                .map_err(|e| CoreError::internal("Mermaid mindmap render failed").with_source(e))?),
             ExportFileType::MermaidTreemap => Ok(to_mermaid_treemap::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
+                .map_err(|e| CoreError::internal("Mermaid treemap render failed").with_source(e))?),
             ExportFileType::CSVNodes => Ok(to_csv_nodes::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
+                .map_err(|e| CoreError::internal("CSV nodes render failed").with_source(e))?),
             ExportFileType::CSVEdges => Ok(to_csv_edges::render(graph, &render_config)
-                .map_err(|e| anyhow::anyhow!("{}", e))?),
-            _ => Err(anyhow::anyhow!(
-                "Export format not implemented for string output"
+                .map_err(|e| CoreError::internal("CSV edges render failed").with_source(e))?),
+            _ => Err(CoreError::validation(
+                "Export format not implemented for string output",
             )),
         }
     }
@@ -86,8 +91,10 @@ impl ExportService {
         &self,
         _project_id: i32,
         plan_yaml: &str,
-    ) -> Result<Vec<String>> {
-        let plan: Plan = serde_yaml::from_str(plan_yaml)?;
+    ) -> CoreResult<Vec<String>> {
+        let plan: Plan = serde_yaml::from_str(plan_yaml).map_err(|e| {
+            CoreError::validation(format!("Invalid plan YAML: {}", e))
+        })?;
         // let mut graph = graph_service.build_graph_from_project(project_id).await?;
         let mut graph = Graph::default(); // Placeholder
 
@@ -101,7 +108,7 @@ impl ExportService {
             if graph_config.invert_graph {
                 graph = graph
                     .invert_graph()
-                    .map_err(|e| anyhow::anyhow!("Failed to invert graph: {}", e))?;
+                    .map_err(|e| CoreError::internal("Failed to invert graph").with_source(e))?;
             }
 
             if graph_config.max_partition_width > 0 {
