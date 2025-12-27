@@ -853,9 +853,10 @@ After refactoring, support multiple deployment modes:
 - Added Actor to GraphQL graph_data mutations via AppContext wrappers (`layercake-core/src/app_context/graph_operations.rs`, `layercake-server/src/graphql/mutations/graph_data.rs`).
 - Added Actor to library item management paths (uploads, updates, deletes, imports, seeding) in core service + GraphQL and server handler (`layercake-core/src/services/library_item_service.rs`, `layercake-core/src/app_context/library_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-server/src/server/handlers/library.rs`).
 - Added Actor to collaboration mutations by routing GraphQL resolvers through `CollaborationService` and using session actors for presence events (`layercake-core/src/services/collaboration_service.rs`, `layercake-server/src/graphql/mutations/collaboration.rs`).
+- Added Actor checks to projection and sequence mutations to enforce authenticated access (`layercake-server/src/graphql/mutations/projection.rs`, `layercake-server/src/graphql/mutations/sequence.rs`).
 
 **Next steps**
-- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for projection and sequence flows).
+- Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for any remaining projection/sequence-related paths).
 - Remove remaining legacy StructuredError adapters where `Error::from(CoreError)` is sufficient.
 - Add server tests for CoreError mapping (`layercake-server/tests/`) and validate against golden baselines.
 - Implement `DefaultAuthorizer` in server and add core auth tests (`layercake-core/tests/auth/`).

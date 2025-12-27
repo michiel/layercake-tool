@@ -19,6 +19,10 @@ impl SequenceMutation {
         input: CreateSequenceInput,
     ) -> Result<Sequence> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        if actor.user_id.is_none() {
+            return Err(StructuredError::unauthorized("User is not authenticated"));
+        }
         let now = Utc::now();
 
         let enabled_dataset_ids_json =
@@ -61,6 +65,10 @@ impl SequenceMutation {
         input: UpdateSequenceInput,
     ) -> Result<Sequence> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        if actor.user_id.is_none() {
+            return Err(StructuredError::unauthorized("User is not authenticated"));
+        }
 
         let existing = sequences::Entity::find_by_id(id)
             .one(&context.db)
@@ -107,6 +115,10 @@ impl SequenceMutation {
     /// Delete a sequence
     async fn delete_sequence(&self, ctx: &Context<'_>, id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        if actor.user_id.is_none() {
+            return Err(StructuredError::unauthorized("User is not authenticated"));
+        }
 
         let result = sequences::Entity::delete_by_id(id)
             .exec(&context.db)

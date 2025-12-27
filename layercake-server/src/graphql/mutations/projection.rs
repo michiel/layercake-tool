@@ -65,6 +65,10 @@ impl ProjectionMutation {
         stories: Vec<ProjectionStorySelectionInput>,
     ) -> Result<ProjectionStoryVerificationResult> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        if actor.user_id.is_none() {
+            return Err(StructuredError::unauthorized("User is not authenticated"));
+        }
 
         let projection = projections::Entity::find_by_id(projection_id)
             .one(&context.db)
