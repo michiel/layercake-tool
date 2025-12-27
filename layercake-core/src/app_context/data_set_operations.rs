@@ -200,7 +200,7 @@ impl AppContext {
 
     pub async fn merge_data_sets(
         &self,
-        _actor: &Actor,
+        actor: &Actor,
         project_id: i32,
         data_set_ids: Vec<i32>,
         name: String,

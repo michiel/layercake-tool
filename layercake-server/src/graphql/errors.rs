@@ -133,10 +133,8 @@ impl StructuredError {
     }
 }
 
-impl From<CoreError> for Error {
-    fn from(err: CoreError) -> Self {
-        StructuredError::from_core_error(err)
-    }
+pub fn core_error_to_graphql_error(err: CoreError) -> Error {
+    StructuredError::from_core_error(err)
 }
 
 /// Extension trait for Result to add context

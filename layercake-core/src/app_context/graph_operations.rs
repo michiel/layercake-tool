@@ -513,7 +513,7 @@ impl AppContext {
         _actor: &Actor,
         id: i32,
         name: Option<String>,
-        metadata: Option<String>,
+        metadata: Option<serde_json::Value>,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
         use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, EntityTrait, Set};
@@ -544,8 +544,9 @@ impl AppContext {
         _actor: &Actor,
         graph_data_id: i32,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
-        self.graph_data_service.replay_edits(graph_data_id).await?;
-        self.graph_data_service
+        let service = crate::services::GraphDataService::new(self.db.clone());
+        service.replay_edits(graph_data_id).await?;
+        service
             .get_by_id(graph_data_id)
             .await?
             .ok_or_else(|| CoreError::not_found("GraphData", graph_data_id.to_string()))
@@ -556,7 +557,8 @@ impl AppContext {
         _actor: &Actor,
         graph_data_id: i32,
     ) -> CoreResult<u64> {
-        self.graph_data_service.clear_edits(graph_data_id).await
+        let service = crate::services::GraphDataService::new(self.db.clone());
+        service.clear_edits(graph_data_id).await
     }
 
     pub async fn replay_graph_edits(

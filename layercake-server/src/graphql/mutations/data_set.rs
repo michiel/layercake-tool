@@ -46,7 +46,7 @@ impl DataSetMutation {
                 file_bytes,
             })
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -67,7 +67,7 @@ impl DataSetMutation {
                 description: input.description,
             })
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -105,7 +105,7 @@ impl DataSetMutation {
             .app
             .bulk_upload_data_sets(&actor, project_id, uploads)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(summaries.into_iter().map(DataSet::from).collect())
     }
@@ -150,7 +150,7 @@ impl DataSetMutation {
                 new_file,
             })
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -163,7 +163,7 @@ impl DataSetMutation {
             .app
             .delete_data_set(&actor, id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -176,7 +176,7 @@ impl DataSetMutation {
             .app
             .reprocess_data_set(&actor, id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -194,7 +194,7 @@ impl DataSetMutation {
             .app
             .update_data_set_graph_json(&actor, id, graph_json)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }
@@ -210,7 +210,7 @@ impl DataSetMutation {
             .app
             .validate_data_set(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSetValidationResult::from(summary))
     }
@@ -237,7 +237,7 @@ impl DataSetMutation {
                 format,
             })
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         use base64::{engine::general_purpose, Engine as _};
         let encoded = general_purpose::STANDARD.encode(&exported.data);
@@ -275,7 +275,7 @@ impl DataSetMutation {
                 file_bytes,
             })
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(ImportDataSetsResult {
             data_sets: outcome.data_sets.into_iter().map(DataSet::from).collect(),
@@ -304,7 +304,7 @@ impl DataSetMutation {
                 input.delete_merged,
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(DataSet::from(summary))
     }

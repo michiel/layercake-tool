@@ -32,7 +32,7 @@ impl PlanMutation {
             .app
             .create_plan(&actor, request)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(Plan::from(summary))
     }
 
@@ -69,7 +69,7 @@ impl PlanMutation {
             .app
             .update_plan(&actor, id, update)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(Plan::from(summary))
     }
 
@@ -82,7 +82,7 @@ impl PlanMutation {
             .app
             .delete_plan(&actor, id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -102,7 +102,7 @@ impl PlanMutation {
             let plan = plan_service
                 .get_plan(plan_id)
                 .await
-                .map_err(Error::from)?
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?
                 .ok_or_else(|| StructuredError::not_found("Plan", plan_id))?;
 
             if plan.project_id != project_id {
@@ -117,7 +117,7 @@ impl PlanMutation {
             plan_service
                 .get_default_plan(project_id)
                 .await
-                .map_err(Error::from)?
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?
                 .ok_or_else(|| StructuredError::not_found("Plan for project", project_id))?
         };
 
@@ -173,7 +173,7 @@ impl PlanMutation {
             .app
             .duplicate_plan(&actor, id, name)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Plan::from(summary))
     }

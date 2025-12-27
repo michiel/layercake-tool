@@ -647,8 +647,8 @@ impl CodeAnalysisService {
         let path_for_task = path.clone();
         let analysis = tokio::task::spawn_blocking(move || analyze_path(&path_for_task))
             .await
-            .map_err(|e| CoreError::internal("Code analysis task failed").with_source(e))?
-            .map_err(|e| CoreError::internal("Code analysis failed").with_source(e))?;
+            .map_err(|e| CoreError::internal(format!("Code analysis task failed: {}", e)))?
+            .map_err(|e| CoreError::internal(format!("Code analysis failed: {}", e)))?;
         let parsed_opts: AnalysisOptions = profile
             .options
             .as_ref()
@@ -709,7 +709,9 @@ impl CodeAnalysisService {
             infra_graph.as_ref(),
             correlation.as_ref(),
         )
-        .map_err(|e| CoreError::internal("Failed to render code analysis report").with_source(e))?;
+        .map_err(|e| {
+            CoreError::internal(format!("Failed to render code analysis report: {}", e))
+        })?;
         let cleaned_report = strip_csv_blocks(&report_markdown);
 
         let dataset_id = match profile.dataset_id {

@@ -46,40 +46,46 @@ impl ExportService {
         match format {
             ExportFileType::DOT => {
                 Ok(to_dot::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal("DOT render failed").with_source(e))?)
+                    .map_err(|e| CoreError::internal(format!("DOT render failed: {}", e)))?)
             }
             ExportFileType::GML => {
                 Ok(to_gml::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal("GML render failed").with_source(e))?)
+                    .map_err(|e| CoreError::internal(format!("GML render failed: {}", e)))?)
             }
             ExportFileType::JSON => {
                 Ok(to_json::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal("JSON render failed").with_source(e))?)
+                    .map_err(|e| CoreError::internal(format!("JSON render failed: {}", e)))?)
             }
             ExportFileType::Mermaid => {
                 Ok(to_mermaid::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal("Mermaid render failed").with_source(e))?)
+                    .map_err(|e| CoreError::internal(format!("Mermaid render failed: {}", e)))?)
             }
             ExportFileType::PlantUML => {
                 Ok(to_plantuml::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal("PlantUML render failed").with_source(e))?)
+                    .map_err(|e| CoreError::internal(format!("PlantUML render failed: {}", e)))?)
             }
             ExportFileType::PlantUmlMindmap => {
                 Ok(to_plantuml_mindmap::render(graph, &render_config)
                     .map_err(|e| {
-                        CoreError::internal("PlantUML mindmap render failed").with_source(e)
+                        CoreError::internal(format!("PlantUML mindmap render failed: {}", e))
                     })?)
             }
             ExportFileType::PlantUmlWbs => Ok(to_plantuml_wbs::render(graph, &render_config)
-                .map_err(|e| CoreError::internal("PlantUML WBS render failed").with_source(e))?),
+                .map_err(|e| {
+                    CoreError::internal(format!("PlantUML WBS render failed: {}", e))
+                })?),
             ExportFileType::MermaidMindmap => Ok(to_mermaid_mindmap::render(graph, &render_config)
-                .map_err(|e| CoreError::internal("Mermaid mindmap render failed").with_source(e))?),
+                .map_err(|e| {
+                    CoreError::internal(format!("Mermaid mindmap render failed: {}", e))
+                })?),
             ExportFileType::MermaidTreemap => Ok(to_mermaid_treemap::render(graph, &render_config)
-                .map_err(|e| CoreError::internal("Mermaid treemap render failed").with_source(e))?),
+                .map_err(|e| {
+                    CoreError::internal(format!("Mermaid treemap render failed: {}", e))
+                })?),
             ExportFileType::CSVNodes => Ok(to_csv_nodes::render(graph, &render_config)
-                .map_err(|e| CoreError::internal("CSV nodes render failed").with_source(e))?),
+                .map_err(|e| CoreError::internal(format!("CSV nodes render failed: {}", e)))?),
             ExportFileType::CSVEdges => Ok(to_csv_edges::render(graph, &render_config)
-                .map_err(|e| CoreError::internal("CSV edges render failed").with_source(e))?),
+                .map_err(|e| CoreError::internal(format!("CSV edges render failed: {}", e)))?),
             _ => Err(CoreError::validation(
                 "Export format not implemented for string output",
             )),
@@ -108,7 +114,7 @@ impl ExportService {
             if graph_config.invert_graph {
                 graph = graph
                     .invert_graph()
-                    .map_err(|e| CoreError::internal("Failed to invert graph").with_source(e))?;
+                    .map_err(|e| CoreError::internal(format!("Failed to invert graph: {}", e)))?;
             }
 
             if graph_config.max_partition_width > 0 {

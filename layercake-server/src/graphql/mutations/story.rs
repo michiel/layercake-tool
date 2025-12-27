@@ -152,12 +152,12 @@ impl StoryMutation {
                 .app
                 .export_story_csv(&actor, story_id)
                 .await
-                .map_err(Error::from)?,
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?,
             StoryExportFormat::Json => context
                 .app
                 .export_story_json(&actor, story_id)
                 .await
-                .map_err(Error::from)?,
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?,
         };
 
         let content_base64 =
@@ -186,12 +186,12 @@ impl StoryMutation {
                 .app
                 .import_story_csv(&actor, project_id, &content)
                 .await
-                .map_err(Error::from)?,
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?,
             StoryImportFormat::Json => context
                 .app
                 .import_story_json(&actor, project_id, &content)
                 .await
-                .map_err(Error::from)?,
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?,
         };
 
         Ok(GqlStoryImportResult {

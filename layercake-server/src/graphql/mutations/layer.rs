@@ -1,6 +1,5 @@
 use async_graphql::*;
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::layer::{LayerAlias, ProjectLayer, ProjectLayerInput};
 
 #[derive(Default)]
@@ -35,7 +34,7 @@ impl LayerMutation {
                 input.enabled.unwrap_or(true),
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(ProjectLayer::from(model))
     }
@@ -55,7 +54,7 @@ impl LayerMutation {
             .app
             .delete_project_layer(&actor, project_id, layer_id, source_dataset_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(rows > 0)
     }
@@ -75,7 +74,7 @@ impl LayerMutation {
             .app
             .set_layer_dataset_enabled(&actor, project_id, data_set_id, enabled)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -89,7 +88,7 @@ impl LayerMutation {
             .app
             .reset_project_layers(&actor, project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -110,7 +109,7 @@ impl LayerMutation {
             .app
             .create_layer_alias(&actor, project_id, alias_layer_id, target_layer_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(LayerAlias::from(result))
     }
@@ -129,7 +128,7 @@ impl LayerMutation {
             .app
             .remove_layer_alias(&actor, project_id, alias_layer_id)
             .await
-            .map_err(Error::from)
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)
     }
 
     /// Remove all aliases for a target layer
@@ -146,6 +145,6 @@ impl LayerMutation {
             .app
             .remove_layer_aliases(&actor, project_id, target_layer_id)
             .await
-            .map_err(Error::from)
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)
     }
 }

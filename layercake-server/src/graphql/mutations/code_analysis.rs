@@ -1,7 +1,6 @@
 use async_graphql::{Context, Object, Result};
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     CodeAnalysisProfile, CodeAnalysisRunResult, CreateCodeAnalysisProfileInput,
     UpdateCodeAnalysisProfileInput,
@@ -36,7 +35,7 @@ impl CodeAnalysisMutation {
                 input.solution_options.clone(),
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(CodeAnalysisProfile::from(profile))
     }
 
@@ -61,7 +60,7 @@ impl CodeAnalysisMutation {
                 Some(input.solution_options.clone()),
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(CodeAnalysisProfile::from(profile))
     }
 
@@ -73,7 +72,7 @@ impl CodeAnalysisMutation {
             .code_analysis_service()
             .delete(&actor, &id)
             .await
-            .map_err(Error::from)
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)
     }
 
     async fn run_code_analysis_profile(
@@ -88,7 +87,7 @@ impl CodeAnalysisMutation {
             .code_analysis_service()
             .run(&actor, &id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(CodeAnalysisRunResult {
             profile: CodeAnalysisProfile::from(profile),
         })

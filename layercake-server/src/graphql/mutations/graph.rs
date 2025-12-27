@@ -2,7 +2,6 @@ use async_graphql::*;
 
 use layercake_core::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph::{
     CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
 };
@@ -65,7 +64,7 @@ impl GraphMutation {
             .app
             .create_graph(&actor, input.project_id, input.name, None)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Graph::from(graph))
     }
@@ -84,7 +83,7 @@ impl GraphMutation {
             .app
             .update_graph(&actor, id, input.name)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Graph::from(graph))
     }
@@ -96,7 +95,7 @@ impl GraphMutation {
             .app
             .validate_graph(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(GraphValidationResult::from(summary))
     }
@@ -110,7 +109,7 @@ impl GraphMutation {
             .app
             .delete_graph(&actor, id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -128,7 +127,7 @@ impl GraphMutation {
             .app
             .create_layer(&actor, input.graph_id, input.layer_id, input.name)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::Layer::from(inserted_layer))
     }
@@ -155,7 +154,7 @@ impl GraphMutation {
             .app
             .update_graph_node(&actor, graph_id, node_id, label, layer, attributes, belongs_to)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -176,7 +175,7 @@ impl GraphMutation {
             .app
             .update_layer_properties(&actor, id, name, alias, properties)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::layer::Layer::from(layer))
     }
@@ -217,7 +216,7 @@ impl GraphMutation {
                 attributes.clone(),
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
     }
@@ -258,7 +257,7 @@ impl GraphMutation {
                 attributes,
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::graph_edge::GraphEdge::from(inserted))
     }
@@ -277,7 +276,7 @@ impl GraphMutation {
             .app
             .delete_graph_edge(&actor, graph_id, edge_id)
             .await
-            .map_err(Error::from)
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)
     }
 
     /// Delete a node from a graph
@@ -295,7 +294,7 @@ impl GraphMutation {
             .app
             .delete_graph_node(&actor, graph_id, node_id.clone())
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
@@ -343,7 +342,7 @@ impl GraphMutation {
             .app
             .bulk_update_graph_data(&actor, graph_id, node_requests, layer_requests)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }

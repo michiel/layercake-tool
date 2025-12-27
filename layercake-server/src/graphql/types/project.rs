@@ -5,7 +5,6 @@ use std::collections::HashMap;
 use layercake_core::app_context::ProjectSummary;
 use layercake_core::database::entities::projects;
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Plan;
 
 #[derive(SimpleObject)]
@@ -60,7 +59,7 @@ impl Project {
             .app
             .get_plan_for_project(self.id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(plan.map(Plan::from))
     }

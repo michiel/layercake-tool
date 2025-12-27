@@ -1,7 +1,6 @@
 use async_graphql::*;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edit::{
     CreateGraphEditInput, EditResult, GraphEdit, ReplaySummary,
 };
@@ -34,7 +33,7 @@ impl GraphEditMutation {
                 false, // External edit - not yet applied, will be replayed
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(GraphEdit::from(edit))
     }
@@ -48,7 +47,7 @@ impl GraphEditMutation {
             .app
             .replay_graph_edits(&actor, graph_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(ReplaySummary {
             total: summary.total as i32,
@@ -79,7 +78,7 @@ impl GraphEditMutation {
             .app
             .clear_graph_edits(&actor, graph_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }

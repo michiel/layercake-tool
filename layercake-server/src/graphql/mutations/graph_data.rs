@@ -1,7 +1,6 @@
 use async_graphql::*;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{GraphData, UpdateGraphDataInput};
 
 #[derive(Default)]
@@ -23,7 +22,7 @@ impl GraphDataMutation {
             .app
             .update_graph_data_metadata(&actor, id, input.name, input.metadata)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(GraphData::from(updated))
     }
@@ -41,7 +40,7 @@ impl GraphDataMutation {
             .app
             .replay_graph_data_edits(&actor, graph_data_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(GraphData::from(graph_data))
     }
@@ -55,7 +54,7 @@ impl GraphDataMutation {
             .app
             .clear_graph_data_edits(&actor, graph_data_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }

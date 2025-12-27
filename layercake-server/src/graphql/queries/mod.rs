@@ -52,7 +52,7 @@ impl Query {
             .app
             .list_projects_filtered(tags)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(projects.into_iter().map(Project::from).collect())
     }
@@ -64,7 +64,7 @@ impl Query {
             .app
             .get_project(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(project.map(Project::from))
     }
@@ -80,7 +80,7 @@ impl Query {
             .code_analysis_service()
             .list(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(profiles
             .into_iter()
             .map(CodeAnalysisProfile::from)
@@ -98,7 +98,7 @@ impl Query {
             .code_analysis_service()
             .get(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(profile.map(CodeAnalysisProfile::from))
     }
 
@@ -109,7 +109,7 @@ impl Query {
             .data_set_service()
             .get_graph_summary(dataset_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(GraphSummary::from(summary))
     }
 
@@ -132,7 +132,7 @@ impl Query {
                 layers,
             )
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(GraphPage::from(page))
     }
 
@@ -197,7 +197,7 @@ impl Query {
             .app
             .list_data_sets(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         let total_datasets = datasets.len() as i32;
         let mut by_type = std::collections::HashMap::new();
@@ -240,7 +240,7 @@ impl Query {
             .app
             .get_plan(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(plan.map(Plan::from))
     }
@@ -252,7 +252,7 @@ impl Query {
             .app
             .list_plans(Some(project_id))
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(plans.into_iter().map(Plan::from).collect())
     }
@@ -312,7 +312,7 @@ impl Query {
             .graph_service()
             .list_project_layers(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(layers.into_iter().map(ProjectLayer::from).collect())
     }
@@ -326,7 +326,7 @@ impl Query {
             .graph_service()
             .missing_layers(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(missing)
     }
 
@@ -371,7 +371,7 @@ impl Query {
             .system_settings
             .list_settings()
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(settings.into_iter().map(SystemSetting::from).collect())
     }
 
@@ -382,7 +382,7 @@ impl Query {
             .system_settings
             .get_setting(&key)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
         Ok(SystemSetting::from(setting))
     }
 
@@ -413,7 +413,7 @@ impl Query {
             .app
             .load_plan_dag(project_id, plan_id)
             .await
-            .map_err(Error::from)?
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?
             .ok_or_else(|| StructuredError::not_found("Project", project_id))?;
 
         Ok(Some(PlanDag::from(snapshot)))
@@ -706,7 +706,7 @@ impl Query {
             .app
             .get_data_set(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(summary.map(DataSet::from))
     }
@@ -718,7 +718,7 @@ impl Query {
             .app
             .list_data_sets(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(summaries.into_iter().map(DataSet::from).collect())
     }
@@ -808,7 +808,7 @@ impl Query {
         let items = service
             .list(params)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(items.into_iter().map(LibraryItem::from).collect())
     }
@@ -820,7 +820,7 @@ impl Query {
         let item = service
             .get(id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(item.map(LibraryItem::from))
     }
@@ -863,7 +863,7 @@ impl Query {
             .app
             .available_data_sets(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(summaries.into_iter().map(DataSetReference::from).collect())
     }
@@ -1252,7 +1252,7 @@ impl Query {
         let sessions = service
             .list_sessions(project_id, None, include_archived, limit, offset)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(sessions
             .into_iter()
@@ -1273,7 +1273,7 @@ impl Query {
         let session = service
             .get_session(&session_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(session.map(crate::graphql::types::ChatSession::from))
     }
@@ -1293,7 +1293,7 @@ impl Query {
         let messages = service
             .get_history(&session_id, limit, offset)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(messages
             .into_iter()
@@ -1310,7 +1310,7 @@ impl Query {
         let count = service
             .get_message_count(&session_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(count as i32)
     }
@@ -1330,7 +1330,7 @@ impl Query {
         let agents = service
             .list_agents(project_id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(agents
             .into_iter()

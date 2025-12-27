@@ -2,7 +2,6 @@ use async_graphql::*;
 
 use layercake_core::app_context::ProjectUpdate;
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
 use layercake_core::services::sample_project_service::SampleProjectService;
 
@@ -23,7 +22,7 @@ impl ProjectMutation {
             .app
             .create_project(&actor, input.name, input.description, input.tags)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Project::from(project))
     }
@@ -41,7 +40,7 @@ impl ProjectMutation {
         let project = service
             .create_sample_project(&actor, &sample_key)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Project::from(project))
     }
@@ -61,7 +60,7 @@ impl ProjectMutation {
             .app
             .update_project(&actor, id, update)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(Project::from(project))
     }
@@ -74,7 +73,7 @@ impl ProjectMutation {
             .app
             .delete_project(&actor, id)
             .await
-            .map_err(Error::from)?;
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(true)
     }
