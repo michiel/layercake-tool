@@ -1,24 +1,26 @@
 #![allow(dead_code)]
 
-use anyhow::{anyhow, Result};
 use regex::Regex;
 use serde_json::Value;
 
+use crate::errors::{CoreError, CoreResult};
 /// Service for data validation and sanitization
 #[allow(dead_code)] // Validation service reserved for future use
 pub struct ValidationService;
 
 impl ValidationService {
     /// Sanitize and validate project name
-    pub fn validate_project_name(name: &str) -> Result<String> {
+    pub fn validate_project_name(name: &str) -> CoreResult<String> {
         let trimmed = name.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("Project name cannot be empty"));
+            return Err(CoreError::validation("Project name cannot be empty"));
         }
 
         if trimmed.len() > 100 {
-            return Err(anyhow!("Project name is too long (max 100 characters)"));
+            return Err(CoreError::validation(
+                "Project name is too long (max 100 characters)",
+            ));
         }
 
         // Remove potentially dangerous characters
@@ -28,19 +30,21 @@ impl ValidationService {
             .collect::<String>();
 
         if sanitized.is_empty() {
-            return Err(anyhow!("Project name contains only invalid characters"));
+            return Err(CoreError::validation(
+                "Project name contains only invalid characters",
+            ));
         }
 
         Ok(sanitized)
     }
 
     /// Validate project description
-    pub fn validate_project_description(description: &str) -> Result<String> {
+    pub fn validate_project_description(description: &str) -> CoreResult<String> {
         let trimmed = description.trim();
 
         if trimmed.len() > 1000 {
-            return Err(anyhow!(
-                "Project description is too long (max 1000 characters)"
+            return Err(CoreError::validation(
+                "Project description is too long (max 1000 characters)",
             ));
         }
 
@@ -56,23 +60,26 @@ impl ValidationService {
     }
 
     /// Validate Plan DAG node ID
-    pub fn validate_node_id(node_id: &str) -> Result<String> {
+    pub fn validate_node_id(node_id: &str) -> CoreResult<String> {
         let trimmed = node_id.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("Node ID cannot be empty"));
+            return Err(CoreError::validation("Node ID cannot be empty"));
         }
 
         if trimmed.len() > 50 {
-            return Err(anyhow!("Node ID is too long (max 50 characters)"));
+            return Err(CoreError::validation(
+                "Node ID is too long (max 50 characters)",
+            ));
         }
 
         // Node IDs should be alphanumeric with underscores
-        let regex = Regex::new(r"^[a-zA-Z0-9_]+$")
-            .map_err(|e| anyhow!("Failed to compile node ID regex: {}", e))?;
+        let regex = Regex::new(r"^[a-zA-Z0-9_]+$").map_err(|e| {
+            CoreError::internal("Failed to compile node ID regex").with_source(e)
+        })?;
         if !regex.is_match(trimmed) {
-            return Err(anyhow!(
-                "Node ID can only contain letters, numbers, and underscores"
+            return Err(CoreError::validation(
+                "Node ID can only contain letters, numbers, and underscores",
             ));
         }
 
@@ -80,45 +87,54 @@ impl ValidationService {
     }
 
     /// Validate JSON configuration
-    pub fn validate_json_config(json_str: &str) -> Result<Value> {
+    pub fn validate_json_config(json_str: &str) -> CoreResult<Value> {
         if json_str.trim().is_empty() {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(json_str)
-            .map_err(|e| anyhow!("Invalid JSON configuration: {}", e))?;
+        let value: Value = serde_json::from_str(json_str).map_err(|e| {
+            CoreError::validation(format!("Invalid JSON configuration: {}", e))
+        })?;
 
         // Check JSON size (prevent excessively large configs)
-        let serialized = serde_json::to_string(&value)?;
+        let serialized = serde_json::to_string(&value).map_err(|e| {
+            CoreError::internal("Failed to serialize JSON configuration").with_source(e)
+        })?;
         if serialized.len() > 10_000 {
-            return Err(anyhow!("JSON configuration is too large (max 10KB)"));
+            return Err(CoreError::validation(
+                "JSON configuration is too large (max 10KB)",
+            ));
         }
 
         Ok(value)
     }
 
     /// Validate file path (for security)
-    pub fn validate_file_path(path: &str) -> Result<String> {
+    pub fn validate_file_path(path: &str) -> CoreResult<String> {
         let trimmed = path.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("File path cannot be empty"));
+            return Err(CoreError::validation("File path cannot be empty"));
         }
 
         if trimmed.len() > 500 {
-            return Err(anyhow!("File path is too long (max 500 characters)"));
+            return Err(CoreError::validation(
+                "File path is too long (max 500 characters)",
+            ));
         }
 
         // Prevent directory traversal
         if trimmed.contains("..") {
-            return Err(anyhow!(
-                "File path cannot contain '..' (directory traversal)"
+            return Err(CoreError::validation(
+                "File path cannot contain '..' (directory traversal)",
             ));
         }
 
         // Prevent absolute paths in user input
         if trimmed.starts_with('/') || trimmed.contains(':') {
-            return Err(anyhow!("Absolute file paths are not allowed"));
+            return Err(CoreError::validation(
+                "Absolute file paths are not allowed",
+            ));
         }
 
         // Basic path sanitization
@@ -128,22 +144,26 @@ impl ValidationService {
             .collect::<String>();
 
         if sanitized.is_empty() {
-            return Err(anyhow!("File path contains only invalid characters"));
+            return Err(CoreError::validation(
+                "File path contains only invalid characters",
+            ));
         }
 
         Ok(sanitized)
     }
 
     /// Validate node label
-    pub fn validate_node_label(label: &str) -> Result<String> {
+    pub fn validate_node_label(label: &str) -> CoreResult<String> {
         let trimmed = label.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("Node label cannot be empty"));
+            return Err(CoreError::validation("Node label cannot be empty"));
         }
 
         if trimmed.len() > 200 {
-            return Err(anyhow!("Node label is too long (max 200 characters)"));
+            return Err(CoreError::validation(
+                "Node label is too long (max 200 characters)",
+            ));
         }
 
         // Basic sanitization
@@ -156,23 +176,26 @@ impl ValidationService {
     }
 
     /// Validate layer name
-    pub fn validate_layer_name(name: &str) -> Result<String> {
+    pub fn validate_layer_name(name: &str) -> CoreResult<String> {
         let trimmed = name.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("Layer name cannot be empty"));
+            return Err(CoreError::validation("Layer name cannot be empty"));
         }
 
         if trimmed.len() > 100 {
-            return Err(anyhow!("Layer name is too long (max 100 characters)"));
+            return Err(CoreError::validation(
+                "Layer name is too long (max 100 characters)",
+            ));
         }
 
         // Layer names should be simple identifiers
-        let regex = Regex::new(r"^[a-zA-Z0-9_\-\s]+$")
-            .map_err(|e| anyhow!("Failed to compile display name regex: {}", e))?;
+        let regex = Regex::new(r"^[a-zA-Z0-9_\-\s]+$").map_err(|e| {
+            CoreError::internal("Failed to compile display name regex").with_source(e)
+        })?;
         if !regex.is_match(trimmed) {
-            return Err(anyhow!(
-                "Layer name can only contain letters, numbers, spaces, underscores, and hyphens"
+            return Err(CoreError::validation(
+                "Layer name can only contain letters, numbers, spaces, underscores, and hyphens",
             ));
         }
 
@@ -180,47 +203,55 @@ impl ValidationService {
     }
 
     /// Validate color code (hex format)
-    pub fn validate_color_code(color: &str) -> Result<String> {
+    pub fn validate_color_code(color: &str) -> CoreResult<String> {
         let trimmed = color.trim();
 
         if trimmed.is_empty() {
-            return Err(anyhow!("Color code cannot be empty"));
+            return Err(CoreError::validation("Color code cannot be empty"));
         }
 
         // Must be valid hex color
-        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$")
-            .map_err(|e| anyhow!("Failed to compile color regex: {}", e))?;
+        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$").map_err(|e| {
+            CoreError::internal("Failed to compile color regex").with_source(e)
+        })?;
         if !regex.is_match(trimmed) {
-            return Err(anyhow!("Color must be a valid hex code (e.g., #FF0000)"));
+            return Err(CoreError::validation(
+                "Color must be a valid hex code (e.g., #FF0000)",
+            ));
         }
 
         Ok(trimmed.to_uppercase())
     }
 
     /// Validate session data (cursor position, viewport, etc.)
-    pub fn validate_session_data(data: &str) -> Result<String> {
+    pub fn validate_session_data(data: &str) -> CoreResult<String> {
         if data.trim().is_empty() {
             return Ok(String::new());
         }
 
         // Validate as JSON
-        let _: Value =
-            serde_json::from_str(data).map_err(|e| anyhow!("Invalid session data JSON: {}", e))?;
+        let _: Value = serde_json::from_str(data).map_err(|e| {
+            CoreError::validation(format!("Invalid session data JSON: {}", e))
+        })?;
 
         // Limit size
         if data.len() > 1_000 {
-            return Err(anyhow!("Session data is too large (max 1KB)"));
+            return Err(CoreError::validation(
+                "Session data is too large (max 1KB)",
+            ));
         }
 
         Ok(data.to_string())
     }
 
     /// Sanitize search query
-    pub fn sanitize_search_query(query: &str) -> Result<String> {
+    pub fn sanitize_search_query(query: &str) -> CoreResult<String> {
         let trimmed = query.trim();
 
         if trimmed.len() > 200 {
-            return Err(anyhow!("Search query is too long (max 200 characters)"));
+            return Err(CoreError::validation(
+                "Search query is too long (max 200 characters)",
+            ));
         }
 
         // Remove potentially dangerous characters for search
@@ -233,13 +264,13 @@ impl ValidationService {
     }
 
     /// Validate collaboration role
-    pub fn validate_collaboration_role(role: &str) -> Result<String> {
+    pub fn validate_collaboration_role(role: &str) -> CoreResult<String> {
         let valid_roles = ["owner", "editor", "viewer"];
         let role_lower = role.trim().to_lowercase();
 
         if !valid_roles.contains(&role_lower.as_str()) {
-            return Err(anyhow!(
-                "Invalid role. Must be one of: owner, editor, viewer"
+            return Err(CoreError::validation(
+                "Invalid role. Must be one of: owner, editor, viewer",
             ));
         }
 
@@ -247,13 +278,13 @@ impl ValidationService {
     }
 
     /// Validate invitation status
-    pub fn validate_invitation_status(status: &str) -> Result<String> {
+    pub fn validate_invitation_status(status: &str) -> CoreResult<String> {
         let valid_statuses = ["pending", "accepted", "declined", "revoked"];
         let status_lower = status.trim().to_lowercase();
 
         if !valid_statuses.contains(&status_lower.as_str()) {
-            return Err(anyhow!(
-                "Invalid status. Must be one of: pending, accepted, declined, revoked"
+            return Err(CoreError::validation(
+                "Invalid status. Must be one of: pending, accepted, declined, revoked",
             ));
         }
 
@@ -261,13 +292,13 @@ impl ValidationService {
     }
 
     /// Validate user status
-    pub fn validate_user_status(status: &str) -> Result<String> {
+    pub fn validate_user_status(status: &str) -> CoreResult<String> {
         let valid_statuses = ["active", "idle", "away", "offline"];
         let status_lower = status.trim().to_lowercase();
 
         if !valid_statuses.contains(&status_lower.as_str()) {
-            return Err(anyhow!(
-                "Invalid user status. Must be one of: active, idle, away, offline"
+            return Err(CoreError::validation(
+                "Invalid user status. Must be one of: active, idle, away, offline",
             ));
         }
 
@@ -277,7 +308,7 @@ impl ValidationService {
     // ===== Plan DAG Validation Methods =====
 
     /// Validate Plan DAG node type
-    pub fn validate_plan_dag_node_type(node_type: &str) -> Result<String> {
+    pub fn validate_plan_dag_node_type(node_type: &str) -> CoreResult<String> {
         let valid_types = [
             "DataSetNode",
             "GraphNode",
@@ -298,116 +329,122 @@ impl ValidationService {
         };
 
         if !valid_types.contains(&normalized) {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Invalid node type '{}'. Must be one of: {}",
                 node_type,
                 valid_types.join(", ")
-            ));
+            )));
         }
 
         Ok(normalized.to_string())
     }
 
     /// Validate Plan DAG node position
-    pub fn validate_plan_dag_position(x: f64, y: f64) -> Result<(f64, f64)> {
+    pub fn validate_plan_dag_position(x: f64, y: f64) -> CoreResult<(f64, f64)> {
         // Reasonable canvas bounds to prevent extreme values
         const MAX_COORDINATE: f64 = 100_000.0;
         const MIN_COORDINATE: f64 = -100_000.0;
 
         if !x.is_finite() || !(MIN_COORDINATE..=MAX_COORDINATE).contains(&x) {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Invalid X coordinate: must be between {} and {}",
-                MIN_COORDINATE,
-                MAX_COORDINATE
-            ));
+                MIN_COORDINATE, MAX_COORDINATE
+            )));
         }
 
         if !y.is_finite() || !(MIN_COORDINATE..=MAX_COORDINATE).contains(&y) {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Invalid Y coordinate: must be between {} and {}",
-                MIN_COORDINATE,
-                MAX_COORDINATE
-            ));
+                MIN_COORDINATE, MAX_COORDINATE
+            )));
         }
 
         Ok((x, y))
     }
 
     /// Validate edge doesn't create self-loop
-    pub fn validate_edge_no_self_loop(source: &str, target: &str) -> Result<()> {
+    pub fn validate_edge_no_self_loop(source: &str, target: &str) -> CoreResult<()> {
         if source == target {
-            return Err(anyhow!(
-                "Edge cannot connect a node to itself (self-loop detected)"
+            return Err(CoreError::validation(
+                "Edge cannot connect a node to itself (self-loop detected)",
             ));
         }
         Ok(())
     }
 
     /// Validate metadata JSON for Plan DAG nodes
-    pub fn validate_plan_dag_metadata(metadata_json: &str) -> Result<Value> {
+    pub fn validate_plan_dag_metadata(metadata_json: &str) -> CoreResult<Value> {
         if metadata_json.trim().is_empty() {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(metadata_json)
-            .map_err(|e| anyhow!("Invalid metadata JSON: {}", e))?;
+        let value: Value = serde_json::from_str(metadata_json).map_err(|e| {
+            CoreError::validation(format!("Invalid metadata JSON: {}", e))
+        })?;
 
         // Check if it's an object
         if !value.is_object() {
-            return Err(anyhow!("Metadata must be a JSON object"));
+            return Err(CoreError::validation("Metadata must be a JSON object"));
         }
 
         // Check JSON size (prevent excessively large metadata)
-        let serialized = serde_json::to_string(&value)?;
+        let serialized = serde_json::to_string(&value).map_err(|e| {
+            CoreError::internal("Failed to serialize metadata JSON").with_source(e)
+        })?;
         if serialized.len() > 50_000 {
-            return Err(anyhow!("Metadata JSON is too large (max 50KB)"));
+            return Err(CoreError::validation(
+                "Metadata JSON is too large (max 50KB)",
+            ));
         }
 
         Ok(value)
     }
 
     /// Validate config JSON for Plan DAG nodes
-    pub fn validate_plan_dag_config(config_json: &str) -> Result<Value> {
+    pub fn validate_plan_dag_config(config_json: &str) -> CoreResult<Value> {
         if config_json.trim().is_empty() {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value =
-            serde_json::from_str(config_json).map_err(|e| anyhow!("Invalid config JSON: {}", e))?;
+        let value: Value = serde_json::from_str(config_json).map_err(|e| {
+            CoreError::validation(format!("Invalid config JSON: {}", e))
+        })?;
 
         // Check if it's an object
         if !value.is_object() {
-            return Err(anyhow!("Config must be a JSON object"));
+            return Err(CoreError::validation("Config must be a JSON object"));
         }
 
         // Check JSON size (prevent excessively large configs)
-        let serialized = serde_json::to_string(&value)?;
+        let serialized = serde_json::to_string(&value).map_err(|e| {
+            CoreError::internal("Failed to serialize config JSON").with_source(e)
+        })?;
         if serialized.len() > 100_000 {
-            return Err(anyhow!("Config JSON is too large (max 100KB)"));
+            return Err(CoreError::validation(
+                "Config JSON is too large (max 100KB)",
+            ));
         }
 
         Ok(value)
     }
 
     /// Validate Plan DAG doesn't exceed reasonable limits
-    pub fn validate_plan_dag_limits(node_count: usize, edge_count: usize) -> Result<()> {
+    pub fn validate_plan_dag_limits(node_count: usize, edge_count: usize) -> CoreResult<()> {
         const MAX_NODES: usize = 1000;
         const MAX_EDGES: usize = 5000;
 
         if node_count > MAX_NODES {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Plan DAG has too many nodes ({} > max {})",
-                node_count,
-                MAX_NODES
-            ));
+                node_count, MAX_NODES
+            )));
         }
 
         if edge_count > MAX_EDGES {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "Plan DAG has too many edges ({} > max {})",
-                edge_count,
-                MAX_EDGES
-            ));
+                edge_count, MAX_EDGES
+            )));
         }
 
         Ok(())
