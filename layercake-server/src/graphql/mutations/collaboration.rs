@@ -27,7 +27,7 @@ impl CollaborationMutation {
         let collaboration = service
             .invite_collaborator(&actor, input.project_id, &input.email, &input.role)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(ProjectCollaborator::from(collaboration))
     }
@@ -45,7 +45,7 @@ impl CollaborationMutation {
         let updated = service
             .accept_invitation(&actor, collaboration_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -63,7 +63,7 @@ impl CollaborationMutation {
         let updated = service
             .decline_invitation(&actor, collaboration_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -92,7 +92,7 @@ impl CollaborationMutation {
                 &input.role,
             )
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -112,7 +112,7 @@ impl CollaborationMutation {
         service
             .remove_collaborator(&actor, collaboration.project_id, collaboration.user_id)
             .await
-            .map_err(StructuredError::from_core_error)?;
+            .map_err(Error::from)?;
 
         Ok(true)
     }

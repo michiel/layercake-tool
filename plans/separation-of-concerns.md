@@ -854,6 +854,7 @@ After refactoring, support multiple deployment modes:
 - Added Actor to library item management paths (uploads, updates, deletes, imports, seeding) in core service + GraphQL and server handler (`layercake-core/src/services/library_item_service.rs`, `layercake-core/src/app_context/library_operations.rs`, `layercake-server/src/graphql/mutations/library.rs`, `layercake-server/src/server/handlers/library.rs`).
 - Added Actor to collaboration mutations by routing GraphQL resolvers through `CollaborationService` and using session actors for presence events (`layercake-core/src/services/collaboration_service.rs`, `layercake-server/src/graphql/mutations/collaboration.rs`).
 - Added Actor checks to projection and sequence mutations to enforce authenticated access (`layercake-server/src/graphql/mutations/projection.rs`, `layercake-server/src/graphql/mutations/sequence.rs`).
+- Began removing legacy `StructuredError::from_core_error` adapters by switching collaboration mutations to use `Error::from(CoreError)` (`layercake-server/src/graphql/mutations/collaboration.rs`).
 
 **Next steps**
 - Continue wiring Actor into remaining mutation paths (audit GraphQL mutations and MCP tool entrypoints for any remaining projection/sequence-related paths).
