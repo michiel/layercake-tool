@@ -110,31 +110,25 @@ impl StructuredError {
     }
 }
 
-impl StructuredError {
-    pub fn from_core_error(err: CoreError) -> Error {
-        let code = match err.kind() {
-            CoreErrorKind::NotFound => "NOT_FOUND",
-            CoreErrorKind::Validation => "VALIDATION_FAILED",
-            CoreErrorKind::Conflict => "CONFLICT",
-            CoreErrorKind::Forbidden => "FORBIDDEN",
-            CoreErrorKind::Unauthorized => "UNAUTHORIZED",
-            CoreErrorKind::Unavailable => "SERVICE_ERROR",
-            CoreErrorKind::Internal => "INTERNAL_ERROR",
-        };
-
-        Error::new(err.message()).extend_with(|_, e| {
-            e.set("code", code);
-            if let Some(fields) = err.fields() {
-                for (key, value) in fields {
-                    e.set(key, value);
-                }
-            }
-        })
-    }
-}
-
 pub fn core_error_to_graphql_error(err: CoreError) -> Error {
-    StructuredError::from_core_error(err)
+    let code = match err.kind() {
+        CoreErrorKind::NotFound => "NOT_FOUND",
+        CoreErrorKind::Validation => "VALIDATION_FAILED",
+        CoreErrorKind::Conflict => "CONFLICT",
+        CoreErrorKind::Forbidden => "FORBIDDEN",
+        CoreErrorKind::Unauthorized => "UNAUTHORIZED",
+        CoreErrorKind::Unavailable => "SERVICE_ERROR",
+        CoreErrorKind::Internal => "INTERNAL_ERROR",
+    };
+
+    Error::new(err.message()).extend_with(|_, e| {
+        e.set("code", code);
+        if let Some(fields) = err.fields() {
+            for (key, value) in fields {
+                e.set(key, value);
+            }
+        }
+    })
 }
 
 /// Extension trait for Result to add context
