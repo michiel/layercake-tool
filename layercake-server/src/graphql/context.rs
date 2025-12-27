@@ -227,3 +227,97 @@ impl GraphQLContext {
         best_role
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use layercake_core::database::entities::{project_collaborators, projects, users};
+    use layercake_core::database::migrations::Migrator;
+    use layercake_core::services::system_settings_service::SystemSettingsService;
+    use sea_orm::{ActiveModelTrait, Database, DatabaseConnection, Set};
+    use sea_orm_migration::MigratorTrait;
+
+    async fn setup_db() -> DatabaseConnection {
+        let db = Database::connect("sqlite::memory:")
+            .await
+            .expect("Failed to connect to test database");
+        Migrator::up(&db, None)
+            .await
+            .expect("Failed to run migrations");
+        db
+    }
+
+    async fn seed_project(db: &DatabaseConnection, name: &str) -> projects::Model {
+        let mut project = projects::ActiveModel::new();
+        project.name = Set(name.to_string());
+        project.insert(db).await.expect("Failed to insert project")
+    }
+
+    async fn seed_user(db: &DatabaseConnection, username: &str) -> users::Model {
+        let mut user = users::ActiveModel::new();
+        user.email = Set(format!("{}@example.com", username));
+        user.username = Set(username.to_string());
+        user.display_name = Set(username.to_string());
+        user.password_hash = Set("hash".to_string());
+        user.insert(db).await.expect("Failed to insert user")
+    }
+
+    async fn seed_collaborator(
+        db: &DatabaseConnection,
+        project: &projects::Model,
+        user: &users::Model,
+        role: project_collaborators::ProjectRole,
+    ) -> project_collaborators::Model {
+        let collaborator = project_collaborators::ActiveModel::new(
+            project.id,
+            user.id,
+            role,
+            Some(user.id),
+        )
+        .accept_invitation();
+
+        collaborator
+            .insert(db)
+            .await
+            .expect("Failed to insert collaborator")
+    }
+
+    #[tokio::test]
+    async fn resolve_user_role_prefers_owner_over_editor() {
+        let db = setup_db().await;
+        let user = seed_user(&db, "role_test").await;
+        let project_a = seed_project(&db, "Project A").await;
+        let project_b = seed_project(&db, "Project B").await;
+
+        seed_collaborator(
+            &db,
+            &project_a,
+            &user,
+            project_collaborators::ProjectRole::Editor,
+        )
+        .await;
+        seed_collaborator(
+            &db,
+            &project_b,
+            &user,
+            project_collaborators::ProjectRole::Owner,
+        )
+        .await;
+
+        let app = Arc::new(AppContext::new(db.clone()));
+        let system_settings = Arc::new(
+            SystemSettingsService::new(db.clone())
+                .await
+                .expect("System settings init"),
+        );
+        let chat_manager = Arc::new(ChatManager::new());
+        let context = GraphQLContext::new(app, system_settings, chat_manager);
+
+        let role = context
+            .resolve_user_role(user.id)
+            .await
+            .expect("Expected collaborator role");
+
+        assert_eq!(role, "owner");
+    }
+}
