@@ -1,4 +1,3 @@
-use anyhow::{Context, Result};
 use icu_locid::locale;
 use rust_xlsxwriter::*;
 use sea_orm::{DatabaseConnection, EntityTrait};
@@ -7,6 +6,7 @@ use std::collections::HashSet;
 
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets;
+use crate::errors::{CoreError, CoreResult};
 use crate::services::data_set_service::DataSetService;
 
 pub struct DataSetBulkService {
@@ -48,7 +48,7 @@ impl DataSetBulkService {
     }
 
     /// Convert calamine range to CSV string with proper escaping and consistent column counts
-    fn range_to_csv(range: &calamine::Range<calamine::Data>) -> Result<Vec<u8>> {
+    fn range_to_csv(range: &calamine::Range<calamine::Data>) -> CoreResult<Vec<u8>> {
         use calamine::Data;
 
         let mut csv_data = Vec::new();
@@ -78,17 +78,21 @@ impl DataSetBulkService {
                 }
 
                 // Write CSV row with proper escaping
-                csv_writer.write_record(&row_values)?;
+                csv_writer.write_record(&row_values).map_err(|e| {
+                    CoreError::internal("Failed to write CSV record").with_source(e)
+                })?;
             }
 
-            csv_writer.flush()?;
+            csv_writer.flush().map_err(|e| {
+                CoreError::internal("Failed to flush CSV writer").with_source(e)
+            })?;
         } // csv_writer is dropped here, releasing the borrow on csv_data
 
         Ok(csv_data)
     }
 
     /// Convert graph_json to CSV rows
-    fn json_array_to_csv_rows(array: &[serde_json::Value]) -> Result<Vec<Vec<String>>> {
+    fn json_array_to_csv_rows(array: &[serde_json::Value]) -> CoreResult<Vec<Vec<String>>> {
         if array.is_empty() {
             return Ok(Vec::new());
         }
@@ -196,14 +200,14 @@ impl DataSetBulkService {
 
     /// Export datasets to XLSX format
     /// Each dataset becomes a separate sheet named with its name containing CSV data
-    pub async fn export_to_xlsx(&self, dataset_ids: &[i32]) -> Result<Vec<u8>> {
+    pub async fn export_to_xlsx(&self, dataset_ids: &[i32]) -> CoreResult<Vec<u8>> {
         let mut workbook = Workbook::new();
 
         // Fetch all requested datasets
         let datasets = data_sets::Entity::find()
             .all(&self.db)
             .await
-            .context("Failed to fetch datasets")?
+            .map_err(|e| CoreError::internal("Failed to fetch datasets").with_source(e))?
             .into_iter()
             .filter(|ds| dataset_ids.contains(&ds.id))
             .collect::<Vec<_>>();
@@ -222,20 +226,23 @@ impl DataSetBulkService {
             .collect();
 
         if !duplicates.is_empty() {
-            return Err(anyhow::anyhow!(
+            return Err(CoreError::validation(format!(
                 "Cannot export: duplicate dataset names found: {}",
                 duplicates
                     .iter()
                     .map(|s| s.as_str())
                     .collect::<Vec<_>>()
                     .join(", ")
-            ));
+            )));
         }
 
         let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
             let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
-                .context("Failed to parse graph_json during export")?;
+                .map_err(|e| {
+                    CoreError::internal("Failed to parse graph_json during export")
+                        .with_source(e)
+                })?;
             let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
             let mut section_written = false;
             // Create a sheet named with the dataset name
@@ -255,14 +262,26 @@ impl DataSetBulkService {
                         Some(31),
                     );
                     let worksheet = workbook.add_worksheet();
-                    worksheet.set_name(&sheet_name)?;
+                    worksheet.set_name(&sheet_name).map_err(|e| {
+                        CoreError::internal("Failed to set worksheet name").with_source(e)
+                    })?;
 
                     for (row_idx, row_data) in rows.iter().enumerate() {
                         for (col_idx, value) in row_data.iter().enumerate() {
                             if let Ok(num) = value.parse::<f64>() {
-                                worksheet.write_number(row_idx as u32, col_idx as u16, num)?;
+                                worksheet
+                                    .write_number(row_idx as u32, col_idx as u16, num)
+                                    .map_err(|e| {
+                                        CoreError::internal("Failed to write worksheet number")
+                                            .with_source(e)
+                                    })?;
                             } else {
-                                worksheet.write_string(row_idx as u32, col_idx as u16, value)?;
+                                worksheet
+                                    .write_string(row_idx as u32, col_idx as u16, value)
+                                    .map_err(|e| {
+                                        CoreError::internal("Failed to write worksheet string")
+                                            .with_source(e)
+                                    })?;
                             }
                         }
                     }
@@ -280,25 +299,33 @@ impl DataSetBulkService {
                 let sheet_name =
                     Self::build_sheet_name(&dataset.name, "Empty", &mut used_sheet_names, Some(31));
                 let worksheet = workbook.add_worksheet();
-                worksheet.set_name(&sheet_name)?;
-                worksheet.write_string(0, 0, "Dataset contains no nodes, edges, or layers")?;
+                worksheet.set_name(&sheet_name).map_err(|e| {
+                    CoreError::internal("Failed to set worksheet name").with_source(e)
+                })?;
+                worksheet
+                    .write_string(0, 0, "Dataset contains no nodes, edges, or layers")
+                    .map_err(|e| {
+                        CoreError::internal("Failed to write worksheet string").with_source(e)
+                    })?;
             }
         }
 
         // Save to buffer
-        workbook.save_to_buffer().context("Failed to generate XLSX")
+        workbook
+            .save_to_buffer()
+            .map_err(|e| CoreError::internal("Failed to generate XLSX").with_source(e))
     }
 
     /// Export datasets to ODS format
     /// Each dataset becomes a separate sheet named with its name containing CSV data
-    pub async fn export_to_ods(&self, dataset_ids: &[i32]) -> Result<Vec<u8>> {
+    pub async fn export_to_ods(&self, dataset_ids: &[i32]) -> CoreResult<Vec<u8>> {
         let mut workbook = WorkBook::new(locale!("en_US"));
 
         // Fetch all requested datasets
         let datasets = data_sets::Entity::find()
             .all(&self.db)
             .await
-            .context("Failed to fetch datasets")?
+            .map_err(|e| CoreError::internal("Failed to fetch datasets").with_source(e))?
             .into_iter()
             .filter(|ds| dataset_ids.contains(&ds.id))
             .collect::<Vec<_>>();
@@ -317,20 +344,23 @@ impl DataSetBulkService {
             .collect();
 
         if !duplicates.is_empty() {
-            return Err(anyhow::anyhow!(
+            return Err(CoreError::validation(format!(
                 "Cannot export: duplicate dataset names found: {}",
                 duplicates
                     .iter()
                     .map(|s| s.as_str())
                     .collect::<Vec<_>>()
                     .join(", ")
-            ));
+            )));
         }
 
         let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
             let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
-                .context("Failed to parse graph_json during export")?;
+                .map_err(|e| {
+                    CoreError::internal("Failed to parse graph_json during export")
+                        .with_source(e)
+                })?;
             let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
             let mut section_written = false;
 
@@ -381,8 +411,9 @@ impl DataSetBulkService {
 
         // Save to buffer
         let buffer = Vec::new();
-        let result = spreadsheet_ods::write_ods_buf(&mut workbook, buffer)
-            .context("Failed to generate ODS")?;
+        let result = spreadsheet_ods::write_ods_buf(&mut workbook, buffer).map_err(|e| {
+            CoreError::internal("Failed to generate ODS").with_source(e)
+        })?;
         Ok(result)
     }
 
@@ -392,7 +423,7 @@ impl DataSetBulkService {
         &self,
         project_id: i32,
         xlsx_data: &[u8],
-    ) -> Result<DataSetImportResult> {
+    ) -> CoreResult<DataSetImportResult> {
         use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
         use std::io::Cursor;
 
@@ -401,7 +432,7 @@ impl DataSetBulkService {
         let cursor = Cursor::new(xlsx_data);
         let mut workbook: Xlsx<_> = open_workbook_from_rs(cursor).map_err(|e| {
             tracing::error!("Failed to open XLSX: {:?}", e);
-            anyhow::anyhow!("Failed to open XLSX file: {:?}", e)
+            CoreError::validation("Failed to open XLSX file")
         })?;
 
         let mut created_count = 0;
@@ -443,7 +474,10 @@ impl DataSetBulkService {
 
                 // Infer data type
                 let data_type = Self::infer_data_type(&sheet_name, &headers).ok_or_else(|| {
-                    anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name)
+                    CoreError::validation(format!(
+                        "Could not infer data type for sheet: {}",
+                        sheet_name
+                    ))
                 })?;
 
                 tracing::info!("Inferred data type: {:?}", data_type);
@@ -459,7 +493,10 @@ impl DataSetBulkService {
                     .filter(data_sets::Column::ProjectId.eq(project_id))
                     .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
-                    .await?
+                    .await
+                    .map_err(|e| {
+                        CoreError::internal("Failed to load datasets").with_source(e)
+                    })?
                 {
                     tracing::info!(
                         "Found existing dataset '{}' (id: {}) - updating",
@@ -510,7 +547,7 @@ impl DataSetBulkService {
         &self,
         project_id: i32,
         ods_data: &[u8],
-    ) -> Result<DataSetImportResult> {
+    ) -> CoreResult<DataSetImportResult> {
         use calamine::{open_workbook_from_rs, Data, Ods, Reader};
         use std::io::Cursor;
 
@@ -519,7 +556,7 @@ impl DataSetBulkService {
         let cursor = Cursor::new(ods_data);
         let mut workbook: Ods<_> = open_workbook_from_rs(cursor).map_err(|e| {
             tracing::error!("Failed to open ODS: {:?}", e);
-            anyhow::anyhow!("Failed to open ODS file: {:?}", e)
+            CoreError::validation("Failed to open ODS file")
         })?;
 
         let mut created_count = 0;
@@ -561,7 +598,10 @@ impl DataSetBulkService {
 
                 // Infer data type
                 let data_type = Self::infer_data_type(&sheet_name, &headers).ok_or_else(|| {
-                    anyhow::anyhow!("Could not infer data type for sheet: {}", sheet_name)
+                    CoreError::validation(format!(
+                        "Could not infer data type for sheet: {}",
+                        sheet_name
+                    ))
                 })?;
 
                 tracing::info!("Inferred data type: {:?}", data_type);
@@ -577,7 +617,10 @@ impl DataSetBulkService {
                     .filter(data_sets::Column::ProjectId.eq(project_id))
                     .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
-                    .await?
+                    .await
+                    .map_err(|e| {
+                        CoreError::internal("Failed to load datasets").with_source(e)
+                    })?
                 {
                     tracing::info!(
                         "Found existing dataset '{}' (id: {}) - updating",
