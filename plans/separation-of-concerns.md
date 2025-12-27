@@ -864,9 +864,10 @@ After refactoring, support multiple deployment modes:
 - Added project-scoped authorization checks across project/plan/plan DAG/graph/dataset mutations using `AuthorizationService` to prevent cross-project access (`layercake-core/src/app_context/mod.rs`, `layercake-core/src/app_context/project_operations.rs`, `layercake-core/src/app_context/plan_operations.rs`, `layercake-core/src/app_context/plan_dag_operations.rs`, `layercake-core/src/app_context/graph_operations.rs`, `layercake-core/src/app_context/data_set_operations.rs`).
 - Added AuthorizationService session/role integration coverage and actor role resolution tests (`layercake-core/tests/auth/authorization_service_tests.rs`, `layercake-server/src/graphql/context.rs`).
 - Removed legacy StructuredError CoreError adapter in favor of `core_error_to_graphql_error` (`layercake-server/src/graphql/errors.rs`).
+- Validated GraphQL golden error baselines after auth updates (`cargo test -p layercake-server --test golden_errors`).
 
 **Next steps**
-- Re-validate golden error baselines after auth changes (`cargo test -p layercake-server --test golden_errors`).
+- Review remaining Stage 2 tasks and queue follow-up items if needed.
 
 #### Tasks
 
