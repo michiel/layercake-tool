@@ -4,9 +4,12 @@ use crate::graphql::chat_manager::ChatManager;
 use layercake_core::auth::Actor;
 use layercake_core::app_context::AppContext;
 use crate::chat::ChatConfig;
+use layercake_core::database::entities::project_collaborators;
 use layercake_core::services::{
-    ExportService, GraphService, ImportService, PlanDagService, SystemSettingsService,
+    authorization::AuthorizationService, ExportService, GraphService, ImportService, PlanDagService,
+    SystemSettingsService,
 };
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
@@ -145,7 +148,10 @@ impl GraphQLContext {
     pub fn get_session_id(&self, ctx: &async_graphql::Context<'_>) -> String {
         // In a real implementation, this would come from HTTP headers
         // For now, use a simple approach with context extensions
-        ctx.data_opt::<String>().cloned().unwrap_or_else(|| {
+        ctx.data_opt::<RequestSession>()
+            .map(|session| session.0.clone())
+            .or_else(|| ctx.data_opt::<String>().cloned())
+            .unwrap_or_else(|| {
             // Generate a session ID based on connection info
             format!(
                 "browser_session_{}",
@@ -181,7 +187,43 @@ impl GraphQLContext {
 
     pub async fn actor_for_request(&self, ctx: &async_graphql::Context<'_>) -> Actor {
         let session_id = self.get_session_id(ctx);
+        let auth_service = AuthorizationService::new(self.db.clone());
+
+        if let Ok(user) = auth_service.get_user_from_session(&session_id).await {
+            if let Some(role) = self.resolve_user_role(user.id).await {
+                return Actor::user(user.id).with_role(role);
+            }
+
+            return Actor::user(user.id);
+        }
+
         let session = self.session_manager.get_or_create_session(&session_id).await;
-        Actor::user(session.user_id).with_role("editor")
+        Actor::user(session.user_id).with_role("viewer")
+    }
+
+    async fn resolve_user_role(&self, user_id: i32) -> Option<String> {
+        let collaborations = project_collaborators::Entity::find()
+            .filter(project_collaborators::Column::UserId.eq(user_id))
+            .filter(project_collaborators::Column::IsActive.eq(true))
+            .filter(project_collaborators::Column::InvitationStatus.eq("accepted"))
+            .all(&self.db)
+            .await
+            .ok()?;
+
+        let mut best_role = None;
+        for collab in collaborations {
+            match collab.role.to_lowercase().as_str() {
+                "owner" => return Some("owner".to_string()),
+                "editor" => best_role = Some("editor".to_string()),
+                "viewer" => {
+                    if best_role.is_none() {
+                        best_role = Some("viewer".to_string());
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        best_role
     }
 }
