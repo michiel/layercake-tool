@@ -5,6 +5,7 @@ use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
 };
 
+use crate::auth::Actor;
 use crate::database::entities::{project_collaborators, projects, users};
 use crate::errors::{CoreError, CoreResult};
 use crate::services::{AuthorizationService, ValidationService};
@@ -22,19 +23,26 @@ impl CollaborationService {
         Self { db, auth_service }
     }
 
+    fn require_user_id(actor: &Actor) -> CoreResult<i32> {
+        actor
+            .user_id
+            .ok_or_else(|| CoreError::unauthorized("User is not authenticated"))
+    }
+
     /// Invite a user to collaborate on a project
     pub async fn invite_collaborator(
         &self,
-        inviter_id: i32,
+        actor: &Actor,
         project_id: i32,
         invitee_email: &str,
         role: &str,
     ) -> CoreResult<project_collaborators::Model> {
+        let inviter_id = Self::require_user_id(actor)?;
         // Check if inviter has admin access
         self.auth_service
             .check_project_admin_access(inviter_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(role)
@@ -93,9 +101,10 @@ impl CollaborationService {
     /// Accept a collaboration invitation
     pub async fn accept_invitation(
         &self,
-        user_id: i32,
+        actor: &Actor,
         collaboration_id: i32,
     ) -> CoreResult<project_collaborators::Model> {
+        let user_id = Self::require_user_id(actor)?;
         // Find collaboration
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&self.db)
@@ -134,9 +143,10 @@ impl CollaborationService {
     /// Decline a collaboration invitation
     pub async fn decline_invitation(
         &self,
-        user_id: i32,
+        actor: &Actor,
         collaboration_id: i32,
     ) -> CoreResult<project_collaborators::Model> {
+        let user_id = Self::require_user_id(actor)?;
         // Find collaboration
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&self.db)
@@ -173,15 +183,16 @@ impl CollaborationService {
     /// Remove a collaborator from a project
     pub async fn remove_collaborator(
         &self,
-        admin_id: i32,
+        actor: &Actor,
         project_id: i32,
         collaborator_id: i32,
     ) -> CoreResult<()> {
+        let admin_id = Self::require_user_id(actor)?;
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
@@ -214,16 +225,17 @@ impl CollaborationService {
     /// Update collaborator role
     pub async fn update_collaborator_role(
         &self,
-        admin_id: i32,
+        actor: &Actor,
         project_id: i32,
         collaborator_id: i32,
         new_role: &str,
     ) -> CoreResult<project_collaborators::Model> {
+        let admin_id = Self::require_user_id(actor)?;
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(new_role)
@@ -261,8 +273,9 @@ impl CollaborationService {
     /// Get pending invitations for a user
     pub async fn get_pending_invitations(
         &self,
-        user_id: i32,
+        actor: &Actor,
     ) -> CoreResult<Vec<(project_collaborators::Model, projects::Model)>> {
+        let user_id = Self::require_user_id(actor)?;
         let invitations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::InvitationStatus.eq("pending"))
@@ -282,8 +295,9 @@ impl CollaborationService {
     /// Get user's collaborations
     pub async fn get_user_collaborations(
         &self,
-        user_id: i32,
+        actor: &Actor,
     ) -> CoreResult<Vec<(project_collaborators::Model, projects::Model)>> {
+        let user_id = Self::require_user_id(actor)?;
         let collaborations = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
             .filter(project_collaborators::Column::IsActive.eq(true))
@@ -303,7 +317,8 @@ impl CollaborationService {
     }
 
     /// Leave a project (for non-owners)
-    pub async fn leave_project(&self, user_id: i32, project_id: i32) -> CoreResult<()> {
+    pub async fn leave_project(&self, actor: &Actor, project_id: i32) -> CoreResult<()> {
+        let user_id = Self::require_user_id(actor)?;
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
             .filter(project_collaborators::Column::UserId.eq(user_id))
@@ -351,15 +366,16 @@ impl CollaborationService {
     /// Transfer project ownership
     pub async fn transfer_ownership(
         &self,
-        current_owner_id: i32,
+        actor: &Actor,
         project_id: i32,
         new_owner_id: i32,
     ) -> CoreResult<()> {
+        let current_owner_id = Self::require_user_id(actor)?;
         // Check if current user is the owner
         self.auth_service
             .check_project_admin_access(current_owner_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Find new owner's collaboration
         let new_owner_collaboration = project_collaborators::Entity::find()
@@ -404,15 +420,6 @@ impl CollaborationService {
             .map_err(|e| CoreError::internal(format!("Failed to update current owner: {}", e)))?;
 
         Ok(())
-    }
-}
-
-fn map_auth_error(err: anyhow::Error) -> CoreError {
-    let message = err.to_string();
-    if message.contains("Database error") {
-        CoreError::internal(message)
-    } else {
-        CoreError::forbidden(message)
     }
 }
 

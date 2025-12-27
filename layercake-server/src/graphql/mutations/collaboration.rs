@@ -1,7 +1,8 @@
 use async_graphql::*;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::EntityTrait;
 
 use layercake_core::database::entities::{project_collaborators, users};
+use layercake_core::services::collaboration_service::CollaborationService;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
@@ -20,51 +21,13 @@ impl CollaborationMutation {
         input: InviteCollaboratorInput,
     ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let service = CollaborationService::new(context.db.clone());
 
-        // Find user by email
-        let user = users::Entity::find()
-            .filter(users::Column::Email.eq(&input.email))
-            .one(&context.db)
+        let collaboration = service
+            .invite_collaborator(&actor, input.project_id, &input.email, &input.role)
             .await
-            .map_err(|e| StructuredError::database("users::Entity::find (invite email)", e))?
-            .ok_or_else(|| StructuredError::not_found("User", &input.email))?;
-
-        // Check if user is already a collaborator
-        let existing = project_collaborators::Entity::find()
-            .filter(project_collaborators::Column::ProjectId.eq(input.project_id))
-            .filter(project_collaborators::Column::UserId.eq(user.id))
-            .filter(project_collaborators::Column::IsActive.eq(true))
-            .one(&context.db)
-            .await
-            .map_err(|e| {
-                StructuredError::database("project_collaborators::Entity::find (existing)", e)
-            })?;
-
-        if existing.is_some() {
-            return Err(StructuredError::conflict(
-                "ProjectCollaborator",
-                "User is already a collaborator on this project",
-            ));
-        }
-
-        // Parse role
-        let role =
-            layercake_core::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-                .map_err(|_| StructuredError::validation("role", "Invalid role"))?;
-
-        // Create collaboration
-        // Note: In a real app, you'd get invited_by from the authentication context
-        let collaboration = project_collaborators::ActiveModel::new(
-            input.project_id,
-            user.id,
-            role,
-            Some(1), // TODO: Get from auth context
-        );
-
-        let collaboration = collaboration
-            .insert(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::insert", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ProjectCollaborator::from(collaboration))
     }
@@ -76,19 +39,13 @@ impl CollaborationMutation {
         collaboration_id: i32,
     ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let service = CollaborationService::new(context.db.clone());
 
-        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
-            .one(&context.db)
+        let updated = service
+            .accept_invitation(&actor, collaboration_id)
             .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
-
-        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
-        collaboration_active = collaboration_active.accept_invitation();
-        let updated = collaboration_active
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -100,19 +57,13 @@ impl CollaborationMutation {
         collaboration_id: i32,
     ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let service = CollaborationService::new(context.db.clone());
 
-        let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
-            .one(&context.db)
+        let updated = service
+            .decline_invitation(&actor, collaboration_id)
             .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
-            .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
-
-        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
-        collaboration_active = collaboration_active.decline_invitation();
-        let updated = collaboration_active
-            .update(&context.db)
-            .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -124,6 +75,8 @@ impl CollaborationMutation {
         input: UpdateCollaboratorRoleInput,
     ) -> Result<ProjectCollaborator> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let service = CollaborationService::new(context.db.clone());
 
         let collaboration = project_collaborators::Entity::find_by_id(input.collaborator_id)
             .one(&context.db)
@@ -131,17 +84,15 @@ impl CollaborationMutation {
             .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
             .ok_or_else(|| StructuredError::not_found("Collaboration", input.collaborator_id))?;
 
-        // Parse new role
-        let role =
-            layercake_core::database::entities::project_collaborators::ProjectRole::from_str(&input.role)
-                .map_err(|_| StructuredError::validation("role", "Invalid role"))?;
-
-        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
-        collaboration_active = collaboration_active.update_role(role);
-        let updated = collaboration_active
-            .update(&context.db)
+        let updated = service
+            .update_collaborator_role(
+                &actor,
+                collaboration.project_id,
+                collaboration.user_id,
+                &input.role,
+            )
             .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(ProjectCollaborator::from(updated))
     }
@@ -149,6 +100,8 @@ impl CollaborationMutation {
     /// Remove collaborator from project
     async fn remove_collaborator(&self, ctx: &Context<'_>, collaboration_id: i32) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let service = CollaborationService::new(context.db.clone());
 
         let collaboration = project_collaborators::Entity::find_by_id(collaboration_id)
             .one(&context.db)
@@ -156,28 +109,29 @@ impl CollaborationMutation {
             .map_err(|e| StructuredError::database("project_collaborators::Entity::find_by_id", e))?
             .ok_or_else(|| StructuredError::not_found("Collaboration", collaboration_id))?;
 
-        let mut collaboration_active: project_collaborators::ActiveModel = collaboration.into();
-        collaboration_active = collaboration_active.deactivate();
-        collaboration_active
-            .update(&context.db)
+        service
+            .remove_collaborator(&actor, collaboration.project_id, collaboration.user_id)
             .await
-            .map_err(|e| StructuredError::database("project_collaborators::Entity::update", e))?;
+            .map_err(StructuredError::from_core_error)?;
 
         Ok(true)
     }
 
     /// Join a project for collaboration
     async fn join_project_collaboration(&self, ctx: &Context<'_>, project_id: i32) -> Result<bool> {
-        let _context = ctx.data::<GraphQLContext>()?;
-
-        // TODO: Extract from authenticated user context when authentication is implemented
-        let (user_id, user_name, avatar_color) = {
-            (
-                "demo_user".to_string(),
-                "Demo User".to_string(),
-                "#3B82F6".to_string(),
-            )
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let user_id = actor
+            .user_id
+            .ok_or_else(|| StructuredError::unauthorized("User is not authenticated"))?;
+        let (user_name, avatar_color) = match users::Entity::find_by_id(user_id)
+            .one(&context.db)
+            .await
+        {
+            Ok(Some(user)) => (user.display_name, user.avatar_color),
+            _ => (format!("User {}", user_id), "#3B82F6".to_string()),
         };
+        let user_id = format!("user_{}", user_id);
 
         let plan_id = format!("project_{}", project_id);
 
@@ -215,16 +169,19 @@ impl CollaborationMutation {
         ctx: &Context<'_>,
         project_id: i32,
     ) -> Result<bool> {
-        let _context = ctx.data::<GraphQLContext>()?;
-
-        // TODO: Extract from authenticated user context when authentication is implemented
-        let (user_id, user_name, avatar_color) = {
-            (
-                "demo_user".to_string(),
-                "Demo User".to_string(),
-                "#3B82F6".to_string(),
-            )
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let user_id = actor
+            .user_id
+            .ok_or_else(|| StructuredError::unauthorized("User is not authenticated"))?;
+        let (user_name, avatar_color) = match users::Entity::find_by_id(user_id)
+            .one(&context.db)
+            .await
+        {
+            Ok(Some(user)) => (user.display_name, user.avatar_color),
+            _ => (format!("User {}", user_id), "#3B82F6".to_string()),
         };
+        let user_id = format!("user_{}", user_id);
 
         let plan_id = format!("project_{}", project_id);
 
