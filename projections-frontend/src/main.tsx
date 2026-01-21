@@ -1,3 +1,4 @@
+import './polyfills/webgpu'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ApolloClient, InMemoryCache, split } from '@apollo/client/core'
