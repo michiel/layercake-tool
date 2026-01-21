@@ -13,8 +13,6 @@ import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
-import { ProjectChatPage } from './pages/ProjectChatPage'
-import { ChatLogsPage } from './pages/ChatLogsPage'
 import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { CodeAnalysisPage } from './pages/CodeAnalysisPage'
 import { CodeAnalysisDetailPage } from './pages/CodeAnalysisDetailPage'
@@ -34,8 +32,6 @@ import { Switch } from './components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
 import { Spinner } from './components/ui/spinner'
-import { ChatProvider } from './components/chat/ChatProvider'
-import { useRegisterChatContext } from './hooks/useRegisterChatContext'
 import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
 import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE, RESET_PROJECT } from './graphql/libraryItems'
@@ -309,18 +305,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
     const experimentalChildren: ProjectNavChild[] = [
       {
-        key: 'chat',
-        label: 'Chat',
-        route: `/projects/${projectId}/chat`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/chat`),
-      },
-      {
-        key: 'chat-logs',
-        label: 'Chat logs',
-        route: `/projects/${projectId}/chat/logs`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/chat/logs`),
-      },
-      {
         key: 'knowledge-base',
         label: 'Knowledge base',
         route: `/projects/${projectId}/data-acquisition/knowledge-base`,
@@ -376,7 +360,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         key: 'experimental',
         label: 'Experimental',
         icon: <IconFlask className="h-4 w-4" />,
-        route: `/projects/${projectId}/chat`,
+        route: `/projects/${projectId}/graphs`,
         matchOptions: { prefix: true },
         children: experimentalChildren,
       }),
@@ -2023,21 +2007,6 @@ const PlanEditorPage = () => {
   const plan = planData?.plan
   const planBelongsToProject = plan && plan.projectId === selectedProject?.id
 
-  const contextDescription = useMemo(() => {
-    if (projectsLoading || planLoading) {
-      return 'Loading plan editor'
-    }
-    if (!selectedProject) {
-      return projectId ? `Plan editor unavailable for project ${projectId}` : 'Plan editor'
-    }
-    if (!plan || !planBelongsToProject) {
-      return `Plan editor unavailable`
-    }
-    return `Editing ${plan.name} for ${selectedProject.name} (#${selectedProject.id})`
-  }, [projectsLoading, planLoading, selectedProject, plan, planBelongsToProject, projectId])
-
-  useRegisterChatContext(contextDescription, selectedProject?.id)
-
   const handleNavigate = (route: string) => {
     navigate(route)
   }
@@ -2171,10 +2140,9 @@ import { StoryPage } from './pages/StoryPage'
 // Main App component with routing
 function App() {
   return (
-    <ChatProvider>
-      <ErrorBoundary>
-        <AppLayout>
-          <Routes>
+    <ErrorBoundary>
+      <AppLayout>
+        <Routes>
             <Route path="/" element={
               <ErrorBoundary>
                 <HomePage />
@@ -2265,16 +2233,6 @@ function App() {
               <ProjectArtefactsPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/chat" element={
-            <ErrorBoundary>
-              <ProjectChatPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/chat/logs" element={
-            <ErrorBoundary>
-              <ChatLogsPage />
-            </ErrorBoundary>
-          } />
           <Route path="/projects/:projectId/graph/:graphId/edit" element={
             <ErrorBoundary>
               <GraphEditorPage />
@@ -2332,9 +2290,8 @@ function App() {
             </ErrorBoundary>
           } />
         </Routes>
-        </AppLayout>
-      </ErrorBoundary>
-    </ChatProvider>
+      </AppLayout>
+    </ErrorBoundary>
   )
 }
 

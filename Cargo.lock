@@ -3533,7 +3533,6 @@ dependencies = [
  "nu-ansi-term 0.49.0",
  "regex",
  "rig-core",
- "rmcp",
  "sea-orm",
  "sea-orm-migration",
  "serde",
@@ -3709,7 +3708,6 @@ dependencies = [
  "once_cell",
  "regex",
  "rig-core",
- "rmcp",
  "rust_xlsxwriter",
  "sea-orm",
  "sea-orm-migration",
@@ -5865,7 +5863,6 @@ dependencies = [
  "ordered-float 5.1.0",
  "pin-project-lite",
  "reqwest",
- "rmcp",
  "schemars 1.0.4",
  "serde",
  "serde_json",
@@ -5917,45 +5914,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "rmcp"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eaa07b85b779d1e1df52dd79f6c6bffbe005b191f07290136cc42a142da3409a"
-dependencies = [
- "async-trait",
- "base64 0.22.1",
- "chrono",
- "futures",
- "http",
- "paste",
- "pin-project-lite",
- "reqwest",
- "rmcp-macros",
- "schemars 1.0.4",
- "serde",
- "serde_json",
- "sse-stream",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "rmcp-macros"
-version = "0.9.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f6fa09933cac0d0204c8a5d647f558425538ed6a0134b1ebb1ae4dc00c96db3"
-dependencies = [
- "darling 0.21.3",
- "proc-macro2",
- "quote",
- "serde_json",
- "syn 2.0.106",
 ]
 
 [[package]]
@@ -6251,7 +6209,6 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82d20c4491bc164fa2f6c5d44565947a52ad80b9505d8e36f8d54c27c739fcd0"
 dependencies = [
- "chrono",
  "dyn-clone",
  "ref-cast",
  "schemars_derive 1.0.4",
@@ -7181,19 +7138,6 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
-]
-
-[[package]]
-name = "sse-stream"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb4dc4d33c68ec1f27d386b5610a351922656e1fdf5c05bbaad930cd1519479a"
-dependencies = [
- "bytes",
- "futures-util",
- "http-body",
- "http-body-util",
- "pin-project-lite",
 ]
 
 [[package]]

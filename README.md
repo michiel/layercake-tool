@@ -11,20 +11,22 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 - Data Source Management – import CSV/TSV assets, persist raw payloads, and replay transformations through the plan pipeline.
 - Desktop & Web Experiences – ship a self-contained Tauri desktop app or run the Vite-powered web UI against the same Rust backend.
 - Real-Time Collaboration – share presence, edit history, and live cursor state through the GraphQL + WebSocket collaboration layer.
-- Agentic Workflows – expose Layercake projects, graphs, and transformations to MCP-compliant assistants (Claude, Ollama, etc.) for chat-driven analysis and tooling.
 - Automation & Exporters – run plans headlessly from the CLI, watch for file changes, and emit PlantUML, Graphviz, Mermaid, GML, or custom Handlebars templates.
-- Persistent Storage & Audit – all projects, DAGs, edits, chat credentials, and plan runs are stored in SQLite via SeaORM migrations.
+- Persistent Storage & Audit – all projects, DAGs, edits, and plan runs are stored in SQLite via SeaORM migrations.
+
+## Removed Features
+- The chat, RAG, and MCP surfaces have been pulled from this workspace so the product now focuses on the plan editor, graph tools, data acquisition, and exporter flows.
 
 ## Repository at a Glance
 
 | Path | Purpose |
 |------|---------|
-| `layercake-core/` | Rust library crate with core plan/runtime logic, services, database access, exporters, and MCP primitives. |
+| `layercake-core/` | Rust library crate with core plan/runtime logic, services, database access, and exporter primitives. |
 | `layercake-cli/` | Rust CLI binary for plan execution, generators, migrations, updates, and the interactive console. |
-| `layercake-server/` | Rust HTTP/GraphQL server binary for the web UI, collaboration, and MCP endpoints. |
+| `layercake-server/` | Rust HTTP/GraphQL server binary for the web UI and collaboration endpoints. |
 | `frontend/` | Vite + React + Mantine UI with ReactFlow-based plan and graph editors. |
 | `src-tauri/` | Tauri 2 shell that embeds the backend, manages SQLite files, and ships the desktop app. |
-| `external-modules/` | Optional integrations (e.g. `axum-mcp` transport helpers). |
+| `external-modules/` | Optional integrations (e.g. custom connectors and tooling helpers). |
 | `resources/` | Sample projects, Handlebars templates, reference exports, and shared assets. |
 | `docs/` | Architecture notes, review logs, and migration plans. |
 | `scripts/` | Dev/build helpers (`dev.sh`, platform builds, installers). |
@@ -63,7 +65,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
    npm run frontend:dev
    ```
 
-Open http://localhost:1422 to access the plan editor, data source manager, graph editors, chat workspace, and system settings.
+Open http://localhost:1422 to access the plan editor, data source manager, graph editors, and system settings.
 
 The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scripts that wire up the services, enforce ports (`3001`/`1422`), initialize the database, and stream logs.
 
@@ -95,7 +97,7 @@ The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scri
   cargo run --bin layercake -- db migrate fresh
   ```
 
-The CLI ships optional features for the interactive console and chat credential manager (enabled in default builds). See `cargo run --bin layercake -- --help` for the complete command tree.
+The CLI ships optional features for the interactive console (enabled in default builds). See `cargo run --bin layercake -- --help` for the complete command tree.
 
 ## Getting Started
 
@@ -130,12 +132,12 @@ cargo build -p layercake-core -p layercake-cli -p layercake-server
 
 ## Working with Projects, Plans, and Graphs
 
-- **Projects** group data sources, plan DAGs, graphs, chat logs, and collaboration sessions.
+- **Projects** group data sources, plan DAGs, graphs, and collaboration sessions.
 - **Plan DAGs** (Plan Visual Editor) orchestrate ingestion, transformation, copy, and export nodes. Changes upstream automatically recompute downstream artifacts.
 - **Graphs** can be edited visually or via tabular controls. Edits are stored as replayable `GraphEdits`, so data refreshes reapply your manual changes.
 - **Data Sources** record raw payloads plus parsed node/edge/layer JSON, enabling repeatable imports.
 - **Exports** use built-in renderers (PlantUML, Graphviz, Mermaid, GML) or custom Handlebars templates located under `resources/library`.
-- **Chat & MCP** integrate with Claude, Gemini, OpenAI, Ollama, and other OpenAI-compatible services. Manage credentials via the System Settings UI or the CLI (`cargo run --bin layercake -- chat-credentials ...`).
+- **Collaboration** uses GraphQL and WebSocket channels to keep multiple clients synchronized on edits, presence, and cursor state.
 
 Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import them through the UI or run the CLI samples to explore the pipeline.
 
@@ -153,7 +155,7 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
 ## Extending Layercake
 
 - **Export Templates** – add Handlebars templates under `resources/library` and register them in the plan DAG to emit custom text or code artifacts.
-- **MCP Tools** – extend `external-modules/axum-mcp` or the server’s `mcp` module to expose additional functions/resources to agentic clients.
+- **GraphQL Schema** – extend `layercake-core/src/graphql` resolvers, mutations, and subscriptions to expose custom project or plan workflows.
 - **Pipeline Stages** – add Rust modules under `layercake-core/src/pipeline` and wire them into plan execution for custom transformations.
 - **Frontend Components** – React components live under `frontend/src/components`; Plan/Graph editors leverage ReactFlow and Mantine for rapid iteration.
 
@@ -165,4 +167,4 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
 - [SPECIFICATION.md](SPECIFICATION.md) – end-to-end product vision, data model, and technology stack.
 - `docs/` – collaboration model, mutation refactors, error handling guides, and architecture discussions.
 
-Layercake is evolving rapidly toward distributed collaborative graph editing and agent-driven workflows. Issues, pull requests, and design discussions are welcome!
+Layercake is evolving rapidly toward distributed collaborative graph editing and automation-focused workflows. Issues, pull requests, and design discussions are welcome!

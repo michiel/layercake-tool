@@ -54,9 +54,7 @@ export const SystemSettingsPage: React.FC = () => {
   const providerCategories = ['OpenAI', 'Anthropic', 'Google Gemini', 'Ollama']
   const topLevelCategories = [
     { key: 'providers', label: 'Providers', categories: providerCategories },
-    { key: 'chat', label: 'Chat', categories: ['Chat'] },
     { key: 'data-acquisition', label: 'Data Acquisition', categories: ['Data Acquisition'] },
-    { key: 'rag', label: 'RAG', categories: ['RAG'] },
   ]
 
   const openEditor = (setting: SystemSetting) => {

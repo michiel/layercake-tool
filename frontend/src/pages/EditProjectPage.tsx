@@ -3,7 +3,6 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { gql } from '@apollo/client'
 import { useMutation, useQuery } from '@apollo/client/react'
 
-import { useRegisterChatContext } from '../hooks/useRegisterChatContext'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 import { Textarea } from '../components/ui/textarea'
@@ -66,13 +65,6 @@ export const EditProjectPage = () => {
       setTags((project.tags ?? []).join(', '))
     }
   }, [project])
-
-  useRegisterChatContext(
-    project
-      ? `Editing project details for ${project.name} (#${project.id})`
-      : 'Editing project details',
-    project?.id,
-  )
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()

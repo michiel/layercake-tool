@@ -16,7 +16,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { CreatePlanModal } from './CreatePlanModal'
 import { EditPlanModal } from './EditPlanModal'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
-import { useRegisterChatContext } from '@/hooks/useRegisterChatContext'
 
 const GET_PROJECT = gql`
   query GetProject($id: Int!) {
@@ -85,11 +84,6 @@ export const PlansPage = () => {
 
   const plans = data?.plans ?? []
   const project = projectData?.project
-
-  useRegisterChatContext(
-    project ? `Managing plans for project ${project.name}` : 'Managing plans',
-    project?.id
-  )
 
   const handleOpenPlan = (plan: Plan) => {
     navigate(`/projects/${plan.projectId}/plans/${plan.id}`)

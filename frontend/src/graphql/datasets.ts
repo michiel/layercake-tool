@@ -565,7 +565,7 @@ export const getOriginDisplayName = (origin: string): string => {
     case 'manual_edit':
       return 'Manual edit'
     case 'rag_agent':
-      return 'RAG Agent'
+      return 'Automated workflow'
     default:
       return 'Unknown'
   }
