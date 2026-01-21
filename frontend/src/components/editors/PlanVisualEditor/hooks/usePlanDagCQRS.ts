@@ -264,29 +264,48 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         return posChanged || idChanged
       })
 
-      // Check if external data has MORE items (additions from other users)
-      // Don't sync when external data has FEWER items (we may have optimistic local changes)
+      // Check if external data has MORE/FEWER items (additions/removals from other users)
       const hasMoreNodes = reactFlowData.nodes.length > nodes.length
       const hasMoreEdges = reactFlowData.edges.length > edges.length
-      const hasSameOrMoreItems = reactFlowData.nodes.length >= nodes.length &&
-                                 reactFlowData.edges.length >= edges.length
+      const hasFewerNodes = reactFlowData.nodes.length < nodes.length
+      const hasFewerEdges = reactFlowData.edges.length < edges.length
+
+      const buildEdgeSignature = (edge: Edge) => {
+        const metadata = (edge.data as any)?.metadata
+        return [
+          edge.id,
+          edge.source,
+          edge.target,
+          metadata?.dataType ?? '',
+          metadata?.label ?? edge.label ?? ''
+        ].join('|')
+      }
+
+      const currentEdgeSignatures = new Map(edges.map(edge => [edge.id, buildEdgeSignature(edge)]))
+      const hasEdgeChanges = reactFlowData.edges.some(edge => currentEdgeSignatures.get(edge.id) !== buildEdgeSignature(edge))
 
       // Only sync when:
       // 1. First load (empty)
-      // 2. External data has more items (additions from other users)
+      // 2. External data has more/fewer items (additions/removals from other users)
       // 3. Same count but content changed (updates from other users)
       const shouldSync = hasNewData && (
         isCurrentEmpty ||
         hasMoreNodes ||
         hasMoreEdges ||
-        (hasSameOrMoreItems && hasNodeChanges)
+        hasFewerNodes ||
+        hasFewerEdges ||
+        hasNodeChanges ||
+        hasEdgeChanges
       )
 
       if (shouldSync) {
         const reason = isCurrentEmpty ? 'empty' :
                       hasMoreNodes ? 'nodes-added' :
                       hasMoreEdges ? 'edges-added' :
-                      hasNodeChanges ? 'node-changed' : 'unknown'
+                      hasFewerNodes ? 'nodes-removed' :
+                      hasFewerEdges ? 'edges-removed' :
+                      hasNodeChanges ? 'node-changed' :
+                      hasEdgeChanges ? 'edge-changed' : 'unknown'
 
         console.log('[usePlanDagCQRS] Syncing ReactFlow state from external data change:', {
           changeId: reactFlowDataChange.changeId,

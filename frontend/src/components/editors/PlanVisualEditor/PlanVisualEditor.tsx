@@ -231,6 +231,33 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     edgesRef.current = edges
   }, [edges])
 
+  const edgeSignature = useMemo(() => {
+    return edges
+      .map(edge => {
+        const metadata = (edge.data as any)?.metadata
+        return [
+          edge.id,
+          edge.source,
+          edge.target,
+          metadata?.dataType ?? '',
+          metadata?.label ?? edge.label ?? ''
+        ].join('|')
+      })
+      .join('::')
+  }, [edges])
+
+  useEffect(() => {
+    setNodes((currentNodes) =>
+      currentNodes.map(node => ({
+        ...node,
+        data: {
+          ...node.data,
+          edges
+        }
+      }))
+    )
+  }, [edgeSignature, edges, setNodes])
+
   useEffect(() => {
     if (!focusNodeId) return
     if (lastFocusedNodeIdRef.current === focusNodeId) return
@@ -312,6 +339,20 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // Remove edges connected to this node
       setEdges((eds) => eds.filter(edge => edge.source !== nodeId && edge.target !== nodeId))
 
+      // Keep Plan DAG state in sync to prevent stale external sync overwrites
+      updatePlanDagOptimistically((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          nodes: current.nodes.filter(node => node.id !== nodeId),
+          edges: current.edges.filter(edge => edge.source !== nodeId && edge.target !== nodeId),
+          metadata: {
+            ...current.metadata,
+            lastModified: new Date().toISOString()
+          }
+        }
+      })
+
       // Persist deletions to backend
       mutations.deleteNode(nodeId)
       backendEdgeIdsToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
@@ -319,7 +360,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // Re-enable external syncs after a short delay to allow mutations to complete
       setTimeout(() => setDragging(false), 100)
     }
-  }, [setNodes, setEdges, mutations, setDragging, edges, deleteProjectionMutation])
+  }, [setNodes, setEdges, mutations, setDragging, edges, deleteProjectionMutation, updatePlanDagOptimistically])
 
   // Switch to plan-dag-canvas document when component mounts
   useEffect(() => {
@@ -513,6 +554,14 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
           )
         }
 
+        updatePlanDagOptimistically(() => ({
+          ...updatedPlanDag,
+          metadata: {
+            ...updatedPlanDag.metadata,
+            lastModified: new Date().toISOString()
+          }
+        }))
+
         // Update the entire plan DAG (this is how edge updates work)
         await mutations.updatePlanDag(updatedPlanDag)
         console.log('Edge updated successfully:', edgeId)
@@ -520,7 +569,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         console.error('Failed to update edge:', error)
       }
     },
-    [planDag, mutations]
+    [planDag, mutations, updatePlanDagOptimistically]
   )
 
   // Edge reconnection handlers
@@ -594,11 +643,37 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       // The edge ID in backend is stored in originalEdge.id
       const oldEdgeId = (oldEdge.data as any)?.originalEdge?.id || oldEdge.id
       mutations.deleteEdge(oldEdgeId)
-      mutations.addEdge(newEdge)
+      updatePlanDagOptimistically((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          edges: current.edges.filter(edge => edge.id !== oldEdgeId && edge.id !== oldEdge.id),
+          metadata: {
+            ...current.metadata,
+            lastModified: new Date().toISOString()
+          }
+        }
+      })
+      mutations.addEdge(newEdge).then((createdEdge) => {
+        updatePlanDagOptimistically((current) => {
+          if (!current) return current
+          if (current.edges.some(edge => edge.id === createdEdge.id)) {
+            return current
+          }
+          return {
+            ...current,
+            edges: [...current.edges, createdEdge],
+            metadata: {
+              ...current.metadata,
+              lastModified: new Date().toISOString()
+            }
+          }
+        })
+      })
 
       console.log('Edge reconnected - deleted:', oldEdgeId, 'created:', newEdge.id)
     },
-    [readonly, setEdges, mutations, nodes, edges]
+    [readonly, setEdges, mutations, nodes, edges, updatePlanDagOptimistically]
   )
 
   const handleReconnectEnd = useCallback(
@@ -607,12 +682,23 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         // Edge was dropped on empty space - delete it
         const edgeIdToDelete = (edge.data as any)?.originalEdge?.id || edge.id
         setEdges((eds) => eds.filter((e) => e.id !== edge.id))
+        updatePlanDagOptimistically((current) => {
+          if (!current) return current
+          return {
+            ...current,
+            edges: current.edges.filter(e => e.id !== edgeIdToDelete && e.id !== edge.id),
+            metadata: {
+              ...current.metadata,
+              lastModified: new Date().toISOString()
+            }
+          }
+        })
         mutations.deleteEdge(edgeIdToDelete)
         console.log('Edge deleted on drop:', edgeIdToDelete)
       }
       edgeReconnectSuccessful.current = true
     },
-    [readonly, setEdges, mutations]
+    [readonly, setEdges, mutations, updatePlanDagOptimistically]
   )
 
   // Handle edge changes
@@ -639,6 +725,19 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
             // Remove from local state immediately for instant visual feedback
             setEdges((eds) => eds.filter((e) => e.id !== change.id))
 
+            // Keep Plan DAG state in sync to prevent stale external sync overwrites
+            updatePlanDagOptimistically((current) => {
+              if (!current) return current
+              return {
+                ...current,
+                edges: current.edges.filter(e => e.id !== backendEdgeId && e.id !== change.id),
+                metadata: {
+                  ...current.metadata,
+                  lastModified: new Date().toISOString()
+                }
+              }
+            })
+
             // Persist deletion to backend
             mutations.deleteEdge(backendEdgeId)
             console.log('Edge deleted via DEL key:', backendEdgeId)
@@ -651,7 +750,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       })
     },
-    [onEdgesChange, mutations, onEdgeSelect, readonly, planDagState.performanceMonitor, planDag, updateManager, edges, setEdges]
+    [onEdgesChange, mutations, onEdgeSelect, readonly, planDagState.performanceMonitor, planDag, updateManager, edges, setEdges, updatePlanDagOptimistically]
   )
 
   // Handle new connections
@@ -739,14 +838,29 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       }
 
       // Don't suppress sync during edge creation - we need to see updates
-      mutations.addEdge(graphqlEdge).catch(err => {
+      mutations.addEdge(graphqlEdge).then((createdEdge) => {
+        updatePlanDagOptimistically((current) => {
+          if (!current) return current
+          if (current.edges.some(edge => edge.id === createdEdge.id)) {
+            return current
+          }
+          return {
+            ...current,
+            edges: [...current.edges, createdEdge],
+            metadata: {
+              ...current.metadata,
+              lastModified: new Date().toISOString()
+            }
+          }
+        })
+      }).catch(err => {
         console.error('[PlanVisualEditor] Failed to create edge:', err)
         // Remove optimistic edge on failure
         setEdges((eds) => eds.filter(e => e.id !== newEdge.id))
         alert(`Failed to create connection: ${err.message}`)
       })
     },
-[nodes, edges, readonly, mutations, setEdges]
+    [nodes, edges, readonly, mutations, setEdges, updatePlanDagOptimistically]
   )
 
   // Validate connections in real-time during drag for visual feedback
@@ -792,6 +906,26 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
             : node
         )
       )
+
+      updatePlanDagOptimistically((current) => {
+        if (!current) return current
+        return {
+          ...current,
+          nodes: current.nodes.map(node =>
+            node.id === nodeId
+              ? {
+                  ...node,
+                  config: preparedConfig,
+                  metadata: sanitizedMetadata
+                }
+              : node
+          ),
+          metadata: {
+            ...current.metadata,
+            lastModified: new Date().toISOString()
+          }
+        }
+      })
 
       const nodeRecord = nodesRef.current.find((node) => node.id === nodeId)
       const nodeType = nodeRecord?.data?.nodeType as PlanDagNodeType | undefined
@@ -844,6 +978,26 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
             )
           )
 
+          updatePlanDagOptimistically((current) => {
+            if (!current) return current
+            return {
+              ...current,
+              nodes: current.nodes.map(node =>
+                node.id === nodeId
+                  ? {
+                      ...node,
+                      config: serverConfig,
+                      metadata: serverMetadata
+                    }
+                  : node
+              ),
+              metadata: {
+                ...current.metadata,
+                lastModified: new Date().toISOString()
+              }
+            }
+          })
+
           console.log('[PlanVisualEditor] Node configuration synchronized with backend:', nodeId)
         }
       } catch (error: any) {
@@ -851,7 +1005,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         alert(`Failed to update node configuration: ${error.message || error}`)
       }
     },
-    [handleNodeDelete, handleNodeEdit, mutations, setNodes, updateGraphNameMutation]
+    [handleNodeDelete, handleNodeEdit, mutations, setNodes, updateGraphNameMutation, updatePlanDagOptimistically]
   )
 
   // Handle viewport changes to track current zoom/pan state
@@ -955,6 +1109,21 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
 
         // Add the node to the ReactFlow state with backend ID
         setNodes((nds) => nds.concat(newNode));
+
+        updatePlanDagOptimistically((current) => {
+          if (!current) return current
+          if (current.nodes.some(node => node.id === backendNodeId)) {
+            return current
+          }
+          return {
+            ...current,
+            nodes: [...current.nodes, createdNode],
+            metadata: {
+              ...current.metadata,
+              lastModified: new Date().toISOString()
+            }
+          }
+        })
       }).catch(async (err) => {
         console.error('Failed to add node to database:', err);
 
@@ -992,7 +1161,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       });
     },
-    [screenToFlowPosition, setNodes, handleNodeEdit, handleNodeDelete, mutations, projectId]
+    [screenToFlowPosition, setNodes, handleNodeEdit, handleNodeDelete, mutations, projectId, updatePlanDagOptimistically]
   );
 
   const handlePointerDrop = (nodeType: PlanDagNodeType, position: { x: number, y: number }) => {
@@ -1028,6 +1197,21 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       };
       setNodes((nds) => nds.concat(newNode));
+
+      updatePlanDagOptimistically((current) => {
+        if (!current) return current
+        if (current.nodes.some(node => node.id === backendNodeId)) {
+          return current
+        }
+        return {
+          ...current,
+          nodes: [...current.nodes, createdNode],
+          metadata: {
+            ...current.metadata,
+            lastModified: new Date().toISOString()
+          }
+        }
+      })
     }).catch(async (err) => {
       console.error('Failed to add node to database:', err);
       if (err.message?.includes('Plan not found for project') ||
@@ -1364,6 +1548,21 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
 
         setNodes((nds) => [...nds, reactFlowNode]);
 
+        updatePlanDagOptimistically((current) => {
+          if (!current) return current
+          if (current.nodes.some(node => node.id === createdNode.id)) {
+            return current
+          }
+          return {
+            ...current,
+            nodes: [...current.nodes, createdNode],
+            metadata: {
+              ...current.metadata,
+              lastModified: new Date().toISOString()
+            }
+          }
+        })
+
         // Create edge if we have source connection info
         if (sourceConnection) {
           const sourceNode = nodes.find(n => n.id === sourceConnection.nodeId);
@@ -1426,6 +1625,21 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
                 const exists = eds.some(e => e.id === reactFlowEdge.id)
                 return exists ? eds : [...eds, reactFlowEdge]
               });
+
+              updatePlanDagOptimistically((current) => {
+                if (!current) return current
+                if (current.edges.some(existing => existing.id === createdEdge.id)) {
+                  return current
+                }
+                return {
+                  ...current,
+                  edges: [...current.edges, createdEdge],
+                  metadata: {
+                    ...current.metadata,
+                    lastModified: new Date().toISOString()
+                  }
+                }
+              })
               } else {
                 console.warn('[PlanVisualEditor] Invalid connection:', validation.errorMessage);
               }
@@ -1441,7 +1655,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         connectionSourceRef.current = null;
       }
     },
-    [newNodePosition, mutations, nodes, edges, planDag, readonly, handleNodeEdit, handleNodeDelete, setNodes, setEdges]
+    [newNodePosition, mutations, nodes, edges, planDag, readonly, handleNodeEdit, handleNodeDelete, setNodes, setEdges, updatePlanDagOptimistically]
   );
 
   // Use stable nodeTypes reference directly

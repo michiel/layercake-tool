@@ -16,12 +16,16 @@ export class ReactFlowAdapter {
    * Pure transformation with memoization for performance
    */
   static planDagToReactFlow(planDag: PlanDag): { nodes: Node[], edges: Edge[] } {
-    // Create a more reliable cache key that includes node positions
+    // Create a more reliable cache key that includes node positions and edge metadata
     const positionHash = planDag.nodes
       .map(n => `${n.id}:${n.position.x},${n.position.y}`)
       .join('|')
       .substring(0, 50) // Limit length
-    const cacheKey = `plandag-${planDag.version}-${planDag.nodes.length}-${planDag.edges.length}-${positionHash}`
+    const edgeHash = planDag.edges
+      .map(e => `${e.id}:${e.source}->${e.target}:${e.metadata?.dataType ?? ''}:${e.metadata?.label ?? ''}`)
+      .join('|')
+      .substring(0, 50)
+    const cacheKey = `plandag-${planDag.version}-${planDag.nodes.length}-${planDag.edges.length}-${positionHash}-${edgeHash}`
 
     if (this.CONVERSION_CACHE.has(cacheKey)) {
       console.log('[ReactFlowAdapter] Using cached ReactFlow conversion for version', planDag.version)
