@@ -9,8 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
 import { createApolloClientForEndpoint } from '@/graphql/client'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
-import ForceGraph3D from '3d-force-graph'
-
 const PROJECTION_QUERY = gql`
   query ProjectionView($id: ID!) {
     projection(id: $id) {
@@ -105,19 +103,39 @@ export const ProjectionViewerPage = () => {
     if (isLayer3d || !graph || !containerRef.current) return
     const elem = containerRef.current
     elem.innerHTML = ''
-    const fg = (ForceGraph3D as any)()(elem)
-      .graphData({
-        nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
-        links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
-      })
-      .nodeLabel('name')
-      .linkDirectionalParticles(0)
-      .linkColor(() => '#6ddcff')
-      .nodeColor(() => '#ffd166')
-      .backgroundColor('#0b1021')
-      .showNavInfo(false)
+
+    let cancelled = false
+    let fgInstance: any = null
+
+    const initializeForceGraph = async () => {
+      try {
+        const module = await import('3d-force-graph')
+        if (cancelled) return
+
+        const ForceGraph3D = (module as any).default ?? module
+        fgInstance = (ForceGraph3D as any)()(elem)
+          .graphData({
+            nodes: graph.nodes?.map((n: any) => ({ id: n.id, name: n.label || n.id })) ?? [],
+            links: graph.edges?.map((e: any) => ({ id: e.id, source: e.source, target: e.target, name: e.label })) ?? [],
+          })
+          .nodeLabel('name')
+          .linkDirectionalParticles(0)
+          .linkColor(() => '#6ddcff')
+          .nodeColor(() => '#ffd166')
+          .backgroundColor('#0b1021')
+          .showNavInfo(false)
+      } catch (error) {
+        console.error('[ProjectionViewerPage] Failed to load 3D force graph', error)
+      }
+    }
+
+    initializeForceGraph()
+
     return () => {
-      fg.graphData({ nodes: [], links: [] })
+      cancelled = true
+      if (fgInstance) {
+        fgInstance.graphData({ nodes: [], links: [] })
+      }
     }
   }, [graph, isLayer3d])
 
