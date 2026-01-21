@@ -8,10 +8,6 @@ mod m20251018_000004_remove_edge_handles;
 mod m20251021_000005_create_library_sources;
 mod m20251024_000006_add_datasource_id_to_graph_data;
 mod m20251024_000007_normalize_graph_schema;
-mod m20251030_000008_create_chat_credentials;
-mod m20251030_000009_seed_chat_credentials;
-mod m20251103_000010_create_chat_sessions;
-mod m20251103_000011_create_chat_messages;
 mod m20251103_000012_extend_users_table;
 mod m20251103_000013_extend_user_sessions_table;
 mod m20251105_000014_create_system_settings;
@@ -22,7 +18,6 @@ mod m20251112_000018_rename_data_sources_to_data_sets;
 mod m20251112_000019_migrate_plan_dag_datasource_references;
 mod m20251112_000020_add_origin_to_data_sets;
 mod m20251112_000021_add_indexed_to_files;
-mod m20251112_000022_add_rag_to_chat_sessions;
 mod m20251114_000023_add_tags_to_projects;
 mod m20251115_000024_create_library_items;
 mod m20251116_000025_add_annotations_to_graphs;
@@ -61,10 +56,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20251021_000005_create_library_sources::Migration),
             Box::new(m20251024_000006_add_datasource_id_to_graph_data::Migration),
             Box::new(m20251024_000007_normalize_graph_schema::Migration),
-            Box::new(m20251030_000008_create_chat_credentials::Migration),
-            Box::new(m20251030_000009_seed_chat_credentials::Migration),
-            Box::new(m20251103_000010_create_chat_sessions::Migration),
-            Box::new(m20251103_000011_create_chat_messages::Migration),
             Box::new(m20251103_000012_extend_users_table::Migration),
             Box::new(m20251103_000013_extend_user_sessions_table::Migration),
             Box::new(m20251105_000014_create_system_settings::Migration),
@@ -75,7 +66,6 @@ impl MigratorTrait for Migrator {
             Box::new(m20251112_000019_migrate_plan_dag_datasource_references::Migration),
             Box::new(m20251112_000020_add_origin_to_data_sets::Migration),
             Box::new(m20251112_000021_add_indexed_to_files::Migration),
-            Box::new(m20251112_000022_add_rag_to_chat_sessions::Migration),
             Box::new(m20251114_000023_add_tags_to_projects::Migration),
             Box::new(m20251115_000024_create_library_items::Migration),
             Box::new(m20251116_000025_add_annotations_to_graphs::Migration),

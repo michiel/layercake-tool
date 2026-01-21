@@ -10,7 +10,6 @@ use sea_orm::{
 use layercake_core::database::entities::{graph_data, graph_data_edges, projects, users};
 use layercake_core::services::system_settings_service::SystemSettingsService;
 
-use layercake_server::chat::ChatProvider;
 use super::{
     commands::SettingsCommand,
     output::{print_table, TableRow},
@@ -188,35 +187,6 @@ impl ConsoleContext {
         }
 
         Ok(())
-    }
-
-    pub async fn start_chat(&mut self, provider_override: Option<ChatProvider>) -> Result<()> {
-        let project = self
-            .selected_project
-            .clone()
-            .ok_or_else(|| anyhow!("Select a project before starting chat"))?;
-
-        let settings_map = self.system_settings.settings_map().await;
-        let chat_config = layercake_server::chat::ChatConfig::from_map(&settings_map);
-        let provider = provider_override.unwrap_or(chat_config.default_provider);
-
-        // Get or create default user for console/development use
-        let user = get_or_create_default_user(&self.db)
-            .await
-            .context("failed to get or create default user")?;
-
-        let mut session = layercake_server::chat::ChatSession::new(
-            self.db.clone(),
-            self.system_settings.clone(),
-            project.id,
-            user,
-            provider,
-            &chat_config,
-        )
-        .await
-        .context("failed to start chat session")?;
-
-        session.interactive_loop().await
     }
 
     pub async fn handle_settings_command(&self, command: SettingsCommand) -> Result<()> {

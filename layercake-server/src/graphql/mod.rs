@@ -1,6 +1,4 @@
 #[cfg(feature = "graphql")]
-pub mod chat_manager;
-#[cfg(feature = "graphql")]
 pub mod context;
 #[cfg(feature = "graphql")]
 pub mod errors;

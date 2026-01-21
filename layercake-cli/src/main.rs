@@ -9,8 +9,6 @@ use layercake_core::{common, generate_commands, plan, plan_execution, update};
 use layercake_server::server;
 
 #[cfg(feature = "console")]
-mod chat_credentials_cli;
-#[cfg(feature = "console")]
 mod console;
 
 #[cfg(feature = "console")]
@@ -54,8 +52,6 @@ enum Commands {
     },
     #[clap(alias = "ca")]
     CodeAnalysis(CodeAnalysisArgs),
-    #[cfg(feature = "console")]
-    ChatCredentials(#[clap(flatten)] chat_credentials_cli::ChatCredentialOptions),
     #[cfg(feature = "console")]
     Console {
         /// Optional database path; defaults to layercake.db
@@ -158,10 +154,6 @@ async fn main() -> Result<()> {
         #[cfg(feature = "console")]
         Commands::Console { database } => {
             console::run_console(console::ConsoleOptions { database }).await?;
-        }
-        #[cfg(feature = "console")]
-        Commands::ChatCredentials(options) => {
-            chat_credentials_cli::run(options).await?;
         }
         Commands::Update {
             check,

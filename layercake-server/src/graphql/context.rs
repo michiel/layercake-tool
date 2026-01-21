@@ -1,9 +1,7 @@
 #![allow(dead_code)]
 
-use crate::graphql::chat_manager::ChatManager;
 use layercake_core::auth::Actor;
 use layercake_core::app_context::AppContext;
-use crate::chat::ChatConfig;
 use layercake_core::database::entities::project_collaborators;
 use layercake_core::services::{
     authorization::AuthorizationService, ExportService, GraphService, ImportService, PlanDagService,
@@ -24,7 +22,6 @@ pub struct GraphQLContext {
     pub graph_service: Arc<GraphService>,
     pub plan_dag_service: Arc<PlanDagService>,
     pub session_manager: Arc<SessionManager>,
-    pub chat_manager: Arc<ChatManager>,
     pub system_settings: Arc<SystemSettingsService>,
 }
 
@@ -123,7 +120,6 @@ impl GraphQLContext {
     pub fn new(
         app: Arc<AppContext>,
         system_settings: Arc<SystemSettingsService>,
-        chat_manager: Arc<ChatManager>,
     ) -> Self {
         let db = app.db().clone();
         let import_service = Arc::clone(app.import_service());
@@ -140,7 +136,6 @@ impl GraphQLContext {
             plan_dag_service,
             session_manager: Arc::new(SessionManager::new()),
             system_settings,
-            chat_manager,
         }
     }
 
@@ -178,11 +173,6 @@ impl GraphQLContext {
 
     pub fn plan_dag_service(&self) -> Arc<PlanDagService> {
         self.plan_dag_service.clone()
-    }
-
-    pub async fn chat_config(&self) -> Arc<ChatConfig> {
-        let values = self.system_settings.settings_map().await;
-        Arc::new(ChatConfig::from_map(&values))
     }
 
     pub async fn actor_for_request(&self, ctx: &async_graphql::Context<'_>) -> Actor {

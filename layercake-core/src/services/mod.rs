@@ -2,7 +2,6 @@
 
 pub mod auth_service;
 pub mod authorization;
-pub mod chat_history_service;
 pub mod code_analysis_service;
 pub mod collaboration_service;
 pub mod data_set_service;
@@ -18,7 +17,6 @@ pub mod graph_service;
 pub mod import_service;
 pub mod layer_palette_service;
 pub mod library_item_service;
-pub mod mcp_agent_service;
 pub mod plan_dag_service;
 pub mod plan_service;
 pub mod project_service;

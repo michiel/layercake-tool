@@ -89,7 +89,6 @@ async fn dispatch_command(context: &mut ConsoleContext, command: ConsoleCommand)
         UseProject { project_id } => context.select_project(project_id).await?,
         ListGraphs { project } => context.list_graphs(project).await?,
         ShowGraph { graph_id } => context.show_graph(graph_id).await?,
-        Chat { provider } => context.start_chat(provider).await?,
         Settings { command } => context.handle_settings_command(command).await?,
         Exit => {
             println!("Type Ctrl+D to exit the console.");

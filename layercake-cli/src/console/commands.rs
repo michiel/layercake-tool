@@ -2,8 +2,6 @@
 
 use clap::{Parser, Subcommand};
 
-use layercake_server::chat::ChatProvider;
-
 /// Top-level parser executed for each REPL input.
 #[derive(Parser, Debug)]
 #[command(
@@ -41,13 +39,6 @@ pub enum ConsoleCommand {
     ShowGraph {
         /// Graph identifier.
         graph_id: i32,
-    },
-    /// Start an interactive chat session.
-    #[command(name = "chat")]
-    Chat {
-        /// Override provider just for this chat session.
-        #[arg(long)]
-        provider: Option<ChatProvider>,
     },
     /// Manage runtime system settings.
     #[command(name = "settings")]

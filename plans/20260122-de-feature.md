@@ -51,8 +51,10 @@ Eliminate the under-developed RAG/chat/genAI surface and the MCP infrastructure 
 
 ## Progress log
 - **2026-01-22**: Captured the de-feature strategy, identified key areas (schema, services, UI, MCP) to remove. Document now reflects the phased approach and scope boundaries.
+- **2026-01-23**: Completed the inventory pass. Chat/RAG/MCP touches span database entities/migrations (`chat_sessions`, `chat_messages`, `chat_credentials`), `chat_history_service`, `layercake-server/src/chat` modules (config, providers, session, GraphQL manager), GraphQL schema/resolvers/mutations/subscriptions (`chat_manager`, `chat` queries/mutations/subscriptions), and frontend artifacts (`chat.ts` GraphQL, pages `ProjectChatPage`, `ChatLogsPage`, hooks `useChatSession`, components `ChatModal`, `config/chat.ts`). Additional dependencies include MCP agents and forceful GraphQL subscription wiring.
+- **2026-01-24**: Removed server-side GraphQL chat/mcp roots, chat history service code, chat database entities/migrations, and CLI console chat commands; the GraphQL context now only wires the remaining services and no longer imports chat-related types.
 
 ## Immediate next steps
-1. Execute the inventory step by listing chat/RAG/MCP schema nodes, services, and UI entry points so we can target removals safely.
-2. Prioritize backend schema/service deletions (models, migrations, GraphQL resolvers) that are currently unused.
-3. Once backend removals finish, revisit the frontend routes/queries to drop references to the removed APIs.
+1. Update `plans/20260122-de-feature.md` with notes about which database/migration files were deleted so future work tracks what data no longer exists.
+2. Clean up the frontend by removing `frontend/src/graphql/chat.ts`, chat pages (`ProjectChatPage`, `ChatLogsPage`), providers/hooks/components (`ChatProvider`, `ChatModal`, `useChatSession`, `chatContextStore`, etc.), and related routes.
+3. Remove any remaining chat/RAG config, images, and documentation references, then rerun `npm run frontend:build` / `cargo check` to ensure the workspace compiles without the removed features.

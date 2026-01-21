@@ -81,7 +81,7 @@ icu_locid = "1.5"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 # Agent integration dependencies
-rig = { version = "0.25.0", package = "rig-core", features = ["rmcp"] }
+rig = { version = "0.25.0", package = "rig-core" }
 
 # Tauri dependencies
 tauri = { version = "2.0", features = ["macos-private-api"] }

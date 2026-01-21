@@ -17,7 +17,6 @@ use crate::graphql::{
     mutations::Mutation, queries::Query, subscriptions::Subscription, GraphQLContext, GraphQLSchema,
 };
 use crate::server::websocket::websocket_handler;
-use crate::graphql::chat_manager::ChatManager;
 use layercake_core::services::system_settings_service::SystemSettingsService;
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
@@ -165,13 +164,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             }
         });
 
-        let chat_manager = Arc::new(ChatManager::new());
-
-        let graphql_context = GraphQLContext::new(
-            app_context.clone(),
-            system_settings.clone(),
-            chat_manager.clone(),
-        );
+        let graphql_context = GraphQLContext::new(app_context.clone(), system_settings.clone());
 
         let schema: Schema<Query, Mutation, Subscription> =
             Schema::build(Query, Mutation::default(), Subscription)

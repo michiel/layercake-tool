@@ -8,7 +8,6 @@ pub mod plan_dag_delta;
 
 // Mutation modules
 mod auth;
-mod chat;
 mod code_analysis;
 mod collaboration;
 mod data_acquisition;
@@ -18,7 +17,6 @@ mod graph_data;
 mod graph_edit;
 mod layer;
 mod library;
-mod mcp;
 mod plan;
 mod plan_dag;
 mod plan_dag_edges;
@@ -37,7 +35,6 @@ use async_graphql::*;
 #[derive(Default, MergedObject)]
 pub struct Mutation(
     pub auth::AuthMutation,
-    pub chat::ChatMutation,
     pub collaboration::CollaborationMutation,
     pub code_analysis::CodeAnalysisMutation,
     pub data_set::DataSetMutation,
@@ -46,7 +43,6 @@ pub struct Mutation(
     pub graph_data::GraphDataMutation,
     pub graph_edit::GraphEditMutation,
     pub library::LibraryMutation,
-    pub mcp::McpMutation,
     pub plan::PlanMutation,
     pub plan_dag::PlanDagMutation,
     pub plan_dag_edges::PlanDagEdgesMutation,
