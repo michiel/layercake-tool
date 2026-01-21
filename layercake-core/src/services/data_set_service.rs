@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set, TransactionTrait,
@@ -13,6 +12,7 @@ use crate::database::entities::{
     graph_data_nodes,
 };
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
+use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::{file_type_detection, source_processing};
 use serde::{Deserialize, Serialize};
@@ -57,12 +57,13 @@ impl DataSetService {
         project_id: i32,
         name: String,
         description: Option<String>,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         // Validate project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Project not found"))?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load project {}: {}", project_id, e)))?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         let empty_graph_json = r#"{"nodes":[],"edges":[],"layers":[]}"#;
 
@@ -83,7 +84,10 @@ impl DataSetService {
             ..data_sets::ActiveModel::new()
         };
 
-        let data_set = data_set.insert(&self.db).await?;
+        let data_set = data_set
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to create data set: {}", e)))?;
         Ok(data_set)
     }
 
@@ -97,22 +101,23 @@ impl DataSetService {
         file_format: FileFormat,
         file_data: Vec<u8>,
         tabular_data_type: Option<DataType>,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         // Validate project exists
         let _project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Project not found"))?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load project {}: {}", project_id, e)))?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
         // Validate file extension matches declared format
         let detected_format = FileFormat::from_extension(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+            .ok_or_else(|| CoreError::validation(format!("Unsupported file extension: {}", filename)))?;
         if detected_format != file_format {
-            return Err(anyhow!(
+            return Err(CoreError::validation(format!(
                 "File extension doesn't match declared format. Expected {}, got {}",
                 file_format.as_ref(),
                 detected_format.as_ref()
-            ));
+            )));
         }
 
         let resolved_data_type =
@@ -136,7 +141,10 @@ impl DataSetService {
             ..data_sets::ActiveModel::new()
         };
 
-        let data_set = data_set.insert(&self.db).await?;
+        let data_set = data_set
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to create data set: {}", e)))?;
 
         // Process the file
         let updated_data_set =
@@ -151,7 +159,10 @@ impl DataSetService {
                     active_model.processed_at = Set(Some(chrono::Utc::now()));
                     active_model.updated_at = Set(chrono::Utc::now());
 
-                    active_model.update(&self.db).await?
+                    active_model
+                        .update(&self.db)
+                        .await
+                        .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?
                 }
                 Err(e) => {
                     // Update with error
@@ -160,8 +171,11 @@ impl DataSetService {
                     active_model.error_message = Set(Some(e.to_string()));
                     active_model.updated_at = Set(chrono::Utc::now());
 
-                    let _updated = active_model.update(&self.db).await?;
-                    return Err(e);
+                    let _updated = active_model
+                        .update(&self.db)
+                        .await
+                        .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
+                    return Err(CoreError::validation(e.to_string()));
                 }
             };
 
@@ -169,18 +183,27 @@ impl DataSetService {
     }
 
     /// Get DataSet by ID
-    pub async fn get_by_id(&self, id: i32) -> Result<Option<data_sets::Model>> {
-        let data_set = data_sets::Entity::find_by_id(id).one(&self.db).await?;
+    pub async fn get_by_id(&self, id: i32) -> CoreResult<Option<data_sets::Model>> {
+        let data_set = data_sets::Entity::find_by_id(id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load data set {}: {}", id, e)))?;
         Ok(data_set)
     }
 
     /// Get all DataSets for a project
     #[allow(dead_code)]
-    pub async fn get_by_project(&self, project_id: i32) -> Result<Vec<data_sets::Model>> {
+    pub async fn get_by_project(&self, project_id: i32) -> CoreResult<Vec<data_sets::Model>> {
         let data_sets = data_sets::Entity::find()
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to load data sets for project {}: {}",
+                    project_id, e
+                ))
+            })?;
         Ok(data_sets)
     }
 
@@ -192,10 +215,10 @@ impl DataSetService {
         description: Option<String>,
         filename: String,
         file_data: Vec<u8>,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         // Auto-detect format from filename
         let file_format = FileFormat::from_extension(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+            .ok_or_else(|| CoreError::validation(format!("Unsupported file extension: {}", filename)))?;
 
         self.create_from_file(
             project_id,
@@ -215,11 +238,11 @@ impl DataSetService {
         id: i32,
         name: Option<String>,
         description: Option<String>,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         let mut active_model: data_sets::ActiveModel = data_set.into();
 
@@ -231,22 +254,35 @@ impl DataSetService {
         }
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update data set {}: {}", id, e)))?;
         Ok(updated)
     }
 
     /// Update DataSet graph data (graph_json) directly
     /// Updates processed_at timestamp to trigger downstream re-execution
-    pub async fn update_graph_data(&self, id: i32, graph_json: String) -> Result<data_sets::Model> {
+    pub async fn update_graph_data(
+        &self,
+        id: i32,
+        graph_json: String,
+    ) -> CoreResult<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
-        let mut parsed: Graph = serde_json::from_str(&graph_json)?;
+        let mut parsed: Graph = serde_json::from_str(&graph_json)
+            .map_err(|e| CoreError::validation(format!("Invalid graph JSON: {}", e)))?;
         parsed.sanitize_labels();
-        let sanitized_graph_json = serde_json::to_string(&parsed)?;
-        let txn = self.db.begin().await?;
+        let sanitized_graph_json = serde_json::to_string(&parsed)
+            .map_err(|e| CoreError::validation(format!("Failed to serialize graph JSON: {}", e)))?;
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to start transaction: {}", e)))?;
         // Legacy tables removed; keep dataset_graph_* cleanup for back-compat but ignore errors if tables are gone
         let _ = dataset_graph_nodes::Entity::delete_many()
             .filter(dataset_graph_nodes::Column::DatasetId.eq(id))
@@ -262,7 +298,10 @@ impl DataSetService {
             .await;
 
         // Ensure a graph_data row exists for this dataset (id is reused)
-        let gd_existing = graph_data::Entity::find_by_id(id).one(&txn).await?;
+        let gd_existing = graph_data::Entity::find_by_id(id)
+            .one(&txn)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph_data {}: {}", id, e)))?;
         if gd_existing.is_none() {
             graph_data::ActiveModel {
                 id: Set(id),
@@ -291,18 +330,21 @@ impl DataSetService {
                 error_message: Set(None),
             }
             .insert(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to create graph_data: {}", e)))?;
         }
 
         // Replace graph_data nodes/edges for this dataset (delete edges first for FK safety)
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(id))
             .exec(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to clear graph_data edges: {}", e)))?;
         graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(id))
             .exec(&txn)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to clear graph_data nodes: {}", e)))?;
 
         let now = chrono::Utc::now();
         for node in &parsed.nodes {
@@ -320,7 +362,10 @@ impl DataSetService {
                 attributes: Set(node.attributes.clone()),
                 created_at: Set(now),
             };
-            model.insert(&txn).await?;
+            model
+                .insert(&txn)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to insert graph_data node: {}", e)))?;
         }
 
         // Skip edges whose endpoints do not exist in the node list to avoid FK violations
@@ -346,7 +391,10 @@ impl DataSetService {
                 attributes: Set(edge.attributes.clone()),
                 created_at: Set(now),
             };
-            model.insert(&txn).await?;
+            model
+                .insert(&txn)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to insert graph_data edge: {}", e)))?;
         }
 
         let mut active_model: data_sets::ActiveModel = data_set.into();
@@ -357,8 +405,9 @@ impl DataSetService {
         // Update graph_data metadata counts/status
         let mut gd_active: graph_data::ActiveModel = graph_data::Entity::find_by_id(id)
             .one(&txn)
-            .await?
-            .ok_or_else(|| anyhow!("graph_data missing for dataset {}", id))?
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph_data {}: {}", id, e)))?
+            .ok_or_else(|| CoreError::not_found("GraphData", id.to_string()))?
             .into();
         gd_active.node_count = Set(parsed.nodes.len() as i32);
         gd_active.edge_count = Set(parsed.edges.len() as i32);
@@ -366,10 +415,18 @@ impl DataSetService {
         gd_active.updated_at = Set(now);
         gd_active.processed_at = Set(Some(now));
         gd_active.computed_date = Set(Some(now));
-        gd_active.update(&txn).await?;
+        gd_active
+            .update(&txn)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update graph_data: {}", e)))?;
 
-        let updated = active_model.update(&txn).await?;
-        txn.commit().await?;
+        let updated = active_model
+            .update(&txn)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to commit transaction: {}", e)))?;
         Ok(updated)
     }
 
@@ -379,11 +436,11 @@ impl DataSetService {
         id: i32,
         title: String,
         body: String,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         let mut active_model: data_sets::ActiveModel = data_set.into();
         let mut annotations: Vec<DataSetAnnotation> = active_model
@@ -400,26 +457,36 @@ impl DataSetService {
             date: chrono::Utc::now(),
             body,
         });
-        active_model.annotations = Set(Some(serde_json::to_string(&annotations)?));
+        active_model.annotations = Set(Some(
+            serde_json::to_string(&annotations).map_err(|e| {
+                CoreError::internal(format!("Failed to serialize annotations: {}", e))
+            })?,
+        ));
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let updated = active_model.update(&self.db).await?;
+        let updated = active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
         Ok(updated)
     }
 
-    pub async fn get_graph_summary(&self, dataset_id: i32) -> Result<GraphSummaryData> {
+    pub async fn get_graph_summary(&self, dataset_id: i32) -> CoreResult<GraphSummaryData> {
         let layer_rows = dataset_graph_layers::Entity::find()
             .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load dataset layers: {}", e)))?;
         let node_count = dataset_graph_nodes::Entity::find()
             .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
             .count(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to count dataset nodes: {}", e)))?;
         let edge_count = dataset_graph_edges::Entity::find()
             .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
             .count(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to count dataset edges: {}", e)))?;
         if node_count > 0 || edge_count > 0 {
             let mut layers: Vec<String> = layer_rows.into_iter().map(|l| l.id).collect();
             layers.sort();
@@ -433,9 +500,11 @@ impl DataSetService {
 
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
-        let graph: Graph = serde_json::from_str(&model.graph_json)?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load data set {}: {}", dataset_id, e)))?
+            .ok_or_else(|| CoreError::not_found("DataSet", dataset_id.to_string()))?;
+        let graph: Graph = serde_json::from_str(&model.graph_json)
+            .map_err(|e| CoreError::validation(format!("Failed to parse graph JSON: {}", e)))?;
         let mut layers: Vec<String> = graph.layers.iter().map(|l| l.id.clone()).collect();
         layers.sort();
         Ok(GraphSummaryData {
@@ -452,7 +521,7 @@ impl DataSetService {
         limit: usize,
         offset: usize,
         filter_layers: Option<Vec<String>>,
-    ) -> Result<GraphPageData> {
+    ) -> CoreResult<GraphPageData> {
         let filter_set: Option<HashSet<String>> =
             filter_layers.clone().map(|v| v.into_iter().collect());
         let mut node_query = dataset_graph_nodes::Entity::find()
@@ -464,18 +533,24 @@ impl DataSetService {
             node_query =
                 node_query.filter(dataset_graph_nodes::Column::Layer.is_in(filter.clone()));
         }
-        let nodes_rows = node_query.all(&self.db).await?;
+        let nodes_rows = node_query
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load dataset nodes: {}", e)))?;
         let total_rows = dataset_graph_nodes::Entity::find()
             .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
             .count(&self.db)
-            .await? as usize;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to count dataset nodes: {}", e)))?
+            as usize;
 
         if !nodes_rows.is_empty() {
             let node_ids: HashSet<String> = nodes_rows.iter().map(|n| n.id.clone()).collect();
             let mut edges_rows = dataset_graph_edges::Entity::find()
                 .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
                 .all(&self.db)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load dataset edges: {}", e)))?;
             if let Some(filter) = &filter_set {
                 edges_rows.retain(|e| filter.contains(&e.layer));
             }
@@ -484,7 +559,8 @@ impl DataSetService {
             let mut layers_rows = dataset_graph_layers::Entity::find()
                 .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
                 .all(&self.db)
-                .await?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load dataset layers: {}", e)))?;
             if let Some(filter) = &filter_set {
                 layers_rows.retain(|l| filter.contains(&l.id));
             }
@@ -541,9 +617,11 @@ impl DataSetService {
 
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
-        let mut graph: Graph = serde_json::from_str(&model.graph_json)?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load data set {}: {}", dataset_id, e)))?
+            .ok_or_else(|| CoreError::not_found("DataSet", dataset_id.to_string()))?;
+        let mut graph: Graph = serde_json::from_str(&model.graph_json)
+            .map_err(|e| CoreError::validation(format!("Failed to parse graph JSON: {}", e)))?;
 
         if let Some(layers) = filter_layers.clone() {
             let set: HashSet<String> = layers.into_iter().collect();
@@ -580,20 +658,20 @@ impl DataSetService {
         id: i32,
         filename: String,
         file_data: Vec<u8>,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         // Detect format from filename extension
         let file_format = FileFormat::from_extension(&filename)
-            .ok_or_else(|| anyhow!("Unsupported file extension: {}", filename))?;
+            .ok_or_else(|| CoreError::validation(format!("Unsupported file extension: {}", filename)))?;
 
         // Determine appropriate data type (respect prior type if detection fails)
         let existing_data_type = data_set
             .get_data_type()
-            .ok_or_else(|| anyhow!("Invalid data type in existing data source"))?;
+            .ok_or_else(|| CoreError::validation("Invalid data type in existing data source"))?;
         let resolved_data_type =
             Self::determine_data_type(&file_format, &file_data, None, Some(existing_data_type))?;
 
@@ -608,7 +686,10 @@ impl DataSetService {
         active_model.error_message = Set(None);
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let data_set = active_model.update(&self.db).await?;
+        let data_set = active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
 
         // Process the new file
         let updated_data_set =
@@ -622,7 +703,10 @@ impl DataSetService {
                     active_model.processed_at = Set(Some(chrono::Utc::now()));
                     active_model.updated_at = Set(chrono::Utc::now());
 
-                    active_model.update(&self.db).await?
+                    active_model
+                        .update(&self.db)
+                        .await
+                        .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?
                 }
                 Err(e) => {
                     let mut active_model: data_sets::ActiveModel = data_set.into();
@@ -630,8 +714,11 @@ impl DataSetService {
                     active_model.error_message = Set(Some(e.to_string()));
                     active_model.updated_at = Set(chrono::Utc::now());
 
-                    let _updated = active_model.update(&self.db).await?;
-                    return Err(e);
+                    let _updated = active_model
+                        .update(&self.db)
+                        .await
+                        .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
+                    return Err(CoreError::validation(e.to_string()));
                 }
             };
 
@@ -639,17 +726,18 @@ impl DataSetService {
     }
 
     /// Delete DataSet and clean up related plan DAG nodes
-    pub async fn delete(&self, id: i32) -> Result<()> {
+    pub async fn delete(&self, id: i32) -> CoreResult<()> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         // Find and delete all plan_dag_nodes that reference this dataset
         let all_dag_nodes = plan_dag_nodes::Entity::find()
             .filter(plan_dag_nodes::Column::NodeType.eq("DataSetNode"))
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load plan DAG nodes: {}", e)))?;
 
         for dag_node in all_dag_nodes {
             // Parse config to check if it references this dataset
@@ -660,17 +748,26 @@ impl DataSetService {
                         plan_dag_edges::Entity::delete_many()
                             .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
                             .exec(&self.db)
-                            .await?;
+                            .await
+                            .map_err(|e| {
+                                CoreError::internal(format!("Failed to delete plan DAG edges: {}", e))
+                            })?;
 
                         plan_dag_edges::Entity::delete_many()
                             .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
                             .exec(&self.db)
-                            .await?;
+                            .await
+                            .map_err(|e| {
+                                CoreError::internal(format!("Failed to delete plan DAG edges: {}", e))
+                            })?;
 
                         // Delete the node
                         plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
                             .exec(&self.db)
-                            .await?;
+                            .await
+                            .map_err(|e| {
+                                CoreError::internal(format!("Failed to delete plan DAG node: {}", e))
+                            })?;
                     }
                 }
             }
@@ -679,24 +776,25 @@ impl DataSetService {
         // Delete the dataset itself
         data_sets::Entity::delete_by_id(data_set.id)
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to delete data set: {}", e)))?;
 
         Ok(())
     }
 
     /// Reprocess existing DataSet file
-    pub async fn reprocess(&self, id: i32) -> Result<data_sets::Model> {
+    pub async fn reprocess(&self, id: i32) -> CoreResult<data_sets::Model> {
         let data_set = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         let file_format = data_set
             .get_file_format()
-            .ok_or_else(|| anyhow!("Invalid file format"))?;
+            .ok_or_else(|| CoreError::validation("Invalid file format"))?;
         let existing_data_type = data_set
             .get_data_type()
-            .ok_or_else(|| anyhow!("Invalid data type"))?;
+            .ok_or_else(|| CoreError::validation("Invalid data type"))?;
         let resolved_data_type = Self::determine_data_type(
             &file_format,
             &data_set.blob,
@@ -711,7 +809,10 @@ impl DataSetService {
         active_model.data_type = Set(resolved_data_type.as_ref().to_string());
         active_model.updated_at = Set(chrono::Utc::now());
 
-        let data_set = active_model.update(&self.db).await?;
+        let data_set = active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
 
         // Process the file
         let updated_data_set = match source_processing::process_file(
@@ -728,7 +829,10 @@ impl DataSetService {
                 active_model.processed_at = Set(Some(chrono::Utc::now()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                active_model.update(&self.db).await?
+                active_model
+                    .update(&self.db)
+                    .await
+                    .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?
             }
             Err(e) => {
                 let mut active_model: data_sets::ActiveModel = data_set.into();
@@ -736,8 +840,11 @@ impl DataSetService {
                 active_model.error_message = Set(Some(e.to_string()));
                 active_model.updated_at = Set(chrono::Utc::now());
 
-                let _updated = active_model.update(&self.db).await?;
-                return Err(e);
+                let _updated = active_model
+                    .update(&self.db)
+                    .await
+                    .map_err(|e| CoreError::internal(format!("Failed to update data set: {}", e)))?;
+                return Err(CoreError::validation(e.to_string()));
             }
         };
 
@@ -745,17 +852,17 @@ impl DataSetService {
     }
 
     /// Validate the stored graph JSON for a dataset
-    pub async fn validate(&self, id: i32) -> Result<DataSetValidationSummary> {
+    pub async fn validate(&self, id: i32) -> CoreResult<DataSetValidationSummary> {
         let model = self
             .get_by_id(id)
             .await?
-            .ok_or_else(|| anyhow!("DataSet not found"))?;
+            .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))?;
 
         let mut graph: Graph = if model.graph_json.trim().is_empty() {
             Graph::default()
         } else {
             serde_json::from_str(&model.graph_json)
-                .map_err(|e| anyhow!("Failed to parse graph JSON: {}", e))?
+                .map_err(|e| CoreError::validation(format!("Failed to parse graph JSON: {}", e)))?
         };
 
         if graph.name.is_empty() {
@@ -824,15 +931,15 @@ impl DataSetService {
         file_data: &[u8],
         manual_hint: Option<DataType>,
         fallback: Option<DataType>,
-    ) -> Result<DataType> {
+    ) -> CoreResult<DataType> {
         match file_format {
             FileFormat::Csv | FileFormat::Tsv => {
                 if let Some(hint) = manual_hint {
                     if matches!(hint, DataType::Nodes | DataType::Edges | DataType::Layers) {
                         return Ok(hint);
                     } else {
-                        return Err(anyhow!(
-                            "Tabular uploads only support Nodes, Edges, or Layers data types"
+                        return Err(CoreError::validation(
+                            "Tabular uploads only support Nodes, Edges, or Layers data types",
                         ));
                     }
                 }
@@ -844,27 +951,27 @@ impl DataSetService {
                             if fallback_type.is_compatible_with_format(file_format) {
                                 Ok(fallback_type)
                             } else {
-                                Err(anyhow!(
+                                Err(CoreError::validation(format!(
                                     "Existing data type {} is incompatible with {} format",
                                     fallback_type.as_ref(),
                                     file_format.as_ref()
-                                ))
+                                )))
                             }
                         } else {
-                            Err(anyhow!(
+                            Err(CoreError::validation(format!(
                                 "Unable to detect data type for {} upload: {}",
                                 file_format.as_ref(),
                                 err
-                            ))
+                            )))
                         }
                     }
                 }
             }
             FileFormat::Json => Ok(DataType::Graph),
-            other => Err(anyhow!(
+            other => Err(CoreError::validation(format!(
                 "{} uploads are not supported for this operation",
                 other.as_ref()
-            )),
+            ))),
         }
     }
 }

@@ -1,8 +1,8 @@
 use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
 use crate::database::entities::graph_data;
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
+use crate::errors::{CoreError, CoreResult};
 use crate::services::GraphDataService;
-use anyhow::Result;
 use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
     QueryFilter, QueryOrder, Set,
@@ -45,7 +45,7 @@ impl GraphEditService {
         new_value: Option<serde_json::Value>,
         created_by: Option<i32>,
         applied: bool,
-    ) -> Result<graph_edits::Model> {
+    ) -> CoreResult<graph_edits::Model> {
         // Get the next sequence number for this graph
         let next_sequence = self.get_next_sequence_number(graph_id).await?;
 
@@ -65,7 +65,10 @@ impl GraphEditService {
             created_by: Set(created_by),
         };
 
-        let edit = edit.insert(&self.db).await?;
+        let edit = edit
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to insert graph edit: {}", e)))?;
 
         // Update the graph's last_edit_sequence and has_pending_edits (only if not applied)
         self.update_graph_edit_metadata(graph_id, next_sequence, applied)
@@ -75,12 +78,13 @@ impl GraphEditService {
     }
 
     /// Get the next sequence number for a graph
-    async fn get_next_sequence_number(&self, graph_id: i32) -> Result<i32> {
+    async fn get_next_sequence_number(&self, graph_id: i32) -> CoreResult<i32> {
         let last_edit = GraphEdits::find()
             .filter(graph_edits::Column::GraphId.eq(graph_id))
             .order_by_desc(graph_edits::Column::SequenceNumber)
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph edits: {}", e)))?;
 
         Ok(last_edit.map(|e| e.sequence_number + 1).unwrap_or(1))
     }
@@ -91,23 +95,28 @@ impl GraphEditService {
         graph_id: i32,
         sequence_number: i32,
         applied: bool,
-    ) -> Result<()> {
+    ) -> CoreResult<()> {
         if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph data: {}", e)))?
             .is_some()
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
             graph_data_service
                 .update_edit_metadata(graph_id, sequence_number, applied)
-                .await?;
+                .await
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to update graph data metadata: {}", e))
+                })?;
         } else {
             use crate::database::entities::graphs::{self, Entity as Graphs};
 
             let graph = Graphs::find_by_id(graph_id)
                 .one(&self.db)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
 
             let mut active_model: graphs::ActiveModel = graph.into();
             active_model.last_edit_sequence = Set(sequence_number);
@@ -117,34 +126,45 @@ impl GraphEditService {
             }
             active_model.updated_at = Set(chrono::Utc::now());
 
-            active_model.update(&self.db).await?;
+            active_model
+                .update(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
         }
         Ok(())
     }
 
-    async fn set_graph_pending_state(&self, graph_id: i32, has_pending: bool) -> Result<()> {
+    async fn set_graph_pending_state(&self, graph_id: i32, has_pending: bool) -> CoreResult<()> {
         if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph data: {}", e)))?
             .is_some()
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
             graph_data_service
                 .set_pending_state(graph_id, has_pending)
-                .await?;
+                .await
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to update graph data pending state: {}", e))
+                })?;
         } else {
             use crate::database::entities::graphs::{self, Entity as Graphs};
 
             let graph = Graphs::find_by_id(graph_id)
                 .one(&self.db)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
 
             let mut active_model: graphs::ActiveModel = graph.into();
             active_model.has_pending_edits = Set(has_pending);
             active_model.updated_at = Set(chrono::Utc::now());
 
-            active_model.update(&self.db).await?;
+            active_model
+                .update(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
         }
         Ok(())
     }
@@ -158,7 +178,7 @@ impl GraphEditService {
         &self,
         graph_id: i32,
         unapplied_only: bool,
-    ) -> Result<Vec<graph_edits::Model>> {
+    ) -> CoreResult<Vec<graph_edits::Model>> {
         let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_id));
 
         if unapplied_only {
@@ -168,28 +188,33 @@ impl GraphEditService {
         let edits = query
             .order_by_asc(graph_edits::Column::SequenceNumber)
             .all(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph edits: {}", e)))?;
 
         Ok(edits)
     }
 
     /// Mark an edit as applied
-    pub async fn mark_edit_applied(&self, edit_id: i32) -> Result<()> {
+    pub async fn mark_edit_applied(&self, edit_id: i32) -> CoreResult<()> {
         let edit = GraphEdits::find_by_id(edit_id)
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow::anyhow!("Edit not found"))?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph edit: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("GraphEdit", edit_id.to_string()))?;
 
         let mut active_model: graph_edits::ActiveModel = edit.into();
         active_model.applied = Set(true);
-        active_model.update(&self.db).await?;
+        active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update graph edit: {}", e)))?;
 
         Ok(())
     }
 
     /// Mark multiple edits as applied
     #[allow(dead_code)]
-    pub async fn mark_edits_applied(&self, edit_ids: Vec<i32>) -> Result<()> {
+    pub async fn mark_edits_applied(&self, edit_ids: Vec<i32>) -> CoreResult<()> {
         for edit_id in edit_ids {
             self.mark_edit_applied(edit_id).await?;
         }
@@ -197,29 +222,42 @@ impl GraphEditService {
     }
 
     /// Clear all edits for a graph
-    pub async fn clear_graph_edits(&self, graph_id: i32) -> Result<u64> {
+    pub async fn clear_graph_edits(&self, graph_id: i32) -> CoreResult<u64> {
         use crate::database::entities::graphs::{self, Entity as Graphs};
 
         // Delete all edits
         let result = GraphEdits::delete_many()
             .filter(graph_edits::Column::GraphId.eq(graph_id))
             .exec(&self.db)
-            .await?;
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to delete graph edits: {}", e)))?;
 
         // Reset graph metadata
         if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph data: {}", e)))?
             .is_some()
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
-            graph_data_service.reset_edit_metadata(graph_id).await?;
-            graph_data_service.mark_replayed(graph_id).await?;
+            graph_data_service
+                .reset_edit_metadata(graph_id)
+                .await
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to reset graph data metadata: {}", e))
+                })?;
+            graph_data_service
+                .mark_replayed(graph_id)
+                .await
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to mark graph data replayed: {}", e))
+                })?;
         } else {
             let graph = Graphs::find_by_id(graph_id)
                 .one(&self.db)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
 
             let mut active_model: graphs::ActiveModel = graph.into();
             active_model.last_edit_sequence = Set(0);
@@ -227,54 +265,70 @@ impl GraphEditService {
             active_model.last_replay_at = Set(None);
             active_model.updated_at = Set(chrono::Utc::now());
 
-            active_model.update(&self.db).await?;
+            active_model
+                .update(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
         }
 
         Ok(result.rows_affected)
     }
 
     /// Update last_replay_at timestamp for a graph
-    pub async fn mark_graph_replayed(&self, graph_id: i32) -> Result<()> {
+    pub async fn mark_graph_replayed(&self, graph_id: i32) -> CoreResult<()> {
         if graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
-            .await?
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to load graph data: {}", e)))?
             .is_some()
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
-            graph_data_service.mark_replayed(graph_id).await?;
+            graph_data_service
+                .mark_replayed(graph_id)
+                .await
+                .map_err(|e| {
+                    CoreError::internal(format!("Failed to mark graph data replayed: {}", e))
+                })?;
         } else {
             use crate::database::entities::graphs::{self, Entity as Graphs};
 
             let graph = Graphs::find_by_id(graph_id)
                 .one(&self.db)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("Graph not found"))?;
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
 
             let mut active_model: graphs::ActiveModel = graph.into();
             active_model.last_replay_at = Set(Some(chrono::Utc::now()));
             active_model.updated_at = Set(chrono::Utc::now());
 
-            active_model.update(&self.db).await?;
+            active_model
+                .update(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
         }
         Ok(())
     }
 
     /// Get edit count for a graph
-    pub async fn get_edit_count(&self, graph_id: i32, unapplied_only: bool) -> Result<u64> {
+    pub async fn get_edit_count(&self, graph_id: i32, unapplied_only: bool) -> CoreResult<u64> {
         let mut query = GraphEdits::find().filter(graph_edits::Column::GraphId.eq(graph_id));
 
         if unapplied_only {
             query = query.filter(graph_edits::Column::Applied.eq(false));
         }
 
-        let count = query.count(&self.db).await?;
+        let count = query
+            .count(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to count graph edits: {}", e)))?;
         Ok(count)
     }
 
     /// Replay all unapplied edits for a graph
     ///
     /// Returns a summary of the replay operation
-    pub async fn replay_graph_edits(&self, graph_id: i32) -> Result<ReplaySummary> {
+    pub async fn replay_graph_edits(&self, graph_id: i32) -> CoreResult<ReplaySummary> {
         info!("Starting replay of edits for graph {}", graph_id);
 
         // Get all unapplied edits in sequence order

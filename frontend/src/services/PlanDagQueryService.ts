@@ -92,11 +92,11 @@ export class PlanDagQueryService {
     onUpdate: (planDag: PlanDag) => void,
     onError?: (error: Error) => void
   ) {
-    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId, 'plan:', query.planId, 'clientId:', this.clientId)
+    console.log('[PlanDagQueryService] Setting up delta subscription for project:', query.projectId, 'clientId:', this.clientId)
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
-      variables: { projectId: query.projectId, planId: query.planId ?? null }
+      variables: { projectId: query.projectId }
     })
 
     console.log('[PlanDagQueryService] Delta subscription created, waiting for updates...')

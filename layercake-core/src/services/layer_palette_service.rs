@@ -1,4 +1,5 @@
 use crate::database::entities::project_layers;
+use crate::errors::{CoreError, CoreResult};
 use chrono::Utc;
 use sea_orm::prelude::*;
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, QueryFilter};
@@ -16,18 +17,21 @@ impl LayerPaletteService {
     pub async fn get_project_palette(
         &self,
         project_id: i32,
-    ) -> Result<Vec<project_layers::Model>, DbErr> {
+    ) -> CoreResult<Vec<project_layers::Model>> {
         project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project palette: {}", e))
+            })
     }
 
     pub async fn get_layers_by_ids(
         &self,
         project_id: i32,
         layer_ids: HashSet<String>,
-    ) -> Result<Vec<project_layers::Model>, DbErr> {
+    ) -> CoreResult<Vec<project_layers::Model>> {
         if layer_ids.is_empty() {
             return Ok(vec![]);
         }
@@ -37,13 +41,16 @@ impl LayerPaletteService {
             .filter(project_layers::Column::LayerId.is_in(layer_ids))
             .all(&self.db)
             .await
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load project layers: {}", e))
+            })
     }
 
     pub async fn add_layer(
         &self,
         project_id: i32,
         layer: NewLayer,
-    ) -> Result<project_layers::Model, DbErr> {
+    ) -> CoreResult<project_layers::Model> {
         let now = Utc::now();
         let active = project_layers::ActiveModel {
             project_id: Set(project_id),
@@ -63,13 +70,14 @@ impl LayerPaletteService {
         project_layers::Entity::insert(active)
             .exec_with_returning(&self.db)
             .await
+            .map_err(|e| CoreError::internal(format!("Failed to insert project layer: {}", e)))
     }
 
     pub async fn validate_layer_references(
         &self,
         project_id: i32,
         layer_ids: &HashSet<String>,
-    ) -> Result<LayerValidationResult, DbErr> {
+    ) -> CoreResult<LayerValidationResult> {
         let existing = self
             .get_project_palette(project_id)
             .await?

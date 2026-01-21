@@ -87,7 +87,7 @@ impl ProjectService {
         self.auth_service
             .check_project_write_access(user_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Find project
         let project = projects::Entity::find_by_id(project_id)
@@ -128,7 +128,7 @@ impl ProjectService {
         self.auth_service
             .check_project_admin_access(user_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Delete project (cascading deletes should handle collaborators)
         let result = projects::Entity::delete_by_id(project_id)
@@ -153,7 +153,7 @@ impl ProjectService {
         self.auth_service
             .check_project_read_access(user_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Get project
         let project = projects::Entity::find_by_id(project_id)
@@ -199,7 +199,7 @@ impl ProjectService {
         self.auth_service
             .check_project_read_access(user_id, project_id)
             .await
-            .map_err(map_auth_error)?;
+            ?;
 
         // Get collaborators with user info
         let collaborators = project_collaborators::Entity::find()
@@ -237,16 +237,6 @@ impl ProjectService {
         self.auth_service
             .get_user_project_role(user_id, project_id)
             .await
-            .map_err(map_auth_error)
-    }
-}
-
-fn map_auth_error(err: anyhow::Error) -> CoreError {
-    let message = err.to_string();
-    if message.contains("Database error") {
-        CoreError::internal(message)
-    } else {
-        CoreError::forbidden(message)
     }
 }
 

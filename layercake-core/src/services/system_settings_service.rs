@@ -1,12 +1,12 @@
 use std::{collections::HashMap, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
 use chrono::Utc;
 use once_cell::sync::Lazy;
 use sea_orm::{ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set};
 use tokio::sync::RwLock;
 
 use crate::database::entities::system_settings;
+use crate::errors::{CoreError, CoreResult};
 
 static DESCRIPTORS: Lazy<HashMap<&'static str, &'static SettingDescriptor>> = Lazy::new(|| {
     let mut map = HashMap::new();
@@ -348,7 +348,7 @@ pub struct SystemSettingsService {
 }
 
 impl SystemSettingsService {
-    pub async fn new(db: DatabaseConnection) -> Result<Self> {
+    pub async fn new(db: DatabaseConnection) -> CoreResult<Self> {
         let service = Self {
             db: db.clone(),
             cache: Arc::new(RwLock::new(HashMap::new())),
@@ -361,7 +361,7 @@ impl SystemSettingsService {
         DESCRIPTORS.get(key).copied()
     }
 
-    async fn sync_defaults(&self) -> Result<()> {
+    async fn sync_defaults(&self) -> CoreResult<()> {
         for descriptor in SettingDescriptor::all().iter() {
             self.ensure_row(descriptor).await?;
         }
@@ -369,11 +369,14 @@ impl SystemSettingsService {
         Ok(())
     }
 
-    async fn ensure_row(&self, descriptor: &SettingDescriptor) -> Result<()> {
+    async fn ensure_row(&self, descriptor: &SettingDescriptor) -> CoreResult<()> {
         let existing = system_settings::Entity::find()
             .filter(system_settings::Column::Key.eq(descriptor.key))
             .one(&self.db)
-            .await?;
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to read system settings").with_source(e)
+            })?;
 
         let now = chrono::Utc::now();
 
@@ -394,7 +397,11 @@ impl SystemSettingsService {
                 active.is_secret = Set(descriptor.is_secret);
                 active.is_read_only = Set(descriptor.is_read_only);
                 active.updated_at = Set(now);
-                active.update(&self.db).await?;
+                active.update(&self.db)
+                    .await
+                    .map_err(|e| {
+                        CoreError::internal("Failed to update system setting").with_source(e)
+                    })?;
             }
             return Ok(());
         }
@@ -412,12 +419,20 @@ impl SystemSettingsService {
             updated_at: Set(now),
             ..Default::default()
         };
-        active.insert(&self.db).await?;
+        active
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create system setting").with_source(e))?;
         Ok(())
     }
 
-    async fn refresh_cache(&self) -> Result<()> {
-        let records = system_settings::Entity::find().all(&self.db).await?;
+    async fn refresh_cache(&self) -> CoreResult<()> {
+        let records = system_settings::Entity::find()
+            .all(&self.db)
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to refresh system settings").with_source(e)
+            })?;
         let mut entries = HashMap::new();
         for record in records {
             entries.insert(record.key.clone(), record);
@@ -434,11 +449,13 @@ impl SystemSettingsService {
         }
     }
 
-    fn view_from_record(record: &system_settings::Model) -> Result<SystemSettingView> {
+    fn view_from_record(record: &system_settings::Model) -> CoreResult<SystemSettingView> {
         let descriptor = DESCRIPTORS
             .get(record.key.as_str())
             .copied()
-            .ok_or_else(|| anyhow!("missing descriptor for {}", record.key))?;
+            .ok_or_else(|| {
+                CoreError::internal(format!("Missing descriptor for {}", record.key))
+            })?;
 
         Ok(SystemSettingView {
             key: record.key.clone(),
@@ -459,7 +476,7 @@ impl SystemSettingsService {
         })
     }
 
-    pub async fn list_settings(&self) -> Result<Vec<SystemSettingView>> {
+    pub async fn list_settings(&self) -> CoreResult<Vec<SystemSettingView>> {
         let cache = self.cache.read().await;
         let mut views = Vec::new();
         for record in cache.values() {
@@ -469,21 +486,24 @@ impl SystemSettingsService {
         Ok(views)
     }
 
-    pub async fn get_setting(&self, key: &str) -> Result<SystemSettingView> {
+    pub async fn get_setting(&self, key: &str) -> CoreResult<SystemSettingView> {
         let cache = self.cache.read().await;
         let record = cache
             .get(key)
             .cloned()
-            .ok_or_else(|| anyhow!("Unknown setting {}", key))?;
+            .ok_or_else(|| CoreError::validation(format!("Unknown setting {}", key)))?;
         Self::view_from_record(&record)
     }
 
-    pub async fn update_setting(&self, key: &str, value: String) -> Result<SystemSettingView> {
+    pub async fn update_setting(&self, key: &str, value: String) -> CoreResult<SystemSettingView> {
         let descriptor = self
             .descriptor(key)
-            .ok_or_else(|| anyhow!("Unknown setting {}", key))?;
+            .ok_or_else(|| CoreError::validation(format!("Unknown setting {}", key)))?;
         if descriptor.is_read_only {
-            return Err(anyhow!("Setting {} is read-only", key));
+            return Err(CoreError::validation(format!(
+                "Setting {} is read-only",
+                key
+            )));
         }
 
         self.validate_value(descriptor, &value)?;
@@ -492,24 +512,29 @@ impl SystemSettingsService {
         let existing = system_settings::Entity::find()
             .filter(system_settings::Column::Key.eq(key))
             .one(&self.db)
-            .await?
-            .ok_or_else(|| anyhow!("Setting {} not found", key))?;
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to load system setting").with_source(e)
+            })?
+            .ok_or_else(|| CoreError::validation(format!("Setting {} not found", key)))?;
 
         let mut active: system_settings::ActiveModel = existing.into();
         active.value = Set(value);
         active.updated_at = Set(now);
-        active.update(&self.db).await?;
+        active.update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to update system setting").with_source(e))?;
 
         self.refresh_cache().await?;
         self.get_setting(key).await
     }
 
-    fn validate_value(&self, descriptor: &SettingDescriptor, value: &str) -> Result<()> {
+    fn validate_value(&self, descriptor: &SettingDescriptor, value: &str) -> CoreResult<()> {
         match descriptor.value_type {
             SettingValueType::Integer => {
-                value
-                    .parse::<i64>()
-                    .with_context(|| format!("{} expects an integer", descriptor.label))?;
+                value.parse::<i64>().map_err(|e| {
+                    CoreError::validation(format!("{} expects an integer: {}", descriptor.label, e))
+                })?;
             }
             SettingValueType::Enum => {
                 let found = descriptor
@@ -517,16 +542,17 @@ impl SystemSettingsService {
                     .iter()
                     .any(|allowed| allowed == &value);
                 if !found {
-                    return Err(anyhow!(
+                    return Err(CoreError::validation(format!(
                         "{} must be one of {:?}",
-                        descriptor.label,
-                        descriptor.allowed_values
-                    ));
+                        descriptor.label, descriptor.allowed_values
+                    )));
                 }
             }
             SettingValueType::Url => {
                 if !value.is_empty() {
-                    url::Url::parse(value).context("invalid URL")?;
+                    url::Url::parse(value).map_err(|e| {
+                        CoreError::validation(format!("invalid URL: {}", e))
+                    })?;
                 }
             }
             _ => {}

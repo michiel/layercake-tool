@@ -3,7 +3,7 @@ use crate::database::entities::{
     data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_layers,
     graph_layers::Entity as Layers, layer_aliases, plan_dag_edges, plan_dag_nodes, project_layers,
 };
-use crate::errors::{GraphError, GraphResult};
+use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::GraphDataService;
 use chrono::Utc;
@@ -62,7 +62,7 @@ impl GraphService {
         project_id: i32,
         dataset_id: i32,
         enabled: bool,
-    ) -> GraphResult<usize> {
+    ) -> CoreResult<usize> {
         use crate::database::entities::data_sets;
 
         tracing::debug!(
@@ -75,8 +75,8 @@ impl GraphService {
         let data_set = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or_else(|| GraphError::Validation(format!("Dataset {} not found", dataset_id)))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("DataSet", dataset_id.to_string()))?;
 
         if data_set.project_id != project_id {
             tracing::warn!(
@@ -186,12 +186,12 @@ impl GraphService {
             .filter(project_layers::Column::SourceDatasetId.eq(Some(dataset_id)))
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(updated)
     }
 
-    async fn seed_project_layers_if_empty(&self, project_id: i32) -> GraphResult<()> {
+    async fn seed_project_layers_if_empty(&self, project_id: i32) -> CoreResult<()> {
         use crate::database::entities::data_sets;
 
         tracing::debug!(
@@ -203,7 +203,7 @@ impl GraphService {
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .count(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if existing > 0 {
             tracing::debug!(
@@ -218,7 +218,7 @@ impl GraphService {
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let mut layer_datasets = Vec::new();
         for ds in datasets {
@@ -254,30 +254,30 @@ impl GraphService {
     pub async fn get_layers_for_graph(
         &self,
         graph_id: i32,
-    ) -> GraphResult<Vec<graph_layers::Model>> {
+    ) -> CoreResult<Vec<graph_layers::Model>> {
         let db_layers = Layers::find()
             .filter(graph_layers::Column::GraphId.eq(graph_id))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(db_layers)
     }
 
     /// Build a Graph from a DAG-built graph; graph_data-first, fallback to legacy graphs table.
-    pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> GraphResult<Graph> {
+    pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> CoreResult<Graph> {
         let normalize_hex = |value: &str| value.trim_start_matches('#').to_string();
 
         // Try unified schema first
         if let Some(gd) = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
         {
             let graph_data_service = GraphDataService::new(self.db.clone());
             let (gd_model, nodes, edges) = graph_data_service
                 .load_full(gd.id)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
             let palette_layers = self
                 .get_all_resolved_layers(gd_model.project_id)
                 .await
@@ -394,15 +394,15 @@ impl GraphService {
             return Ok(graph);
         }
 
-        Err(GraphError::NotFound(graph_id))
+        Err(CoreError::not_found("Graph", graph_id.to_string()))
     }
 
-    pub async fn validate_graph(&self, graph_id: i32) -> GraphResult<GraphValidationSummary> {
+    pub async fn validate_graph(&self, graph_id: i32) -> CoreResult<GraphValidationSummary> {
         let gd = graph_data::Entity::find_by_id(graph_id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or(GraphError::NotFound(graph_id))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
         let graph = self.build_graph_from_dag_graph(graph_id).await?;
 
         let mut errors = Vec::new();
@@ -430,7 +430,7 @@ impl GraphService {
         project_id: i32,
         name: String,
         node_id: Option<String>,
-    ) -> GraphResult<crate::database::entities::graph_data::Model> {
+    ) -> CoreResult<crate::database::entities::graph_data::Model> {
         use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, Set};
 
@@ -465,7 +465,7 @@ impl GraphService {
             error_message: Set(None),
         };
 
-        let graph = graph.insert(&self.db).await.map_err(GraphError::Database)?;
+        let graph = graph.insert(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(graph)
     }
@@ -474,15 +474,15 @@ impl GraphService {
         &self,
         id: i32,
         name: Option<String>,
-    ) -> GraphResult<crate::database::entities::graph_data::Model> {
+    ) -> CoreResult<crate::database::entities::graph_data::Model> {
         use crate::database::entities::graph_data;
         use sea_orm::{ActiveModelTrait, Set};
 
         let graph = graph_data::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or(GraphError::NotFound(id))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Graph", id.to_string()))?;
 
         let mut active_model: graph_data::ActiveModel = graph.into();
 
@@ -494,18 +494,18 @@ impl GraphService {
         let updated = active_model
             .update(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(updated)
     }
 
-    pub async fn delete_graph(&self, id: i32) -> GraphResult<()> {
+    pub async fn delete_graph(&self, id: i32) -> CoreResult<()> {
         use crate::database::entities::graph_data;
 
         let graph = graph_data::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or(GraphError::NotFound(id))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("Graph", id.to_string()))?;
 
         // Find and delete all plan_dag_nodes that reference this graph by node_id
         if let Some(dag_node_id) = graph.dag_node_id {
@@ -513,7 +513,7 @@ impl GraphService {
                 .filter(plan_dag_nodes::Column::Id.eq(&dag_node_id))
                 .all(&self.db)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             for dag_node in dag_nodes {
                 // Delete connected edges first
@@ -521,19 +521,19 @@ impl GraphService {
                     .filter(plan_dag_edges::Column::SourceNodeId.eq(&dag_node.id))
                     .exec(&self.db)
                     .await
-                    .map_err(GraphError::Database)?;
+                    .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
                 plan_dag_edges::Entity::delete_many()
                     .filter(plan_dag_edges::Column::TargetNodeId.eq(&dag_node.id))
                     .exec(&self.db)
                     .await
-                    .map_err(GraphError::Database)?;
+                    .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
                 // Delete the node
                 plan_dag_nodes::Entity::delete_by_id(&dag_node.id)
                     .exec(&self.db)
                     .await
-                    .map_err(GraphError::Database)?;
+                    .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
             }
         }
 
@@ -541,7 +541,7 @@ impl GraphService {
         graph_data::Entity::delete_by_id(graph.id)
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(())
     }
@@ -556,7 +556,7 @@ impl GraphService {
         belongs_to: Option<String>,
         weight: Option<f64>,
         attrs: Option<serde_json::Value>,
-    ) -> GraphResult<graph_data_nodes::Model> {
+    ) -> CoreResult<graph_data_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let now = chrono::Utc::now();
@@ -578,7 +578,7 @@ impl GraphService {
         let inserted = active_model
             .insert(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(inserted)
     }
 
@@ -586,7 +586,7 @@ impl GraphService {
         &self,
         graph_id: i32,
         node_id: String,
-    ) -> GraphResult<graph_data_nodes::Model> {
+    ) -> CoreResult<graph_data_nodes::Model> {
         use sea_orm::{EntityTrait, QueryFilter};
 
         // Delete dependent edges to satisfy FK constraints on graph_data_edges
@@ -598,15 +598,15 @@ impl GraphService {
             .filter(edge_condition)
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let node = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("GraphNode", node_id.clone()))?;
 
         // Delete the node
         graph_data_nodes::Entity::delete_many()
@@ -614,7 +614,7 @@ impl GraphService {
             .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(node)
     }
@@ -627,7 +627,7 @@ impl GraphService {
         layer: Option<String>,
         attrs: Option<serde_json::Value>,
         belongs_to: Option<Option<String>>,
-    ) -> GraphResult<graph_data_nodes::Model> {
+    ) -> CoreResult<graph_data_nodes::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let node = graph_data_nodes::Entity::find()
@@ -635,8 +635,8 @@ impl GraphService {
             .filter(graph_data_nodes::Column::ExternalId.eq(&node_id))
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or_else(|| GraphError::InvalidNode(node_id.clone()))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("GraphNode", node_id.clone()))?;
 
         let mut active_model: graph_data_nodes::ActiveModel = node.into();
 
@@ -659,7 +659,7 @@ impl GraphService {
         let updated = active_model
             .update(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(updated)
     }
 
@@ -669,14 +669,14 @@ impl GraphService {
         name: Option<String>,
         alias: Option<String>,
         properties: Option<serde_json::Value>,
-    ) -> GraphResult<graph_layers::Model> {
+    ) -> CoreResult<graph_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let layer = Layers::find_by_id(layer_id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?
-            .ok_or_else(|| GraphError::InvalidLayer(format!("Layer {} not found", layer_id)))?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("GraphLayer", layer_id.to_string()))?;
 
         let mut active_model: graph_layers::ActiveModel = layer.into();
 
@@ -690,7 +690,7 @@ impl GraphService {
 
         if let Some(properties) = properties {
             let properties_string = serde_json::to_string(&properties).map_err(|e| {
-                GraphError::Validation(format!("Invalid layer properties JSON: {}", e))
+                CoreError::validation(format!("Invalid layer properties JSON: {}", e))
             })?;
             active_model.properties = Set(Some(properties_string));
         }
@@ -698,14 +698,14 @@ impl GraphService {
         let updated = active_model
             .update(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(updated)
     }
 
     pub async fn list_project_layers(
         &self,
         project_id: i32,
-    ) -> GraphResult<Vec<project_layers::Model>> {
+    ) -> CoreResult<Vec<project_layers::Model>> {
         // Ensure palette exists by seeding from layer datasets if empty
         self.seed_project_layers_if_empty(project_id).await?;
 
@@ -715,7 +715,7 @@ impl GraphService {
             .order_by_asc(project_layers::Column::LayerId)
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         Ok(layers)
     }
 
@@ -731,7 +731,7 @@ impl GraphService {
         alias: Option<String>,
         source_dataset_id: Option<i32>,
         enabled: bool,
-    ) -> GraphResult<project_layers::Model> {
+    ) -> CoreResult<project_layers::Model> {
         use sea_orm::{ActiveModelTrait, Set};
 
         let alias = Self::normalize_alias(alias);
@@ -747,7 +747,7 @@ impl GraphService {
         let existing = existing_query
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         let now = chrono::Utc::now();
 
@@ -761,7 +761,7 @@ impl GraphService {
             active.enabled = Set(enabled);
             active.updated_at = Set(now);
 
-            active.update(&self.db).await.map_err(GraphError::Database)
+            active.update(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))
         } else {
             let active = project_layers::ActiveModel {
                 id: sea_orm::ActiveValue::NotSet,
@@ -778,7 +778,7 @@ impl GraphService {
                 updated_at: Set(now),
             };
 
-            active.insert(&self.db).await.map_err(GraphError::Database)
+            active.insert(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))
         }
     }
 
@@ -787,7 +787,7 @@ impl GraphService {
         project_id: i32,
         layer_id: String,
         source_dataset_id: Option<i32>,
-    ) -> GraphResult<u64> {
+    ) -> CoreResult<u64> {
         use crate::database::entities::layer_aliases;
 
         // Find the layer first
@@ -799,7 +799,7 @@ impl GraphService {
         } else {
             query.filter(project_layers::Column::SourceDatasetId.is_null())
         };
-        let layer = query.one(&self.db).await.map_err(GraphError::Database)?;
+        let layer = query.one(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if let Some(layer_model) = layer {
             // Delete all aliases pointing to this layer
@@ -807,13 +807,13 @@ impl GraphService {
                 .filter(layer_aliases::Column::TargetLayerId.eq(layer_model.id))
                 .exec(&self.db)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             // Now delete the layer itself
             let result = project_layers::Entity::delete_by_id(layer_model.id)
                 .exec(&self.db)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             Ok(result.rows_affected)
         } else {
@@ -827,28 +827,28 @@ impl GraphService {
         project_id: i32,
         dataset_id: i32,
         enabled: bool,
-    ) -> GraphResult<usize> {
+    ) -> CoreResult<usize> {
         let updated = self
             .seed_layers_from_dataset(project_id, dataset_id, enabled)
             .await?;
         Ok(updated)
     }
 
-    pub async fn reset_project_layers(&self, project_id: i32) -> GraphResult<()> {
+    pub async fn reset_project_layers(&self, project_id: i32) -> CoreResult<()> {
         let now = chrono::Utc::now();
 
         layer_aliases::Entity::delete_many()
             .filter(layer_aliases::Column::ProjectId.eq(project_id))
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         project_layers::Entity::delete_many()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .filter(project_layers::Column::SourceDatasetId.is_null())
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         project_layers::Entity::update_many()
             .col_expr(project_layers::Column::Enabled, Expr::value(false))
@@ -857,12 +857,12 @@ impl GraphService {
             .filter(project_layers::Column::SourceDatasetId.is_not_null())
             .exec(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(())
     }
 
-    pub async fn missing_layers(&self, project_id: i32) -> GraphResult<Vec<String>> {
+    pub async fn missing_layers(&self, project_id: i32) -> CoreResult<Vec<String>> {
         // Get enabled project layers to build the known set. Disabled entries should be treated
         // as missing so that palette coverage reflects the active configuration.
         let enabled_layers = project_layers::Entity::find()
@@ -870,7 +870,7 @@ impl GraphService {
             .filter(project_layers::Column::Enabled.eq(true))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         let mut enabled_layer_ids = HashSet::new();
         let mut known: HashSet<String> = HashSet::new();
         for layer in enabled_layers {
@@ -884,7 +884,7 @@ impl GraphService {
             .filter(layer_aliases::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         for alias in aliases {
             if enabled_layer_ids.contains(&alias.target_layer_id) {
                 known.insert(alias.alias_layer_id);
@@ -896,7 +896,7 @@ impl GraphService {
             .filter(graph_data::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
             .into_iter()
             .map(|gd| gd.id)
             .collect();
@@ -911,7 +911,7 @@ impl GraphService {
             .filter(graph_data_nodes::Column::GraphDataId.is_in(gd_ids.clone()))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         for node in node_layers {
             if let Some(layer) = node.layer {
                 let trimmed = layer.trim();
@@ -925,7 +925,7 @@ impl GraphService {
             .filter(graph_data_edges::Column::GraphDataId.is_in(gd_ids))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
         for edge in edge_layers {
             if let Some(layer) = edge.layer {
                 let trimmed = layer.trim();
@@ -947,14 +947,14 @@ impl GraphService {
         &self,
         project_id: i32,
         layer_id: &str,
-    ) -> GraphResult<Option<Layer>> {
+    ) -> CoreResult<Option<Layer>> {
         // 1. Try to find direct match in project_layers
         let direct_layer = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .filter(project_layers::Column::LayerId.eq(layer_id))
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if let Some(layer) = direct_layer {
             return Ok(Some(self.hydrate_project_layer(project_id, layer).await?));
@@ -966,14 +966,14 @@ impl GraphService {
             .filter(layer_aliases::Column::AliasLayerId.eq(layer_id))
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if let Some(alias_record) = alias {
             // Get the target layer
             let target_layer = project_layers::Entity::find_by_id(alias_record.target_layer_id)
                 .one(&self.db)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             if let Some(target) = target_layer {
                 // Return layer using the alias ID but with target layer's colors
@@ -998,7 +998,7 @@ impl GraphService {
 
     /// Get all layers for a project, including aliases as separate layer entries
     /// Only returns enabled layers (or aliases pointing to enabled layers)
-    pub async fn get_all_resolved_layers(&self, project_id: i32) -> GraphResult<Vec<Layer>> {
+    pub async fn get_all_resolved_layers(&self, project_id: i32) -> CoreResult<Vec<Layer>> {
         let mut layers = Vec::new();
 
         // Get all direct layers (only enabled ones)
@@ -1007,7 +1007,7 @@ impl GraphService {
             .filter(project_layers::Column::Enabled.eq(true))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         for layer in direct_layers {
             layers.push(self.hydrate_project_layer(project_id, layer).await?);
@@ -1018,14 +1018,14 @@ impl GraphService {
             .filter(layer_aliases::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         for alias_record in aliases {
             // Get the target layer
             let target_layer = project_layers::Entity::find_by_id(alias_record.target_layer_id)
                 .one(&self.db)
                 .await
-                .map_err(GraphError::Database)?;
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
             if let Some(target) = target_layer {
                 // Only include if the target layer is enabled
@@ -1053,7 +1053,7 @@ impl GraphService {
         &self,
         project_id: i32,
         layer: project_layers::Model,
-    ) -> GraphResult<Layer> {
+    ) -> CoreResult<Layer> {
         let (background_color, text_color, border_color) =
             self.resolve_layer_colors(project_id, &layer).await?;
 
@@ -1073,7 +1073,7 @@ impl GraphService {
         &self,
         project_id: i32,
         layer: &project_layers::Model,
-    ) -> GraphResult<(String, String, String)> {
+    ) -> CoreResult<(String, String, String)> {
         let mut background_color = sanitize_hex(&layer.background_color, "FFFFFF");
         let mut text_color = sanitize_hex(&layer.text_color, "000000");
         let mut border_color = sanitize_hex(&layer.border_color, "000000");
@@ -1117,7 +1117,7 @@ impl GraphService {
         &self,
         project_id: i32,
         layer_id: &str,
-    ) -> GraphResult<Option<project_layers::Model>> {
+    ) -> CoreResult<Option<project_layers::Model>> {
         let manual = project_layers::Entity::find()
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .filter(project_layers::Column::LayerId.eq(layer_id))
@@ -1125,7 +1125,7 @@ impl GraphService {
             .filter(project_layers::Column::SourceDatasetId.is_null())
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if manual.is_some() {
             return Ok(manual);
@@ -1139,7 +1139,7 @@ impl GraphService {
             .order_by_asc(project_layers::Column::Id)
             .one(&self.db)
             .await
-            .map_err(GraphError::Database)?;
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(fallback)
     }

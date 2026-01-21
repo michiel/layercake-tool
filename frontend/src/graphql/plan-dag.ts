@@ -311,8 +311,8 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
 
 // Delta-based subscription for JSON Patch updates
 export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
-  subscription PlanDagDeltaChanged($projectId: Int!, $planId: Int) {
-    planDagDeltaChanged(projectId: $projectId, planId: $planId) {
+  subscription PlanDagDeltaChanged($projectId: Int!) {
+    planDagDeltaChanged(projectId: $projectId) {
       projectId
       version
       userId

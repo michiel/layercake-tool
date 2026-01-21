@@ -52,7 +52,11 @@ async fn main() -> anyhow::Result<()> {
     Migrator::up(&db, None).await?;
 
     let app = Arc::new(layercake_core::app_context::AppContext::new(db.clone()));
-    let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
+    let system_settings = Arc::new(
+        SystemSettingsService::new(db.clone())
+            .await
+            .map_err(anyhow::Error::from)?,
+    );
     let chat_manager = Arc::new(ChatManager::new());
     let gql_context = GraphQLContext::new(app, system_settings, chat_manager);
 

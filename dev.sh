@@ -37,6 +37,7 @@ FRONTEND_DIR="frontend"
 PROJECTIONS_DIR="projections-frontend"
 TAURI_DIR="src-tauri"
 LOG_LEVEL="${LOG_LEVEL:-debug}"
+LOCAL_AUTH_BYPASS="${LAYERCAKE_LOCAL_AUTH_BYPASS:-1}"
 
 # Function to print colored output
 print_status() {
@@ -172,6 +173,7 @@ else
     print_status "Frontend port: $FRONTEND_PORT"
 fi
 print_status "Log level: $LOG_LEVEL"
+print_status "Local auth bypass: $LOCAL_AUTH_BYPASS"
 
 # Initialize database if it doesn't exist
 if [[ ! -f "layercake.db" ]]; then
@@ -188,7 +190,7 @@ if [[ "$TAURI_MODE" == "true" ]]; then
     print_status "Starting Tauri desktop application (this may take a moment to compile)..."
 
     # Tauri dev command handles both backend and frontend
-    cargo tauri dev > tauri.log 2>&1 &
+    LAYERCAKE_LOCAL_AUTH_BYPASS="$LOCAL_AUTH_BYPASS" cargo tauri dev > tauri.log 2>&1 &
     TAURI_PID=$!
 
     # Wait for Tauri to start

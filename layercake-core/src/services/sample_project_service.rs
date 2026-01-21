@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use chrono::Utc;
 use include_dir::{include_dir, Dir, File};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, Set};
@@ -9,7 +8,9 @@ use uuid::Uuid;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
+use crate::errors::{CoreError, CoreResult};
 use crate::services::{data_set_service::DataSetService, graph_service::GraphService};
+use crate::auth::Actor;
 
 static SAMPLE_PROJECT_DIR: Dir<'_> = include_dir!("../resources/sample-v1");
 
@@ -66,7 +67,11 @@ impl SampleProjectService {
     }
 
     /// Create a new project seeded with the requested sample bundle.
-    pub async fn create_sample_project(&self, sample_key: &str) -> Result<projects::Model> {
+    pub async fn create_sample_project(
+        &self,
+        _actor: &Actor,
+        sample_key: &str,
+    ) -> CoreResult<projects::Model> {
         let assets = self.load_assets(sample_key)?;
         debug!("Creating sample project for key {}", sample_key);
 
@@ -74,7 +79,10 @@ impl SampleProjectService {
         let mut project = projects::ActiveModel::new();
         project.name = Set(assets.metadata.name.clone());
         project.description = Set(assets.metadata.description.clone());
-        let project = project.insert(&self.db).await?;
+        let project = project
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to create sample project").with_source(e))?;
 
         // Create default plan for project
         let now = Utc::now();
@@ -92,7 +100,8 @@ impl SampleProjectService {
             updated_at: Set(now),
         }
         .insert(&self.db)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to create sample project plan").with_source(e))?;
 
         // Create data sources for nodes, edges, layers
         let data_set_service = DataSetService::new(self.db.clone());
@@ -153,7 +162,9 @@ impl SampleProjectService {
                 created_at: Set(now),
                 updated_at: Set(now),
             };
-            node.insert(&self.db).await?;
+            node.insert(&self.db)
+                .await
+                .map_err(|e| CoreError::internal("Failed to create sample dataset node").with_source(e))?;
             dataset_nodes.push(node_id);
         }
 
@@ -179,7 +190,8 @@ impl SampleProjectService {
             updated_at: Set(now),
         }
         .insert(&self.db)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to create sample merge node").with_source(e))?;
 
         // Graph node that consumes merge output
         let graph_service = GraphService::new(self.db.clone());
@@ -202,7 +214,8 @@ impl SampleProjectService {
             updated_at: Set(now),
         }
         .insert(&self.db)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to create sample graph node").with_source(e))?;
 
         let graph = graph_service
             .create_graph(project.id, graph_label.clone(), Some(graph_node_id.clone()))
@@ -211,7 +224,10 @@ impl SampleProjectService {
         // Update Plan DAG node config with graph metadata
         if let Some(existing_graph_node) = plan_dag_nodes::Entity::find_by_id(&graph_node_id)
             .one(&self.db)
-            .await?
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to load sample graph node").with_source(e)
+            })?
         {
             let mut graph_node_active: plan_dag_nodes::ActiveModel = existing_graph_node.into();
             graph_node_active.config_json = Set(serde_json::json!({
@@ -226,7 +242,12 @@ impl SampleProjectService {
             .to_string());
             graph_node_active.metadata_json = Set(graph_metadata_json);
             graph_node_active.updated_at = Set(Utc::now());
-            graph_node_active.update(&self.db).await?;
+            graph_node_active
+                .update(&self.db)
+                .await
+                .map_err(|e| {
+                    CoreError::internal("Failed to update sample graph node").with_source(e)
+                })?;
         }
 
         // Connect data sources -> merge node
@@ -243,7 +264,10 @@ impl SampleProjectService {
                 updated_at: Set(now),
             }
             .insert(&self.db)
-            .await?;
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to connect sample datasets").with_source(e)
+            })?;
         }
 
         // Connect merge node -> graph node
@@ -258,15 +282,16 @@ impl SampleProjectService {
             updated_at: Set(now),
         }
         .insert(&self.db)
-        .await?;
+        .await
+        .map_err(|e| CoreError::internal("Failed to connect sample graph").with_source(e))?;
 
         Ok(project)
     }
 
-    fn load_assets(&self, sample_key: &str) -> Result<SampleProjectAssets> {
+    fn load_assets(&self, sample_key: &str) -> CoreResult<SampleProjectAssets> {
         let dir = SAMPLE_PROJECT_DIR
             .get_dir(sample_key)
-            .ok_or_else(|| anyhow!("Sample '{sample_key}' not found"))?;
+            .ok_or_else(|| CoreError::not_found("SampleProject", sample_key.to_string()))?;
 
         let metadata = Self::extract_metadata(&dir, sample_key.to_string())?;
         let nodes = Self::read_sample_file(&dir, &["nodes.csv"], sample_key, "nodes")?;
@@ -281,7 +306,7 @@ impl SampleProjectService {
         })
     }
 
-    fn extract_metadata(dir: &Dir<'_>, key: String) -> Result<SampleProjectMetadata> {
+    fn extract_metadata(dir: &Dir<'_>, key: String) -> CoreResult<SampleProjectMetadata> {
         let plan_yaml = dir
             .get_file("plan.yaml")
             .and_then(|plan| serde_yaml::from_slice::<Value>(plan.contents()).ok());
@@ -315,7 +340,7 @@ impl SampleProjectService {
         candidate_names: &[&str],
         sample_key: &str,
         label: &str,
-    ) -> Result<SampleFile> {
+    ) -> CoreResult<SampleFile> {
         if let Some(file) = Self::find_file(dir, candidate_names) {
             let filename = file
                 .path()
@@ -325,9 +350,9 @@ impl SampleProjectService {
             let contents = file.contents().to_vec();
             Ok(SampleFile { filename, contents })
         } else {
-            Err(anyhow!(
-                "Sample '{sample_key}' missing {label} file (looked for {})",
-                candidate_names.join(", ")
+            Err(CoreError::not_found(
+                "SampleProjectAsset",
+                format!("{sample_key}:{label}"),
             ))
         }
     }
@@ -359,7 +384,7 @@ impl SampleProjectService {
         file: &SampleFile,
         data_type: DataType,
         label: &str,
-    ) -> Result<data_sets::Model> {
+    ) -> CoreResult<data_sets::Model> {
         let description = format!("{} {} sample dataset", metadata.name, label);
         data_set_service
             .create_from_file(

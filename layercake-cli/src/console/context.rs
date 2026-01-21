@@ -73,7 +73,11 @@ impl fmt::Display for ProjectSelection {
 
 impl ConsoleContext {
     pub async fn bootstrap(db: DatabaseConnection) -> Result<Self> {
-        let system_settings = Arc::new(SystemSettingsService::new(db.clone()).await?);
+        let system_settings = Arc::new(
+            SystemSettingsService::new(db.clone())
+                .await
+                .map_err(anyhow::Error::from)?,
+        );
         Ok(Self {
             db,
             system_settings,

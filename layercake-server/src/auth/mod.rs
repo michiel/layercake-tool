@@ -5,6 +5,10 @@ pub struct DefaultAuthorizer;
 
 impl Authorizer for DefaultAuthorizer {
     fn authorize(&self, actor: &Actor, action: &str) -> Result<(), CoreError> {
+        if local_auth_bypass_enabled() {
+            return Ok(());
+        }
+
         if actor.is_system() {
             return Ok(());
         }
@@ -42,4 +46,14 @@ impl Authorizer for DefaultAuthorizer {
             action
         )))
     }
+}
+
+fn local_auth_bypass_enabled() -> bool {
+    std::env::var("LAYERCAKE_LOCAL_AUTH_BYPASS")
+        .ok()
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
+        })
+        .unwrap_or(false)
 }
