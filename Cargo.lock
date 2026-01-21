@@ -3521,7 +3521,7 @@ checksum = "507460a910eb7b32ee961886ff48539633b788a36b65692b95f225b844c82553"
 
 [[package]]
 name = "layercake-cli"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3547,7 +3547,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-code-analysis"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3573,7 +3573,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-core"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3618,7 +3618,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-genai"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3680,7 +3680,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-server"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -3731,7 +3731,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-tauri"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "axum",
@@ -3756,7 +3756,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-test-utils"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "anyhow",
  "sea-orm",
