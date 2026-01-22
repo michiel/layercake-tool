@@ -253,7 +253,8 @@ else
     # Start backend server
     print_status "Starting backend server (this may take a moment to compile)..."
     cd "$BACKEND_DIR"
-    cargo run --bin layercake -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > backend.log 2>&1 &
+    LAYERCAKE_LOCAL_AUTH_BYPASS="$LOCAL_AUTH_BYPASS" \
+      cargo run --bin layercake -- serve --port $BACKEND_PORT --log-level $LOG_LEVEL --cors-origin "http://localhost:$FRONTEND_PORT" > backend.log 2>&1 &
     BACKEND_PID=$!
     cd - > /dev/null
 

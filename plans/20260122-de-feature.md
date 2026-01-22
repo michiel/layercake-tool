@@ -58,6 +58,7 @@ Eliminate the under-developed RAG/chat/genAI surface and the MCP infrastructure 
 - **2026-01-27**: Reconciled `GraphQLContext::new` tests with the slimmed context signature (no `ChatManager`), refreshed the console command docs, trimmed `.env.example` so the example environment no longer advertises the removed chat/MCP stack, and validated the narrowed workspace with `cargo check` and `npm run frontend:build` (both pass with pre-existing warnings about unused imports/dynamic imports).
 - **2026-01-28**: Updated `README.md` and `AGENTS.md` to describe the reduced surface, linked back to this plan as the authoritative record, and confirmed there are no further high-level docs that still advertise chat/RAG/MCP functionality.
 - **2026-01-29**: Added placeholder migrations for the deleted chat/RAG tables so the migration log remains consistent when the database applies previously-run versions, and reran `cargo build` to verify the workspace compiles clean despite lingering unused-import/dead-code warnings.
+- **2026-01-30**: Updated `dev.sh` to export `LAYERCAKE_LOCAL_AUTH_BYPASS` when launching the backend so local plan edits remain authorized even though the `.env` sample no longer lists that variable.
 
 ## Immediate next steps
 - None; the de-feature work is fully documented and complete.
