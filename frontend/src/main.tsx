@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { Stack } from '@/components/layout-primitives'
 import { ThemeProvider } from '@/components/theme/theme-provider'
 import { TagsFilterProvider } from '@/hooks/useTagsFilter'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 // Tailwind CSS
 import './index.css'
@@ -82,18 +83,20 @@ if (isTauriApp()) {
         <React.StrictMode>
           <ApolloProvider client={apolloClient}>
             <Toaster />
-            <BrowserRouter>
-              <ThemeProvider
-                attribute="class"
-                defaultTheme="light"
-                enableSystem={false}
-                storageKey="layercake-theme"
-              >
-                <TagsFilterProvider>
-                  <App />
-                </TagsFilterProvider>
-              </ThemeProvider>
-            </BrowserRouter>
+            <TooltipProvider>
+              <BrowserRouter>
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="light"
+                  enableSystem={false}
+                  storageKey="layercake-theme"
+                >
+                  <TagsFilterProvider>
+                    <App />
+                  </TagsFilterProvider>
+                </ThemeProvider>
+              </BrowserRouter>
+            </TooltipProvider>
           </ApolloProvider>
         </React.StrictMode>
       )
@@ -125,18 +128,20 @@ if (isTauriApp()) {
     <React.StrictMode>
       <ApolloProvider client={apolloClient}>
         <Toaster />
-        <BrowserRouter>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="light"
-            enableSystem={false}
-            storageKey="layercake-theme"
-          >
-            <TagsFilterProvider>
-              <App />
-            </TagsFilterProvider>
-          </ThemeProvider>
-        </BrowserRouter>
+        <TooltipProvider>
+          <BrowserRouter>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="light"
+              enableSystem={false}
+              storageKey="layercake-theme"
+            >
+              <TagsFilterProvider>
+                <App />
+              </TagsFilterProvider>
+            </ThemeProvider>
+          </BrowserRouter>
+        </TooltipProvider>
       </ApolloProvider>
     </React.StrictMode>
   )

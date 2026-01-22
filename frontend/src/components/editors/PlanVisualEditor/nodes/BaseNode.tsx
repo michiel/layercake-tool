@@ -226,32 +226,37 @@ export const BaseNode = memo(({
     setIsEditingLabel(false)
   }
 
-const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
-  event.stopPropagation()
-  event.preventDefault()
-  if (event.button !== 0) return
-  callback?.()
-}
-
-const copyTextToClipboard = async (value: string) => {
-  if (!value) return
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      await navigator.clipboard.writeText(value)
-    } else {
-      const textArea = document.createElement('textarea')
-      textArea.value = value
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-    }
-    showSuccessNotification('Copied ID', value)
-  } catch (error) {
-    console.error('Failed to copy node identifier', error)
-    showErrorNotification('Copy failed', 'Unable to copy the node identifier.')
+  const handleButtonPointerDown = (event: React.PointerEvent) => {
+    event.stopPropagation()
+    event.preventDefault()
   }
-}
+
+  const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
+    event.stopPropagation()
+    event.preventDefault()
+    if (event.button !== 0) return
+    callback?.()
+  }
+
+  const copyTextToClipboard = async (value: string) => {
+    if (!value) return
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const textArea = document.createElement('textarea')
+        textArea.value = value
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+      }
+      showSuccessNotification('Copied ID', value)
+    } catch (error) {
+      console.error('Failed to copy node identifier', error)
+      showErrorNotification('Copy failed', 'Unable to copy the node identifier.')
+    }
+  }
 
   const handleCopyNodeId = useCallback(() => {
     copyTextToClipboard(canonicalNodeId)
@@ -266,9 +271,10 @@ const copyTextToClipboard = async (value: string) => {
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50"
+              className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/50 nodrag"
               data-action-icon="edit-label"
-              onMouseDown={(e) => handleButtonClick(e, () => setIsEditingLabel(true))}
+              onPointerDown={handleButtonPointerDown}
+              onClick={(e) => handleButtonClick(e, () => setIsEditingLabel(true))}
             >
               <IconSettings size={13} />
             </Button>
@@ -282,9 +288,10 @@ const copyTextToClipboard = async (value: string) => {
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
+              className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50 nodrag"
               data-action-icon="edit"
-              onMouseDown={(e) => handleButtonClick(e, onEdit)}
+              onPointerDown={handleButtonPointerDown}
+              onClick={(e) => handleButtonClick(e, onEdit)}
             >
               <IconSettings size={13} />
             </Button>
@@ -297,9 +304,10 @@ const copyTextToClipboard = async (value: string) => {
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
+            className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50 nodrag"
             data-action-icon="copy"
-            onMouseDown={(e) => handleButtonClick(e, handleCopyNodeId)}
+            onPointerDown={handleButtonPointerDown}
+            onClick={(e) => handleButtonClick(e, handleCopyNodeId)}
           >
             <IconCopy size={13} />
           </Button>
@@ -311,14 +319,15 @@ const copyTextToClipboard = async (value: string) => {
           <Button
             size="icon"
             variant="ghost"
-            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50"
+            className="h-7 w-7 text-red-600 hover:text-red-700 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/50 nodrag"
             data-action-icon="delete"
-            onMouseDown={(e) => handleButtonClick(e, onDelete)}
+            onPointerDown={handleButtonPointerDown}
+            onClick={(e) => handleButtonClick(e, onDelete)}
           >
-              <IconTrash size={13} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Delete node</TooltipContent>
+            <IconTrash size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Delete node</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )
@@ -509,14 +518,26 @@ const copyTextToClipboard = async (value: string) => {
               </Button>
             </Group>
           ) : (
-            <div className="flex flex-col gap-1" style={{ flex: 1, minWidth: 0 }}>
+            <div className="flex items-center justify-between gap-2" style={{ flex: 1, minWidth: 0 }}>
               <p className="text-sm font-semibold line-clamp-2" style={{ wordBreak: 'break-word' }}>
                 {metadata.label}
               </p>
               {canonicalNodeId && (
-                <p className="text-[10px] text-muted-foreground font-mono break-all">
-                  {canonicalNodeId}
-                </p>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-6 w-6 rounded-full text-muted-foreground hover:text-foreground nodrag"
+                      onPointerDown={handleButtonPointerDown}
+                      onClick={(e) => handleButtonClick(e, handleCopyNodeId)}
+                      aria-label="Copy canonical node ID"
+                    >
+                      <IconCopy size={12} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Copy node identifier</TooltipContent>
+                </Tooltip>
               )}
             </div>
           )}
