@@ -13,6 +13,7 @@ import { GET_DATASOURCE, DataSet } from '../../../../graphql/datasets'
 import { getExecutionStateLabel, getExecutionStateColor, isExecutionComplete, isExecutionInProgress } from '../../../../graphql/preview'
 import { DataSetDataDialog } from '../dialogs/DataSetDataDialog'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 
 interface DataSetNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -21,7 +22,8 @@ interface DataSetNodeProps extends NodeProps {
 }
 
 export const DataSetNode = memo((props: DataSetNodeProps) => {
-  const { data, onEdit, onDelete, readonly = false } = props
+  const { data, readonly = false } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
   const [dataSourceInfo, setDataSetInfo] = useState<DataSet | null>(null)
   const [showDataDialog, setShowDataDialog] = useState(false)
 
@@ -119,8 +121,8 @@ export const DataSetNode = memo((props: DataSetNodeProps) => {
         nodeType={PlanDagNodeType.DATA_SOURCE}
         config={config}
         metadata={data.metadata}
-        onEdit={() => onEdit?.(props.id)}
-        onDelete={() => onDelete?.(props.id)}
+        onEdit={() => resolvedOnEdit?.(props.id)}
+        onDelete={() => resolvedOnDelete?.(props.id)}
         readonly={readonly}
         edges={edges}
         hasValidConfig={hasValidConfig}

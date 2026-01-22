@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { NodeProps } from 'reactflow'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { PlanDagNodeType, MergeNodeConfig } from '../../../../types/plan-dag'
 
 interface MergeNodeProps extends NodeProps {
@@ -9,7 +10,8 @@ interface MergeNodeProps extends NodeProps {
 }
 
 export const MergeNode = memo((props: MergeNodeProps) => {
-  const { data, onEdit, onDelete } = props
+  const { data } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
   const config = data.config as MergeNodeConfig
 
   // Footer content with merge strategy
@@ -25,8 +27,8 @@ export const MergeNode = memo((props: MergeNodeProps) => {
       nodeType={PlanDagNodeType.MERGE}
       config={data.config}
       metadata={data.metadata}
-      onEdit={() => onEdit?.(props.id)}
-      onDelete={() => onDelete?.(props.id)}
+      onEdit={() => resolvedOnEdit?.(props.id)}
+      onDelete={() => resolvedOnDelete?.(props.id)}
       readonly={data.readonly}
       edges={data.edges}
       hasValidConfig={data.hasValidConfig}

@@ -18,6 +18,7 @@ import { PlanDagNodeType, SequenceArtefactNodeConfig } from '../../../../types/p
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/export'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog } from '../../../visualization'
 
@@ -28,7 +29,8 @@ interface ExtendedNodeProps extends NodeProps {
 }
 
 export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
-  const { data, onEdit, onDelete, readonly = false } = props
+  const { data, readonly = false } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
   const [downloading, setDownloading] = useState(false)
   const [mermaidOpen, setMermaidOpen] = useState(false)
   const [mermaidContent, setMermaidContent] = useState('')
@@ -206,8 +208,8 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
         nodeType={PlanDagNodeType.SEQUENCE_ARTEFACT}
         config={config}
         metadata={displayMetadata}
-        onEdit={() => onEdit?.(props.id)}
-        onDelete={() => onDelete?.(props.id)}
+        onEdit={() => resolvedOnEdit?.(props.id)}
+        onDelete={() => resolvedOnDelete?.(props.id)}
         readonly={readonly}
         edges={edges}
         hasValidConfig={hasValidConfig}

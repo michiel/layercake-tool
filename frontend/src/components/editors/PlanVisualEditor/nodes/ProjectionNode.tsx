@@ -6,6 +6,7 @@ import { IconPresentation, IconExternalLink, IconDownload } from '@tabler/icons-
 import { PlanDagNodeType, ProjectionNodeConfig } from '../../../../types/plan-dag'
 import { isNodeConfigured } from '../../../../utils/planDagValidation'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { Badge } from '@/components/ui/badge'
 import { Stack } from '@/components/layout-primitives'
 import { Button } from '@/components/ui/button'
@@ -30,7 +31,8 @@ interface ExtendedNodeProps extends NodeProps {
 }
 
 export const ProjectionNode = memo((props: ExtendedNodeProps) => {
-  const { data, onEdit, onDelete, readonly = false } = props
+  const { data, readonly = false } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
 
   const config = data.config as ProjectionNodeConfig
   const edges = data.edges || []
@@ -152,8 +154,8 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
       nodeType={PlanDagNodeType.PROJECTION}
       config={config}
       metadata={data.metadata}
-      onEdit={() => onEdit?.(props.id)}
-      onDelete={() => onDelete?.(props.id)}
+      onEdit={() => resolvedOnEdit?.(props.id)}
+      onDelete={() => resolvedOnDelete?.(props.id)}
       readonly={readonly}
       edges={edges}
       hasValidConfig={hasValidConfig}

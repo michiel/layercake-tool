@@ -25,6 +25,7 @@ import type { GraphData } from '../../../visualization/GraphPreview'
 import { GraphDataDialog } from '../dialogs/GraphDataDialog'
 import { useNavigate } from 'react-router-dom'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { UPDATE_GRAPH, VALIDATE_GRAPH, type GraphValidationResult } from '../../../../graphql/graphs'
@@ -47,7 +48,8 @@ interface GraphNodeProps extends NodeProps {
 }
 
 export const GraphNode = memo((props: GraphNodeProps) => {
-  const { data, onEdit, onDelete, readonly = false } = props
+  const { data, readonly = false } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
   const [showPreview, setShowPreview] = useState(false)
   const [showDataDialog, setShowDataDialog] = useState(false)
   const [showAnnotations, setShowAnnotations] = useState(false)
@@ -276,7 +278,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
             onMouseDown={(e: React.MouseEvent) => {
               e.stopPropagation()
               e.preventDefault()
-              onEdit?.(props.id)
+              resolvedOnEdit?.(props.id)
             }}
           >
             <IconSettings size={13} />
@@ -294,7 +296,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
             onMouseDown={(e: React.MouseEvent) => {
               e.stopPropagation()
               e.preventDefault()
-              onDelete?.(props.id)
+              resolvedOnDelete?.(props.id)
             }}
           >
             <IconTrash size={13} />
@@ -348,8 +350,8 @@ export const GraphNode = memo((props: GraphNodeProps) => {
         nodeType={PlanDagNodeType.GRAPH}
         config={config}
         metadata={data.metadata}
-        onEdit={() => onEdit?.(props.id)}
-        onDelete={() => onDelete?.(props.id)}
+        onEdit={() => resolvedOnEdit?.(props.id)}
+        onDelete={() => resolvedOnDelete?.(props.id)}
         onLabelChange={handleLabelChange}
         readonly={readonly}
         edges={edges}

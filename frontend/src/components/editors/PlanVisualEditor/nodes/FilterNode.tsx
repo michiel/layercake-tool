@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react'
 import { NodeProps } from 'reactflow'
 import { Stack } from '@/components/layout-primitives'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { PlanDagNodeType, QueryFilterConfig } from '../../../../types/plan-dag'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { extractQueryConfigFromRaw } from '../forms/filterConfigUtils'
@@ -40,7 +41,8 @@ interface FilterNodeProps extends NodeProps {
 }
 
 export const FilterNode = memo((props: FilterNodeProps) => {
-  const { data, onEdit, onDelete } = props
+  const { data } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
 
   // Get project ID from context
   const projectId = data.projectId as number | undefined
@@ -67,8 +69,8 @@ export const FilterNode = memo((props: FilterNodeProps) => {
       nodeType={PlanDagNodeType.FILTER}
       config={data.config}
       metadata={data.metadata}
-      onEdit={() => onEdit?.(props.id)}
-      onDelete={() => onDelete?.(props.id)}
+      onEdit={() => resolvedOnEdit?.(props.id)}
+      onDelete={() => resolvedOnDelete?.(props.id)}
       onLabelChange={handleLabelChange}
       readonly={data.readonly}
       edges={data.edges}

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { IconFileText } from '@tabler/icons-react'
 import { BaseNode } from './BaseNode'
+import { resolveNodeHandlers } from './nodeHandlers'
 import { PlanDagNodeType, GraphTransform } from '../../../../types/plan-dag'
 import { usePlanDagCQRSMutations } from '../../../../hooks/usePlanDagCQRSMutations'
 import { useGraphPreview } from '../../../../hooks/usePreview'
@@ -80,7 +81,8 @@ interface TransformNodeProps extends NodeProps {
 }
 
 export const TransformNode = memo((props: TransformNodeProps) => {
-  const { data, onEdit, onDelete } = props
+  const { data } = props
+  const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
   const [showAnnotations, setShowAnnotations] = useState(false)
 
   // Get project ID from context
@@ -123,8 +125,8 @@ export const TransformNode = memo((props: TransformNodeProps) => {
         nodeType={PlanDagNodeType.TRANSFORM}
         config={data.config}
         metadata={data.metadata}
-        onEdit={() => onEdit?.(props.id)}
-        onDelete={() => onDelete?.(props.id)}
+        onEdit={() => resolvedOnEdit?.(props.id)}
+        onDelete={() => resolvedOnDelete?.(props.id)}
         onLabelChange={handleLabelChange}
         readonly={data.readonly}
         edges={data.edges}
