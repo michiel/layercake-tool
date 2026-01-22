@@ -2,6 +2,7 @@
 
 pub mod auth_service;
 pub mod authorization;
+pub mod cli_graphql_helpers;
 pub mod code_analysis_service;
 pub mod collaboration_service;
 pub mod data_set_service;
