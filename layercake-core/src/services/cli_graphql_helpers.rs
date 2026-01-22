@@ -6,13 +6,12 @@ use serde_json::Value;
 use crate::{
     app_context::{
         AppContext, DataSetSummary, PlanDagEdgeRequest, PlanDagEdgeUpdateRequest,
-        PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanSummary,
+        PlanDagNodeRequest, PlanDagNodeUpdateRequest, PlanDagSnapshot, PlanSummary,
     },
     auth::Actor,
     errors::{CoreError, CoreResult},
-    plan_dag::{
-        PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, PlanDagSnapshot, Position,
-    },
+    plan::{ExportFileType, RenderConfig},
+    plan_dag::{PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position},
 };
 
 /// Shared context injected into CLI helpers that mirror the GraphQL bindings.
@@ -360,5 +359,17 @@ impl CliContext {
             .await?;
 
         Ok(CliPlanDagEdge::new(project_id, plan_id, edge))
+    }
+
+    pub async fn preview_graph_export(
+        &self,
+        graph_id: i32,
+        format: ExportFileType,
+        render_config: Option<RenderConfig>,
+        max_rows: Option<usize>,
+    ) -> CoreResult<String> {
+        self.app
+            .preview_graph_export(&self.actor, graph_id, format, render_config, max_rows)
+            .await
     }
 }

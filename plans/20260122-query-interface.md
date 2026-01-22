@@ -100,7 +100,7 @@ Deliver a JSON-first CLI/REPL query surface that reuses the existing GraphQL ser
 
 ## Status
 - **Stage 1** – GraphQL helper wiring: ✅ extracted shared CLI helpers that reuse `AppContext` services, return canonical IDs (`dataset:*`, `plan:*`, `plannode:*`, `edge:*`), and emit JSON-ready structs from `CliContext`.
-- **Stage 2** – CLI query command: pending; build `layercake query` with Clap JSON inputs/outputs and hook into the helpers above.
+- **Stage 2** – CLI query command: ✅ added `layercake query` with Clap flags, JSON payload handling, and hooks into the shared helpers for datasets, plans, nodes, edges, and exports (download previews + file writes).
 - **Stage 3** – REPL surface: pending; add `layercake repl` that keeps project/plan context and emits one-line JSON responses for agents.
 - **Stage 4** – UI affordances: pending; add copy-ID controls across dataset/plan/node lists so canonical identifiers are easily accessible.
 - **Stage 5** – Documentation: pending; document the query/repl surface and canonical ID strategy in README/CHANGES.

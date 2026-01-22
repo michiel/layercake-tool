@@ -11,6 +11,9 @@ use layercake_server::server;
 #[cfg(feature = "console")]
 mod console;
 
+mod query;
+use query::QueryArgs;
+
 #[cfg(feature = "console")]
 #[derive(Parser)]
 #[clap(author, version, about)]
@@ -37,6 +40,7 @@ enum Commands {
         #[clap(subcommand)]
         command: GenerateCommands,
     },
+    Query(QueryArgs),
     Serve {
         #[clap(short, long, default_value = "3000")]
         port: u16,
@@ -126,6 +130,9 @@ async fn main() -> Result<()> {
                 generate_commands::generate_sample(sample, dir);
             }
         },
+        Commands::Query(query_args) => {
+            query::run_query_command(query_args).await?;
+        }
         Commands::Serve {
             port,
             database,
