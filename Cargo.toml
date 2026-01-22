@@ -3,7 +3,6 @@ members = [
     "layercake-cli",
     "layercake-code-analysis",
     "layercake-core",
-    "layercake-genai",
     "layercake-server",
     "layercake-test-utils",
     "src-tauri",

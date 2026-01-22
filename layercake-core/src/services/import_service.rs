@@ -27,15 +27,15 @@ impl ImportService {
 
     async fn import_layers(&self, graph_id: i32, csv_data: &str) -> CoreResult<usize> {
         let mut reader = ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let headers = reader.headers().map_err(|e| {
-            CoreError::validation(format!("Invalid CSV headers: {}", e))
-        })?.clone();
+        let headers = reader
+            .headers()
+            .map_err(|e| CoreError::validation(format!("Invalid CSV headers: {}", e)))?
+            .clone();
 
         let mut count = 0;
         for record in reader.records() {
-            let record = record.map_err(|e| {
-                CoreError::validation(format!("Invalid CSV record: {}", e))
-            })?;
+            let record =
+                record.map_err(|e| CoreError::validation(format!("Invalid CSV record: {}", e)))?;
 
             let layer_id = record.get(0).unwrap_or("").to_string();
             let name = record.get(1).unwrap_or(&layer_id).to_string();

@@ -465,7 +465,10 @@ impl GraphService {
             error_message: Set(None),
         };
 
-        let graph = graph.insert(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+        let graph = graph
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         Ok(graph)
     }
@@ -761,7 +764,10 @@ impl GraphService {
             active.enabled = Set(enabled);
             active.updated_at = Set(now);
 
-            active.update(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))
+            active
+                .update(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))
         } else {
             let active = project_layers::ActiveModel {
                 id: sea_orm::ActiveValue::NotSet,
@@ -778,7 +784,10 @@ impl GraphService {
                 updated_at: Set(now),
             };
 
-            active.insert(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))
+            active
+                .insert(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))
         }
     }
 
@@ -799,7 +808,10 @@ impl GraphService {
         } else {
             query.filter(project_layers::Column::SourceDatasetId.is_null())
         };
-        let layer = query.one(&self.db).await.map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+        let layer = query
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
 
         if let Some(layer_model) = layer {
             // Delete all aliases pointing to this layer

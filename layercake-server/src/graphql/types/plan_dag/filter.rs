@@ -6,8 +6,8 @@ use serde_json::json;
 use std::collections::HashSet;
 use tracing::warn;
 
-use layercake_core::graph::Graph;
 use crate::graphql::types::scalars::JSON;
+use layercake_core::graph::Graph;
 
 // Filter Node Configuration
 #[derive(SimpleObject, InputObject, Clone, Debug, Serialize)]

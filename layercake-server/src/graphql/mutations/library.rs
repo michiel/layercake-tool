@@ -3,13 +3,13 @@ use base64::{engine::general_purpose, Engine as _};
 use serde_json::json;
 use std::path::PathBuf;
 
-use layercake_core::database::entities::common_types::FileFormat as EntityFileFormat;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     DataSet, ExportProjectArchivePayload, LibraryItem, LibraryItemType, Project,
     UpdateLibraryItemInput, UploadLibraryItemInput,
 };
+use layercake_core::database::entities::common_types::FileFormat as EntityFileFormat;
 use layercake_core::services::library_item_service::{
     infer_data_type, DatasetMetadata, LibraryItemService, SeedLibraryResult, ITEM_TYPE_DATASET,
     ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE, ITEM_TYPE_PROMPT,
@@ -196,13 +196,12 @@ impl LibraryMutation {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
-        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<ExportProjectArchivePayload> {
         let context = ctx.data::<GraphQLContext>()?;
         let actor = context.actor_for_request(ctx).await;
         let archive = context
             .app
-            .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
+            .export_project_archive(&actor, project_id)
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -247,7 +246,6 @@ impl LibraryMutation {
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
         path: String,
-        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
         #[graphql(name = "keepConnection")] keep_connection: Option<bool>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -260,7 +258,6 @@ impl LibraryMutation {
                 &actor,
                 project_id,
                 &target,
-                include_knowledge_base.unwrap_or(false),
                 keep_connection.unwrap_or(false),
             )
             .await
@@ -312,13 +309,12 @@ impl LibraryMutation {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
-        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
         let actor = context.actor_for_request(ctx).await;
         context
             .app
-            .reexport_project_to_connection(&actor, project_id, include_knowledge_base.unwrap_or(false))
+            .reexport_project_to_connection(&actor, project_id)
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -331,7 +327,6 @@ impl LibraryMutation {
         &self,
         ctx: &Context<'_>,
         #[graphql(name = "projectId")] project_id: i32,
-        #[graphql(name = "includeKnowledgeBase")] include_knowledge_base: Option<bool>,
     ) -> Result<Project> {
         let context = ctx.data::<GraphQLContext>()?;
         let actor = context.actor_for_request(ctx).await;
@@ -339,7 +334,7 @@ impl LibraryMutation {
         // Export the project
         let archive = context
             .app
-            .export_project_archive(&actor, project_id, include_knowledge_base.unwrap_or(false))
+            .export_project_archive(&actor, project_id)
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 

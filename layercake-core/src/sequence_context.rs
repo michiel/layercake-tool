@@ -12,9 +12,9 @@ use crate::export::sequence_renderer::{
     SequenceRenderConfigResolved, SequenceRenderContext, SequenceStep, SequenceStorySummary,
     SequenceStoryWithSequences,
 };
+use crate::plan::LayerSourceStyle;
 use crate::sequence_types::{NotePosition, SequenceEdgeRef};
 use crate::story_types::StoryLayerConfig;
-use crate::plan::LayerSourceStyle;
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

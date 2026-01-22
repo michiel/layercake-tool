@@ -74,9 +74,8 @@ impl ValidationService {
         }
 
         // Node IDs should be alphanumeric with underscores
-        let regex = Regex::new(r"^[a-zA-Z0-9_]+$").map_err(|e| {
-            CoreError::internal("Failed to compile node ID regex").with_source(e)
-        })?;
+        let regex = Regex::new(r"^[a-zA-Z0-9_]+$")
+            .map_err(|e| CoreError::internal("Failed to compile node ID regex").with_source(e))?;
         if !regex.is_match(trimmed) {
             return Err(CoreError::validation(
                 "Node ID can only contain letters, numbers, and underscores",
@@ -92,9 +91,8 @@ impl ValidationService {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(json_str).map_err(|e| {
-            CoreError::validation(format!("Invalid JSON configuration: {}", e))
-        })?;
+        let value: Value = serde_json::from_str(json_str)
+            .map_err(|e| CoreError::validation(format!("Invalid JSON configuration: {}", e)))?;
 
         // Check JSON size (prevent excessively large configs)
         let serialized = serde_json::to_string(&value).map_err(|e| {
@@ -132,9 +130,7 @@ impl ValidationService {
 
         // Prevent absolute paths in user input
         if trimmed.starts_with('/') || trimmed.contains(':') {
-            return Err(CoreError::validation(
-                "Absolute file paths are not allowed",
-            ));
+            return Err(CoreError::validation("Absolute file paths are not allowed"));
         }
 
         // Basic path sanitization
@@ -211,9 +207,8 @@ impl ValidationService {
         }
 
         // Must be valid hex color
-        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$").map_err(|e| {
-            CoreError::internal("Failed to compile color regex").with_source(e)
-        })?;
+        let regex = Regex::new(r"^#[0-9A-Fa-f]{6}$")
+            .map_err(|e| CoreError::internal("Failed to compile color regex").with_source(e))?;
         if !regex.is_match(trimmed) {
             return Err(CoreError::validation(
                 "Color must be a valid hex code (e.g., #FF0000)",
@@ -230,15 +225,12 @@ impl ValidationService {
         }
 
         // Validate as JSON
-        let _: Value = serde_json::from_str(data).map_err(|e| {
-            CoreError::validation(format!("Invalid session data JSON: {}", e))
-        })?;
+        let _: Value = serde_json::from_str(data)
+            .map_err(|e| CoreError::validation(format!("Invalid session data JSON: {}", e)))?;
 
         // Limit size
         if data.len() > 1_000 {
-            return Err(CoreError::validation(
-                "Session data is too large (max 1KB)",
-            ));
+            return Err(CoreError::validation("Session data is too large (max 1KB)"));
         }
 
         Ok(data.to_string())
@@ -378,9 +370,8 @@ impl ValidationService {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(metadata_json).map_err(|e| {
-            CoreError::validation(format!("Invalid metadata JSON: {}", e))
-        })?;
+        let value: Value = serde_json::from_str(metadata_json)
+            .map_err(|e| CoreError::validation(format!("Invalid metadata JSON: {}", e)))?;
 
         // Check if it's an object
         if !value.is_object() {
@@ -388,9 +379,8 @@ impl ValidationService {
         }
 
         // Check JSON size (prevent excessively large metadata)
-        let serialized = serde_json::to_string(&value).map_err(|e| {
-            CoreError::internal("Failed to serialize metadata JSON").with_source(e)
-        })?;
+        let serialized = serde_json::to_string(&value)
+            .map_err(|e| CoreError::internal("Failed to serialize metadata JSON").with_source(e))?;
         if serialized.len() > 50_000 {
             return Err(CoreError::validation(
                 "Metadata JSON is too large (max 50KB)",
@@ -406,9 +396,8 @@ impl ValidationService {
             return Ok(Value::Object(serde_json::Map::new()));
         }
 
-        let value: Value = serde_json::from_str(config_json).map_err(|e| {
-            CoreError::validation(format!("Invalid config JSON: {}", e))
-        })?;
+        let value: Value = serde_json::from_str(config_json)
+            .map_err(|e| CoreError::validation(format!("Invalid config JSON: {}", e)))?;
 
         // Check if it's an object
         if !value.is_object() {
@@ -416,9 +405,8 @@ impl ValidationService {
         }
 
         // Check JSON size (prevent excessively large configs)
-        let serialized = serde_json::to_string(&value).map_err(|e| {
-            CoreError::internal("Failed to serialize config JSON").with_source(e)
-        })?;
+        let serialized = serde_json::to_string(&value)
+            .map_err(|e| CoreError::internal("Failed to serialize config JSON").with_source(e))?;
         if serialized.len() > 100_000 {
             return Err(CoreError::validation(
                 "Config JSON is too large (max 100KB)",

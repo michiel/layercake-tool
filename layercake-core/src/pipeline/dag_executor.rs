@@ -9,14 +9,14 @@ use tracing::{debug_span, info, warn, Instrument};
 use crate::database::entities::graph_data;
 use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
 use crate::database::entities::{graphs, plan_dag_nodes, projections, sequence_contexts};
-use crate::plan_dag::{
-    config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
-};
 use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::graph_data_persist_utils::{
     edges_to_graph_data_inputs, nodes_to_graph_data_inputs,
 };
 use crate::pipeline::{DatasourceImporter, GraphDataBuilder, MergeBuilder};
+use crate::plan_dag::{
+    config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
+};
 use crate::sequence_context::{build_story_context, SequenceStoryContext};
 use crate::services::graph_service::GraphService;
 use chrono::Utc;
@@ -544,10 +544,7 @@ impl DagExecutor {
         }
 
         // Use name from config if provided, otherwise fall back to node metadata label
-        let projection_name = config
-            .name
-            .clone()
-            .unwrap_or_else(|| node_name.to_string());
+        let projection_name = config.name.clone().unwrap_or_else(|| node_name.to_string());
 
         let projection_type = config
             .projection_type

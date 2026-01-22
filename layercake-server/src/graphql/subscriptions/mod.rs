@@ -4,7 +4,9 @@ use std::pin::Pin;
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::{NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
+use crate::graphql::types::{
+    NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
+};
 // REMOVED: CursorPosition import - user presence now handled via WebSocket only
 
 pub struct Subscription;
@@ -335,7 +337,6 @@ impl Subscription {
 
         Ok(Box::pin(stream))
     }
-
 }
 
 // Global storage for plan broadcasters using generic EventBroadcaster

@@ -1,8 +1,8 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use layercake_core::database::entities::{graph_data_edges, graph_data_nodes, projections};
 use crate::graphql::errors::StructuredError;
+use layercake_core::database::entities::{graph_data_edges, graph_data_nodes, projections};
 
 /// Projection metadata type
 #[derive(SimpleObject, Clone, Debug)]

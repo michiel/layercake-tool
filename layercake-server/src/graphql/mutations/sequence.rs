@@ -2,10 +2,10 @@ use async_graphql::*;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
-use layercake_core::database::entities::sequences;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{CreateSequenceInput, Sequence, UpdateSequenceInput};
+use layercake_core::database::entities::sequences;
 
 #[derive(Default)]
 pub struct SequenceMutation;

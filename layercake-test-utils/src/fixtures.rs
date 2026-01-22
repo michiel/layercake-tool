@@ -27,8 +27,7 @@ pub fn load_golden(relative_path: &str) -> io::Result<Vec<u8>> {
 
 pub fn load_golden_json<T: DeserializeOwned>(relative_path: &str) -> io::Result<T> {
     let bytes = load_golden(relative_path)?;
-    serde_json::from_slice(&bytes)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    serde_json::from_slice(&bytes).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 pub fn write_golden(relative_path: &str, bytes: &[u8]) -> io::Result<PathBuf> {

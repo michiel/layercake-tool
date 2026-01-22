@@ -3,9 +3,9 @@ use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 
-use layercake_core::database::entities::{sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Story;
+use layercake_core::database::entities::{sequences, stories};
 
 /// Note position for sequence edge annotations
 #[derive(Clone, Debug, Serialize, Deserialize, Enum, Copy, PartialEq, Eq)]

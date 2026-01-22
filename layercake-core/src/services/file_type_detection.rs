@@ -26,9 +26,9 @@ fn detect_from_csv(file_data: &[u8], delimiter: u8) -> CoreResult<DataType> {
         .delimiter(delimiter)
         .from_reader(file_data);
 
-    let headers = reader.headers().map_err(|e| {
-        CoreError::validation(format!("Failed to read CSV headers: {}", e))
-    })?;
+    let headers = reader
+        .headers()
+        .map_err(|e| CoreError::validation(format!("Failed to read CSV headers: {}", e)))?;
     let header_set: HashSet<String> = headers.iter().map(|h| h.trim().to_lowercase()).collect();
 
     // Check for edges: must have id, source, target
@@ -76,9 +76,8 @@ fn detect_from_csv(file_data: &[u8], delimiter: u8) -> CoreResult<DataType> {
 
 /// Detect data type from JSON structure
 fn detect_from_json(file_data: &[u8]) -> CoreResult<DataType> {
-    let json: Value = serde_json::from_slice(file_data).map_err(|e| {
-        CoreError::validation(format!("Invalid JSON: {}", e))
-    })?;
+    let json: Value = serde_json::from_slice(file_data)
+        .map_err(|e| CoreError::validation(format!("Invalid JSON: {}", e)))?;
 
     // Check for graph structure (has both nodes and edges)
     if let Some(obj) = json.as_object() {

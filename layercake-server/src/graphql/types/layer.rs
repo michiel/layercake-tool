@@ -1,10 +1,10 @@
 use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use layercake_core::database::entities::{graph_data, graph_layers, layer_aliases, project_layers};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
+use layercake_core::database::entities::{graph_data, graph_layers, layer_aliases, project_layers};
 
 // Input type for bulk layer updates
 #[derive(InputObject, Clone, Debug)]

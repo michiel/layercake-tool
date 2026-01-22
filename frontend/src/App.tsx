@@ -13,10 +13,8 @@ import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
-import { KnowledgeBasePage } from './pages/KnowledgeBasePage'
 import { CodeAnalysisPage } from './pages/CodeAnalysisPage'
 import { CodeAnalysisDetailPage } from './pages/CodeAnalysisDetailPage'
-import { DatasetCreationPage } from './pages/DatasetCreationPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { ProjectLayersPage } from './pages/ProjectLayersPage'
 import { getOrCreateSessionId } from './utils/session'
@@ -28,7 +26,6 @@ import { Alert, AlertDescription } from './components/ui/alert'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './components/ui/select'
-import { Switch } from './components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from './components/ui/tooltip'
 import { Separator } from './components/ui/separator'
 import { Spinner } from './components/ui/spinner'
@@ -132,13 +129,11 @@ const EXPORT_PROJECT_TO_DIRECTORY = gql`
   mutation ExportProjectToDirectory(
     $projectId: Int!
     $path: String!
-    $includeKnowledgeBase: Boolean
     $keepConnection: Boolean
   ) {
     exportProjectToDirectory(
       projectId: $projectId
       path: $path
-      includeKnowledgeBase: $includeKnowledgeBase
       keepConnection: $keepConnection
     )
   }
@@ -156,8 +151,8 @@ const REIMPORT_PROJECT = gql`
 `
 
 const REEXPORT_PROJECT = gql`
-  mutation ReexportProject($projectId: Int!, $includeKnowledgeBase: Boolean) {
-    reexportProject(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase)
+  mutation ReexportProject($projectId: Int!) {
+    reexportProject(projectId: $projectId)
   }
 `
 
@@ -304,18 +299,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     ]
 
     const experimentalChildren: ProjectNavChild[] = [
-      {
-        key: 'knowledge-base',
-        label: 'Knowledge base',
-        route: `/projects/${projectId}/data-acquisition/knowledge-base`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/knowledge-base`),
-      },
-      {
-        key: 'dataset-creation',
-        label: 'Data set creation',
-        route: `/projects/${projectId}/data-acquisition/datasets`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/datasets`),
-      },
       {
         key: 'code-analysis',
         label: 'Code analysis',
@@ -1412,14 +1395,8 @@ const ProjectDetailPage = () => {
   const stories = storiesData?.stories ?? []
 
   const [exportDialogOpen, setExportDialogOpen] = useState(false)
-  const [includeKnowledgeBase, setIncludeKnowledgeBase] = useState(false)
   const [activeExportTab, setActiveExportTab] = useState<'archive' | 'template'>('archive')
 
-  useEffect(() => {
-    if (!exportDialogOpen) {
-      setIncludeKnowledgeBase(false)
-    }
-  }, [exportDialogOpen])
   const [exportProjectArchiveMutation, { loading: exportArchiveLoading }] = useMutation(EXPORT_PROJECT_ARCHIVE)
   const [exportProjectAsTemplateMutation, { loading: exportTemplateLoading }] = useMutation(
     EXPORT_PROJECT_AS_TEMPLATE
@@ -1485,7 +1462,6 @@ const ProjectDetailPage = () => {
         variables: {
           projectId: selectedProject.id,
           path,
-          includeKnowledgeBase,
           keepConnection,
         },
       })
@@ -1516,7 +1492,7 @@ const ProjectDetailPage = () => {
     if (!selectedProject?.importExportPath) return
     try {
       await reexportProjectMutation({
-        variables: { projectId: selectedProject.id, includeKnowledgeBase },
+        variables: { projectId: selectedProject.id },
       })
       showSuccessNotification('Re-export complete', `Updated ${selectedProject.importExportPath}`)
     } catch (error: any) {
@@ -1533,7 +1509,7 @@ const ProjectDetailPage = () => {
     }
     try {
       const { data } = await resetProjectMutation({
-        variables: { projectId: projectIdNum, includeKnowledgeBase: true },
+        variables: { projectId: projectIdNum },
       })
       const result = (data as any)?.resetProject
 
@@ -1638,7 +1614,7 @@ const ProjectDetailPage = () => {
     }
     try {
       const { data } = await exportProjectArchiveMutation({
-        variables: { projectId: projectIdNum, includeKnowledgeBase },
+        variables: { projectId: projectIdNum },
       })
       const payload = (data as any)?.exportProjectArchive
       if (!payload) {
@@ -1939,17 +1915,6 @@ const ProjectDetailPage = () => {
               <p className="text-sm text-muted-foreground">
                 Download a ZIP archive containing this project&apos;s DAG and full dataset contents.
               </p>
-              <div className="rounded-lg border p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-medium">Include knowledge base</p>
-                    <p className="text-xs text-muted-foreground">
-                      Attach uploaded source files, embeddings, and palette metadata stored in the knowledge base.
-                    </p>
-                  </div>
-                  <Switch checked={includeKnowledgeBase} onCheckedChange={setIncludeKnowledgeBase} />
-                </div>
-              </div>
               <Button onClick={handleExportArchive} disabled={exportArchiveLoading}>
                 {exportArchiveLoading && <Spinner className="mr-2 h-4 w-4" />}
                 Download project (.zip)
@@ -2243,11 +2208,6 @@ function App() {
               <DataSetsPage />
             </ErrorBoundary>
           } />
-          <Route path="/projects/:projectId/data-acquisition/knowledge-base" element={
-            <ErrorBoundary>
-              <KnowledgeBasePage />
-            </ErrorBoundary>
-          } />
           <Route path="/projects/:projectId/data-acquisition/code-analysis" element={
             <ErrorBoundary>
               <CodeAnalysisPage />
@@ -2256,11 +2216,6 @@ function App() {
           <Route path="/projects/:projectId/data-acquisition/code-analysis/:profileId" element={
             <ErrorBoundary>
               <CodeAnalysisDetailPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/data-acquisition/datasets" element={
-            <ErrorBoundary>
-              <DatasetCreationPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={

@@ -60,10 +60,9 @@ impl PlanDagService {
                     let mut active: plans::ActiveModel = plan.clone().into();
                     active.name = Set(Self::default_plan_name().to_string());
                     active.updated_at = Set(Utc::now());
-                    let plan = active
-                        .update(&self.db)
-                        .await
-                        .map_err(|e| CoreError::internal(format!("Failed to rename plan: {}", e)))?;
+                    let plan = active.update(&self.db).await.map_err(|e| {
+                        CoreError::internal(format!("Failed to rename plan: {}", e))
+                    })?;
                     Ok(plan)
                 } else {
                     Ok(plan)
@@ -220,14 +219,10 @@ impl PlanDagService {
             position_y: Set(validated_y),
             source_position: Set(None),
             target_position: Set(None),
-            metadata_json: Set(
-                serde_json::to_string(&validated_metadata)
-                    .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?,
-            ),
-            config_json: Set(
-                serde_json::to_string(&validated_config)
-                    .map_err(|e| CoreError::validation(format!("Invalid config: {}", e)))?,
-            ),
+            metadata_json: Set(serde_json::to_string(&validated_metadata)
+                .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?),
+            config_json: Set(serde_json::to_string(&validated_config)
+                .map_err(|e| CoreError::validation(format!("Invalid config: {}", e)))?),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -330,7 +325,6 @@ impl PlanDagService {
                                 let metadata_value = Value::Object(metadata_obj);
                                 let metadata_json = metadata_value.to_string();
                                 node_active.metadata_json = Set(metadata_json.clone());
-
                             }
                         }
                     }
@@ -388,9 +382,7 @@ impl PlanDagService {
             )
             .exec(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to delete connected edges: {}", e))
-            })?;
+            .map_err(|e| CoreError::internal(format!("Failed to delete connected edges: {}", e)))?;
 
         // Delete the node
         plan_dag_nodes::Entity::delete_many()
@@ -450,10 +442,10 @@ impl PlanDagService {
         let plan = self.resolve_plan(project_id, plan_id).await?;
 
         // Fetch current state for delta generation and validation
-        let (current_nodes, current_edges) =
-            self.fetch_current_plan_dag(plan.id)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to fetch current state: {}", e)))?;
+        let (current_nodes, current_edges) = self
+            .fetch_current_plan_dag(plan.id)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to fetch current state: {}", e)))?;
 
         // Validate DAG limits
         ValidationService::validate_plan_dag_limits(current_nodes.len(), current_edges.len() + 1)
@@ -467,10 +459,8 @@ impl PlanDagService {
             source_node_id: Set(validated_source),
             target_node_id: Set(validated_target),
             // Removed source_handle and target_handle for floating edges
-            metadata_json: Set(
-                serde_json::to_string(&validated_metadata)
-                    .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?,
-            ),
+            metadata_json: Set(serde_json::to_string(&validated_metadata)
+                .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?),
             created_at: Set(now),
             updated_at: Set(now),
         };
@@ -674,9 +664,7 @@ impl PlanDagService {
             .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
             .all(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load plan DAG nodes: {}", e))
-            })?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan DAG nodes: {}", e)))?;
 
         let mut outcome = PlanDagMigrationOutcome {
             checked_nodes: nodes.len(),
@@ -704,15 +692,9 @@ impl PlanDagService {
                 let mut active: plan_dag_nodes::ActiveModel = node.clone().into();
                 active.node_type = Set(validated_type.clone());
                 active.updated_at = Set(Utc::now());
-                active
-                    .update(&self.db)
-                    .await
-                    .map_err(|e| {
-                        CoreError::internal(format!(
-                            "Failed to migrate node {}: {}",
-                            node.id, e
-                        ))
-                    })?;
+                active.update(&self.db).await.map_err(|e| {
+                    CoreError::internal(format!("Failed to migrate node {}: {}", node.id, e))
+                })?;
 
                 outcome.migrated_nodes.push(PlanDagMigrationDetail {
                     node_id: node.id.clone(),
@@ -725,14 +707,12 @@ impl PlanDagService {
         }
 
         if updated_any {
-            self.bump_plan_version(plan.id)
-                .await
-                .map_err(|e| {
-                    CoreError::internal(format!(
-                        "Failed to increment plan version after migration: {}",
-                        e
-                    ))
-                })?;
+            self.bump_plan_version(plan.id).await.map_err(|e| {
+                CoreError::internal(format!(
+                    "Failed to increment plan version after migration: {}",
+                    e
+                ))
+            })?;
         }
 
         Ok(outcome)

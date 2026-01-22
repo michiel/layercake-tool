@@ -4,9 +4,9 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Deserialize;
 
-use layercake_core::database::entities::{graph_data_edges, projections, sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
+use layercake_core::database::entities::{graph_data_edges, projections, sequences, stories};
 
 #[derive(InputObject)]
 #[graphql(rename_fields = "camelCase")]

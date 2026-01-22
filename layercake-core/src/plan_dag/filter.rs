@@ -220,11 +220,11 @@ mod query_filter_executor {
                 edge_ids = edge_ids
                     .into_iter()
                     .filter(|edge_id| {
-                        graph
-                            .edges
-                            .iter()
-                            .any(|edge| &edge.id == edge_id && node_ids.contains(&edge.source)
-                                && node_ids.contains(&edge.target))
+                        graph.edges.iter().any(|edge| {
+                            &edge.id == edge_id
+                                && node_ids.contains(&edge.source)
+                                && node_ids.contains(&edge.target)
+                        })
                     })
                     .collect();
             }
@@ -249,9 +249,7 @@ mod query_filter_executor {
 
         match config.link_pruning_mode {
             QueryLinkPruningMode::AutoDropDanglingEdges => {
-                graph
-                    .edges
-                    .retain(|edge| !pruned_edges.contains(&edge.id));
+                graph.edges.retain(|edge| !pruned_edges.contains(&edge.id));
             }
             QueryLinkPruningMode::RetainEdges => {}
             QueryLinkPruningMode::DropOrphanNodes => {
@@ -318,7 +316,11 @@ mod query_filter_executor {
         Ok(rows.into_iter().map(|row| row.id).collect())
     }
 
-    fn build_query_sql(table: &str, graph_id: i32, rule_group: &QueryRuleGroup) -> AnyResult<String> {
+    fn build_query_sql(
+        table: &str,
+        graph_id: i32,
+        rule_group: &QueryRuleGroup,
+    ) -> AnyResult<String> {
         let rule_sql = build_rule_group_sql(rule_group)?;
         Ok(format!(
             "SELECT id FROM {} WHERE graph_id = {} AND {}",

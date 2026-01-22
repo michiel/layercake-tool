@@ -41,8 +41,7 @@ impl CollaborationService {
         // Check if inviter has admin access
         self.auth_service
             .check_project_admin_access(inviter_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(role)
@@ -191,8 +190,7 @@ impl CollaborationService {
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Find collaboration
         let collaboration = project_collaborators::Entity::find()
@@ -234,8 +232,7 @@ impl CollaborationService {
         // Check if admin has admin access
         self.auth_service
             .check_project_admin_access(admin_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Validate role
         let validated_role = ValidationService::validate_collaboration_role(new_role)
@@ -253,19 +250,16 @@ impl CollaborationService {
 
         // Prevent changing owner role unless they're changing their own role
         if collaboration.role == "owner" && admin_id != collaborator_id {
-            return Err(CoreError::forbidden(
-                "Cannot change project owner's role",
-            ));
+            return Err(CoreError::forbidden("Cannot change project owner's role"));
         }
 
         // Update collaboration
         let mut active_collaboration: project_collaborators::ActiveModel = collaboration.into();
         active_collaboration.role = Set(validated_role);
 
-        let updated_collaboration = active_collaboration
-            .update(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to update collaborator role: {}", e)))?;
+        let updated_collaboration = active_collaboration.update(&self.db).await.map_err(|e| {
+            CoreError::internal(format!("Failed to update collaborator role: {}", e))
+        })?;
 
         Ok(updated_collaboration)
     }
@@ -374,8 +368,7 @@ impl CollaborationService {
         // Check if current user is the owner
         self.auth_service
             .check_project_admin_access(current_owner_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Find new owner's collaboration
         let new_owner_collaboration = project_collaborators::Entity::find()
@@ -385,9 +378,7 @@ impl CollaborationService {
             .one(&self.db)
             .await
             .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
-            .ok_or_else(|| {
-                CoreError::validation("New owner must be an active collaborator")
-            })?;
+            .ok_or_else(|| CoreError::validation("New owner must be an active collaborator"))?;
 
         // Find current owner's collaboration
         let current_owner_collaboration = project_collaborators::Entity::find()
@@ -397,9 +388,7 @@ impl CollaborationService {
             .one(&self.db)
             .await
             .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
-            .ok_or_else(|| {
-                CoreError::not_found("Collaborator", current_owner_id.to_string())
-            })?;
+            .ok_or_else(|| CoreError::not_found("Collaborator", current_owner_id.to_string()))?;
 
         // Update new owner
         let mut new_owner_active: project_collaborators::ActiveModel =

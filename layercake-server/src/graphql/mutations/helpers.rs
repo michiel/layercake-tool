@@ -4,8 +4,8 @@ use serde::Deserialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use layercake_core::database::entities::{project_collaborators, user_sessions, users};
 use crate::graphql::errors::StructuredError;
+use layercake_core::database::entities::{project_collaborators, user_sessions, users};
 use layercake_core::plan::{
     ExportFileType, GraphvizLayout, GraphvizRenderOptions, MermaidDisplay, MermaidLook,
     MermaidRenderOptions, RenderConfig, RenderConfigBuiltInStyle, RenderConfigOrientation,

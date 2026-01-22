@@ -101,9 +101,7 @@ impl AppContext {
         let story = stories::Entity::find_by_id(story_id)
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to fetch story {}: {}", story_id, e))
-            })?
+            .map_err(|e| CoreError::internal(format!("Failed to fetch story {}: {}", story_id, e)))?
             .ok_or_else(|| CoreError::not_found("Story", story_id.to_string()))?;
 
         let story_sequences = sequences::Entity::find()
@@ -177,9 +175,7 @@ impl AppContext {
         let story = stories::Entity::find_by_id(story_id)
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to fetch story {}: {}", story_id, e))
-            })?
+            .map_err(|e| CoreError::internal(format!("Failed to fetch story {}: {}", story_id, e)))?
             .ok_or_else(|| CoreError::not_found("Story", story_id.to_string()))?;
 
         let story_sequences = sequences::Entity::find()
@@ -251,8 +247,8 @@ impl AppContext {
         let mut rows: Vec<StoryCsvImportRow> = Vec::new();
 
         for result in rdr.deserialize() {
-            let row: StoryCsvImportRow = result
-                .map_err(|e| CoreError::validation(format!("Invalid CSV row: {}", e)))?;
+            let row: StoryCsvImportRow =
+                result.map_err(|e| CoreError::validation(format!("Invalid CSV row: {}", e)))?;
             rows.push(row);
         }
 
@@ -327,15 +323,9 @@ impl AppContext {
                     ..Default::default()
                 };
 
-                let model = new_story
-                    .insert(&txn)
-                    .await
-                    .map_err(|e| {
-                        CoreError::internal(format!(
-                            "Failed to create story '{}': {}",
-                            story_name, e
-                        ))
-                    })?;
+                let model = new_story.insert(&txn).await.map_err(|e| {
+                    CoreError::internal(format!("Failed to create story '{}': {}", story_name, e))
+                })?;
                 created_count += 1;
                 model
             } else {
@@ -345,8 +335,7 @@ impl AppContext {
                     .await
                     .map_err(|e| {
                         CoreError::internal(format!("Failed to fetch story {}: {}", story_id, e))
-                    })?
-                {
+                    })? {
                     Some(existing) => {
                         let mut active: stories::ActiveModel = existing.into();
                         active.name = Set(story_name.clone());
@@ -356,8 +345,8 @@ impl AppContext {
                             Some(first_row.story_description.clone())
                         });
                         active.tags = Set(first_row.story_tags.clone());
-                        active.enabled_dataset_ids =
-                            Set(serde_json::to_string(&story_dataset_ids).map_err(|e| {
+                        active.enabled_dataset_ids = Set(serde_json::to_string(&story_dataset_ids)
+                            .map_err(|e| {
                                 CoreError::internal(format!(
                                     "Failed to serialize dataset IDs: {}",
                                     e
@@ -365,15 +354,12 @@ impl AppContext {
                             })?);
                         active.updated_at = Set(Utc::now());
 
-                        let model = active
-                            .update(&txn)
-                            .await
-                            .map_err(|e| {
-                                CoreError::internal(format!(
-                                    "Failed to update story {}: {}",
-                                    story_id, e
-                                ))
-                            })?;
+                        let model = active.update(&txn).await.map_err(|e| {
+                            CoreError::internal(format!(
+                                "Failed to update story {}: {}",
+                                story_id, e
+                            ))
+                        })?;
                         updated_count += 1;
                         model
                     }
@@ -388,29 +374,25 @@ impl AppContext {
                                 Some(first_row.story_description.clone())
                             }),
                             tags: Set(first_row.story_tags.clone()),
-                            enabled_dataset_ids: Set(
-                                serde_json::to_string(&story_dataset_ids).map_err(|e| {
+                            enabled_dataset_ids: Set(serde_json::to_string(&story_dataset_ids)
+                                .map_err(|e| {
                                     CoreError::internal(format!(
                                         "Failed to serialize dataset IDs: {}",
                                         e
                                     ))
-                                })?,
-                            ),
+                                })?),
                             layer_config: Set("[]".to_string()),
                             created_at: Set(Utc::now()),
                             updated_at: Set(Utc::now()),
                             ..Default::default()
                         };
 
-                        let model = new_story
-                            .insert(&txn)
-                            .await
-                            .map_err(|e| {
-                                CoreError::internal(format!(
-                                    "Failed to create story '{}': {}",
-                                    story_name, e
-                                ))
-                            })?;
+                        let model = new_story.insert(&txn).await.map_err(|e| {
+                            CoreError::internal(format!(
+                                "Failed to create story '{}': {}",
+                                story_name, e
+                            ))
+                        })?;
                         created_count += 1;
                         model
                     }
@@ -484,14 +466,14 @@ impl AppContext {
                         } else {
                             Some(first_seq_row.sequence_description.clone())
                         }),
-                        enabled_dataset_ids: Set(
-                            serde_json::to_string(&seq_dataset_ids).map_err(|e| {
+                        enabled_dataset_ids: Set(serde_json::to_string(&seq_dataset_ids).map_err(
+                            |e| {
                                 CoreError::internal(format!(
                                     "Failed to serialize sequence dataset IDs: {}",
                                     e
                                 ))
-                            })?,
-                        ),
+                            },
+                        )?),
                         edge_order: Set(serde_json::to_string(&edge_order).map_err(|e| {
                             CoreError::internal(format!(
                                 "Failed to serialize sequence edge order: {}",
@@ -503,15 +485,12 @@ impl AppContext {
                         ..Default::default()
                     };
 
-                    new_sequence
-                        .insert(&txn)
-                        .await
-                        .map_err(|e| {
-                            CoreError::internal(format!(
-                                "Failed to create sequence '{}' for story {}: {}",
-                                sequence_name, story_model.id, e
-                            ))
-                        })?;
+                    new_sequence.insert(&txn).await.map_err(|e| {
+                        CoreError::internal(format!(
+                            "Failed to create sequence '{}' for story {}: {}",
+                            sequence_name, story_model.id, e
+                        ))
+                    })?;
                     sequence_count += 1;
                 } else {
                     // Update existing sequence
@@ -523,8 +502,7 @@ impl AppContext {
                                 "Failed to fetch sequence {}: {}",
                                 sequence_id, e
                             ))
-                        })?
-                    {
+                        })? {
                         Some(existing) => {
                             let mut active: sequences::ActiveModel = existing.into();
                             active.name = Set(sequence_name.clone());
@@ -541,14 +519,13 @@ impl AppContext {
                                         e
                                     ))
                                 })?);
-                            active.edge_order = Set(serde_json::to_string(&edge_order).map_err(
-                                |e| {
+                            active.edge_order =
+                                Set(serde_json::to_string(&edge_order).map_err(|e| {
                                     CoreError::internal(format!(
                                         "Failed to serialize sequence edge order: {}",
                                         e
                                     ))
-                                },
-                            )?);
+                                })?);
                             active.updated_at = Set(Utc::now());
 
                             active.update(&txn).await.map_err(|e| {
@@ -571,14 +548,13 @@ impl AppContext {
                                         Some(first_seq_row.sequence_description.clone())
                                     },
                                 ),
-                                enabled_dataset_ids: Set(
-                                    serde_json::to_string(&seq_dataset_ids).map_err(|e| {
-                                        CoreError::internal(format!(
-                                            "Failed to serialize sequence dataset IDs: {}",
-                                            e
-                                        ))
-                                    })?,
-                                ),
+                                enabled_dataset_ids: Set(serde_json::to_string(&seq_dataset_ids)
+                                    .map_err(|e| {
+                                    CoreError::internal(format!(
+                                        "Failed to serialize sequence dataset IDs: {}",
+                                        e
+                                    ))
+                                })?),
                                 edge_order: Set(serde_json::to_string(&edge_order).map_err(
                                     |e| {
                                         CoreError::internal(format!(
@@ -592,15 +568,12 @@ impl AppContext {
                                 ..Default::default()
                             };
 
-                            new_sequence
-                                .insert(&txn)
-                                .await
-                                .map_err(|e| {
-                                    CoreError::internal(format!(
-                                        "Failed to create sequence '{}' for story {}: {}",
-                                        sequence_name, story_model.id, e
-                                    ))
-                                })?;
+                            new_sequence.insert(&txn).await.map_err(|e| {
+                                CoreError::internal(format!(
+                                    "Failed to create sequence '{}' for story {}: {}",
+                                    sequence_name, story_model.id, e
+                                ))
+                            })?;
                             sequence_count += 1;
                         }
                     }
@@ -687,36 +660,26 @@ impl AppContext {
                     tags: Set(serde_json::to_string(&story_data.tags).map_err(|e| {
                         CoreError::internal(format!("Failed to serialize tags: {}", e))
                     })?),
-                    enabled_dataset_ids: Set(
-                        serde_json::to_string(&story_data.enabled_dataset_ids).map_err(|e| {
-                            CoreError::internal(format!(
-                                "Failed to serialize dataset IDs: {}",
-                                e
-                            ))
-                        })?,
-                    ),
-                    layer_config: Set(
-                        serde_json::to_string(&story_data.layer_config).map_err(|e| {
-                            CoreError::internal(format!(
-                                "Failed to serialize layer config: {}",
-                                e
-                            ))
-                        })?,
-                    ),
+                    enabled_dataset_ids: Set(serde_json::to_string(
+                        &story_data.enabled_dataset_ids,
+                    )
+                    .map_err(|e| {
+                        CoreError::internal(format!("Failed to serialize dataset IDs: {}", e))
+                    })?),
+                    layer_config: Set(serde_json::to_string(&story_data.layer_config).map_err(
+                        |e| CoreError::internal(format!("Failed to serialize layer config: {}", e)),
+                    )?),
                     created_at: Set(Utc::now()),
                     updated_at: Set(Utc::now()),
                     ..Default::default()
                 };
 
-                let model = new_story
-                    .insert(&txn)
-                    .await
-                    .map_err(|e| {
-                        CoreError::internal(format!(
-                            "Failed to create story '{}': {}",
-                            story_data.name, e
-                        ))
-                    })?;
+                let model = new_story.insert(&txn).await.map_err(|e| {
+                    CoreError::internal(format!(
+                        "Failed to create story '{}': {}",
+                        story_data.name, e
+                    ))
+                })?;
                 created_count += 1;
                 model
             } else {
@@ -729,31 +692,28 @@ impl AppContext {
                             "Failed to fetch story {}: {}",
                             story_data.id, e
                         ))
-                    })?
-                {
+                    })? {
                     Some(existing) => {
                         let mut active: stories::ActiveModel = existing.into();
                         active.name = Set(story_data.name.clone());
                         active.description = Set(story_data.description.clone());
-                        active.tags = Set(serde_json::to_string(&story_data.tags).map_err(|e| {
-                            CoreError::internal(format!("Failed to serialize tags: {}", e))
+                        active.tags =
+                            Set(serde_json::to_string(&story_data.tags).map_err(|e| {
+                                CoreError::internal(format!("Failed to serialize tags: {}", e))
+                            })?);
+                        active.enabled_dataset_ids = Set(serde_json::to_string(
+                            &story_data.enabled_dataset_ids,
+                        )
+                        .map_err(|e| {
+                            CoreError::internal(format!("Failed to serialize dataset IDs: {}", e))
                         })?);
-                        active.enabled_dataset_ids = Set(
-                            serde_json::to_string(&story_data.enabled_dataset_ids).map_err(|e| {
-                                CoreError::internal(format!(
-                                    "Failed to serialize dataset IDs: {}",
-                                    e
-                                ))
-                            })?,
-                        );
-                        active.layer_config = Set(
-                            serde_json::to_string(&story_data.layer_config).map_err(|e| {
+                        active.layer_config = Set(serde_json::to_string(&story_data.layer_config)
+                            .map_err(|e| {
                                 CoreError::internal(format!(
                                     "Failed to serialize layer config: {}",
                                     e
                                 ))
-                            })?,
-                        );
+                            })?);
                         active.updated_at = Set(Utc::now());
 
                         let model = active.update(&txn).await.map_err(|e| {
@@ -774,38 +734,33 @@ impl AppContext {
                             tags: Set(serde_json::to_string(&story_data.tags).map_err(|e| {
                                 CoreError::internal(format!("Failed to serialize tags: {}", e))
                             })?),
-                            enabled_dataset_ids: Set(
-                                serde_json::to_string(&story_data.enabled_dataset_ids).map_err(
-                                    |e| {
-                                        CoreError::internal(format!(
-                                            "Failed to serialize dataset IDs: {}",
-                                            e
-                                        ))
-                                    },
-                                )?,
-                            ),
-                            layer_config: Set(
-                                serde_json::to_string(&story_data.layer_config).map_err(|e| {
+                            enabled_dataset_ids: Set(serde_json::to_string(
+                                &story_data.enabled_dataset_ids,
+                            )
+                            .map_err(|e| {
+                                CoreError::internal(format!(
+                                    "Failed to serialize dataset IDs: {}",
+                                    e
+                                ))
+                            })?),
+                            layer_config: Set(serde_json::to_string(&story_data.layer_config)
+                                .map_err(|e| {
                                     CoreError::internal(format!(
                                         "Failed to serialize layer config: {}",
                                         e
                                     ))
-                                })?,
-                            ),
+                                })?),
                             created_at: Set(Utc::now()),
                             updated_at: Set(Utc::now()),
                             ..Default::default()
                         };
 
-                        let model = new_story
-                            .insert(&txn)
-                            .await
-                            .map_err(|e| {
-                                CoreError::internal(format!(
-                                    "Failed to create story '{}': {}",
-                                    story_data.name, e
-                                ))
-                            })?;
+                        let model = new_story.insert(&txn).await.map_err(|e| {
+                            CoreError::internal(format!(
+                                "Failed to create story '{}': {}",
+                                story_data.name, e
+                            ))
+                        })?;
                         created_count += 1;
                         model
                     }
@@ -836,16 +791,15 @@ impl AppContext {
                         story_id: Set(story_model.id),
                         name: Set(sequence_data.name.clone()),
                         description: Set(sequence_data.description.clone()),
-                        enabled_dataset_ids: Set(
-                            serde_json::to_string(&sequence_data.enabled_dataset_ids).map_err(
-                                |e| {
-                                    CoreError::internal(format!(
-                                        "Failed to serialize sequence dataset IDs: {}",
-                                        e
-                                    ))
-                                },
-                            )?,
-                        ),
+                        enabled_dataset_ids: Set(serde_json::to_string(
+                            &sequence_data.enabled_dataset_ids,
+                        )
+                        .map_err(|e| {
+                            CoreError::internal(format!(
+                                "Failed to serialize sequence dataset IDs: {}",
+                                e
+                            ))
+                        })?),
                         edge_order: Set(serde_json::to_string(&sequence_data.edge_order).map_err(
                             |e| {
                                 CoreError::internal(format!(
@@ -859,15 +813,12 @@ impl AppContext {
                         ..Default::default()
                     };
 
-                    new_sequence
-                        .insert(&txn)
-                        .await
-                        .map_err(|e| {
-                            CoreError::internal(format!(
-                                "Failed to create sequence '{}' for story {}: {}",
-                                sequence_data.name, story_model.id, e
-                            ))
-                        })?;
+                    new_sequence.insert(&txn).await.map_err(|e| {
+                        CoreError::internal(format!(
+                            "Failed to create sequence '{}' for story {}: {}",
+                            sequence_data.name, story_model.id, e
+                        ))
+                    })?;
                     sequence_count += 1;
                 } else {
                     // Update existing sequence
@@ -884,24 +835,23 @@ impl AppContext {
                             let mut active: sequences::ActiveModel = existing.into();
                             active.name = Set(sequence_data.name.clone());
                             active.description = Set(sequence_data.description.clone());
-                            active.enabled_dataset_ids = Set(
-                                serde_json::to_string(&sequence_data.enabled_dataset_ids).map_err(
-                                    |e| {
+                            active.enabled_dataset_ids =
+                                Set(serde_json::to_string(&sequence_data.enabled_dataset_ids)
+                                    .map_err(|e| {
                                         CoreError::internal(format!(
                                             "Failed to serialize sequence dataset IDs: {}",
                                             e
                                         ))
-                                    },
-                                )?,
-                            );
-                            active.edge_order = Set(
-                                serde_json::to_string(&sequence_data.edge_order).map_err(|e| {
-                                    CoreError::internal(format!(
-                                        "Failed to serialize sequence edge order: {}",
-                                        e
-                                    ))
-                                })?,
-                            );
+                                    })?);
+                            active.edge_order = Set(serde_json::to_string(
+                                &sequence_data.edge_order,
+                            )
+                            .map_err(|e| {
+                                CoreError::internal(format!(
+                                    "Failed to serialize sequence edge order: {}",
+                                    e
+                                ))
+                            })?);
                             active.updated_at = Set(Utc::now());
 
                             active.update(&txn).await.map_err(|e| {
@@ -918,39 +868,33 @@ impl AppContext {
                                 story_id: Set(story_model.id),
                                 name: Set(sequence_data.name.clone()),
                                 description: Set(sequence_data.description.clone()),
-                                enabled_dataset_ids: Set(
-                                    serde_json::to_string(&sequence_data.enabled_dataset_ids)
-                                        .map_err(|e| {
-                                            CoreError::internal(format!(
-                                                "Failed to serialize sequence dataset IDs: {}",
-                                                e
-                                            ))
-                                        })?,
-                                ),
-                                edge_order: Set(
-                                    serde_json::to_string(&sequence_data.edge_order).map_err(
-                                        |e| {
-                                            CoreError::internal(format!(
-                                                "Failed to serialize sequence edge order: {}",
-                                                e
-                                            ))
-                                        },
-                                    )?,
-                                ),
+                                enabled_dataset_ids: Set(serde_json::to_string(
+                                    &sequence_data.enabled_dataset_ids,
+                                )
+                                .map_err(|e| {
+                                    CoreError::internal(format!(
+                                        "Failed to serialize sequence dataset IDs: {}",
+                                        e
+                                    ))
+                                })?),
+                                edge_order: Set(serde_json::to_string(&sequence_data.edge_order)
+                                    .map_err(|e| {
+                                    CoreError::internal(format!(
+                                        "Failed to serialize sequence edge order: {}",
+                                        e
+                                    ))
+                                })?),
                                 created_at: Set(Utc::now()),
                                 updated_at: Set(Utc::now()),
                                 ..Default::default()
                             };
 
-                            new_sequence
-                                .insert(&txn)
-                                .await
-                                .map_err(|e| {
-                                    CoreError::internal(format!(
-                                        "Failed to create sequence '{}' for story {}: {}",
-                                        sequence_data.name, story_model.id, e
-                                    ))
-                                })?;
+                            new_sequence.insert(&txn).await.map_err(|e| {
+                                CoreError::internal(format!(
+                                    "Failed to create sequence '{}' for story {}: {}",
+                                    sequence_data.name, story_model.id, e
+                                ))
+                            })?;
                             sequence_count += 1;
                         }
                     }
@@ -978,11 +922,7 @@ impl AppContext {
 
     // ===== Helper methods =====
 
-    async fn validate_dataset_exists(
-        &self,
-        project_id: i32,
-        dataset_id: i32,
-    ) -> CoreResult<bool> {
+    async fn validate_dataset_exists(&self, project_id: i32, dataset_id: i32) -> CoreResult<bool> {
         let dataset = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await
@@ -1003,15 +943,12 @@ impl AppContext {
             .map_err(|e| {
                 CoreError::internal(format!("Failed to fetch dataset {}: {}", dataset_id, e))
             })?
-            .ok_or_else(|| {
-                CoreError::validation(format!("Dataset {} not found", dataset_id))
-            })?;
+            .ok_or_else(|| CoreError::validation(format!("Dataset {} not found", dataset_id)))?;
 
         let graph_json: Value = serde_json::from_str(&dataset.graph_json).map_err(|e| {
             CoreError::internal(format!(
                 "Failed to parse graph_json for dataset {}: {}",
-                dataset_id,
-                e
+                dataset_id, e
             ))
         })?;
 

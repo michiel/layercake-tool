@@ -34,12 +34,12 @@ fn graphql_error_baselines_are_valid_json() {
         .unwrap_or_else(|e| panic!("Invalid manifest JSON: {}", e));
 
     for case in manifest.cases {
-        let payload_path = manifest_path
-            .parent()
-            .unwrap()
-            .join(&case.path);
+        let payload_path = manifest_path.parent().unwrap().join(&case.path);
         let payload = fs::read(&payload_path).unwrap_or_else(|e| {
-            panic!("Missing baseline {} at {:?}: {}", case.name, payload_path, e)
+            panic!(
+                "Missing baseline {} at {:?}: {}",
+                case.name, payload_path, e
+            )
         });
         let _: serde_json::Value = serde_json::from_slice(&payload).unwrap_or_else(|e| {
             panic!(

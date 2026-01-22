@@ -2,9 +2,9 @@ use chrono::Utc;
 use sea_orm::{ActiveModelTrait, EntityTrait, QueryOrder, Set};
 
 use super::{AppContext, ProjectSummary, ProjectUpdate};
+use crate::auth::Actor;
 use crate::database::entities::projects;
 use crate::errors::{CoreError, CoreResult};
-use crate::auth::Actor;
 
 impl AppContext {
     // ----- Project helpers -------------------------------------------------

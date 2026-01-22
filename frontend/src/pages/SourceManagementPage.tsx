@@ -260,7 +260,7 @@ export const SourceManagementPage: React.FC = () => {
 
   const handleDelete = useCallback(async (file: ProjectFile) => {
     if (!Number.isFinite(numericProjectId)) return
-    if (!confirm(`Delete "${file.filename}"? This will also remove its embeddings from the knowledge base.`)) return
+    if (!confirm(`Delete "${file.filename}"? This will also remove the stored embeddings and metadata.`)) return
 
     const result = await deleteFile({
       variables: {
@@ -335,8 +335,8 @@ export const SourceManagementPage: React.FC = () => {
     showSuccessNotification(
       indexed ? 'File indexed' : 'File removed from index',
       indexed
-        ? `${file.filename} has been added to the knowledge base`
-        : `${file.filename} has been removed from the knowledge base`,
+        ? `${file.filename} is now available for project datasets.`
+        : `${file.filename} has been removed from the dataset index.`,
     )
     await refetch()
   }, [numericProjectId, refetch, toggleFileIndex])
@@ -387,7 +387,7 @@ export const SourceManagementPage: React.FC = () => {
         <Stack gap="xs">
           <h1 className="text-2xl font-bold">Document management</h1>
           <p className="text-muted-foreground">
-            Upload files, assign metadata and tags, and control which assets feed the project knowledge base.
+            Upload files, assign metadata and tags, and control which assets feed the project data catalog.
           </p>
         </Stack>
 

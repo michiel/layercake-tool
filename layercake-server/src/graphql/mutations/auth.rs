@@ -2,12 +2,12 @@ use async_graphql::*;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use layercake_core::database::entities::{user_sessions, users};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     LoginInput, LoginResponse, RegisterResponse, RegisterUserInput, UpdateUserInput, User,
 };
+use layercake_core::database::entities::{user_sessions, users};
 use layercake_core::services::auth_service::AuthService;
 
 #[derive(Default)]
@@ -26,12 +26,10 @@ impl AuthMutation {
         // Validate input
         AuthService::validate_email(&input.email)
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-        AuthService::validate_username(&input.username).map_err(|e| {
-            crate::graphql::errors::core_error_to_graphql_error(e)
-        })?;
-        AuthService::validate_display_name(&input.display_name).map_err(|e| {
-            crate::graphql::errors::core_error_to_graphql_error(e)
-        })?;
+        AuthService::validate_username(&input.username)
+            .map_err(|e| crate::graphql::errors::core_error_to_graphql_error(e))?;
+        AuthService::validate_display_name(&input.display_name)
+            .map_err(|e| crate::graphql::errors::core_error_to_graphql_error(e))?;
 
         // Check if user already exists
         let existing_user = users::Entity::find()

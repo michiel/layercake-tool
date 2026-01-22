@@ -3,10 +3,12 @@
 use async_graphql::*;
 use serde::{Deserialize, Serialize};
 
-use layercake_core::app_context::{summarize_graph_counts, DataSetSummary, DataSetValidationSummary};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::Project;
+use layercake_core::app_context::{
+    summarize_graph_counts, DataSetSummary, DataSetValidationSummary,
+};
 use layercake_core::services::data_set_service::DataSetAnnotation;
 
 #[derive(SimpleObject, Serialize, Deserialize, Clone)]
@@ -349,10 +351,18 @@ pub enum DataSetDataType {
 impl From<layercake_core::database::entities::common_types::DataType> for DataSetDataType {
     fn from(db_type: layercake_core::database::entities::common_types::DataType) -> Self {
         match db_type {
-            layercake_core::database::entities::common_types::DataType::Nodes => DataSetDataType::NODES,
-            layercake_core::database::entities::common_types::DataType::Edges => DataSetDataType::EDGES,
-            layercake_core::database::entities::common_types::DataType::Layers => DataSetDataType::LAYERS,
-            layercake_core::database::entities::common_types::DataType::Graph => DataSetDataType::GRAPH,
+            layercake_core::database::entities::common_types::DataType::Nodes => {
+                DataSetDataType::NODES
+            }
+            layercake_core::database::entities::common_types::DataType::Edges => {
+                DataSetDataType::EDGES
+            }
+            layercake_core::database::entities::common_types::DataType::Layers => {
+                DataSetDataType::LAYERS
+            }
+            layercake_core::database::entities::common_types::DataType::Graph => {
+                DataSetDataType::GRAPH
+            }
         }
     }
 }
@@ -360,10 +370,18 @@ impl From<layercake_core::database::entities::common_types::DataType> for DataSe
 impl From<DataSetDataType> for layercake_core::database::entities::common_types::DataType {
     fn from(gql_type: DataSetDataType) -> Self {
         match gql_type {
-            DataSetDataType::NODES => layercake_core::database::entities::common_types::DataType::Nodes,
-            DataSetDataType::EDGES => layercake_core::database::entities::common_types::DataType::Edges,
-            DataSetDataType::LAYERS => layercake_core::database::entities::common_types::DataType::Layers,
-            DataSetDataType::GRAPH => layercake_core::database::entities::common_types::DataType::Graph,
+            DataSetDataType::NODES => {
+                layercake_core::database::entities::common_types::DataType::Nodes
+            }
+            DataSetDataType::EDGES => {
+                layercake_core::database::entities::common_types::DataType::Edges
+            }
+            DataSetDataType::LAYERS => {
+                layercake_core::database::entities::common_types::DataType::Layers
+            }
+            DataSetDataType::GRAPH => {
+                layercake_core::database::entities::common_types::DataType::Graph
+            }
         }
     }
 }

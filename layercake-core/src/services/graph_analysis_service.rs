@@ -25,10 +25,7 @@ impl GraphAnalysisService {
         Self { db }
     }
 
-    pub async fn analyze_connectivity(
-        &self,
-        graph_id: i32,
-    ) -> CoreResult<GraphConnectivityReport> {
+    pub async fn analyze_connectivity(&self, graph_id: i32) -> CoreResult<GraphConnectivityReport> {
         let graph_service = GraphService::new(self.db.clone());
         let graph = graph_service.build_graph_from_dag_graph(graph_id).await?;
         let adjacency = build_adjacency(&graph);
@@ -56,7 +53,6 @@ impl GraphAnalysisService {
         Ok(find_all_paths(&adjacency, source, target, max_paths))
     }
 }
-
 
 fn build_adjacency(graph: &Graph) -> HashMap<String, Vec<String>> {
     let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();

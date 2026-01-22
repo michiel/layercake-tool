@@ -83,9 +83,9 @@ impl DataSetBulkService {
                 })?;
             }
 
-            csv_writer.flush().map_err(|e| {
-                CoreError::internal("Failed to flush CSV writer").with_source(e)
-            })?;
+            csv_writer
+                .flush()
+                .map_err(|e| CoreError::internal("Failed to flush CSV writer").with_source(e))?;
         } // csv_writer is dropped here, releasing the borrow on csv_data
 
         Ok(csv_data)
@@ -238,10 +238,9 @@ impl DataSetBulkService {
 
         let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
-            let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
-                .map_err(|e| {
-                    CoreError::internal("Failed to parse graph_json during export")
-                        .with_source(e)
+            let parsed: serde_json::Value =
+                serde_json::from_str(&dataset.graph_json).map_err(|e| {
+                    CoreError::internal("Failed to parse graph_json during export").with_source(e)
                 })?;
             let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
             let mut section_written = false;
@@ -356,10 +355,9 @@ impl DataSetBulkService {
 
         let mut used_sheet_names = HashSet::new();
         for dataset in datasets {
-            let parsed: serde_json::Value = serde_json::from_str(&dataset.graph_json)
-                .map_err(|e| {
-                    CoreError::internal("Failed to parse graph_json during export")
-                        .with_source(e)
+            let parsed: serde_json::Value =
+                serde_json::from_str(&dataset.graph_json).map_err(|e| {
+                    CoreError::internal("Failed to parse graph_json during export").with_source(e)
                 })?;
             let sections = [("nodes", "Nodes"), ("edges", "Edges"), ("layers", "Layers")];
             let mut section_written = false;
@@ -411,9 +409,8 @@ impl DataSetBulkService {
 
         // Save to buffer
         let buffer = Vec::new();
-        let result = spreadsheet_ods::write_ods_buf(&mut workbook, buffer).map_err(|e| {
-            CoreError::internal("Failed to generate ODS").with_source(e)
-        })?;
+        let result = spreadsheet_ods::write_ods_buf(&mut workbook, buffer)
+            .map_err(|e| CoreError::internal("Failed to generate ODS").with_source(e))?;
         Ok(result)
     }
 
@@ -494,9 +491,7 @@ impl DataSetBulkService {
                     .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
                     .await
-                    .map_err(|e| {
-                        CoreError::internal("Failed to load datasets").with_source(e)
-                    })?
+                    .map_err(|e| CoreError::internal("Failed to load datasets").with_source(e))?
                 {
                     tracing::info!(
                         "Found existing dataset '{}' (id: {}) - updating",
@@ -618,9 +613,7 @@ impl DataSetBulkService {
                     .filter(data_sets::Column::Name.eq(sheet_name.clone()))
                     .one(&self.db)
                     .await
-                    .map_err(|e| {
-                        CoreError::internal("Failed to load datasets").with_source(e)
-                    })?
+                    .map_err(|e| CoreError::internal("Failed to load datasets").with_source(e))?
                 {
                     tracing::info!(
                         "Found existing dataset '{}' (id: {}) - updating",

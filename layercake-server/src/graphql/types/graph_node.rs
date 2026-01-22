@@ -1,5 +1,5 @@
-use layercake_core::database::entities::graph_data_nodes;
 use async_graphql::*;
+use layercake_core::database::entities::graph_data_nodes;
 use serde::{Deserialize, Serialize};
 
 // Input type for bulk node updates

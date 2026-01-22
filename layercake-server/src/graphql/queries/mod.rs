@@ -4,11 +4,6 @@ use sea_orm::{
     QueryFilter, QueryOrder, Statement,
 };
 
-use layercake_core::database::entities::{
-    data_sets, graph_data, graph_data_edges, graph_data_nodes, layer_aliases, plan_dag_edges,
-    plan_dag_nodes, plans, project_collaborators, projections, sequences, stories, user_sessions,
-    users,
-};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::code_analysis::CodeAnalysisProfile;
@@ -25,12 +20,16 @@ use crate::graphql::types::{
     UserSession,
 };
 use crate::graphql::types::{GraphPage, GraphSummary};
+use layercake_core::database::entities::{
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, layer_aliases, plan_dag_edges,
+    plan_dag_nodes, plans, project_collaborators, projections, sequences, stories, user_sessions,
+    users,
+};
 use layercake_core::services::{
     graph_edit_service::GraphEditService, library_item_service::LibraryItemFilter,
     library_item_service::LibraryItemService, sample_project_service::SampleProjectService,
     GraphService,
 };
-use layercake_genai::entities::tags as acquisition_tags;
 use std::collections::HashMap;
 
 pub struct Query;
@@ -137,102 +136,6 @@ impl Query {
     }
 
     /// Get aggregate statistics for a project (for overview page)
-    async fn project_stats(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-    ) -> Result<crate::graphql::types::ProjectStats> {
-        let context = ctx.data::<GraphQLContext>()?;
-
-        // Get document stats
-        let files = context
-            .app
-            .data_acquisition_service()
-            .list_files(project_id)
-            .await
-            .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
-
-        let total_files = files.len() as i32;
-        let mut indexed_count = 0;
-
-        for file in &files {
-            let file_id = uuid::Uuid::parse_str(&file.id.to_string()).map_err(|e| {
-                StructuredError::validation("fileId", format!("Invalid UUID: {}", e))
-            })?;
-            if context
-                .app
-                .data_acquisition_service()
-                .is_file_indexed(project_id, file_id)
-                .await
-                .unwrap_or(false)
-            {
-                indexed_count += 1;
-            }
-        }
-
-        let document_stats = crate::graphql::types::DocumentStats {
-            total: total_files,
-            indexed: indexed_count,
-            not_indexed: total_files - indexed_count,
-        };
-
-        // Get knowledge base stats
-        let kb_status = context
-            .app
-            .data_acquisition_service()
-            .knowledge_base_status(project_id)
-            .await
-            .map_err(|e| {
-                StructuredError::service("DataAcquisitionService::knowledge_base_status", e)
-            })?;
-
-        let kb_stats = crate::graphql::types::KnowledgeBaseStats {
-            file_count: kb_status.file_count as i32,
-            chunk_count: kb_status.chunk_count as i32,
-            last_indexed_at: kb_status.last_indexed_at,
-        };
-
-        // Get dataset stats
-        let datasets = context
-            .app
-            .list_data_sets(project_id)
-            .await
-            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-
-        let total_datasets = datasets.len() as i32;
-        let mut by_type = std::collections::HashMap::new();
-
-        for ds in datasets {
-            if ds.node_count.unwrap_or(0) > 0 {
-                *by_type.entry("nodes".to_string()).or_insert(0) += 1;
-            }
-            if ds.edge_count.unwrap_or(0) > 0 {
-                *by_type.entry("edges".to_string()).or_insert(0) += 1;
-            }
-            if ds.layer_count.unwrap_or(0) > 0 {
-                *by_type.entry("layers".to_string()).or_insert(0) += 1;
-            }
-            if ds.node_count.unwrap_or(0) == 0
-                && ds.edge_count.unwrap_or(0) == 0
-                && ds.layer_count.unwrap_or(0) == 0
-            {
-                *by_type.entry("empty".to_string()).or_insert(0) += 1;
-            }
-        }
-
-        let dataset_stats = crate::graphql::types::DatasetStats {
-            total: total_datasets,
-            by_type,
-        };
-
-        Ok(crate::graphql::types::ProjectStats {
-            project_id,
-            documents: document_stats,
-            knowledge_base: kb_stats,
-            datasets: dataset_stats,
-        })
-    }
-
     /// Get a specific plan by ID
     async fn plan(&self, ctx: &Context<'_>, id: i32) -> Result<Option<Plan>> {
         let context = ctx.data::<GraphQLContext>()?;
@@ -1232,103 +1135,6 @@ impl Query {
             .map_err(|e| StructuredError::service("GraphEditService::get_edit_count", e))?;
 
         Ok(count as i32)
-    }
-
-    /// Fetch per-project knowledge base status
-    async fn knowledge_base_status(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-    ) -> Result<crate::graphql::types::KnowledgeBaseStatus> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let status = context
-            .app
-            .data_acquisition_service()
-            .knowledge_base_status(project_id)
-            .await
-            .map_err(|e| {
-                StructuredError::service("DataAcquisitionService::knowledge_base_status", e)
-            })?;
-
-        Ok(crate::graphql::types::KnowledgeBaseStatus {
-            project_id: status.project_id,
-            file_count: status.file_count,
-            chunk_count: status.chunk_count,
-            status: status.status,
-            last_indexed_at: status.last_indexed_at,
-            embedding_provider: status.embedding_provider,
-            embedding_model: status.embedding_model,
-        })
-    }
-
-    /// List stored files for a project
-    async fn data_acquisition_files(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-    ) -> Result<Vec<crate::graphql::types::ProjectFile>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let files = context
-            .app
-            .data_acquisition_service()
-            .list_files(project_id)
-            .await
-            .map_err(|e| StructuredError::service("DataAcquisitionService::list_files", e))?;
-
-        let mut result = Vec::new();
-        for file in files {
-            let file_id = uuid::Uuid::parse_str(&file.id.to_string()).map_err(|e| {
-                StructuredError::validation("fileId", format!("Invalid UUID: {}", e))
-            })?;
-            let indexed = context
-                .app
-                .data_acquisition_service()
-                .is_file_indexed(project_id, file_id)
-                .await
-                .unwrap_or(false);
-
-            result.push(crate::graphql::types::ProjectFile {
-                id: file.id.to_string(),
-                filename: file.filename,
-                media_type: file.media_type,
-                size_bytes: file.size_bytes,
-                checksum: file.checksum,
-                created_at: file.created_at,
-                tags: file.tags,
-                indexed,
-            });
-        }
-
-        Ok(result)
-    }
-
-    /// List tags optionally filtered by scope
-    async fn data_acquisition_tags(
-        &self,
-        ctx: &Context<'_>,
-        scope: Option<String>,
-    ) -> Result<Vec<crate::graphql::types::TagView>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let db = context.app.db();
-        let mut query =
-            acquisition_tags::Entity::find().order_by_asc(acquisition_tags::Column::Name);
-        if let Some(scope_value) = scope {
-            query = query.filter(acquisition_tags::Column::Scope.eq(scope_value));
-        }
-        let tags = query
-            .all(db)
-            .await
-            .map_err(|e| StructuredError::database("tags", e))?;
-
-        Ok(tags
-            .into_iter()
-            .map(|model| crate::graphql::types::TagView {
-                id: model.id.to_string(),
-                name: model.name,
-                scope: model.scope,
-                color: model.color,
-            })
-            .collect())
     }
 
     // Projection Queries

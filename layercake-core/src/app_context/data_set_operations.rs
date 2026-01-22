@@ -8,8 +8,8 @@ use super::{AppContext, DataSetSummary, DataSetValidationSummary, GraphValidatio
 use super::{BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetFileCreateRequest};
 use super::{DataSetExportFormat, DataSetExportRequest, DataSetExportResult, DataSetUpdateRequest};
 use super::{DataSetImportFormat, DataSetImportOutcome, DataSetImportRequest};
-use crate::database::entities::data_sets;
 use crate::auth::Actor;
+use crate::database::entities::data_sets;
 use crate::errors::{CoreError, CoreResult};
 
 impl AppContext {
@@ -29,10 +29,7 @@ impl AppContext {
         Ok(data_sets.into_iter().map(DataSetSummary::from).collect())
     }
 
-    pub async fn available_data_sets(
-        &self,
-        project_id: i32,
-    ) -> CoreResult<Vec<DataSetSummary>> {
+    pub async fn available_data_sets(&self, project_id: i32) -> CoreResult<Vec<DataSetSummary>> {
         self.list_data_sets(project_id).await
     }
 
@@ -40,9 +37,7 @@ impl AppContext {
         let data_set = data_sets::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load data set {}: {}", id, e))
-            })?;
+            .map_err(|e| CoreError::internal(format!("Failed to load data set {}: {}", id, e)))?;
 
         Ok(data_set.map(DataSetSummary::from))
     }
@@ -155,10 +150,7 @@ impl AppContext {
         };
 
         if had_new_file && (name.is_some() || description.is_some()) {
-            model = self
-                .data_set_service
-                .update(id, name, description)
-                .await?;
+            model = self.data_set_service.update(id, name, description).await?;
         }
 
         Ok(DataSetSummary::from(model))
@@ -179,16 +171,9 @@ impl AppContext {
         Ok(DataSetSummary::from(model))
     }
 
-    pub async fn reprocess_data_set(
-        &self,
-        actor: &Actor,
-        id: i32,
-    ) -> CoreResult<DataSetSummary> {
+    pub async fn reprocess_data_set(&self, actor: &Actor, id: i32) -> CoreResult<DataSetSummary> {
         self.authorize_data_set_write(actor, id).await?;
-        let model = self
-            .data_set_service
-            .reprocess(id)
-            .await?;
+        let model = self.data_set_service.reprocess(id).await?;
 
         Ok(DataSetSummary::from(model))
     }
@@ -197,16 +182,16 @@ impl AppContext {
         self.data_set_service
             .validate(id)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to validate data set {}: {}", id, e))
-            })
+            .map_err(|e| CoreError::internal(format!("Failed to validate data set {}: {}", id, e)))
     }
 
     pub async fn validate_graph(&self, graph_id: i32) -> CoreResult<GraphValidationSummary> {
         self.graph_service
             .validate_graph(graph_id)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to validate graph {}: {}", graph_id, e)))
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to validate graph {}: {}", graph_id, e))
+            })
     }
 
     pub async fn delete_data_set(&self, actor: &Actor, id: i32) -> CoreResult<()> {
@@ -236,7 +221,9 @@ impl AppContext {
             .filter(data_sets::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to load data sets for merging: {}", e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load data sets for merging: {}", e))
+            })?;
 
         if models.len() != data_set_ids.len() {
             return Err(CoreError::validation(format!(
@@ -255,10 +242,7 @@ impl AppContext {
                 DataSetEmptyCreateRequest {
                     project_id,
                     name,
-                    description: Some(format!(
-                        "Merged from {} data sets",
-                        data_set_ids.len()
-                    )),
+                    description: Some(format!("Merged from {} data sets", data_set_ids.len())),
                 },
             )
             .await?;
@@ -457,7 +441,8 @@ impl AppContext {
         actor: &Actor,
         request: DataSetImportRequest,
     ) -> CoreResult<DataSetImportOutcome> {
-        self.authorize_project_write(actor, request.project_id).await?;
+        self.authorize_project_write(actor, request.project_id)
+            .await?;
         let result = match request.format {
             DataSetImportFormat::Xlsx => self
                 .data_set_bulk_service
@@ -488,9 +473,7 @@ impl AppContext {
             .filter(data_sets::Column::Id.is_in(result.imported_ids.clone()))
             .all(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load imported datasets: {}", e))
-            })?;
+            .map_err(|e| CoreError::internal(format!("Failed to load imported datasets: {}", e)))?;
 
         Ok(DataSetImportOutcome {
             data_sets: models.into_iter().map(DataSetSummary::from).collect(),

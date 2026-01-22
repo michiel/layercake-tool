@@ -5,12 +5,12 @@ use serde_yaml::Value;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
+use crate::auth::Actor;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
 use crate::errors::{CoreError, CoreResult};
 use crate::services::{data_set_service::DataSetService, graph_service::GraphService};
-use crate::auth::Actor;
 
 static SAMPLE_PROJECT_DIR: Dir<'_> = include_dir!("../resources/sample-v1");
 
@@ -162,9 +162,9 @@ impl SampleProjectService {
                 created_at: Set(now),
                 updated_at: Set(now),
             };
-            node.insert(&self.db)
-                .await
-                .map_err(|e| CoreError::internal("Failed to create sample dataset node").with_source(e))?;
+            node.insert(&self.db).await.map_err(|e| {
+                CoreError::internal("Failed to create sample dataset node").with_source(e)
+            })?;
             dataset_nodes.push(node_id);
         }
 
@@ -225,9 +225,7 @@ impl SampleProjectService {
         if let Some(existing_graph_node) = plan_dag_nodes::Entity::find_by_id(&graph_node_id)
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal("Failed to load sample graph node").with_source(e)
-            })?
+            .map_err(|e| CoreError::internal("Failed to load sample graph node").with_source(e))?
         {
             let mut graph_node_active: plan_dag_nodes::ActiveModel = existing_graph_node.into();
             graph_node_active.config_json = Set(serde_json::json!({
@@ -242,12 +240,9 @@ impl SampleProjectService {
             .to_string());
             graph_node_active.metadata_json = Set(graph_metadata_json);
             graph_node_active.updated_at = Set(Utc::now());
-            graph_node_active
-                .update(&self.db)
-                .await
-                .map_err(|e| {
-                    CoreError::internal("Failed to update sample graph node").with_source(e)
-                })?;
+            graph_node_active.update(&self.db).await.map_err(|e| {
+                CoreError::internal("Failed to update sample graph node").with_source(e)
+            })?;
         }
 
         // Connect data sources -> merge node
@@ -265,9 +260,7 @@ impl SampleProjectService {
             }
             .insert(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal("Failed to connect sample datasets").with_source(e)
-            })?;
+            .map_err(|e| CoreError::internal("Failed to connect sample datasets").with_source(e))?;
         }
 
         // Connect merge node -> graph node

@@ -2,10 +2,10 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 
-use layercake_core::database::entities::{graph_data, graph_edits};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
+use layercake_core::database::entities::{graph_data, graph_edits};
 
 #[derive(Clone, Debug, SimpleObject)]
 #[graphql(complex)]

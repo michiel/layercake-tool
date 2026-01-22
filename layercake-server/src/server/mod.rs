@@ -13,8 +13,8 @@ pub enum MigrateDirection {
     Fresh,
 }
 
-use layercake_core::database::{connection::*, migrations::Migrator};
 use anyhow::Result;
+use layercake_core::database::{connection::*, migrations::Migrator};
 use sea_orm_migration::prelude::*;
 use tracing::info;
 

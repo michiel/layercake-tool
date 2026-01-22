@@ -2,10 +2,10 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 
-use layercake_core::app_context::PlanSummary;
-use layercake_core::database::entities::{plans, projects};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Project;
+use layercake_core::app_context::PlanSummary;
+use layercake_core::database::entities::{plans, projects};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]

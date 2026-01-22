@@ -1,17 +1,17 @@
 use async_graphql::*;
 use base64::Engine;
 
-use layercake_core::app_context::{
-    BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetExportFormat, DataSetExportRequest,
-    DataSetFileCreateRequest, DataSetFileReplacement, DataSetImportFormat, DataSetImportRequest,
-    DataSetUpdateRequest,
-};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     BulkUploadDataSetInput, CreateDataSetInput, CreateEmptyDataSetInput, DataSet,
     DataSetValidationResult, ExportDataSetsInput, ExportDataSetsResult, ImportDataSetsInput,
     ImportDataSetsResult, MergeDataSetsInput, UpdateDataSetInput,
+};
+use layercake_core::app_context::{
+    BulkDataSetUpload, DataSetEmptyCreateRequest, DataSetExportFormat, DataSetExportRequest,
+    DataSetFileCreateRequest, DataSetFileReplacement, DataSetImportFormat, DataSetImportRequest,
+    DataSetUpdateRequest,
 };
 
 #[derive(Default)]
@@ -36,15 +36,18 @@ impl DataSetMutation {
 
         let summary = context
             .app
-            .create_data_set_from_file(&actor, DataSetFileCreateRequest {
-                project_id: input.project_id,
-                name: input.name,
-                description: input.description,
-                filename: input.filename,
-                file_format: input.file_format.into(),
-                tabular_data_type: input.tabular_data_type.map(Into::into),
-                file_bytes,
-            })
+            .create_data_set_from_file(
+                &actor,
+                DataSetFileCreateRequest {
+                    project_id: input.project_id,
+                    name: input.name,
+                    description: input.description,
+                    filename: input.filename,
+                    file_format: input.file_format.into(),
+                    tabular_data_type: input.tabular_data_type.map(Into::into),
+                    file_bytes,
+                },
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -61,11 +64,14 @@ impl DataSetMutation {
         let actor = context.actor_for_request(ctx).await;
         let summary = context
             .app
-            .create_empty_data_set(&actor, DataSetEmptyCreateRequest {
-                project_id: input.project_id,
-                name: input.name,
-                description: input.description,
-            })
+            .create_empty_data_set(
+                &actor,
+                DataSetEmptyCreateRequest {
+                    project_id: input.project_id,
+                    name: input.name,
+                    description: input.description,
+                },
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -143,12 +149,15 @@ impl DataSetMutation {
 
         let summary = context
             .app
-            .update_data_set(&actor, DataSetUpdateRequest {
-                id,
-                name: input.name,
-                description: input.description,
-                new_file,
-            })
+            .update_data_set(
+                &actor,
+                DataSetUpdateRequest {
+                    id,
+                    name: input.name,
+                    description: input.description,
+                    new_file,
+                },
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -231,11 +240,14 @@ impl DataSetMutation {
 
         let exported = context
             .app
-            .export_data_sets(&actor, DataSetExportRequest {
-                project_id: input.project_id,
-                data_set_ids: input.data_set_ids,
-                format,
-            })
+            .export_data_sets(
+                &actor,
+                DataSetExportRequest {
+                    project_id: input.project_id,
+                    data_set_ids: input.data_set_ids,
+                    format,
+                },
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -269,11 +281,14 @@ impl DataSetMutation {
 
         let outcome = context
             .app
-            .import_data_sets(&actor, DataSetImportRequest {
-                project_id: input.project_id,
-                format,
-                file_bytes,
-            })
+            .import_data_sets(
+                &actor,
+                DataSetImportRequest {
+                    project_id: input.project_id,
+                    format,
+                    file_bytes,
+                },
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 

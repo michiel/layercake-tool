@@ -193,83 +193,6 @@ static DESCRIPTOR_LIST: &[SettingDescriptor] = &[
         is_secret: true,
         is_read_only: false,
     },
-    SettingDescriptor {
-        key: "LAYERCAKE_EMBEDDING_PROVIDER",
-        label: "Embedding Provider",
-        category: "Data Acquisition",
-        description: "Provider used for knowledge base embeddings.",
-        value_type: SettingValueType::Enum,
-        allowed_values: &["openai", "ollama"],
-        default_value: "ollama",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_OPENAI_EMBEDDING_MODEL",
-        label: "OpenAI Embedding Model",
-        category: "OpenAI",
-        description: "Model identifier used when embeddings run against OpenAI.",
-        value_type: SettingValueType::String,
-        allowed_values: &[],
-        default_value: "text-embedding-3-large",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_OLLAMA_EMBEDDING_MODEL",
-        label: "Ollama Embedding Model",
-        category: "Ollama",
-        description: "Model identifier used when embeddings run against a local Ollama server.",
-        value_type: SettingValueType::String,
-        allowed_values: &[],
-        default_value: "nomic-embed-text:v1.5",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_RAG_DEFAULT_TOP_K",
-        label: "RAG Default Top K",
-        category: "RAG",
-        description: "Default number of document chunks to retrieve for chat context.",
-        value_type: SettingValueType::Integer,
-        allowed_values: &[],
-        default_value: "5",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_RAG_DEFAULT_THRESHOLD",
-        label: "RAG Default Threshold",
-        category: "RAG",
-        description: "Default minimum similarity score (0.0-1.0) for including chunks in context.",
-        value_type: SettingValueType::Float,
-        allowed_values: &[],
-        default_value: "0.7",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_RAG_MAX_CONTEXT_TOKENS",
-        label: "RAG Max Context Tokens",
-        category: "RAG",
-        description: "Maximum number of tokens to include from retrieved chunks.",
-        value_type: SettingValueType::Integer,
-        allowed_values: &[],
-        default_value: "4000",
-        is_secret: false,
-        is_read_only: false,
-    },
-    SettingDescriptor {
-        key: "LAYERCAKE_RAG_ENABLE_CITATIONS",
-        label: "RAG Enable Citations",
-        category: "RAG",
-        description: "Whether to append source citations to chat responses by default.",
-        value_type: SettingValueType::Boolean,
-        allowed_values: &["true", "false"],
-        default_value: "true",
-        is_secret: false,
-        is_read_only: false,
-    },
 ];
 
 /// Canonical metadata describing a configurable runtime setting.
@@ -374,9 +297,7 @@ impl SystemSettingsService {
             .filter(system_settings::Column::Key.eq(descriptor.key))
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal("Failed to read system settings").with_source(e)
-            })?;
+            .map_err(|e| CoreError::internal("Failed to read system settings").with_source(e))?;
 
         let now = chrono::Utc::now();
 
@@ -397,11 +318,9 @@ impl SystemSettingsService {
                 active.is_secret = Set(descriptor.is_secret);
                 active.is_read_only = Set(descriptor.is_read_only);
                 active.updated_at = Set(now);
-                active.update(&self.db)
-                    .await
-                    .map_err(|e| {
-                        CoreError::internal("Failed to update system setting").with_source(e)
-                    })?;
+                active.update(&self.db).await.map_err(|e| {
+                    CoreError::internal("Failed to update system setting").with_source(e)
+                })?;
             }
             return Ok(());
         }
@@ -430,9 +349,7 @@ impl SystemSettingsService {
         let records = system_settings::Entity::find()
             .all(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal("Failed to refresh system settings").with_source(e)
-            })?;
+            .map_err(|e| CoreError::internal("Failed to refresh system settings").with_source(e))?;
         let mut entries = HashMap::new();
         for record in records {
             entries.insert(record.key.clone(), record);
@@ -453,9 +370,7 @@ impl SystemSettingsService {
         let descriptor = DESCRIPTORS
             .get(record.key.as_str())
             .copied()
-            .ok_or_else(|| {
-                CoreError::internal(format!("Missing descriptor for {}", record.key))
-            })?;
+            .ok_or_else(|| CoreError::internal(format!("Missing descriptor for {}", record.key)))?;
 
         Ok(SystemSettingView {
             key: record.key.clone(),
@@ -513,15 +428,14 @@ impl SystemSettingsService {
             .filter(system_settings::Column::Key.eq(key))
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal("Failed to load system setting").with_source(e)
-            })?
+            .map_err(|e| CoreError::internal("Failed to load system setting").with_source(e))?
             .ok_or_else(|| CoreError::validation(format!("Setting {} not found", key)))?;
 
         let mut active: system_settings::ActiveModel = existing.into();
         active.value = Set(value);
         active.updated_at = Set(now);
-        active.update(&self.db)
+        active
+            .update(&self.db)
             .await
             .map_err(|e| CoreError::internal("Failed to update system setting").with_source(e))?;
 
@@ -550,9 +464,8 @@ impl SystemSettingsService {
             }
             SettingValueType::Url => {
                 if !value.is_empty() {
-                    url::Url::parse(value).map_err(|e| {
-                        CoreError::validation(format!("invalid URL: {}", e))
-                    })?;
+                    url::Url::parse(value)
+                        .map_err(|e| CoreError::validation(format!("invalid URL: {}", e)))?;
                 }
             }
             _ => {}

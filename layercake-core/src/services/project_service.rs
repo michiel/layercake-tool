@@ -86,8 +86,7 @@ impl ProjectService {
         // Check write access
         self.auth_service
             .check_project_write_access(user_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Find project
         let project = projects::Entity::find_by_id(project_id)
@@ -107,8 +106,9 @@ impl ProjectService {
 
         if let Some(description) = description {
             let validated_description =
-                ValidationService::validate_project_description(description)
-                    .map_err(|e| CoreError::validation(format!("Invalid project description: {}", e)))?;
+                ValidationService::validate_project_description(description).map_err(|e| {
+                    CoreError::validation(format!("Invalid project description: {}", e))
+                })?;
             active_project.description = Set(Some(validated_description));
         }
 
@@ -127,8 +127,7 @@ impl ProjectService {
         // Check admin access
         self.auth_service
             .check_project_admin_access(user_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Delete project (cascading deletes should handle collaborators)
         let result = projects::Entity::delete_by_id(project_id)
@@ -144,16 +143,11 @@ impl ProjectService {
     }
 
     /// Get project by ID with access check
-    pub async fn get_project(
-        &self,
-        user_id: i32,
-        project_id: i32,
-    ) -> CoreResult<projects::Model> {
+    pub async fn get_project(&self, user_id: i32, project_id: i32) -> CoreResult<projects::Model> {
         // Check read access
         self.auth_service
             .check_project_read_access(user_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Get project
         let project = projects::Entity::find_by_id(project_id)
@@ -198,8 +192,7 @@ impl ProjectService {
         // Check read access
         self.auth_service
             .check_project_read_access(user_id, project_id)
-            .await
-            ?;
+            .await?;
 
         // Get collaborators with user info
         let collaborators = project_collaborators::Entity::find()

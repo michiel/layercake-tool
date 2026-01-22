@@ -24,10 +24,7 @@ impl GraphDataService {
         Self { db }
     }
 
-    pub async fn create(
-        &self,
-        input: GraphDataCreate,
-    ) -> CoreResult<graph_data::Model> {
+    pub async fn create(&self, input: GraphDataCreate) -> CoreResult<graph_data::Model> {
         let now = Utc::now();
         let active = graph_data::ActiveModel {
             project_id: Set(input.project_id),
@@ -87,11 +84,9 @@ impl GraphDataService {
         graph_data_id: i32,
         nodes: Vec<GraphDataNodeInput>,
     ) -> CoreResult<()> {
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| CoreError::internal("Failed to begin graph_data transaction").with_source(e))?;
+        let txn = self.db.begin().await.map_err(|e| {
+            CoreError::internal("Failed to begin graph_data transaction").with_source(e)
+        })?;
 
         // Remove edges first to satisfy FK constraints on graph_data_edges
         graph_data_edges::Entity::delete_many()
@@ -125,7 +120,9 @@ impl GraphDataService {
             graph_data_nodes::Entity::insert(active)
                 .exec(&txn)
                 .await
-                .map_err(|e| CoreError::internal("Failed to insert graph_data node").with_source(e))?;
+                .map_err(|e| {
+                    CoreError::internal("Failed to insert graph_data node").with_source(e)
+                })?;
         }
 
         graph_data::ActiveModel {
@@ -149,11 +146,9 @@ impl GraphDataService {
         graph_data_id: i32,
         edges: Vec<GraphDataEdgeInput>,
     ) -> CoreResult<()> {
-        let txn = self
-            .db
-            .begin()
-            .await
-            .map_err(|e| CoreError::internal("Failed to begin graph_data transaction").with_source(e))?;
+        let txn = self.db.begin().await.map_err(|e| {
+            CoreError::internal("Failed to begin graph_data transaction").with_source(e)
+        })?;
 
         // Gather node ids for informational logging about external references
         let node_ids: std::collections::HashSet<String> = graph_data_nodes::Entity::find()
@@ -202,7 +197,9 @@ impl GraphDataService {
             graph_data_edges::Entity::insert(active)
                 .exec(&txn)
                 .await
-                .map_err(|e| CoreError::internal("Failed to insert graph_data edge").with_source(e))?;
+                .map_err(|e| {
+                    CoreError::internal("Failed to insert graph_data edge").with_source(e)
+                })?;
         }
 
         if external_ref_count > 0 {
@@ -228,10 +225,7 @@ impl GraphDataService {
             .map_err(|e| CoreError::internal("Failed to commit graph_data edges").with_source(e))
     }
 
-    pub async fn load_nodes(
-        &self,
-        graph_data_id: i32,
-    ) -> CoreResult<Vec<graph_data_nodes::Model>> {
+    pub async fn load_nodes(&self, graph_data_id: i32) -> CoreResult<Vec<graph_data_nodes::Model>> {
         graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
             .all(&self.db)
@@ -239,10 +233,7 @@ impl GraphDataService {
             .map_err(|e| CoreError::internal("Failed to load graph_data nodes").with_source(e))
     }
 
-    pub async fn load_edges(
-        &self,
-        graph_data_id: i32,
-    ) -> CoreResult<Vec<graph_data_edges::Model>> {
+    pub async fn load_edges(&self, graph_data_id: i32) -> CoreResult<Vec<graph_data_edges::Model>> {
         graph_data_edges::Entity::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
             .all(&self.db)
@@ -286,11 +277,7 @@ impl GraphDataService {
             .map_err(|e| CoreError::internal("Failed to update graph_data status").with_source(e))
     }
 
-    pub async fn mark_complete(
-        &self,
-        graph_data_id: i32,
-        source_hash: String,
-    ) -> CoreResult<()> {
+    pub async fn mark_complete(&self, graph_data_id: i32, source_hash: String) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await
@@ -312,13 +299,11 @@ impl GraphDataService {
     pub async fn load_full(
         &self,
         graph_data_id: i32,
-    ) -> CoreResult<
-        (
-            graph_data::Model,
-            Vec<graph_data_nodes::Model>,
-            Vec<graph_data_edges::Model>,
-        ),
-    > {
+    ) -> CoreResult<(
+        graph_data::Model,
+        Vec<graph_data_nodes::Model>,
+        Vec<graph_data_edges::Model>,
+    )> {
         let graph = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await
@@ -334,18 +319,12 @@ impl GraphDataService {
     }
 
     /// Convenience method for listing datasets in a project
-    pub async fn list_datasets(
-        &self,
-        project_id: i32,
-    ) -> CoreResult<Vec<graph_data::Model>> {
+    pub async fn list_datasets(&self, project_id: i32) -> CoreResult<Vec<graph_data::Model>> {
         self.list_by_project_and_source(project_id, "dataset").await
     }
 
     /// Convenience method for listing computed graphs in a project
-    pub async fn list_computed(
-        &self,
-        project_id: i32,
-    ) -> CoreResult<Vec<graph_data::Model>> {
+    pub async fn list_computed(&self, project_id: i32) -> CoreResult<Vec<graph_data::Model>> {
         self.list_by_project_and_source(project_id, "computed")
             .await
     }
@@ -357,11 +336,7 @@ impl GraphDataService {
     }
 
     /// Mark a graph_data as error with an error message
-    pub async fn mark_error(
-        &self,
-        graph_data_id: i32,
-        error: String,
-    ) -> CoreResult<()> {
+    pub async fn mark_error(&self, graph_data_id: i32, error: String) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await
@@ -469,11 +444,7 @@ impl GraphDataService {
     }
 
     /// Set the pending edits state for a graph_data
-    pub async fn set_pending_state(
-        &self,
-        graph_data_id: i32,
-        has_pending: bool,
-    ) -> CoreResult<()> {
+    pub async fn set_pending_state(&self, graph_data_id: i32, has_pending: bool) -> CoreResult<()> {
         let mut model: graph_data::ActiveModel = graph_data::Entity::find_by_id(graph_data_id)
             .one(&self.db)
             .await

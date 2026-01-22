@@ -4,8 +4,8 @@ use async_graphql::*;
 use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 
-use layercake_core::database::entities::{project_collaborators, user_sessions, users};
 use crate::graphql::context::GraphQLContext;
+use layercake_core::database::entities::{project_collaborators, user_sessions, users};
 
 #[derive(SimpleObject)]
 #[graphql(complex)]

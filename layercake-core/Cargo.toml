@@ -57,8 +57,6 @@ spreadsheet-ods = { workspace = true }
 icu_locid = { workspace = true }
 zip = { workspace = true }
 
-# Data acquisition
-layercake-genai = { path = "../layercake-genai" }
 layercake-code-analysis = { path = "../layercake-code-analysis" }
 layercake-projections = { path = "../layercake-projections" }
 

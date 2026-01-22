@@ -15,8 +15,6 @@ use crate::services::{
     dataset_bulk_service::DataSetBulkService, AuthorizationService, ExportService, GraphService,
     ImportService, PlanDagService, ProjectRole,
 };
-use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
-
 mod data_set_operations;
 mod graph_operations;
 mod library_operations;
@@ -40,42 +38,16 @@ pub struct AppContext {
     plan_service: Arc<PlanService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
-    data_acquisition_service: Arc<DataAcquisitionService>,
     code_analysis_service: Arc<CodeAnalysisService>,
 }
 
 impl AppContext {
     pub fn new(db: DatabaseConnection) -> Self {
-        let provider_hint = std::env::var("LAYERCAKE_EMBEDDING_PROVIDER")
-            .ok()
-            .or_else(|| std::env::var("LAYERCAKE_CHAT_PROVIDER").ok());
-        let provider_config = EmbeddingProviderConfig::from_env();
-        let data_acquisition_service = Arc::new(DataAcquisitionService::new(
-            db.clone(),
-            provider_hint,
-            provider_config,
-        ));
-        Self::with_data_acquisition_and_authorizer(
-            db,
-            data_acquisition_service,
-            Arc::new(AllowAllAuthorizer),
-        )
+        Self::with_authorizer(db, Arc::new(AllowAllAuthorizer))
     }
 
-    pub fn with_data_acquisition(
+    pub fn with_authorizer(
         db: DatabaseConnection,
-        data_acquisition_service: Arc<DataAcquisitionService>,
-    ) -> Self {
-        Self::with_data_acquisition_and_authorizer(
-            db,
-            data_acquisition_service,
-            Arc::new(AllowAllAuthorizer),
-        )
-    }
-
-    pub fn with_data_acquisition_and_authorizer(
-        db: DatabaseConnection,
-        data_acquisition_service: Arc<DataAcquisitionService>,
         authorizer: Arc<dyn Authorizer + Send + Sync>,
     ) -> Self {
         let import_service = Arc::new(ImportService::new(db.clone()));
@@ -101,7 +73,6 @@ impl AppContext {
             plan_service,
             graph_edit_service,
             graph_analysis_service,
-            data_acquisition_service,
             code_analysis_service,
         }
     }
@@ -245,10 +216,6 @@ impl AppContext {
     #[allow(dead_code)]
     pub fn graph_analysis_service(&self) -> &Arc<GraphAnalysisService> {
         &self.graph_analysis_service
-    }
-
-    pub fn data_acquisition_service(&self) -> &Arc<DataAcquisitionService> {
-        &self.data_acquisition_service
     }
 }
 
@@ -545,9 +512,7 @@ pub struct DataSetImportOutcome {
     pub updated_count: i32,
 }
 
-use crate::plan_dag::{
-    PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position,
-};
+use crate::plan_dag::{PlanDagEdge, PlanDagMetadata, PlanDagNode, PlanDagNodeType, Position};
 use serde_json::Value;
 
 #[derive(Clone, Serialize, Deserialize)]

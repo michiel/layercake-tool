@@ -1,9 +1,9 @@
 use async_graphql::*;
 
-use layercake_core::app_context::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::plan_dag::{PlanDagEdge, PlanDagEdgeInput, PlanDagEdgeUpdateInput};
+use layercake_core::app_context::{PlanDagEdgeRequest, PlanDagEdgeUpdateRequest};
 
 #[derive(Default)]
 pub struct PlanDagEdgesMutation;

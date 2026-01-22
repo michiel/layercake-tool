@@ -44,10 +44,7 @@ fn node_type_storage_name(node_type: &PlanDagNodeType) -> &'static str {
     }
 }
 
-fn generate_node_id(
-    node_type: &PlanDagNodeType,
-    _existing_nodes: &[PlanDagNode],
-) -> String {
+fn generate_node_id(node_type: &PlanDagNodeType, _existing_nodes: &[PlanDagNode]) -> String {
     // Generate a globally unique ID using UUID to prevent collisions across projects/plans
     // Format: <node_type_prefix>_<uuid>
     let prefix = node_type_prefix(node_type);
@@ -82,8 +79,7 @@ impl AppContext {
             .await
             .map_err(|e| {
                 CoreError::internal(format!("Failed to load project {}: {}", project_id, e))
-            })?
-        {
+            })? {
             Some(project) => project,
             None => return Ok(None),
         };
@@ -106,13 +102,11 @@ impl AppContext {
             let mut nodes = self
                 .plan_dag_service
                 .get_nodes(project_id, Some(plan.id))
-                .await
-                ?;
+                .await?;
             let edges = self
                 .plan_dag_service
                 .get_edges(project_id, Some(plan.id))
-                .await
-                ?;
+                .await?;
 
             for idx in 0..nodes.len() {
                 let node_type = nodes[idx].node_type;

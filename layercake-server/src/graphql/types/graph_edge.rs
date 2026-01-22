@@ -1,5 +1,5 @@
-use layercake_core::database::entities::graph_data_edges;
 use async_graphql::*;
+use layercake_core::database::entities::graph_data_edges;
 use serde::{Deserialize, Serialize};
 
 #[derive(SimpleObject, Clone, Debug, Serialize, Deserialize)]

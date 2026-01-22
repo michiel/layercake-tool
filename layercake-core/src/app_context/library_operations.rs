@@ -5,7 +5,6 @@ use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use base64::{engine::general_purpose, Engine as _};
 use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -24,16 +23,12 @@ use crate::database::entities::{
     data_sets, layer_aliases, library_items, plan_dag_edges, plan_dag_nodes, plans, project_layers,
     projects, sequences, stories,
 };
+use crate::errors::{CoreError, CoreResult};
 use crate::services::data_set_service::DataSetService;
 use crate::services::library_item_service::{
     LibraryItemService, ITEM_TYPE_PROJECT, ITEM_TYPE_PROJECT_TEMPLATE,
 };
-use crate::errors::{CoreError, CoreResult};
 use crate::services::plan_service::PlanCreateRequest;
-use layercake_genai::entities::{
-    file_tags as kb_file_tags, files as kb_files, kb_documents as kb_docs, tags as kb_tags,
-    vector_index_state as kb_vector_state,
-};
 
 // Private helper structs for archive/template operations
 #[derive(Clone)]
@@ -140,74 +135,6 @@ struct PaletteExport {
     aliases: Vec<ExportedLayerAlias>,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseFileEntry {
-    id: String,
-    filename: String,
-    media_type: String,
-    size_bytes: i64,
-    checksum: String,
-    created_at: DateTime<Utc>,
-    indexed: bool,
-    blob_path: String,
-    tag_ids: Vec<String>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseTagEntry {
-    id: String,
-    name: String,
-    scope: String,
-    color: Option<String>,
-    created_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseFileTagEntry {
-    file_id: String,
-    tag_id: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseDocumentEntry {
-    id: String,
-    file_id: Option<String>,
-    chunk_id: String,
-    media_type: String,
-    chunk_text: String,
-    metadata: Option<Value>,
-    embedding_model: Option<String>,
-    embedding: Option<String>,
-    created_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseVectorStateEntry {
-    id: String,
-    status: String,
-    last_indexed_at: Option<DateTime<Utc>>,
-    last_error: Option<String>,
-    config: Option<Value>,
-    embedding_provider: Option<String>,
-    embedding_model: Option<String>,
-    updated_at: DateTime<Utc>,
-}
-
-#[derive(Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-struct KnowledgeBaseIndex {
-    files: Vec<KnowledgeBaseFileEntry>,
-    tags: Vec<KnowledgeBaseTagEntry>,
-    file_tags: Vec<KnowledgeBaseFileTagEntry>,
-    documents: Vec<KnowledgeBaseDocumentEntry>,
-    vector_states: Vec<KnowledgeBaseVectorStateEntry>,
-}
-
 fn deserialize_i32_from_string_or_number<'de, D>(deserializer: D) -> Result<i32, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -300,9 +227,7 @@ fn sanitize_relative_path(path: &str) -> Result<PathBuf> {
     Ok(candidate.components().collect())
 }
 
-fn node_type_storage_name(
-    node_type: &crate::plan_dag::PlanDagNodeType,
-) -> &'static str {
+fn node_type_storage_name(node_type: &crate::plan_dag::PlanDagNodeType) -> &'static str {
     use crate::plan_dag::PlanDagNodeType;
     match node_type {
         PlanDagNodeType::DataSet => "DataSetNode",
@@ -545,10 +470,12 @@ impl AppContext {
 
         let dag_bytes = serde_json::to_vec_pretty(&snapshot)
             .map_err(|e| CoreError::internal(format!("Failed to encode DAG snapshot: {}", e)))?;
-        let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-            .map_err(|e| CoreError::internal(format!("Failed to encode template manifest: {}", e)))?;
-        let project_bytes = serde_json::to_vec_pretty(&project_record)
-            .map_err(|e| CoreError::internal(format!("Failed to encode project metadata: {}", e)))?;
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| {
+            CoreError::internal(format!("Failed to encode template manifest: {}", e))
+        })?;
+        let project_bytes = serde_json::to_vec_pretty(&project_record).map_err(|e| {
+            CoreError::internal(format!("Failed to encode project metadata: {}", e))
+        })?;
         let dataset_index_bytes = serde_json::to_vec_pretty(&dataset_index)
             .map_err(|e| CoreError::internal(format!("Failed to encode dataset index: {}", e)))?;
         let metadata_bytes = serde_json::to_vec_pretty(&json!({
@@ -573,21 +500,18 @@ impl AppContext {
             for descriptor in &dataset_records {
                 if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
-                    zip.start_file(path, options)
-                        .map_err(|e| {
-                            CoreError::internal(format!("Failed to add dataset file: {}", e))
-                        })?;
-                    zip.write_all(graph_json.as_bytes())
-                        .map_err(|e| {
-                            CoreError::internal(format!("Failed to write dataset file: {}", e))
-                        })?;
+                    zip.start_file(path, options).map_err(|e| {
+                        CoreError::internal(format!("Failed to add dataset file: {}", e))
+                    })?;
+                    zip.write_all(graph_json.as_bytes()).map_err(|e| {
+                        CoreError::internal(format!("Failed to write dataset file: {}", e))
+                    })?;
                 }
             }
 
-            zip.finish()
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to finalize template archive: {}", e))
-                })?;
+            zip.finish().map_err(|e| {
+                CoreError::internal(format!("Failed to finalize template archive: {}", e))
+            })?;
         }
 
         let zip_bytes = cursor.into_inner();
@@ -624,7 +548,6 @@ impl AppContext {
         &self,
         _actor: &Actor,
         project_id: i32,
-        include_knowledge_base: bool,
     ) -> CoreResult<ProjectArchiveFile> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
@@ -685,12 +608,12 @@ impl AppContext {
 
         let dag_bytes = serde_json::to_vec_pretty(&snapshot)
             .map_err(|e| CoreError::internal(format!("Failed to encode DAG snapshot: {}", e)))?;
-        let manifest_bytes = serde_json::to_vec_pretty(&manifest)
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to encode project export manifest: {}", e))
-            })?;
-        let project_bytes = serde_json::to_vec_pretty(&project_record)
-            .map_err(|e| CoreError::internal(format!("Failed to encode project metadata: {}", e)))?;
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).map_err(|e| {
+            CoreError::internal(format!("Failed to encode project export manifest: {}", e))
+        })?;
+        let project_bytes = serde_json::to_vec_pretty(&project_record).map_err(|e| {
+            CoreError::internal(format!("Failed to encode project metadata: {}", e))
+        })?;
         let dataset_index_bytes = serde_json::to_vec_pretty(&dataset_index)
             .map_err(|e| CoreError::internal(format!("Failed to encode dataset index: {}", e)))?;
         let metadata_bytes = serde_json::to_vec_pretty(&json!({
@@ -716,19 +639,6 @@ impl AppContext {
         {
             additional_assets.push(asset);
         }
-        if include_knowledge_base {
-            if let Some((index_asset, mut file_assets)) =
-                self.collect_knowledge_base_assets(project_id)
-                    .await
-                    .map_err(|e| {
-                        CoreError::internal(format!("Failed to collect knowledge base assets: {}", e))
-                    })?
-            {
-                additional_assets.push(index_asset);
-                additional_assets.append(&mut file_assets);
-            }
-        }
-
         let mut cursor = Cursor::new(Vec::new());
         {
             let mut zip = ZipWriter::new(&mut cursor);
@@ -746,32 +656,27 @@ impl AppContext {
             for descriptor in &dataset_records {
                 if let Some(graph_json) = dataset_graphs.get(&descriptor.original_id) {
                     let path = format!("datasets/{}", descriptor.filename);
-                    zip.start_file(path, options)
-                        .map_err(|e| {
-                            CoreError::internal(format!("Failed to add dataset file: {}", e))
-                        })?;
-                    zip.write_all(graph_json.as_bytes())
-                        .map_err(|e| {
-                            CoreError::internal(format!("Failed to write dataset file: {}", e))
-                        })?;
+                    zip.start_file(path, options).map_err(|e| {
+                        CoreError::internal(format!("Failed to add dataset file: {}", e))
+                    })?;
+                    zip.write_all(graph_json.as_bytes()).map_err(|e| {
+                        CoreError::internal(format!("Failed to write dataset file: {}", e))
+                    })?;
                 }
             }
 
             for asset in additional_assets {
-                zip.start_file(asset.path.clone(), options)
-                    .map_err(|e| {
-                        CoreError::internal(format!("Failed to add {}: {}", asset.path, e))
-                    })?;
-                zip.write_all(&asset.bytes)
-                    .map_err(|e| {
-                        CoreError::internal(format!("Failed to write {}: {}", asset.path, e))
-                    })?;
+                zip.start_file(asset.path.clone(), options).map_err(|e| {
+                    CoreError::internal(format!("Failed to add {}: {}", asset.path, e))
+                })?;
+                zip.write_all(&asset.bytes).map_err(|e| {
+                    CoreError::internal(format!("Failed to write {}: {}", asset.path, e))
+                })?;
             }
 
-            zip.finish()
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to finalize project archive: {}", e))
-                })?;
+            zip.finish().map_err(|e| {
+                CoreError::internal(format!("Failed to finalize project archive: {}", e))
+            })?;
         }
 
         let filename = format!(
@@ -790,7 +695,6 @@ impl AppContext {
         actor: &Actor,
         project_id: i32,
         target_path: &Path,
-        include_knowledge_base: bool,
         keep_connection: bool,
     ) -> CoreResult<()> {
         if !target_path.is_absolute() {
@@ -807,9 +711,7 @@ impl AppContext {
             ))
         })?;
 
-        let archive = self
-            .export_project_archive(actor, project_id, include_knowledge_base)
-            .await?;
+        let archive = self.export_project_archive(actor, project_id).await?;
         write_archive_to_directory(&archive.bytes, target_path)
             .map_err(|e| CoreError::internal(format!("Failed to write archive: {}", e)))?;
 
@@ -847,16 +749,16 @@ impl AppContext {
         let mut archive = ZipArchive::new(Cursor::new(archive_bytes))
             .map_err(|e| CoreError::internal(format!("Failed to read project archive: {}", e)))?;
 
-        let manifest: ProjectBundleManifest =
-            read_template_json(&mut archive, "manifest.json")
-                .map_err(|e| CoreError::internal(format!("Failed to read manifest.json: {}", e)))?;
+        let manifest: ProjectBundleManifest = read_template_json(&mut archive, "manifest.json")
+            .map_err(|e| CoreError::internal(format!("Failed to read manifest.json: {}", e)))?;
         let project_record: ProjectRecord = read_template_json(&mut archive, "project.json")
             .map_err(|e| CoreError::internal(format!("Failed to read project.json: {}", e)))?;
         let dag_snapshot: PlanDagSnapshot = read_template_json(&mut archive, "dag.json")
             .map_err(|e| CoreError::internal(format!("Failed to read dag.json: {}", e)))?;
         let dataset_index: DatasetBundleIndex =
-            read_template_json(&mut archive, "datasets/index.json")
-                .map_err(|e| CoreError::internal(format!("Failed to read datasets index: {}", e)))?;
+            read_template_json(&mut archive, "datasets/index.json").map_err(|e| {
+                CoreError::internal(format!("Failed to read datasets index: {}", e))
+            })?;
         let plans_index: Option<PlansIndex> =
             try_read_template_json(&mut archive, "plans/index.json")
                 .map_err(|e| CoreError::internal(format!("Failed to read plans index: {}", e)))?;
@@ -868,18 +770,6 @@ impl AppContext {
             try_read_template_json(&mut archive, "layers/palette.json").map_err(|e| {
                 CoreError::internal(format!("Failed to read palette export: {}", e))
             })?;
-        let knowledge_base_index: Option<KnowledgeBaseIndex> =
-            try_read_template_json(&mut archive, "kb/index.json")
-                .map_err(|e| CoreError::internal(format!("Failed to read KB index: {}", e)))?;
-        let mut kb_file_blobs: HashMap<String, Vec<u8>> = HashMap::new();
-        if let Some(index) = &knowledge_base_index {
-            for file_entry in &index.files {
-                let bytes = read_zip_file_bytes(&mut archive, &file_entry.blob_path).map_err(
-                    |e| CoreError::internal(format!("Failed to read KB blob: {}", e)),
-                )?;
-                kb_file_blobs.insert(file_entry.id.clone(), bytes);
-            }
-        }
 
         let tags = project_record.tags.clone();
         let desired_name = project_name.unwrap_or(project_record.name.clone());
@@ -896,12 +786,9 @@ impl AppContext {
             ..Default::default()
         };
 
-        let project = project_model
-            .insert(&self.db)
-            .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to create project from archive: {}", e))
-            })?;
+        let project = project_model.insert(&self.db).await.map_err(|e| {
+            CoreError::internal(format!("Failed to create project from archive: {}", e))
+        })?;
 
         let dataset_service = DataSetService::new(self.db.clone());
         let mut id_map = HashMap::new();
@@ -909,14 +796,12 @@ impl AppContext {
         for descriptor in &dataset_index.datasets {
             let dataset_path = format!("datasets/{}", descriptor.filename);
             let file_bytes = {
-                let mut dataset_file = archive
-                    .by_name(&dataset_path)
-                    .map_err(|e| {
-                        CoreError::internal(format!(
-                            "Missing dataset file {}: {}",
-                            descriptor.filename, e
-                        ))
-                    })?;
+                let mut dataset_file = archive.by_name(&dataset_path).map_err(|e| {
+                    CoreError::internal(format!(
+                        "Missing dataset file {}: {}",
+                        descriptor.filename, e
+                    ))
+                })?;
                 let mut bytes = Vec::new();
                 dataset_file.read_to_end(&mut bytes).map_err(|e| {
                     CoreError::internal(format!(
@@ -962,38 +847,33 @@ impl AppContext {
                 .map_err(|e| CoreError::internal(format!("Failed to import plans: {}", e)))?;
         } else {
             let plan = self
-                .create_plan(actor, PlanCreateRequest {
-                    project_id: project.id,
-                    name: if manifest.plan_name.trim().is_empty() {
-                        format!("{} Plan", desired_name)
-                    } else {
-                        manifest.plan_name.clone()
+                .create_plan(
+                    actor,
+                    PlanCreateRequest {
+                        project_id: project.id,
+                        name: if manifest.plan_name.trim().is_empty() {
+                            format!("{} Plan", desired_name)
+                        } else {
+                            manifest.plan_name.clone()
+                        },
+                        description: None,
+                        tags: Some(vec![]),
+                        yaml_content: "".to_string(),
+                        dependencies: None,
+                        status: Some("draft".to_string()),
                     },
-                    description: None,
-                    tags: Some(vec![]),
-                    yaml_content: "".to_string(),
-                    dependencies: None,
-                    status: Some("draft".to_string()),
-                })
+                )
                 .await?;
 
             insert_plan_dag_from_snapshot(&self.db, plan.id, &dag_snapshot, &id_map)
                 .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to recreate plan DAG: {}", e))
-                })?;
+                .map_err(|e| CoreError::internal(format!("Failed to recreate plan DAG: {}", e)))?;
         }
 
         if let Some(story_bundle) = stories_export {
             self.import_stories_from_export(project.id, story_bundle, &id_map)
                 .await
                 .map_err(|e| CoreError::internal(format!("Failed to import stories: {}", e)))?;
-        }
-
-        if let Some(kb_index) = knowledge_base_index {
-            self.import_knowledge_base_from_export(project.id, kb_index, kb_file_blobs)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to import knowledge base: {}", e)))?;
         }
 
         Ok(ProjectSummary::from(project))
@@ -1045,15 +925,12 @@ impl AppContext {
             })?
             .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
-        let path = project
-            .import_export_path
-            .clone()
-            .ok_or_else(|| {
-                CoreError::validation(format!(
-                    "Project {} has no connected import/export path",
-                    project_id
-                ))
-            })?;
+        let path = project.import_export_path.clone().ok_or_else(|| {
+            CoreError::validation(format!(
+                "Project {} has no connected import/export path",
+                project_id
+            ))
+        })?;
 
         // Remove the existing project and re-import using the same ID
         self.delete_project(actor, project_id).await?;
@@ -1074,7 +951,6 @@ impl AppContext {
         &self,
         actor: &Actor,
         project_id: i32,
-        include_knowledge_base: bool,
     ) -> CoreResult<()> {
         let project = projects::Entity::find_by_id(project_id)
             .one(&self.db)
@@ -1084,24 +960,15 @@ impl AppContext {
             })?
             .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
 
-        let path = project
-            .import_export_path
-            .clone()
-            .ok_or_else(|| {
-                CoreError::validation(format!(
-                    "Project {} has no connected import/export path",
-                    project_id
-                ))
-            })?;
+        let path = project.import_export_path.clone().ok_or_else(|| {
+            CoreError::validation(format!(
+                "Project {} has no connected import/export path",
+                project_id
+            ))
+        })?;
 
-        self.export_project_to_directory(
-            actor,
-            project_id,
-            Path::new(&path),
-            include_knowledge_base,
-            false,
-        )
-        .await
+        self.export_project_to_directory(actor, project_id, Path::new(&path), false)
+            .await
     }
 
     pub async fn create_project_from_library(
@@ -1160,19 +1027,22 @@ impl AppContext {
         })?;
 
         let plan = self
-            .create_plan(actor, PlanCreateRequest {
-                project_id: project.id,
-                name: if manifest.plan_name.trim().is_empty() {
-                    format!("{} Plan", desired_name)
-                } else {
-                    manifest.plan_name.clone()
+            .create_plan(
+                actor,
+                PlanCreateRequest {
+                    project_id: project.id,
+                    name: if manifest.plan_name.trim().is_empty() {
+                        format!("{} Plan", desired_name)
+                    } else {
+                        manifest.plan_name.clone()
+                    },
+                    description: None,
+                    tags: Some(vec![]),
+                    yaml_content: "".to_string(),
+                    dependencies: None,
+                    status: Some("draft".to_string()),
                 },
-                description: None,
-                tags: Some(vec![]),
-                yaml_content: "".to_string(),
-                dependencies: None,
-                status: Some("draft".to_string()),
-            })
+            )
             .await?;
 
         let dataset_service = DataSetService::new(self.db.clone());
@@ -1437,148 +1307,6 @@ impl AppContext {
         }))
     }
 
-    async fn collect_knowledge_base_assets(
-        &self,
-        project_id: i32,
-    ) -> Result<Option<(ExportAsset, Vec<ExportAsset>)>> {
-        let files = kb_files::Entity::find()
-            .filter(kb_files::Column::ProjectId.eq(project_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to load knowledge base files: {}", e))?;
-
-        if files.is_empty() {
-            return Ok(None);
-        }
-
-        let file_ids: Vec<Uuid> = files.iter().map(|file| file.id).collect();
-        let file_tags = if file_ids.is_empty() {
-            Vec::new()
-        } else {
-            kb_file_tags::Entity::find()
-                .filter(kb_file_tags::Column::FileId.is_in(file_ids.clone()))
-                .all(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to load file tags: {}", e))?
-        };
-
-        let tag_ids: Vec<Uuid> = file_tags.iter().map(|row| row.tag_id).collect();
-        let tags = if tag_ids.is_empty() {
-            Vec::new()
-        } else {
-            kb_tags::Entity::find()
-                .filter(kb_tags::Column::Id.is_in(tag_ids.clone()))
-                .all(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to load tags: {}", e))?
-        };
-
-        let documents = kb_docs::Entity::find()
-            .filter(kb_docs::Column::ProjectId.eq(project_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to load knowledge base documents: {}", e))?;
-
-        let vector_states = kb_vector_state::Entity::find()
-            .filter(kb_vector_state::Column::ProjectId.eq(project_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| anyhow!("Failed to load knowledge base vector state: {}", e))?;
-
-        let mut tag_lookup = HashMap::new();
-        for tag in tags {
-            tag_lookup.insert(
-                tag.id,
-                KnowledgeBaseTagEntry {
-                    id: tag.id.to_string(),
-                    name: tag.name,
-                    scope: tag.scope,
-                    color: tag.color,
-                    created_at: tag.created_at,
-                },
-            );
-        }
-
-        let mut file_tag_map: HashMap<Uuid, Vec<String>> = HashMap::new();
-        let mut file_tag_entries = Vec::new();
-        for link in file_tags {
-            file_tag_map
-                .entry(link.file_id)
-                .or_default()
-                .push(link.tag_id.to_string());
-            file_tag_entries.push(KnowledgeBaseFileTagEntry {
-                file_id: link.file_id.to_string(),
-                tag_id: link.tag_id.to_string(),
-            });
-        }
-
-        let mut index = KnowledgeBaseIndex::default();
-        index.tags = tag_lookup.values().cloned().collect();
-        index.file_tags = file_tag_entries;
-
-        let mut binary_assets = Vec::new();
-        for file in files {
-            let sanitized_name = sanitize_dataset_filename(&file.filename);
-            let blob_path = format!("kb/files/{}/{}", file.id, sanitized_name);
-            binary_assets.push(ExportAsset {
-                path: blob_path.clone(),
-                bytes: file.blob.clone(),
-            });
-
-            index.files.push(KnowledgeBaseFileEntry {
-                id: file.id.to_string(),
-                filename: file.filename,
-                media_type: file.media_type,
-                size_bytes: file.size_bytes,
-                checksum: file.checksum,
-                created_at: file.created_at,
-                indexed: file.indexed,
-                blob_path,
-                tag_ids: file_tag_map.remove(&file.id).unwrap_or_default(),
-            });
-        }
-
-        index.documents = documents
-            .into_iter()
-            .map(|doc| KnowledgeBaseDocumentEntry {
-                id: doc.id.to_string(),
-                file_id: doc.file_id.map(|id| id.to_string()),
-                chunk_id: doc.chunk_id,
-                media_type: doc.media_type,
-                chunk_text: doc.chunk_text,
-                metadata: doc.metadata,
-                embedding_model: doc.embedding_model,
-                embedding: doc
-                    .embedding
-                    .map(|bytes| general_purpose::STANDARD.encode(bytes)),
-                created_at: doc.created_at,
-            })
-            .collect();
-
-        index.vector_states = vector_states
-            .into_iter()
-            .map(|state| KnowledgeBaseVectorStateEntry {
-                id: state.id.to_string(),
-                status: state.status,
-                last_indexed_at: state.last_indexed_at,
-                last_error: state.last_error,
-                config: state.config,
-                embedding_provider: state.embedding_provider,
-                embedding_model: state.embedding_model,
-                updated_at: state.updated_at,
-            })
-            .collect();
-
-        let index_bytes = serde_json::to_vec_pretty(&index)
-            .map_err(|e| anyhow!("Failed to encode knowledge base index: {}", e))?;
-        let index_asset = ExportAsset {
-            path: "kb/index.json".into(),
-            bytes: index_bytes,
-        };
-
-        Ok(Some((index_asset, binary_assets)))
-    }
-
     async fn import_plans_from_export(
         &self,
         actor: &Actor,
@@ -1595,15 +1323,18 @@ impl AppContext {
             let path = format!("plans/{}", entry.filename);
             let plan_file: ExportedPlanFile = read_template_json(archive, &path)?;
             let plan = self
-                .create_plan(actor, PlanCreateRequest {
-                    project_id,
-                    name: plan_file.metadata.name.clone(),
-                    description: plan_file.metadata.description.clone(),
-                    tags: Some(plan_file.metadata.tags.clone()),
-                    yaml_content: plan_file.metadata.yaml_content.clone(),
-                    dependencies: plan_file.metadata.dependencies.clone(),
-                    status: Some(plan_file.metadata.status.clone()),
-                })
+                .create_plan(
+                    actor,
+                    PlanCreateRequest {
+                        project_id,
+                        name: plan_file.metadata.name.clone(),
+                        description: plan_file.metadata.description.clone(),
+                        tags: Some(plan_file.metadata.tags.clone()),
+                        yaml_content: plan_file.metadata.yaml_content.clone(),
+                        dependencies: plan_file.metadata.dependencies.clone(),
+                        status: Some(plan_file.metadata.status.clone()),
+                    },
+                )
                 .await?;
 
             insert_plan_dag_from_snapshot(&self.db, plan.id, &plan_file.dag, dataset_map)
@@ -1747,151 +1478,6 @@ impl AppContext {
 
         Ok(())
     }
-
-    async fn import_knowledge_base_from_export(
-        &self,
-        project_id: i32,
-        index: KnowledgeBaseIndex,
-        blobs: HashMap<String, Vec<u8>>,
-    ) -> Result<()> {
-        if index.files.is_empty() {
-            return Ok(());
-        }
-
-        let mut tag_id_map = HashMap::new();
-        for tag in index.tags {
-            let tag_id = Uuid::parse_str(&tag.id)
-                .map_err(|e| anyhow!("Invalid tag id {}: {}", tag.id, e))?;
-            tag_id_map.insert(tag.id.clone(), tag_id);
-            if kb_tags::Entity::find_by_id(tag_id)
-                .one(&self.db)
-                .await?
-                .is_none()
-            {
-                let model = kb_tags::ActiveModel {
-                    id: Set(tag_id),
-                    name: Set(tag.name),
-                    scope: Set(tag.scope),
-                    color: Set(tag.color),
-                    created_at: Set(tag.created_at),
-                };
-                model
-                    .insert(&self.db)
-                    .await
-                    .map_err(|e| anyhow!("Failed to insert knowledge base tag: {}", e))?;
-            }
-        }
-
-        let mut file_id_map = HashMap::new();
-        for file in index.files {
-            let file_id = Uuid::parse_str(&file.id)
-                .map_err(|e| anyhow!("Invalid file id {}: {}", file.id, e))?;
-            let blob = blobs
-                .get(&file.id)
-                .cloned()
-                .ok_or_else(|| anyhow!("Missing blob for knowledge base file {}", file.id))?;
-            let model = kb_files::ActiveModel {
-                id: Set(file_id),
-                project_id: Set(project_id),
-                filename: Set(file.filename),
-                media_type: Set(file.media_type),
-                size_bytes: Set(file.size_bytes),
-                blob: Set(blob),
-                checksum: Set(file.checksum),
-                created_by: Set(None),
-                created_at: Set(file.created_at),
-                indexed: Set(file.indexed),
-            };
-            model
-                .insert(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to insert knowledge base file: {}", e))?;
-            file_id_map.insert(file.id, file_id);
-        }
-
-        for link in index.file_tags {
-            let file_id = file_id_map
-                .get(&link.file_id)
-                .copied()
-                .ok_or_else(|| anyhow!("Unknown file id {} in file_tags", link.file_id))?;
-            let tag_id = tag_id_map
-                .get(&link.tag_id)
-                .copied()
-                .ok_or_else(|| anyhow!("Unknown tag id {} in file_tags", link.tag_id))?;
-
-            let model = kb_file_tags::ActiveModel {
-                id: Set(Uuid::new_v4()),
-                file_id: Set(file_id),
-                tag_id: Set(tag_id),
-                created_at: Set(Utc::now()),
-            };
-            model
-                .insert(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to insert file tag mapping: {}", e))?;
-        }
-
-        for document in index.documents {
-            let doc_id = Uuid::parse_str(&document.id)
-                .map_err(|e| anyhow!("Invalid document id {}: {}", document.id, e))?;
-            let file_id = match document.file_id {
-                Some(ref id) => Some(
-                    file_id_map
-                        .get(id)
-                        .copied()
-                        .ok_or_else(|| anyhow!("Unknown file id {} in documents", id))?,
-                ),
-                None => None,
-            };
-            let embedding = match document.embedding {
-                Some(ref encoded) => {
-                    Some(general_purpose::STANDARD.decode(encoded).map_err(|e| {
-                        anyhow!("Failed to decode embedding for {}: {}", document.id, e)
-                    })?)
-                }
-                None => None,
-            };
-
-            let model = kb_docs::ActiveModel {
-                id: Set(doc_id),
-                project_id: Set(project_id),
-                file_id: Set(file_id),
-                chunk_id: Set(document.chunk_id),
-                media_type: Set(document.media_type),
-                chunk_text: Set(document.chunk_text),
-                metadata: Set(document.metadata),
-                embedding_model: Set(document.embedding_model),
-                embedding: Set(embedding),
-                created_at: Set(document.created_at),
-            };
-            model
-                .insert(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to insert knowledge base document: {}", e))?;
-        }
-
-        for state in index.vector_states {
-            let state_id = Uuid::parse_str(&state.id)
-                .map_err(|e| anyhow!("Invalid vector state id {}: {}", state.id, e))?;
-            let model = kb_vector_state::ActiveModel {
-                id: Set(state_id),
-                project_id: Set(project_id),
-                status: Set(state.status),
-                last_indexed_at: Set(state.last_indexed_at),
-                last_error: Set(state.last_error),
-                config: Set(state.config),
-                updated_at: Set(state.updated_at),
-                embedding_provider: Set(state.embedding_provider),
-                embedding_model: Set(state.embedding_model),
-            };
-            model
-                .insert(&self.db)
-                .await
-                .map_err(|e| anyhow!("Failed to insert vector index state: {}", e))?;
-        }
-
-        Ok(())
-    }
 }
 
 // ----- Standalone helper functions -----
@@ -1983,16 +1569,6 @@ fn try_read_template_json<T: DeserializeOwned>(
         Err(ZipError::FileNotFound) => Ok(None),
         Err(e) => Err(anyhow!("Template archive missing {}: {}", path, e)),
     }
-}
-
-fn read_zip_file_bytes(archive: &mut ZipArchive<Cursor<Vec<u8>>>, path: &str) -> Result<Vec<u8>> {
-    let mut file = archive
-        .by_name(path)
-        .map_err(|e| anyhow!("Archive missing {}: {}", path, e))?;
-    let mut buffer = Vec::new();
-    file.read_to_end(&mut buffer)
-        .map_err(|e| anyhow!("Failed to read {}: {}", path, e))?;
-    Ok(buffer)
 }
 
 fn analyze_data_sets(

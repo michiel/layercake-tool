@@ -4,11 +4,13 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde_json::Value;
 
+use crate::server::app::AppState;
 use layercake_core::database::entities::common_types::{
     DataType as CoreDataType, FileFormat as CoreFileFormat,
 };
-use crate::server::app::AppState;
-use layercake_core::services::library_item_service::{LibraryItemService, ITEM_TYPE_PROJECT_TEMPLATE};
+use layercake_core::services::library_item_service::{
+    LibraryItemService, ITEM_TYPE_PROJECT_TEMPLATE,
+};
 
 pub async fn download_library_item(
     State(state): State<AppState>,

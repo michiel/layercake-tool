@@ -73,7 +73,7 @@ export const WorkbenchPage = () => {
     }
     try {
       const { data } = await resetProjectMutation({
-        variables: { projectId: projectIdNum, includeKnowledgeBase: true },
+        variables: { projectId: projectIdNum },
       })
       const result = (data as any)?.resetProject
 

@@ -1,3 +1,4 @@
+pub mod auth;
 pub mod code_analysis_enhanced_solution_graph;
 pub mod code_analysis_graph;
 pub mod code_analysis_solution_graph;
@@ -10,13 +11,12 @@ pub mod graph;
 pub mod infra_graph;
 pub mod pipeline;
 pub mod plan;
-pub mod plan_execution;
 pub mod plan_dag;
-pub mod sequence_types;
+pub mod plan_execution;
 pub mod sequence_context;
+pub mod sequence_types;
 pub mod story_types;
 pub mod update;
-pub mod auth;
 
 pub mod app_context;
 pub use app_context::AppContext;

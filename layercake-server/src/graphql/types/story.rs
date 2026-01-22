@@ -3,9 +3,9 @@ use chrono::{DateTime, Utc};
 use sea_orm::{EntityTrait, PaginatorTrait};
 use serde::{Deserialize, Serialize};
 
-use layercake_core::database::entities::{projects, sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::Project;
+use layercake_core::database::entities::{projects, sequences, stories};
 
 /// Layer source configuration for a story
 /// Controls how layer sources are rendered - if a source is in this list,

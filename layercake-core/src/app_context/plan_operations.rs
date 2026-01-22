@@ -38,11 +38,9 @@ impl AppContext {
         actor: &Actor,
         request: PlanCreateRequest,
     ) -> CoreResult<PlanSummary> {
-        self.authorize_project_write(actor, request.project_id).await?;
-        let plan = self
-            .plan_service
-            .create_plan(request)
+        self.authorize_project_write(actor, request.project_id)
             .await?;
+        let plan = self.plan_service.create_plan(request).await?;
 
         Ok(PlanSummary::from(plan))
     }
@@ -55,10 +53,7 @@ impl AppContext {
     ) -> CoreResult<PlanSummary> {
         let project_id = self.project_id_for_plan(id).await?;
         self.authorize_project_write(actor, project_id).await?;
-        let plan = self
-            .plan_service
-            .update_plan(id, update)
-            .await?;
+        let plan = self.plan_service.update_plan(id, update).await?;
 
         Ok(PlanSummary::from(plan))
     }
@@ -77,10 +72,7 @@ impl AppContext {
     ) -> CoreResult<PlanSummary> {
         let project_id = self.project_id_for_plan(id).await?;
         self.authorize_project_write(actor, project_id).await?;
-        let plan = self
-            .plan_service
-            .duplicate_plan(id, name)
-            .await?;
+        let plan = self.plan_service.duplicate_plan(id, name).await?;
 
         Ok(PlanSummary::from(plan))
     }

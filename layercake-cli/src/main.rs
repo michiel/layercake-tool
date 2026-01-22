@@ -12,7 +12,6 @@ use layercake_server::server;
 mod console;
 
 #[cfg(feature = "console")]
-
 #[derive(Parser)]
 #[clap(author, version, about)]
 struct Cli {

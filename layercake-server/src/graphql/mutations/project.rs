@@ -1,8 +1,8 @@
 use async_graphql::*;
 
-use layercake_core::app_context::ProjectUpdate;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::project::{CreateProjectInput, Project, UpdateProjectInput};
+use layercake_core::app_context::ProjectUpdate;
 use layercake_core::services::sample_project_service::SampleProjectService;
 
 #[derive(Default)]

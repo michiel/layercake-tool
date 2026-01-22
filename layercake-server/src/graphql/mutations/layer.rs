@@ -1,6 +1,6 @@
-use async_graphql::*;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::layer::{LayerAlias, ProjectLayer, ProjectLayerInput};
+use async_graphql::*;
 
 #[derive(Default)]
 pub struct LayerMutation;

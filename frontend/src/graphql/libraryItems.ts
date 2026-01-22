@@ -115,8 +115,8 @@ export const EXPORT_PROJECT_AS_TEMPLATE = gql`
 `
 
 export const EXPORT_PROJECT_ARCHIVE = gql`
-  mutation ExportProjectArchive($projectId: Int!, $includeKnowledgeBase: Boolean) {
-    exportProjectArchive(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase) {
+  mutation ExportProjectArchive($projectId: Int!) {
+    exportProjectArchive(projectId: $projectId) {
       filename
       fileContent
     }
@@ -124,8 +124,8 @@ export const EXPORT_PROJECT_ARCHIVE = gql`
 `
 
 export const RESET_PROJECT = gql`
-  mutation ResetProject($projectId: Int!, $includeKnowledgeBase: Boolean) {
-    resetProject(projectId: $projectId, includeKnowledgeBase: $includeKnowledgeBase) {
+  mutation ResetProject($projectId: Int!) {
+    resetProject(projectId: $projectId) {
       id
       name
       description

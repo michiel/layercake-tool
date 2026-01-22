@@ -11,21 +11,20 @@ use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
 
-use layercake_core::app_context::AppContext;
 use crate::collaboration::{CollaborationCoordinator, CoordinatorHandle};
 use crate::graphql::{
     mutations::Mutation, queries::Query, subscriptions::Subscription, GraphQLContext, GraphQLSchema,
 };
 use crate::server::websocket::websocket_handler;
-use layercake_core::services::system_settings_service::SystemSettingsService;
 use async_graphql::{
     parser::types::{DocumentOperations, OperationType, Selection},
     Request, Schema,
 };
 use async_graphql_axum::{GraphQLRequest, GraphQLResponse as AxumGraphQLResponse};
+use layercake_core::app_context::AppContext;
+use layercake_core::services::system_settings_service::SystemSettingsService;
 
 use super::handlers::{health, library};
-use layercake_genai::{config::EmbeddingProviderConfig, services::DataAcquisitionService};
 use layercake_projections::graphql::{
     ProjectionMutation as ProjectionsMutation, ProjectionQuery as ProjectionsQuery,
     ProjectionSchemaContext, ProjectionSubscription as ProjectionsSubscription, ProjectionsSchema,
@@ -50,70 +49,8 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
             .map_err(anyhow::Error::from)?,
     );
 
-    let provider_hint = {
-        let explicit = system_settings
-            .raw_value("LAYERCAKE_EMBEDDING_PROVIDER")
-            .await
-            .filter(|value| !value.trim().is_empty());
-        if explicit.is_some() {
-            explicit
-        } else {
-            system_settings
-                .raw_value("LAYERCAKE_CHAT_PROVIDER")
-                .await
-                .filter(|value| !value.trim().is_empty())
-        }
-    };
-
-    let mut embedding_config = EmbeddingProviderConfig::from_env();
-
-    {
-        if let Some(value) = system_settings.raw_value("OPENAI_API_KEY").await {
-            if !value.is_empty() {
-                embedding_config.openai_api_key = Some(value);
-            }
-        }
-        if let Some(value) = system_settings.raw_value("OPENAI_BASE_URL").await {
-            if !value.is_empty() {
-                embedding_config.openai_base_url = Some(value);
-            }
-        }
-        if let Some(value) = system_settings
-            .raw_value("LAYERCAKE_OPENAI_EMBEDDING_MODEL")
-            .await
-        {
-            if !value.is_empty() {
-                embedding_config.openai_model = Some(value);
-            }
-        }
-        if let Some(value) = system_settings.raw_value("OLLAMA_BASE_URL").await {
-            if !value.is_empty() {
-                embedding_config.ollama_base_url = Some(value);
-            }
-        }
-        if let Some(value) = system_settings.raw_value("OLLAMA_API_KEY").await {
-            if !value.is_empty() {
-                embedding_config.ollama_api_key = Some(value);
-            }
-        }
-        if let Some(value) = system_settings
-            .raw_value("LAYERCAKE_OLLAMA_EMBEDDING_MODEL")
-            .await
-        {
-            if !value.is_empty() {
-                embedding_config.ollama_model = Some(value);
-            }
-        }
-    }
-
-    let data_acquisition_service = Arc::new(DataAcquisitionService::new(
+    let app_context = Arc::new(AppContext::with_authorizer(
         db.clone(),
-        provider_hint,
-        embedding_config,
-    ));
-    let app_context = Arc::new(AppContext::with_data_acquisition_and_authorizer(
-        db.clone(),
-        data_acquisition_service.clone(),
         Arc::new(crate::auth::DefaultAuthorizer),
     ));
 
@@ -226,12 +163,15 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     // Serve projections build assets if available
     // When running in Tauri, cwd is src-tauri, so go up one level
-    let mut projections_path = std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let mut projections_path =
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
     // If we're in src-tauri directory, go up one level to project root
     if projections_path.ends_with("src-tauri") {
-        projections_path = projections_path.parent().unwrap_or(&projections_path).to_path_buf();
+        projections_path = projections_path
+            .parent()
+            .unwrap_or(&projections_path)
+            .to_path_buf();
     }
 
     let projections_path = projections_path.join("projections-frontend/dist");
@@ -273,16 +213,22 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     // Serve standalone projection viewer build at /projections/viewer/*
     // When running in Tauri, cwd is src-tauri, so go up one level
-    let mut projections_viewer_path = std::env::current_dir()
-        .unwrap_or_else(|_| std::path::PathBuf::from("."));
+    let mut projections_viewer_path =
+        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
 
     // If we're in src-tauri directory, go up one level to project root
     if projections_viewer_path.ends_with("src-tauri") {
-        projections_viewer_path = projections_viewer_path.parent().unwrap_or(&projections_viewer_path).to_path_buf();
+        projections_viewer_path = projections_viewer_path
+            .parent()
+            .unwrap_or(&projections_viewer_path)
+            .to_path_buf();
     }
 
     let projections_viewer_path = projections_viewer_path.join("projections-frontend/dist");
-    tracing::info!("Serving projection viewer from: {}", projections_viewer_path.display());
+    tracing::info!(
+        "Serving projection viewer from: {}",
+        projections_viewer_path.display()
+    );
 
     let projections_viewer = ServeDir::new(projections_viewer_path.clone())
         .fallback(ServeFile::new(projections_viewer_path.join("index.html")));

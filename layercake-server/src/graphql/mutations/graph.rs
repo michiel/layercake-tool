@@ -1,10 +1,10 @@
 use async_graphql::*;
 
-use layercake_core::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::{
     CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
 };
+use layercake_core::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use serde_json::Value;
 
 #[derive(Default)]
@@ -152,7 +152,9 @@ impl GraphMutation {
 
         let node = context
             .app
-            .update_graph_node(&actor, graph_id, node_id, label, layer, attributes, belongs_to)
+            .update_graph_node(
+                &actor, graph_id, node_id, label, layer, attributes, belongs_to,
+            )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
@@ -246,15 +248,7 @@ impl GraphMutation {
         let inserted = context
             .app
             .add_graph_edge(
-                &actor,
-                graph_id,
-                id,
-                source,
-                target,
-                label,
-                layer,
-                weight,
-                attributes,
+                &actor, graph_id, id, source, target, label, layer, weight, attributes,
             )
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;

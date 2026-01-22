@@ -22,9 +22,7 @@ impl LayerPaletteService {
             .filter(project_layers::Column::ProjectId.eq(project_id))
             .all(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load project palette: {}", e))
-            })
+            .map_err(|e| CoreError::internal(format!("Failed to load project palette: {}", e)))
     }
 
     pub async fn get_layers_by_ids(
@@ -41,9 +39,7 @@ impl LayerPaletteService {
             .filter(project_layers::Column::LayerId.is_in(layer_ids))
             .all(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load project layers: {}", e))
-            })
+            .map_err(|e| CoreError::internal(format!("Failed to load project layers: {}", e)))
     }
 
     pub async fn add_layer(

@@ -59,5 +59,4 @@ tokio-stream = "0.1"
 json-patch = "2.0"
 
 layercake-core = { path = "../layercake-core", package = "layercake-core" }
-layercake-genai = { path = "../layercake-genai" }
 layercake-projections = { path = "../layercake-projections" }

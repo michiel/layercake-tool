@@ -386,7 +386,9 @@ impl GraphEditApplicator {
             .filter(edge_condition)
             .exec(&self.db)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to delete graph data edges: {}", e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to delete graph data edges: {}", e))
+            })?;
 
         let result = graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
@@ -812,7 +814,8 @@ impl GraphEditApplicator {
             dataset_id: Set(None),
         };
 
-        layer.insert(&self.db)
+        layer
+            .insert(&self.db)
             .await
             .map_err(|e| CoreError::internal(format!("Failed to insert graph layer: {}", e)))?;
 

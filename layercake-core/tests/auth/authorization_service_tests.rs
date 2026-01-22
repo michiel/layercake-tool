@@ -46,13 +46,9 @@ async fn seed_collaborator(
     user: &users::Model,
     role: project_collaborators::ProjectRole,
 ) -> project_collaborators::Model {
-    let collaborator = project_collaborators::ActiveModel::new(
-        project.id,
-        user.id,
-        role,
-        Some(user.id),
-    )
-    .accept_invitation();
+    let collaborator =
+        project_collaborators::ActiveModel::new(project.id, user.id, role, Some(user.id))
+            .accept_invitation();
 
     collaborator
         .insert(db)

@@ -42,13 +42,9 @@ impl PlanService {
 
     fn serialize_dependencies(dependencies: Option<Vec<i32>>) -> CoreResult<Option<String>> {
         match dependencies {
-            Some(values) => {
-                Ok(Some(
-                    serde_json::to_string(&values).map_err(|e| {
-                        CoreError::validation(format!("Invalid plan dependencies: {}", e))
-                    })?,
-                ))
-            }
+            Some(values) => Ok(Some(serde_json::to_string(&values).map_err(|e| {
+                CoreError::validation(format!("Invalid plan dependencies: {}", e))
+            })?)),
             None => Ok(None),
         }
     }
@@ -111,9 +107,7 @@ impl PlanService {
         let plan = plans::Entity::find_by_id(id)
             .one(&self.db)
             .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load plan {}: {}", id, e))
-            })?;
+            .map_err(|e| CoreError::internal(format!("Failed to load plan {}: {}", id, e)))?;
 
         Ok(plan)
     }
@@ -317,12 +311,9 @@ impl PlanService {
                 updated_at: Set(now),
             };
 
-            duplicate_node
-                .insert(&txn)
-                .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to copy node {}: {}", node.id, e))
-                })?;
+            duplicate_node.insert(&txn).await.map_err(|e| {
+                CoreError::internal(format!("Failed to copy node {}: {}", node.id, e))
+            })?;
         }
 
         let edges = plan_dag_edges::Entity::find()
@@ -350,12 +341,9 @@ impl PlanService {
                 updated_at: Set(now),
             };
 
-            new_edge
-                .insert(&txn)
-                .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to copy edge {}: {}", edge.id, e))
-                })?;
+            new_edge.insert(&txn).await.map_err(|e| {
+                CoreError::internal(format!("Failed to copy edge {}: {}", edge.id, e))
+            })?;
         }
 
         txn.commit()

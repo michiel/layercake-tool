@@ -50,7 +50,7 @@ impl<'de> Deserialize<'de> for TransformNodeConfig {
 pub struct GraphTransform {
     pub kind: GraphTransformKind,
     #[serde(default)]
-        pub params: GraphTransformParams,
+    pub params: GraphTransformParams,
 }
 
 impl GraphTransform {

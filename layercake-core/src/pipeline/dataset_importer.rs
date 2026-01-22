@@ -268,7 +268,11 @@ impl DatasourceImporter {
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
                     // Skip id/label/layer/comment since they map to dedicated fields
-                    if header == "id" || header == "label" || header == "layer" || header == "comment" {
+                    if header == "id"
+                        || header == "label"
+                        || header == "layer"
+                        || header == "comment"
+                    {
                         continue;
                     }
                     attributes.insert(header.to_string(), json!(field));
@@ -410,8 +414,14 @@ impl DatasourceImporter {
             for (i, field) in record.iter().enumerate() {
                 if let Some(header) = headers.get(i) {
                     // Skip id/source/target/label/layer/weight/comment since they map to dedicated fields
-                    if header == "id" || header == "source" || header == "target"
-                        || header == "label" || header == "layer" || header == "weight" || header == "comment" {
+                    if header == "id"
+                        || header == "source"
+                        || header == "target"
+                        || header == "label"
+                        || header == "layer"
+                        || header == "weight"
+                        || header == "comment"
+                    {
                         continue;
                     }
                     attributes.insert(header.to_string(), json!(field));

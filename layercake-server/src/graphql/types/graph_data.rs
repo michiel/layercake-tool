@@ -2,12 +2,12 @@ use async_graphql::*;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 
-use layercake_core::database::entities::{graph_data, graph_data_edges, graph_data_nodes};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::graph_edge::GraphEdge;
 use crate::graphql::types::graph_node::GraphNode;
 use crate::graphql::types::Project;
+use layercake_core::database::entities::{graph_data, graph_data_edges, graph_data_nodes};
 
 #[derive(SimpleObject, Serialize, Deserialize, Clone)]
 pub struct GraphDataAnnotationGql {

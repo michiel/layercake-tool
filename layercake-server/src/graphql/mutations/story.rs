@@ -3,7 +3,6 @@ use base64::Engine;
 use chrono::Utc;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 
-use layercake_core::database::entities::{sequences, stories};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
@@ -11,6 +10,7 @@ use crate::graphql::types::{
     StoryImportResult as GqlStoryImportResult, StoryImportSummary as GqlStoryImportSummary,
     UpdateStoryInput,
 };
+use layercake_core::database::entities::{sequences, stories};
 
 #[derive(Default)]
 pub struct StoryMutation;

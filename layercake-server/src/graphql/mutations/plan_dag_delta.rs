@@ -1,7 +1,5 @@
+use crate::graphql::types::{PatchOp, PatchOperation, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode};
 use layercake_core::database::entities::{plan_dag_edges, plan_dag_nodes, plans};
-use crate::graphql::types::{
-    PatchOp, PatchOperation, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
-};
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
 /// Helper function to generate JSON Patch for node addition

@@ -1,13 +1,13 @@
 use async_graphql::*;
 use sea_orm::EntityTrait;
 
-use layercake_core::database::entities::{project_collaborators, users};
-use layercake_core::services::collaboration_service::CollaborationService;
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     InviteCollaboratorInput, ProjectCollaborator, UpdateCollaboratorRoleInput,
 };
+use layercake_core::database::entities::{project_collaborators, users};
+use layercake_core::services::collaboration_service::CollaborationService;
 
 #[derive(Default)]
 pub struct CollaborationMutation;
@@ -124,13 +124,11 @@ impl CollaborationMutation {
         let user_id = actor
             .user_id
             .ok_or_else(|| StructuredError::unauthorized("User is not authenticated"))?;
-        let (user_name, avatar_color) = match users::Entity::find_by_id(user_id)
-            .one(&context.db)
-            .await
-        {
-            Ok(Some(user)) => (user.display_name, user.avatar_color),
-            _ => (format!("User {}", user_id), "#3B82F6".to_string()),
-        };
+        let (user_name, avatar_color) =
+            match users::Entity::find_by_id(user_id).one(&context.db).await {
+                Ok(Some(user)) => (user.display_name, user.avatar_color),
+                _ => (format!("User {}", user_id), "#3B82F6".to_string()),
+            };
         let user_id = format!("user_{}", user_id);
 
         let plan_id = format!("project_{}", project_id);
@@ -174,13 +172,11 @@ impl CollaborationMutation {
         let user_id = actor
             .user_id
             .ok_or_else(|| StructuredError::unauthorized("User is not authenticated"))?;
-        let (user_name, avatar_color) = match users::Entity::find_by_id(user_id)
-            .one(&context.db)
-            .await
-        {
-            Ok(Some(user)) => (user.display_name, user.avatar_color),
-            _ => (format!("User {}", user_id), "#3B82F6".to_string()),
-        };
+        let (user_name, avatar_color) =
+            match users::Entity::find_by_id(user_id).one(&context.db).await {
+                Ok(Some(user)) => (user.display_name, user.avatar_color),
+                _ => (format!("User {}", user_id), "#3B82F6".to_string()),
+            };
         let user_id = format!("user_{}", user_id);
 
         let plan_id = format!("project_{}", project_id);

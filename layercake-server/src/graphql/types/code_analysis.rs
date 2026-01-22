@@ -1,6 +1,6 @@
-use layercake_core::services::code_analysis_service::CodeAnalysisProfile as ServiceProfile;
 use async_graphql::{InputObject, SimpleObject};
 use chrono::{DateTime, Utc};
+use layercake_core::services::code_analysis_service::CodeAnalysisProfile as ServiceProfile;
 
 #[derive(SimpleObject, Clone)]
 pub struct CodeAnalysisProfile {

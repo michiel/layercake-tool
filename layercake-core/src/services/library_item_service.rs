@@ -231,11 +231,7 @@ impl LibraryItemService {
         if library_dir.is_dir() {
             let files: Vec<PathBuf> = fs::read_dir(&library_dir)
                 .map_err(|e| {
-                    CoreError::internal(format!(
-                        "Failed to read {}: {}",
-                        library_dir.display(),
-                        e
-                    ))
+                    CoreError::internal(format!("Failed to read {}: {}", library_dir.display(), e))
                 })?
                 .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
                 .collect();
@@ -286,11 +282,7 @@ impl LibraryItemService {
         if prompts_dir.is_dir() {
             let prompt_files: Vec<PathBuf> = fs::read_dir(&prompts_dir)
                 .map_err(|e| {
-                    CoreError::internal(format!(
-                        "Failed to read {}: {}",
-                        prompts_dir.display(),
-                        e
-                    ))
+                    CoreError::internal(format!("Failed to read {}: {}", prompts_dir.display(), e))
                 })?
                 .filter_map(|entry| entry.ok().map(|e| e.path()).filter(|path| path.is_file()))
                 .filter(|path| {
@@ -351,10 +343,9 @@ impl LibraryItemService {
             CoreError::internal(format!("Failed to read {}: {}", path.display(), e))
         })?;
 
-        let file_format = FileFormat::from_extension(filename)
-            .ok_or_else(|| {
-                CoreError::validation(format!("Unsupported file extension for {}", filename))
-            })?;
+        let file_format = FileFormat::from_extension(filename).ok_or_else(|| {
+            CoreError::validation(format!("Unsupported file extension for {}", filename))
+        })?;
 
         let data_type = infer_data_type(filename, &file_format, &file_bytes)?;
         let name = derive_name(filename);
@@ -515,7 +506,10 @@ impl LibraryItemService {
     ) -> CoreResult<Vec<data_sets::Model>> {
         let mut imported = Vec::new();
         for id in ids {
-            imported.push(self.import_dataset_into_project(actor, project_id, *id).await?);
+            imported.push(
+                self.import_dataset_into_project(actor, project_id, *id)
+                    .await?,
+            );
         }
         Ok(imported)
     }
@@ -563,14 +557,12 @@ impl LibraryItemService {
         };
 
         if matches!(file_format, FileFormat::Csv | FileFormat::Tsv) {
-            let delimiter = file_format
-                .get_delimiter()
-                .ok_or_else(|| {
-                    CoreError::validation(format!(
-                        "Unable to determine delimiter for {:?}",
-                        file_format
-                    ))
-                })?;
+            let delimiter = file_format.get_delimiter().ok_or_else(|| {
+                CoreError::validation(format!(
+                    "Unable to determine delimiter for {:?}",
+                    file_format
+                ))
+            })?;
             let mut reader = ReaderBuilder::new()
                 .has_headers(true)
                 .delimiter(delimiter)
@@ -648,12 +640,12 @@ pub fn infer_data_type(
     match file_format {
         FileFormat::Json => Ok(DataType::Graph),
         FileFormat::Csv | FileFormat::Tsv => infer_data_type_from_headers(file_format, file_data),
-        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => Err(
-            CoreError::validation(format!(
+        FileFormat::Xlsx | FileFormat::Ods | FileFormat::Pdf | FileFormat::Xml => {
+            Err(CoreError::validation(format!(
                 "File format {:?} is not supported for data type inference",
                 file_format
-            )),
-        ),
+            )))
+        }
     }
 }
 
@@ -661,14 +653,12 @@ fn infer_data_type_from_headers(
     file_format: &FileFormat,
     file_data: &[u8],
 ) -> CoreResult<DataType> {
-    let delimiter = file_format
-        .get_delimiter()
-        .ok_or_else(|| {
-            CoreError::validation(format!(
-                "Unable to determine delimiter for {:?}",
-                file_format
-            ))
-        })?;
+    let delimiter = file_format.get_delimiter().ok_or_else(|| {
+        CoreError::validation(format!(
+            "Unable to determine delimiter for {:?}",
+            file_format
+        ))
+    })?;
 
     let mut reader = ReaderBuilder::new()
         .has_headers(true)

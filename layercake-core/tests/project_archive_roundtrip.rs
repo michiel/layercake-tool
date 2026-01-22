@@ -45,15 +45,18 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         .await?;
 
     let plan = app
-        .create_plan(&SystemActor::internal(), PlanCreateRequest {
-            project_id: project.id,
-            name: "Roundtrip Plan".to_string(),
-            description: Some("plan with detached dataset".to_string()),
-            tags: Some(vec!["roundtrip".to_string()]),
-            yaml_content: "steps: []".to_string(),
-            dependencies: None,
-            status: Some("draft".to_string()),
-        })
+        .create_plan(
+            &SystemActor::internal(),
+            PlanCreateRequest {
+                project_id: project.id,
+                name: "Roundtrip Plan".to_string(),
+                description: Some("plan with detached dataset".to_string()),
+                tags: Some(vec!["roundtrip".to_string()]),
+                yaml_content: "steps: []".to_string(),
+                dependencies: None,
+                status: Some("draft".to_string()),
+            },
+        )
         .await?;
 
     app.create_plan_dag_node(

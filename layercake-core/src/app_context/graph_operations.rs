@@ -1,9 +1,9 @@
-use serde_json::{json, Value};
 use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
 use crate::auth::Actor;
 use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_analysis_service::GraphConnectivityReport;
 use crate::services::graph_edit_service::ReplaySummary as GraphEditReplaySummary;
+use serde_json::{json, Value};
 impl AppContext {
     // ----- Graph editing helpers ------------------------------------------
     pub async fn create_graph(
@@ -25,15 +25,11 @@ impl AppContext {
         name: Option<String>,
     ) -> CoreResult<crate::database::entities::graph_data::Model> {
         self.authorize_graph_write(actor, id).await?;
-        self.graph_service
-            .update_graph(id, name)
-            .await
+        self.graph_service.update_graph(id, name).await
     }
     pub async fn delete_graph(&self, actor: &Actor, id: i32) -> CoreResult<()> {
         self.authorize_graph_write(actor, id).await?;
-        self.graph_service
-            .delete_graph(id)
-            .await
+        self.graph_service.delete_graph(id).await
     }
     pub async fn add_graph_node(
         &self,
@@ -158,9 +154,7 @@ impl AppContext {
                 .filter(EdgeColumn::ExternalId.eq(&edge_id))
                 .exec(&self.db)
                 .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to delete graph edge: {}", e))
-                })?;
+                .map_err(|e| CoreError::internal(format!("Failed to delete graph edge: {}", e)))?;
             Ok(true)
         } else {
             Ok(false)
@@ -218,15 +212,9 @@ impl AppContext {
             .set_layer_dataset_enabled(project_id, dataset_id, enabled)
             .await
     }
-    pub async fn reset_project_layers(
-        &self,
-        actor: &Actor,
-        project_id: i32,
-    ) -> CoreResult<()> {
+    pub async fn reset_project_layers(&self, actor: &Actor, project_id: i32) -> CoreResult<()> {
         self.authorize_project_write(actor, project_id).await?;
-        self.graph_service
-            .reset_project_layers(project_id)
-            .await
+        self.graph_service.reset_project_layers(project_id).await
     }
     pub async fn create_layer_alias(
         &self,
@@ -313,7 +301,9 @@ impl AppContext {
             .filter(NodeColumn::Id.eq(&node_id))
             .one(&self.db)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to load graph node {}: {}", node_id, e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load graph node {}: {}", node_id, e))
+            })?;
         let belongs_to_param = belongs_to.as_ref().map(|value| {
             if value.is_empty() {
                 None
@@ -332,7 +322,9 @@ impl AppContext {
                 belongs_to_param.clone(),
             )
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to update graph node {}: {}", node_id, e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to update graph node {}: {}", node_id, e))
+            })?;
         if let Some(old_node) = old_node {
             if let Some(new_label) = &label {
                 if old_node.label.as_ref() != Some(new_label) {
@@ -427,7 +419,9 @@ impl AppContext {
         let old_layer = Layers::find_by_id(layer_id)
             .one(&self.db)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to load layer {}: {}", layer_id, e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to load layer {}: {}", layer_id, e))
+            })?;
         if let Some(layer) = &old_layer {
             self.authorize_graph_write(actor, layer.graph_id).await?;
         }
@@ -435,7 +429,9 @@ impl AppContext {
             .graph_service
             .update_layer_properties(layer_id, name.clone(), alias.clone(), properties.clone())
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to update layer {}: {}", layer_id, e)))?;
+            .map_err(|e| {
+                CoreError::internal(format!("Failed to update layer {}: {}", layer_id, e))
+            })?;
         if let Some(old_layer) = old_layer {
             if let Some(new_name) = &name {
                 if &old_layer.name != new_name {
@@ -625,11 +621,7 @@ impl AppContext {
             .await
     }
 
-    pub async fn clear_graph_edits(
-        &self,
-        actor: &Actor,
-        graph_id: i32,
-    ) -> CoreResult<u64> {
+    pub async fn clear_graph_edits(&self, actor: &Actor, graph_id: i32) -> CoreResult<u64> {
         self.authorize_graph_write(actor, graph_id).await?;
         self.graph_edit_service.clear_graph_edits(graph_id).await
     }

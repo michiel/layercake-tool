@@ -10,7 +10,6 @@ pub mod plan_dag_delta;
 mod auth;
 mod code_analysis;
 mod collaboration;
-mod data_acquisition;
 mod data_set;
 mod graph;
 mod graph_data;
@@ -38,7 +37,6 @@ pub struct Mutation(
     pub collaboration::CollaborationMutation,
     pub code_analysis::CodeAnalysisMutation,
     pub data_set::DataSetMutation,
-    pub data_acquisition::DataAcquisitionMutation,
     pub graph::GraphMutation,
     pub graph_data::GraphDataMutation,
     pub graph_edit::GraphEditMutation,

@@ -1,11 +1,11 @@
 use sea_orm::DatabaseConnection;
 
+use crate::errors::{CoreError, CoreResult};
 use crate::export::{
     to_csv_edges, to_csv_nodes, to_dot, to_gml, to_json, to_mermaid, to_mermaid_mindmap,
     to_mermaid_treemap, to_plantuml, to_plantuml_mindmap, to_plantuml_wbs,
 };
 use crate::graph::Graph;
-use crate::errors::{CoreError, CoreResult};
 use crate::plan::{
     ExportFileType, NotePosition, Plan, RenderConfig, RenderConfigBuiltInStyle,
     RenderConfigOrientation, RenderTargetOptions,
@@ -44,36 +44,23 @@ impl ExportService {
         let render_config = render_config_override.unwrap_or(default_render_config);
 
         match format {
-            ExportFileType::DOT => {
-                Ok(to_dot::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal(format!("DOT render failed: {}", e)))?)
-            }
-            ExportFileType::GML => {
-                Ok(to_gml::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal(format!("GML render failed: {}", e)))?)
-            }
-            ExportFileType::JSON => {
-                Ok(to_json::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal(format!("JSON render failed: {}", e)))?)
-            }
-            ExportFileType::Mermaid => {
-                Ok(to_mermaid::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal(format!("Mermaid render failed: {}", e)))?)
-            }
-            ExportFileType::PlantUML => {
-                Ok(to_plantuml::render(graph, &render_config)
-                    .map_err(|e| CoreError::internal(format!("PlantUML render failed: {}", e)))?)
-            }
-            ExportFileType::PlantUmlMindmap => {
-                Ok(to_plantuml_mindmap::render(graph, &render_config)
-                    .map_err(|e| {
-                        CoreError::internal(format!("PlantUML mindmap render failed: {}", e))
-                    })?)
-            }
+            ExportFileType::DOT => Ok(to_dot::render(graph, &render_config)
+                .map_err(|e| CoreError::internal(format!("DOT render failed: {}", e)))?),
+            ExportFileType::GML => Ok(to_gml::render(graph, &render_config)
+                .map_err(|e| CoreError::internal(format!("GML render failed: {}", e)))?),
+            ExportFileType::JSON => Ok(to_json::render(graph, &render_config)
+                .map_err(|e| CoreError::internal(format!("JSON render failed: {}", e)))?),
+            ExportFileType::Mermaid => Ok(to_mermaid::render(graph, &render_config)
+                .map_err(|e| CoreError::internal(format!("Mermaid render failed: {}", e)))?),
+            ExportFileType::PlantUML => Ok(to_plantuml::render(graph, &render_config)
+                .map_err(|e| CoreError::internal(format!("PlantUML render failed: {}", e)))?),
+            ExportFileType::PlantUmlMindmap => Ok(to_plantuml_mindmap::render(
+                graph,
+                &render_config,
+            )
+            .map_err(|e| CoreError::internal(format!("PlantUML mindmap render failed: {}", e)))?),
             ExportFileType::PlantUmlWbs => Ok(to_plantuml_wbs::render(graph, &render_config)
-                .map_err(|e| {
-                    CoreError::internal(format!("PlantUML WBS render failed: {}", e))
-                })?),
+                .map_err(|e| CoreError::internal(format!("PlantUML WBS render failed: {}", e)))?),
             ExportFileType::MermaidMindmap => Ok(to_mermaid_mindmap::render(graph, &render_config)
                 .map_err(|e| {
                     CoreError::internal(format!("Mermaid mindmap render failed: {}", e))
@@ -98,9 +85,8 @@ impl ExportService {
         _project_id: i32,
         plan_yaml: &str,
     ) -> CoreResult<Vec<String>> {
-        let plan: Plan = serde_yaml::from_str(plan_yaml).map_err(|e| {
-            CoreError::validation(format!("Invalid plan YAML: {}", e))
-        })?;
+        let plan: Plan = serde_yaml::from_str(plan_yaml)
+            .map_err(|e| CoreError::validation(format!("Invalid plan YAML: {}", e)))?;
         // let mut graph = graph_service.build_graph_from_project(project_id).await?;
         let mut graph = Graph::default(); // Placeholder
 
