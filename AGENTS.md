@@ -31,3 +31,6 @@
 - Reference related issues or specs (e.g., `SPECIFICATION.md`) and note schema migrations or template updates.
 - PRs should detail the motivation, list manual test commands executed, and include screenshots for UI-facing changes.
 - Update relevant docs (README, IMPLEMENTATION.md, samples) whenever behavior or developer workflows shift.
+
+## Removed Surfaces
+- The chat, RAG, and MCP surfaces have been removed from this workspace to keep Layercake focused on plan editing, graph tooling, data acquisition, and exports. Refer to `plans/20260122-de-feature.md` for the decision log and the remaining work history.

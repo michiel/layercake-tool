@@ -56,8 +56,7 @@ Eliminate the under-developed RAG/chat/genAI surface and the MCP infrastructure 
 - **2026-01-25**: Logged the deletion of chat/RAG migrations (`m20251030_000008_create_chat_credentials.rs`, `m20251030_000009_seed_chat_credentials.rs`, `m20251103_000010_create_chat_sessions.rs`, `m20251103_000011_create_chat_messages.rs`, `m20251112_000022_add_rag_to_chat_sessions.rs`), pruned frontend chat components, stores, and utilities, refreshed UI text/navigation/docs (README, dataset origins), and verified the build with `npm run frontend:build` and `cargo check`.
 - **2026-01-26**: Completed the Rust workspace audit for lingering `mcp`/genAI keywords, confirmed neither `Cargo.toml` manifests nor GraphQL schema files still reference `layercake-genai`, and dropped the crate plus its SeaORM models/config wiring so the workspace now builds without the genAI surface. 
 - **2026-01-27**: Reconciled `GraphQLContext::new` tests with the slimmed context signature (no `ChatManager`), refreshed the console command docs, trimmed `.env.example` so the example environment no longer advertises the removed chat/MCP stack, and validated the narrowed workspace with `cargo check` and `npm run frontend:build` (both pass with pre-existing warnings about unused imports/dynamic imports).
+- **2026-01-28**: Updated `README.md` and `AGENTS.md` to describe the reduced surface, linked back to this plan as the authoritative record, and confirmed there are no further high-level docs that still advertise chat/RAG/MCP functionality.
 
 ## Immediate next steps
-1. Remove chat/MCP-specific configuration surface (system settings descriptors, `.env` samples, CLI/help copy) so there are no runtime knobs pointing at the retired providers or protocols.
-2. Sweep the main documentation and plan notes (README, AGENTS.md, doc indexes, and release references) to record the de-feature decision and drop outstanding mentions of chat, RAG, or MCP.
-3. Run `cargo check` and `npm run frontend:build` to confirm the workspace still builds cleanly now that the generative stack is removed.
+- None; the de-feature work is fully documented and complete.

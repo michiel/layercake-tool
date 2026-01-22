@@ -1,6 +1,6 @@
 # Layercake
 
-Layercake is an interactive platform for designing, executing, and reviewing graph-based plans. It combines a visual DAG builder, rich graph editors, automated exporters, and agentic tooling across three surfaces: a Rust backend and CLI, a React web application, and a Tauri desktop shell that bundles everything into a single install.
+Layercake is an interactive platform for designing, executing, and reviewing graph-based plans. It combines a visual DAG builder, rich graph editors, automated exporters, and collaboration tooling across three surfaces: a Rust backend and CLI, a React web application, and a Tauri desktop shell that bundles everything into a single install.
 
 ![Layercake plan architecture](images/layercake-project.svg)
 
@@ -15,7 +15,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 - Persistent Storage & Audit – all projects, DAGs, edits, and plan runs are stored in SQLite via SeaORM migrations.
 
 ## Removed Features
-- The chat, RAG, and MCP surfaces have been pulled from this workspace so the product now focuses on the plan editor, graph tools, data acquisition, and exporter flows.
+- The chat, RAG, and MCP surfaces have been pulled from this workspace so the product now focuses on the plan editor, graph tools, data acquisition, and exporter flows. See `plans/20260122-de-feature.md` for the implementation log and rationale behind the de-feature effort.
 
 ## Repository at a Glance
 
