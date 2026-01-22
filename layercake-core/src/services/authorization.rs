@@ -189,13 +189,13 @@ impl AuthorizationService {
 }
 
 fn local_auth_bypass_enabled() -> bool {
-    std::env::var("LAYERCAKE_LOCAL_AUTH_BYPASS")
-        .ok()
-        .map(|value| {
+    match std::env::var("LAYERCAKE_LOCAL_AUTH_BYPASS") {
+        Ok(value) => {
             let normalized = value.trim().to_ascii_lowercase();
             matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
+        }
+        Err(_) => cfg!(debug_assertions),
+    }
 }
 
 /// Project role with permission hierarchy
