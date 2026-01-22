@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from 'react'
+import { memo, useRef, useState, type MouseEvent, type PointerEvent } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
 import {
@@ -157,17 +157,25 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
     })
   }
 
-  const handlePreviewExport = (event: React.MouseEvent) => {
-    event.stopPropagation()
-    event.preventDefault()
+  const handlePreviewExport = () => {
     triggerPreview('text')
   }
 
-  const handleMermaidPreview = (event: React.MouseEvent) => {
-    event.stopPropagation()
-    event.preventDefault()
+  const handleMermaidPreview = () => {
     triggerPreview('mermaid')
   }
+
+  const stopPointerInteraction = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    event.preventDefault()
+  }
+
+  const handleActionClick =
+    (action: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      event.preventDefault()
+      action()
+    }
 
   const handleCopyPreview = () => {
     if (textareaRef.current) {
@@ -214,10 +222,11 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 rounded-full text-emerald-600"
+                      className="h-9 w-9 rounded-full text-emerald-600 nodrag"
                       data-action-icon="preview-export"
                       disabled={loadingTarget === 'text'}
-                      onMouseDown={handlePreviewExport}
+                      onPointerDown={stopPointerInteraction}
+                      onClick={handleActionClick(handlePreviewExport)}
                     >
                       <IconEye size={12} />
                     </Button>
@@ -228,13 +237,14 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-9 w-9 rounded-full text-purple-600"
-                        data-action-icon="mermaid-preview"
-                        disabled={loadingTarget === 'mermaid'}
-                        onMouseDown={handleMermaidPreview}
-                      >
+                      size="icon"
+                      variant="ghost"
+                      className="h-9 w-9 rounded-full text-purple-600 nodrag"
+                      data-action-icon="mermaid-preview"
+                      disabled={loadingTarget === 'mermaid'}
+                      onPointerDown={stopPointerInteraction}
+                      onClick={handleActionClick(handleMermaidPreview)}
+                    >
                         <IconChartDots size={12} />
                       </Button>
                     </TooltipTrigger>
@@ -246,14 +256,11 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 rounded-full text-blue-600"
+                      className="h-9 w-9 rounded-full text-blue-600 nodrag"
                       data-action-icon="download"
                       disabled={downloading}
-                      onMouseDown={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        handleDownload()
-                      }}
+                      onPointerDown={stopPointerInteraction}
+                      onClick={handleActionClick(handleDownload)}
                     >
                       <IconDownload size={12} />
                     </Button>

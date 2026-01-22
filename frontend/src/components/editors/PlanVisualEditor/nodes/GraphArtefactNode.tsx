@@ -1,4 +1,4 @@
-import { memo, useState, useRef } from 'react'
+import { memo, useState, useRef, type MouseEvent, type PointerEvent } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
 import {
@@ -307,6 +307,18 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
     }
   }
 
+  const stopPointerInteraction = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    event.preventDefault()
+  }
+
+  const handleActionClick =
+    (action: () => void) => (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      event.preventDefault()
+      action()
+    }
+
   const labelBadges = !isConfigured ? (
     <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
       Not Configured
@@ -346,14 +358,11 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 rounded-full"
+                      className="h-9 w-9 rounded-full nodrag"
                       data-action-icon="preview"
                       disabled={isTextPreviewLoading}
-                      onMouseDown={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        handlePreview()
-                      }}
+                      onPointerDown={stopPointerInteraction}
+                      onClick={handleActionClick(handlePreview)}
                     >
                       <IconEye size={12} />
                     </Button>
@@ -366,14 +375,11 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-9 w-9 rounded-full text-purple-600"
+                        className="h-9 w-9 rounded-full text-purple-600 nodrag"
                         data-action-icon="mermaid-preview"
                         disabled={isMermaidLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          handleMermaidPreview()
-                        }}
+                        onPointerDown={stopPointerInteraction}
+                        onClick={handleActionClick(handleMermaidPreview)}
                       >
                         <IconChartDots size={12} />
                       </Button>
@@ -387,14 +393,11 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-9 w-9 rounded-full text-green-600"
+                        className="h-9 w-9 rounded-full text-green-600 nodrag"
                         data-action-icon="dot-preview"
                         disabled={isDotLoading}
-                        onMouseDown={(e: React.MouseEvent) => {
-                          e.stopPropagation()
-                          e.preventDefault()
-                          handleDotPreview()
-                        }}
+                        onPointerDown={stopPointerInteraction}
+                        onClick={handleActionClick(handleDotPreview)}
                       >
                         <IconNetwork size={12} />
                       </Button>
@@ -407,14 +410,11 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="h-9 w-9 rounded-full text-blue-600"
+                      className="h-9 w-9 rounded-full text-blue-600 nodrag"
                       data-action-icon="download"
                       disabled={downloading}
-                      onMouseDown={(e: React.MouseEvent) => {
-                        e.stopPropagation()
-                        e.preventDefault()
-                        handleDownload()
-                      }}
+                      onPointerDown={stopPointerInteraction}
+                      onClick={handleActionClick(handleDownload)}
                     >
                       <IconDownload size={12} />
                     </Button>

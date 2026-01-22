@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState, type MouseEvent, type PointerEvent } from 'react'
 import { NodeProps } from 'reactflow'
 import { useMutation } from '@apollo/client/react'
 import { gql } from '@apollo/client'
@@ -57,6 +57,89 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
     hasValidConfig
   )
 
+  const stopPointerInteraction = (event: PointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation()
+    event.preventDefault()
+  }
+
+  const handleActionClick =
+    (action: () => void | Promise<void>) => async (event: MouseEvent<HTMLButtonElement>) => {
+      event.stopPropagation()
+      event.preventDefault()
+      await action()
+    }
+
+  const handleOpenProjection = async () => {
+    if (!config.projectionId) return
+    if ((window as any).__TAURI__) {
+      try {
+        const serverInfo = await getServerInfo()
+        if (!serverInfo) {
+          showErrorNotification('Open failed', 'Unable to get server information')
+          return
+        }
+        const url = `${serverInfo.url}/projections/viewer/${config.projectionId}?apiBase=${encodeURIComponent(serverInfo.url)}`
+        console.log('Creating Tauri window with URL:', url)
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+        const label = `projection-${config.projectionId}-${Date.now()}`
+        const win = new WebviewWindow(label, {
+          url,
+          maximized: true,
+          title: `Projection #${config.projectionId}`
+        })
+        win.once('tauri://created', () => {
+          console.log('Tauri window created successfully')
+          showSuccessNotification('Projection opened', 'New window created.')
+        })
+        win.once('tauri://error', (e: unknown) => {
+          console.error('Tauri window error event:', e)
+          const errorMsg = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e)
+          showErrorNotification('Open failed', errorMsg)
+        })
+      } catch (err: any) {
+        console.error('Failed to open projection window', err)
+        showErrorNotification('Open failed', err?.message || 'Unable to open projection viewer')
+      }
+    } else {
+      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
+      const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${config.projectionId}`
+      window.open(url, '_blank', 'noreferrer')
+    }
+  }
+
+  const handleDownloadProjection = async () => {
+    if (!config.projectionId) return
+    setDownloading(true)
+    try {
+      const { data: exportData } = await exportProjection({ variables: { id: config.projectionId.toString() } })
+      const payload = (exportData as any)?.exportProjection
+      if (!payload?.contentBase64) {
+        throw new Error('No export payload returned')
+      }
+      const binary = atob(payload.contentBase64)
+      const len = binary.length
+      const bytes = new Uint8Array(len)
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      const blob = new Blob([bytes], { type: 'application/zip' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = payload.filename || `projection-${config.projectionId}.zip`
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      showSuccessNotification('Export ready', 'Projection bundle downloaded.')
+    } catch (err: any) {
+      console.error('Failed to export projection', err)
+      showErrorNotification('Export failed', err?.message || 'Unable to export projection')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
   const labelBadges = !isConfigured ? (
     <Badge variant="outline" className="text-xs text-orange-600 border-orange-600">
       Not Configured
@@ -78,107 +161,35 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
       extraToolButtons={
         config.projectionId ? (
           <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100"
-                  onMouseDown={async (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-
-                    if ((window as any).__TAURI__) {
-                      try {
-                        // Get actual server URL from Tauri
-                        const serverInfo = await getServerInfo()
-                        if (!serverInfo) {
-                          showErrorNotification('Open failed', 'Unable to get server information')
-                          return
-                        }
-                        // Pass the server URL as a query parameter so the projection viewer knows where to connect
-                        const url = `${serverInfo.url}/projections/viewer/${config.projectionId}?apiBase=${encodeURIComponent(serverInfo.url)}`
-                        console.log('Creating Tauri window with URL:', url)
-
-                        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-                        const label = `projection-${config.projectionId}-${Date.now()}`
-                        const win = new WebviewWindow(label, {
-                          url,
-                          maximized: true,
-                          title: `Projection #${config.projectionId}`
-                        })
-                        win.once('tauri://created', () => {
-                          console.log('Tauri window created successfully')
-                          showSuccessNotification('Projection opened', 'New window created.')
-                        })
-                        win.once('tauri://error', (e: unknown) => {
-                          console.error('Tauri window error event:', e)
-                          const errorMsg = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e)
-                          showErrorNotification('Open failed', errorMsg)
-                        })
-                      } catch (err: any) {
-                        console.error('Failed to open projection window', err)
-                        showErrorNotification('Open failed', err?.message || 'Unable to open projection viewer')
-                      }
-                    } else {
-                      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
-                      const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${config.projectionId}`
-                      window.open(url, '_blank', 'noreferrer')
-                    }
-                  }}
-                >
-                  <IconExternalLink size={13} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Open projection</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100"
-                  disabled={downloading}
-                  onMouseDown={async (e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    if (!config.projectionId) return
-                    setDownloading(true)
-                    try {
-                      const { data: exportData } = await exportProjection({ variables: { id: config.projectionId.toString() } })
-                      const payload = (exportData as any)?.exportProjection
-                      if (!payload?.contentBase64) {
-                        throw new Error('No export payload returned')
-                      }
-                      const binary = atob(payload.contentBase64)
-                      const len = binary.length
-                      const bytes = new Uint8Array(len)
-                      for (let i = 0; i < len; i += 1) {
-                        bytes[i] = binary.charCodeAt(i)
-                      }
-                      const blob = new Blob([bytes], { type: 'application/zip' })
-                      const url = URL.createObjectURL(blob)
-                      const link = document.createElement('a')
-                      link.href = url
-                      link.download = payload.filename || `projection-${config.projectionId}.zip`
-                      document.body.appendChild(link)
-                      link.click()
-                      link.remove()
-                      URL.revokeObjectURL(url)
-                      showSuccessNotification('Export ready', 'Projection bundle downloaded.')
-                    } catch (err: any) {
-                      console.error('Failed to export projection', err)
-                      showErrorNotification('Export failed', err?.message || 'Unable to export projection')
-                    } finally {
-                      setDownloading(false)
-                    }
-                  }}
-                >
-                  <IconDownload size={13} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download projection</TooltipContent>
-            </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 nodrag"
+                    onPointerDown={stopPointerInteraction}
+                    onClick={handleActionClick(handleOpenProjection)}
+                  >
+                    <IconExternalLink size={13} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Open projection</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100 nodrag"
+                    disabled={downloading}
+                    onPointerDown={stopPointerInteraction}
+                    onClick={handleActionClick(handleDownloadProjection)}
+                  >
+                    <IconDownload size={13} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Download projection</TooltipContent>
+              </Tooltip>
           </TooltipProvider>
         ) : null
       }
