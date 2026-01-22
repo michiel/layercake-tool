@@ -8,7 +8,7 @@ import {
   type TouchEvent as ReactTouchEvent
 } from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
-import { IconSettings, IconTrash, IconCheck, IconX, IconArrowRight } from '@tabler/icons-react'
+import { IconSettings, IconTrash, IconCheck, IconX, IconArrowRight, IconCopy } from '@tabler/icons-react'
 import { PlanDagNodeType, NodeConfig, NodeMetadata } from '../../../../types/plan-dag'
 import { getRequiredInputCount, canHaveMultipleOutputs, isNodeConfigured } from '../../../../utils/planDagValidation'
 import { getNodeColor, getNodeIcon } from '../../../../utils/nodeStyles'
@@ -17,6 +17,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePlanVisualEditorContext } from '../context'
+import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
 interface BaseNodeProps extends NodeProps {
   nodeType: PlanDagNodeType
@@ -90,6 +92,12 @@ export const BaseNode = memo(({
   const color = getNodeColor(nodeType)
   const requiredInputs = getRequiredInputCount(nodeType)
   const canHaveOutputs = canHaveMultipleOutputs(nodeType)
+
+  const editorContext = usePlanVisualEditorContext()
+  const canonicalNodeId =
+    editorContext?.projectId && editorContext.planId && id
+      ? `plannode:${editorContext.projectId}:${editorContext.planId}:${id}`
+      : id ?? ''
 
   // Check if node is configured
   const isConfigured = isNodeConfigured(nodeType, id || '', edges, hasValidConfig)
@@ -225,6 +233,30 @@ const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
   callback?.()
 }
 
+const copyTextToClipboard = async (value: string) => {
+  if (!value) return
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      await navigator.clipboard.writeText(value)
+    } else {
+      const textArea = document.createElement('textarea')
+      textArea.value = value
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
+    showSuccessNotification('Copied ID', value)
+  } catch (error) {
+    console.error('Failed to copy node identifier', error)
+    showErrorNotification('Copy failed', 'Unable to copy the node identifier.')
+  }
+}
+
+  const handleCopyNodeId = useCallback(() => {
+    copyTextToClipboard(canonicalNodeId)
+  }, [canonicalNodeId])
+
   // Default tool buttons if not provided
   const defaultToolButtons = !readonly && (
     <TooltipProvider>
@@ -260,6 +292,20 @@ const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
           <TooltipContent>Edit node</TooltipContent>
         </Tooltip>
       )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-gray-600 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700/50"
+            data-action-icon="copy"
+            onMouseDown={(e) => handleButtonClick(e, handleCopyNodeId)}
+          >
+            <IconCopy size={13} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Copy node identifier</TooltipContent>
+      </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -463,9 +509,16 @@ const handleButtonClick = (event: ReactMouseEvent, callback?: () => void) => {
               </Button>
             </Group>
           ) : (
-            <p className="text-sm font-semibold line-clamp-2" style={{ wordBreak: 'break-word', flex: 1, minWidth: 0 }}>
-              {metadata.label}
-            </p>
+            <div className="flex flex-col gap-1" style={{ flex: 1, minWidth: 0 }}>
+              <p className="text-sm font-semibold line-clamp-2" style={{ wordBreak: 'break-word' }}>
+                {metadata.label}
+              </p>
+              {canonicalNodeId && (
+                <p className="text-[10px] text-muted-foreground font-mono break-all">
+                  {canonicalNodeId}
+                </p>
+              )}
+            </div>
           )}
         </Group>
 

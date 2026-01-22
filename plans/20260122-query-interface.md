@@ -102,5 +102,5 @@ Deliver a JSON-first CLI/REPL query surface that reuses the existing GraphQL ser
 - **Stage 1** – GraphQL helper wiring: ✅ extracted shared CLI helpers that reuse `AppContext` services, return canonical IDs (`dataset:*`, `plan:*`, `plannode:*`, `edge:*`), and emit JSON-ready structs from `CliContext`.
 - **Stage 2** – CLI query command: ✅ added `layercake query` with Clap flags, JSON payload handling, and hooks into the shared helpers for datasets, plans, nodes, edges, and exports (download previews + file writes).
 - **Stage 3** – REPL surface: ✅ added `layercake repl` with project/plan context, JSON responses, command parsing (`set`, `list`, `create/update/delete/move nodes & edges`, `download export`), interactive prompt, and stdin piping so agents can reuse the same helper layer.
-- **Stage 4** – UI affordances: pending; add copy-ID controls across dataset/plan/node lists so canonical identifiers are easily accessible.
-- **Stage 5** – Documentation: pending; document the query/repl surface and canonical ID strategy in README/CHANGES.
+- **Stage 4** – UI affordances: ✅ added copy-ID buttons in the dataset table, plan cards, and PlanVisualEditor nodes so canonical identifiers are visible and can quickly be copied for agent workflows.
+- **Stage 5** – Documentation: ✅ documented the CLI query/repl surface, canonical IDs, and agent/TUI usage in `README.md`/`CHANGES.md` so automation consumers can discover JSON commands and copyable identifiers.

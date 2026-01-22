@@ -107,6 +107,31 @@ export const PlansPage = () => {
     await deletePlan({ variables: { id: plan.id } })
   }
 
+  const copyTextToClipboard = async (value: string, label: string) => {
+    if (!value) return
+    try {
+      if (navigator?.clipboard) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        const textArea = document.createElement('textarea')
+        textArea.value = value
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+      }
+      showSuccessNotification('Copied ID', label)
+    } catch (error) {
+      console.error('Failed to copy plan ID', error)
+      showErrorNotification('Copy failed', 'Unable to copy the plan identifier.')
+    }
+  }
+
+  const handleCopyPlanId = (plan: Plan) => {
+    const canonicalId = `plan:${plan.projectId}:${plan.id}`
+    copyTextToClipboard(canonicalId, canonicalId)
+  }
+
   const pageTitle = useMemo(() => {
     if (project) {
       return `${project.name} · Plans`
@@ -165,8 +190,10 @@ export const PlansPage = () => {
       )}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {plans.map((plan: Plan) => (
-          <Card key={plan.id} className="border">
+        {plans.map((plan: Plan) => {
+          const canonicalPlanId = `plan:${plan.projectId}:${plan.id}`
+          return (
+            <Card key={plan.id} className="border">
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <div>
                 <CardTitle className="text-lg font-semibold">{plan.name}</CardTitle>
@@ -221,9 +248,22 @@ export const PlansPage = () => {
                   Version {plan.version} · Created {formatDateTime(plan.createdAt)}
                 </p>
               </Stack>
+              <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                <span className="font-mono break-all">{canonicalPlanId}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground"
+                  onClick={() => handleCopyPlanId(plan)}
+                  aria-label="Copy plan ID"
+                >
+                  <IconCopy className="h-4 w-4" />
+                </Button>
+              </div>
             </CardContent>
           </Card>
-        ))}
+        )
+      })}
       </div>
 
       <CreatePlanModal

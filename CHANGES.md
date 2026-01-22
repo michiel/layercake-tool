@@ -1,12 +1,15 @@
 # Changelog
 
 ## Unreleased
+- Added the JSON-first `layercake query` command (and shared GraphQL helpers) so datasets, plans, DAG nodes/edges, and export previews can be managed by CLI or automation using canonical `dataset:/plan:/plannode:` identifiers.
+- Added the `layercake repl` shell that keeps project/plan context, parses simple commands (`set`, `list nodes`, `create node`, `download export`, etc.), and prints structured JSON responses so interactive agents can operate without the browser.
 - Documented the removal of the chat/RAG/MCP surface (see `plans/20260122-de-feature.md`) so the README/AGENTS instructions now advertise only plan, graph, data, and export workflows.
 - Added stub migrations for the previously dropped chat/RAG tables (`m20251030_000008`/`000009`, `m20251103_000010`/`000011`, `m20251112_000022`) so database migration history still satisfies the applied versions list.
 - Ensured `dev.sh` propagates `LAYERCAKE_LOCAL_AUTH_BYPASS` when starting the backend so local plan edits remain authorized even after the environment sample was simplified.
 - Defaulted `LAYERCAKE_LOCAL_AUTH_BYPASS` to `true` for debug builds so standalone local invocations get the prior unrestricted access without needing to set the env var manually.
 - Extended the bypass to default to `true` for all builds/targets so local runs keep unrestricted access unless the environment variable explicitly disables it, avoiding “Actor is not authorized for write:project” errors when editing plans locally.
 - Ensured artefact previews/downloads use the editor’s `projectId`/`planId` context after node creation so preview controls work immediately without reloading the canvas (GraphArtefact nodes now fall back to plan-context IDs when their per-node data is still syncing).
+- Added copy-ID controls in the dataset table, plan cards, and DAG nodes so the canonical `dataset:`, `plan:`, and `plannode:` strings are visible and easily copied for agents to reference.
 - GraphQL Graph/GraphData now expose `graphDataId`/`legacyGraphId` plus `sourceType`; clients should prefer `graphDataId` for all mutations/queries and treat `legacyGraphId` only as a badge/regeneration hint during the single-schema migration.
 - Backend graph queries/validation run solely on `graph_data`; legacy fallbacks removed ahead of the legacy table drop migration (`m20251215_000001_drop_legacy_graph_tables.rs`).
 

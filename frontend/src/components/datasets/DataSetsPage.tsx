@@ -15,7 +15,8 @@ import {
   IconX,
   IconFileExport,
   IconBooks,
-  IconGitMerge
+  IconGitMerge,
+  IconCopy
 } from '@tabler/icons-react'
 import { useQuery as useProjectsQuery } from '@apollo/client/react'
 import { Breadcrumbs } from '../common/Breadcrumbs'
@@ -51,6 +52,8 @@ import {
   LibraryItem,
   LibraryItemType
 } from '../../graphql/libraryItems'
+
+import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
 import { gql } from '@apollo/client'
 
@@ -157,6 +160,32 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const handleDelete = (dataSource: DataSet) => {
     setSelectedDataSet(dataSource)
     setDeleteModalOpen(true)
+  }
+
+  const copyToClipboard = async (value: string, label: string) => {
+    if (!value) return
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(value)
+      } else {
+        // Fallback for browsers without navigator.clipboard
+        const textArea = document.createElement('textarea')
+        textArea.value = value
+        document.body.appendChild(textArea)
+        textArea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textArea)
+      }
+      showSuccessNotification('Copied ID', label)
+    } catch (error) {
+      console.error('Failed to copy to clipboard', error)
+      showErrorNotification('Copy failed', 'Unable to copy the identifier to clipboard.')
+    }
+  }
+
+  const handleCopyDataSetId = (dataSource: DataSet) => {
+    const canonicalId = `dataset:${projectNumericId}:${dataSource.id}`
+    copyToClipboard(canonicalId, canonicalId)
   }
 
   const confirmDelete = async () => {
@@ -540,7 +569,9 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dataSources.map((dataSource) => (
+                {dataSources.map((dataSource) => {
+                  const canonicalId = `dataset:${projectNumericId}:${dataSource.id}`
+                  return (
                     <TableRow key={dataSource.id}>
                       <TableCell>
                         <Checkbox
@@ -556,6 +587,18 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                               {truncateDescription(dataSource.description)}
                             </p>
                           )}
+                          <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                            <span className="font-mono break-all">{canonicalId}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground"
+                              onClick={() => handleCopyDataSetId(dataSource)}
+                              aria-label="Copy dataset ID"
+                            >
+                              <IconCopy className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
@@ -655,7 +698,8 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
                         </DropdownMenu>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )
+                })}
                 </TableBody>
               </Table>
             </div>

@@ -99,6 +99,22 @@ The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scri
 
 The CLI ships optional features for the interactive console (enabled in default builds). See `cargo run --bin layercake -- --help` for the complete command tree.
 
+### Query & REPL automation
+
+- `layercake query` now exposes a JSON-first surface for managing datasets, plans, DAG nodes/edges, and export previews. Supply `--project`/`--plan`, `--entity` (datasets, plans, nodes, edges, exports), `--action` (`list`, `get`, `create`, `update`, `delete`, `move`, `download`), and `--payload-json` or `--payload-file`. Output stays JSON (`--pretty` optional) so agents can read canonical `dataset:PROJECT:DATASET`, `plan:PROJECT:PLAN`, and `plannode:PROJECT:PLAN:NODE` identifiers after every mutation.
+
+  ```bash
+  layercake query --entity nodes --action list --project 5 --plan 2
+  layercake query --entity nodes --action create --project 5 --plan 2 \
+    --payload-json '{"nodeType":"GraphNode","position":{"x":0,"y":0},"metadata":{"label":"My Node"},"config":"{}"}'
+  layercake query --entity exports --action download \
+    --payload-json '{"graphId":17,"format":"JSON"}' --output-file /tmp/graph.json
+  ```
+
+- `layercake repl` boots a REPL that keeps project/plan context (`set project=5`, `set plan=2`), understands shortcuts such as `list nodes`, `create node {... }`, `move node {... }`, `delete edge {... }`, and `download export {... } --output /tmp/file`. Every command prints a single-line JSON object with `status`, `command`, and the canonical ID results so agents can parse responses reliably.
+
+- Dataset and plan listings now show their canonical IDs (`dataset:PROJECT:ID`, `plan:PROJECT:ID`) with a copy button, and every PlanVisualEditor node exposes the `plannode:PROJECT:PLAN:NODE` ID and a copy action. Grab an ID from the UI and reuse it directly in automation or conversation without guessing the underlying identifiers.
+
 ## Getting Started
 
 ### Prerequisites
