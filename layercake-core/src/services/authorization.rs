@@ -194,7 +194,7 @@ fn local_auth_bypass_enabled() -> bool {
             let normalized = value.trim().to_ascii_lowercase();
             matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
         }
-        Err(_) => cfg!(debug_assertions),
+        Err(_) => true,
     }
 }
 
