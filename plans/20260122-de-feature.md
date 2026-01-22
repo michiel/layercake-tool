@@ -61,6 +61,7 @@ Eliminate the under-developed RAG/chat/genAI surface and the MCP infrastructure 
 - **2026-01-30**: Updated `dev.sh` to export `LAYERCAKE_LOCAL_AUTH_BYPASS` when launching the backend so local plan edits remain authorized even though the `.env` sample no longer lists that variable.
 - **2026-01-31**: Defaulted `LAYERCAKE_LOCAL_AUTH_BYPASS` to `true` in debug builds so local GraphQL requests get a system-level session while the environment variable remains optional for dev automation.
 - **2026-02-01**: Switched `LAYERCAKE_LOCAL_AUTH_BYPASS` to default to `true` irrespective of build mode so local runs keep unrestricted access unless explicitly disabled, preventing the “Actor is not authorized for write:project” errors during plan editing.
+- **2026-02-02**: Added a `PlanVisualEditorContext` provider so newly created nodes inherit the editor’s `projectId`/`planId` and artefact previews/downloads work immediately without reloading the canvas.
 
 ## Immediate next steps
 - None; the de-feature work is fully documented and complete.

@@ -36,6 +36,7 @@ import { NODE_TYPES } from './nodeTypes'
 // Import collaboration components
 import { CollaborativeCursors } from '../../collaboration/CollaborativeCursors'
 import { UserPresenceData } from '../../../types/websocket'
+import { PlanVisualEditorContext } from './context'
 
 // Import dialogs
 import { NodeConfigDialog } from './NodeConfigDialog'
@@ -1898,7 +1899,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
             <p>{draggingNode.type}</p>
           </Card>
         )}
-        <ReactFlow
+        <PlanVisualEditorContext.Provider value={{ projectId, planId }}>
+          <ReactFlow
           nodes={nodesWithEdges}
           edges={edgesWithMarkers}
           onNodesChange={handleNodesChange}
@@ -1985,7 +1987,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
           <CollaborativeCursors users={onlineUsers} currentUserId={undefined} />
 
           {/* Collaboration features integration complete */}
-        </ReactFlow>
+          </ReactFlow>
+        </PlanVisualEditorContext.Provider>
       </div>
 
       {/* Node Configuration Dialog */}

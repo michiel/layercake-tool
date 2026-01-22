@@ -20,6 +20,7 @@ import { EXPORT_NODE_OUTPUT, ExportNodeOutputResult } from '../../../../graphql/
 import { BaseNode } from './BaseNode'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog, DotPreviewDialog } from '../../../visualization'
+import { usePlanVisualEditorContext } from '../context'
 
 type ArtefactConfig = GraphArtefactNodeConfig | TreeArtefactNodeConfig
 
@@ -145,8 +146,9 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
   const isMermaidMindmap = kind === 'tree' && normalizedTarget === 'mermaidmindmap'
   const isMermaidTreemap = kind === 'tree' && normalizedTarget === 'mermaidtreemap'
 
-  const projectId = data.projectId as number | undefined
-  const planId = data.planId as number | undefined
+  const editorContext = usePlanVisualEditorContext()
+  const projectId = (data.projectId as number | undefined) ?? editorContext?.projectId
+  const planId = (data.planId as number | undefined) ?? editorContext?.planId
 
   const [exportNodeOutput] = useMutation(EXPORT_NODE_OUTPUT, {
     onCompleted: (data: any) => {
