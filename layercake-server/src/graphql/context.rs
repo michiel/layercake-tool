@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 
-use layercake_core::auth::Actor;
 use layercake_core::app_context::AppContext;
+use layercake_core::auth::Actor;
 use layercake_core::database::entities::project_collaborators;
 use layercake_core::services::{
-    authorization::AuthorizationService, ExportService, GraphService, ImportService, PlanDagService,
-    SystemSettingsService,
+    authorization::AuthorizationService, ExportService, GraphService, ImportService,
+    PlanDagService, SystemSettingsService,
 };
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use std::collections::HashMap;
@@ -117,10 +117,7 @@ impl SessionManager {
 }
 
 impl GraphQLContext {
-    pub fn new(
-        app: Arc<AppContext>,
-        system_settings: Arc<SystemSettingsService>,
-    ) -> Self {
+    pub fn new(app: Arc<AppContext>, system_settings: Arc<SystemSettingsService>) -> Self {
         let db = app.db().clone();
         let import_service = Arc::clone(app.import_service());
         let export_service = Arc::clone(app.export_service());
@@ -147,12 +144,12 @@ impl GraphQLContext {
             .map(|session| session.0.clone())
             .or_else(|| ctx.data_opt::<String>().cloned())
             .unwrap_or_else(|| {
-            // Generate a session ID based on connection info
-            format!(
-                "browser_session_{}",
-                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
-            )
-        })
+                // Generate a session ID based on connection info
+                format!(
+                    "browser_session_{}",
+                    chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                )
+            })
     }
 
     pub fn db(&self) -> &sea_orm::DatabaseConnection {
@@ -187,7 +184,10 @@ impl GraphQLContext {
             return Actor::user(user.id);
         }
 
-        let session = self.session_manager.get_or_create_session(&session_id).await;
+        let session = self
+            .session_manager
+            .get_or_create_session(&session_id)
+            .await;
         Actor::user(session.user_id).with_role("viewer")
     }
 
@@ -258,13 +258,9 @@ mod tests {
         user: &users::Model,
         role: project_collaborators::ProjectRole,
     ) -> project_collaborators::Model {
-        let collaborator = project_collaborators::ActiveModel::new(
-            project.id,
-            user.id,
-            role,
-            Some(user.id),
-        )
-        .accept_invitation();
+        let collaborator =
+            project_collaborators::ActiveModel::new(project.id, user.id, role, Some(user.id))
+                .accept_invitation();
 
         collaborator
             .insert(db)
@@ -300,8 +296,7 @@ mod tests {
                 .await
                 .expect("System settings init"),
         );
-        let chat_manager = Arc::new(ChatManager::new());
-        let context = GraphQLContext::new(app, system_settings, chat_manager);
+        let context = GraphQLContext::new(app, system_settings);
 
         let role = context
             .resolve_user_role(user.id)

@@ -3,9 +3,8 @@
 //! Interactive console subsystem providing the `layercake console` REPL.
 //!
 //! The console currently exposes basic project and graph navigation commands
-//! together with a conversational `chat` command that integrates with the MCP
-//! tooling surface. The REPL is powered by `clap-repl`, reusing the same clap
-//! syntax the CLI already understands.
+//! together with system setting inspection helpers. The REPL is powered by
+//! `clap-repl`, reusing the same clap syntax the CLI already understands.
 
 mod commands;
 mod context;
