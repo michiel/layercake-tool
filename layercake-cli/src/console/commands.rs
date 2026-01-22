@@ -57,18 +57,18 @@ pub enum SettingsCommand {
     /// List all configurable settings
     #[command(name = "list")]
     List,
-        /// Show details for a specific setting
-        #[command(name = "show")]
-        Show {
-            /// Setting key (e.g. PROJECT_DEFAULT_LAYER)
-            key: String,
-        },
-        /// Update a setting value
-        #[command(name = "set")]
-        Set {
-            /// Setting key (e.g. PROJECT_DEFAULT_LAYER)
-            key: String,
-            /// New value to persist
-            value: String,
-        },
+    /// Show details for a specific setting
+    #[command(name = "show")]
+    Show {
+        /// Setting key (e.g. PROJECT_DEFAULT_LAYER)
+        key: String,
+    },
+    /// Update a setting value
+    #[command(name = "set")]
+    Set {
+        /// Setting key (e.g. PROJECT_DEFAULT_LAYER)
+        key: String,
+        /// New value to persist
+        value: String,
+    },
 }

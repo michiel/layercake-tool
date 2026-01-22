@@ -12,7 +12,10 @@ use layercake_server::server;
 mod console;
 
 mod query;
+mod query_payloads;
 use query::QueryArgs;
+mod repl;
+use repl::ReplArgs;
 
 #[cfg(feature = "console")]
 #[derive(Parser)]
@@ -40,6 +43,7 @@ enum Commands {
         #[clap(subcommand)]
         command: GenerateCommands,
     },
+    Repl(ReplArgs),
     Query(QueryArgs),
     Serve {
         #[clap(short, long, default_value = "3000")]
@@ -130,6 +134,9 @@ async fn main() -> Result<()> {
                 generate_commands::generate_sample(sample, dir);
             }
         },
+        Commands::Repl(repl_args) => {
+            repl::run_repl(repl_args).await?;
+        }
         Commands::Query(query_args) => {
             query::run_query_command(query_args).await?;
         }

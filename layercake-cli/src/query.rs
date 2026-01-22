@@ -3,18 +3,16 @@ use std::{fs, sync::Arc};
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, ValueEnum};
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
 use serde_json::{json, Value};
 
+use crate::query_payloads::{
+    EdgeDeletePayload, EdgeUpdatePayload, ExportRequest, NodeDeletePayload, NodeMovePayload,
+    NodeUpdatePayload,
+};
 use layercake_core::{
     app_context::AppContext,
     database::connection::{establish_connection, get_database_url},
-    plan::{ExportFileType, RenderConfig},
-    plan_dag::Position,
-    services::cli_graphql_helpers::{
-        CliContext, CliPlanEdgeInput, CliPlanEdgeUpdateInput, CliPlanNodeInput,
-        CliPlanNodeUpdateInput,
-    },
+    services::cli_graphql_helpers::{CliContext, CliPlanEdgeInput, CliPlanNodeInput},
 };
 
 /// Query command arguments consumed by `layercake query`.
@@ -122,7 +120,7 @@ pub async fn run_query_command(args: QueryArgs) -> Result<()> {
 
     let payload = read_payload(&args)?;
 
-    match execute_command(&ctx, &args, payload).await {
+    match execute_query_action(&ctx, &args, payload).await {
         Ok(result) => {
             emit_response(&args, "ok", Some(result), None)?;
             Ok(())
@@ -135,7 +133,7 @@ pub async fn run_query_command(args: QueryArgs) -> Result<()> {
     }
 }
 
-async fn execute_command(
+pub async fn execute_query_action(
     ctx: &CliContext,
     args: &QueryArgs,
     payload: Option<Value>,
@@ -387,48 +385,4 @@ fn print_json(value: &Value, pretty: bool) -> Result<()> {
         println!("{}", value);
     }
     Ok(())
-}
-
-#[derive(Deserialize)]
-struct NodeUpdatePayload {
-    #[serde(rename = "nodeId")]
-    node_id: String,
-    #[serde(flatten)]
-    update: CliPlanNodeUpdateInput,
-}
-
-#[derive(Deserialize)]
-struct NodeDeletePayload {
-    #[serde(rename = "nodeId")]
-    node_id: String,
-}
-
-#[derive(Deserialize)]
-struct NodeMovePayload {
-    #[serde(rename = "nodeId")]
-    node_id: String,
-    position: Position,
-}
-
-#[derive(Deserialize)]
-struct EdgeUpdatePayload {
-    #[serde(rename = "edgeId")]
-    edge_id: String,
-    #[serde(flatten)]
-    update: CliPlanEdgeUpdateInput,
-}
-
-#[derive(Deserialize)]
-struct EdgeDeletePayload {
-    #[serde(rename = "edgeId")]
-    edge_id: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ExportRequest {
-    graph_id: i32,
-    format: ExportFileType,
-    render_config: Option<RenderConfig>,
-    max_rows: Option<usize>,
 }
