@@ -2349,9 +2349,9 @@ dependencies = [
 
 [[package]]
 name = "get-size-derive2"
-version = "0.6.3"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5a443e77201a230c25f0c11574e9b20e5705f749520e0f30ab0d0974fb1a794"
+checksum = "ab21d7bd2c625f2064f04ce54bcb88bc57c45724cde45cba326d784e22d3f71a"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -2360,9 +2360,9 @@ dependencies = [
 
 [[package]]
 name = "get-size2"
-version = "0.6.3"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0594e2a78d082f2f8b1615c728391c6a5277f6c017474a7249934fc735945d55"
+checksum = "879272b0de109e2b67b39fcfe3d25fdbba96ac07e44a254f5a0b4d7ff55340cb"
 dependencies = [
  "get-size-derive2",
 ]
@@ -3983,7 +3983,7 @@ dependencies = [
  "log",
  "phf 0.11.3",
  "phf_codegen 0.11.3",
- "string_cache",
+ "string_cache 0.8.9",
  "string_cache_codegen",
  "tendril",
 ]
@@ -5102,6 +5102,15 @@ name = "phf_shared"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67eabc2ef2a60eb7faa00097bd1ffdb5bd28e62bf39990626a582201b7a754e5"
+dependencies = [
+ "siphasher 1.0.1",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
 dependencies = [
  "siphasher 1.0.1",
 ]
@@ -6889,15 +6898,15 @@ dependencies = [
 
 [[package]]
 name = "spreadsheet-ods"
-version = "0.25.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2a6757a54c463151b5da73f1757dec65304262810ffc32d47550e00d04395a1"
+checksum = "0163c56fb6220cbcc043af3146b8b069efb843d2d9be1c85df19150836018526"
 dependencies = [
  "base64 0.22.1",
  "chrono",
  "color-rs2",
  "get-size2",
- "icu_locid",
+ "icu_locale_core",
  "kparse",
  "lazy_static",
  "nom",
@@ -6905,8 +6914,8 @@ dependencies = [
  "quick-xml 0.38.3",
  "rust_decimal",
  "rust_decimal_macros",
- "string_cache",
- "zip 4.6.1",
+ "string_cache 0.9.0",
+ "zip 6.0.0",
 ]
 
 [[package]]
@@ -7181,6 +7190,19 @@ dependencies = [
  "new_debug_unreachable",
  "parking_lot 0.12.5",
  "phf_shared 0.11.3",
+ "precomputed-hash",
+ "serde",
+]
+
+[[package]]
+name = "string_cache"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a18596f8c785a729f2819c0f6a7eae6ebeebdfffbfe4214ae6b087f690e31901"
+dependencies = [
+ "new_debug_unreachable",
+ "parking_lot 0.12.5",
+ "phf_shared 0.13.1",
  "precomputed-hash",
  "serde",
 ]
@@ -9961,9 +9983,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "4.6.1"
+version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
+checksum = "eb2a05c7c36fde6c09b08576c9f7fb4cda705990f73b58fe011abf7dfb24168b"
 dependencies = [
  "arbitrary",
  "crc32fast",
