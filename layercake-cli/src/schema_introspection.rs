@@ -155,6 +155,9 @@ pub fn get_available_actions(entity: &str) -> Vec<String> {
             "delete".to_string(),
             "move".to_string(),
             "traverse".to_string(),
+            "search".to_string(),
+            "batch".to_string(),
+            "clone".to_string(),
         ],
         "edges" => vec![
             "create".to_string(),
@@ -162,6 +165,15 @@ pub fn get_available_actions(entity: &str) -> Vec<String> {
             "delete".to_string(),
         ],
         "exports" => vec!["download".to_string()],
+        "schema" => vec!["get".to_string(), "list".to_string()],
+        "analysis" => vec!["get".to_string()],
+        "annotations" => vec![
+            "create".to_string(),
+            "list".to_string(),
+            "get".to_string(),
+            "update".to_string(),
+            "delete".to_string(),
+        ],
         _ => vec![],
     }
 }

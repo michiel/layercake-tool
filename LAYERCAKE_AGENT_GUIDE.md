@@ -50,6 +50,7 @@ layercake query \
 | `exports` | download | Graph visualisation exports |
 | `schema` | get, list | Introspect available types and actions (Phase 1.4) |
 | `analysis` | get | Graph structure analysis (Phase 2.3) |
+| `annotations` | create, list, get, update, delete | Key-value annotations for nodes and edges (Phase 2.4) |
 
 ## Entities and Available Actions
 
@@ -424,7 +425,36 @@ For `schema` entity:
 // List available actions
 {
   "type": "actions",  // Returns actions for specified entity
-  "entity": "nodes"  // Required: "nodes", "edges", "datasets", "plans", "exports", "schema", "analysis"
+  "entity": "nodes"  // Required: "nodes", "edges", "datasets", "plans", "exports", "schema", "analysis", "annotations"
+}
+```
+
+**Annotation Payloads (Phase 2.4):**
+
+For creating annotations:
+```json
+{
+  "targetId": "graph_42b0374af121",  // Required: Node or edge ID
+  "targetType": "node",  // Required: "node" or "edge"
+  "key": "status",  // Required: Annotation key
+  "value": "reviewed"  // Required: Annotation value
+}
+```
+
+For listing annotations:
+```json
+{
+  "targetId": "graph_42b0374af121",  // Optional: Filter by specific target
+  "key": "status"  // Optional: Filter by key
+}
+// Omit both to list all annotations in the plan
+```
+
+For getting/updating/deleting annotations:
+```json
+{
+  "id": 1,  // Required: Annotation ID
+  "value": "approved"  // Required for update: New value
 }
 ```
 
@@ -668,6 +698,96 @@ layercake query --database layercake.db \
 }
 ```
 
+### Annotations (Phase 2.4)
+**Purpose**: Attach key-value metadata annotations to nodes and edges for documentation, status tracking, or custom metadata.
+
+**Actions:**
+- `create` - Create a new annotation
+- `list` - List annotations (for a target or entire plan)
+- `get` - Get a specific annotation by ID
+- `update` - Update annotation value
+- `delete` - Delete an annotation
+
+**Examples:**
+```bash
+# Create annotation on a node
+layercake query --database layercake.db \
+  --entity annotations --action create \
+  --project 34 --plan 37 \
+  --payload-json '{
+    "targetId":"graph_42b0374af121",
+    "targetType":"node",
+    "key":"status",
+    "value":"reviewed"
+  }' --pretty
+
+# Create annotation on an edge
+layercake query --database layercake.db \
+  --entity annotations --action create \
+  --project 34 --plan 37 \
+  --payload-json '{
+    "targetId":"edge_d8381d18a7a2",
+    "targetType":"edge",
+    "key":"confidence",
+    "value":"0.95"
+  }' --pretty
+
+# List annotations for a specific target
+layercake query --database layercake.db \
+  --entity annotations --action list \
+  --project 34 --plan 37 \
+  --payload-json '{"targetId":"graph_42b0374af121"}' --pretty
+
+# List all annotations in a plan
+layercake query --database layercake.db \
+  --entity annotations --action list \
+  --project 34 --plan 37 \
+  --payload-json '{}' --pretty
+
+# List annotations filtered by key
+layercake query --database layercake.db \
+  --entity annotations --action list \
+  --project 34 --plan 37 \
+  --payload-json '{"key":"status"}' --pretty
+
+# Get specific annotation by ID
+layercake query --database layercake.db \
+  --entity annotations --action get \
+  --payload-json '{"id":1}' --pretty
+
+# Update annotation value
+layercake query --database layercake.db \
+  --entity annotations --action update \
+  --payload-json '{"id":1,"value":"approved"}' --pretty
+
+# Delete annotation
+layercake query --database layercake.db \
+  --entity annotations --action delete \
+  --payload-json '{"id":1}' --pretty
+```
+
+**Annotation Response Example:**
+```json
+{
+  "id": 1,
+  "project_id": 34,
+  "plan_id": 37,
+  "target_id": "graph_42b0374af121",
+  "target_type": "node",
+  "key": "status",
+  "value": "reviewed",
+  "created_at": "2026-01-23T10:30:00Z",
+  "updated_at": "2026-01-23T10:30:00Z"
+}
+```
+
+**Use Cases:**
+- **Status Tracking**: Mark nodes as "reviewed", "approved", "deprecated"
+- **Documentation**: Add notes, links, or context to specific nodes/edges
+- **Quality Metrics**: Track confidence scores, error rates, or other metrics
+- **Custom Metadata**: Any key-value data that doesn't fit in the standard node/edge structure
+- **Workflow State**: Track progress through multi-stage processes
+
 ## Response Format
 
 All responses follow this structure:
@@ -897,6 +1017,45 @@ layercake query --database layercake.db \
 # }
 ```
 
+### 12. Using Annotations for Metadata (Phase 2.4)
+
+```bash
+# Add status annotation to a node
+layercake query --database layercake.db \
+  --entity annotations --action create \
+  --project 34 --plan 37 \
+  --payload-json '{
+    "targetId":"graph_42b0374af121",
+    "targetType":"node",
+    "key":"reviewed",
+    "value":"true"
+  }' --pretty
+
+# Add priority annotation
+layercake query --database layercake.db \
+  --entity annotations --action create \
+  --project 34 --plan 37 \
+  --payload-json '{
+    "targetId":"graph_42b0374af121",
+    "targetType":"node",
+    "key":"priority",
+    "value":"high"
+  }' --pretty
+
+# List all annotations for a node to see its metadata
+layercake query --database layercake.db \
+  --entity annotations --action list \
+  --project 34 --plan 37 \
+  --payload-json '{"targetId":"graph_42b0374af121"}' --pretty
+
+# Find all high-priority items across the plan
+layercake query --database layercake.db \
+  --entity annotations --action list \
+  --project 34 --plan 37 \
+  --payload-json '{"key":"priority"}' --pretty \
+  | jq '.[] | select(.value == "high")'
+```
+
 ## Tips for Agents
 
 1. **Always use `--pretty`** when exploring to make responses readable
@@ -916,6 +1075,7 @@ layercake query --database layercake.db \
 15. **Search with empty query** (Phase 2.2) to find nodes by topology (isolated, noIncoming, noOutgoing)
 16. **Check for cycles** (Phase 2.3) before adding edges that might create circular dependencies
 17. **Clone nodes for experimentation** (Phase 2.5) instead of manually recreating complex configurations
+18. **Use annotations** (Phase 2.4) for flexible metadata without schema changes - perfect for status tracking, notes, and custom properties
 
 ## Error Handling
 
@@ -1036,5 +1196,5 @@ The test suite includes:
 - 2.1: Batch Operations
 - 2.2: Search and Discovery
 - 2.3: Graph Analysis
-- 2.4: Annotations (pending - requires database migration)
+- 2.4: Annotations
 - 2.5: Clone Operations

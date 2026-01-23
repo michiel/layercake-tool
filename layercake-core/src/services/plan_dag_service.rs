@@ -4,7 +4,9 @@ use sea_orm::{
     QueryOrder, Set,
 };
 
-use crate::database::entities::{data_sets, plan_dag_edges, plan_dag_nodes, plans};
+use crate::database::entities::{
+    data_sets, plan_dag_annotations, plan_dag_edges, plan_dag_nodes, plans,
+};
 use crate::errors::{CoreError, CoreResult};
 use crate::plan_dag::{PlanDagEdge, PlanDagNode, Position};
 use crate::services::ValidationService;
@@ -1269,6 +1271,143 @@ fn normalize_legacy_node_type(node_type: &str) -> (String, Option<String>) {
             Some("Normalized tree artefact node naming".to_string()),
         ),
         other => (other.to_string(), None),
+    }
+}
+
+impl PlanDagService {
+    /// Phase 2.4: Create an annotation for a node or edge
+    pub async fn create_annotation(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        target_id: String,
+        target_type: String,
+        key: String,
+        value: String,
+    ) -> CoreResult<plan_dag_annotations::Model> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        // Validate target_type
+        if target_type != "node" && target_type != "edge" {
+            return Err(CoreError::validation(format!(
+                "Invalid target_type '{}'. Must be 'node' or 'edge'",
+                target_type
+            )));
+        }
+
+        let now = Utc::now();
+        let annotation = plan_dag_annotations::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            project_id: Set(project_id),
+            plan_id: Set(plan.id),
+            target_id: Set(target_id),
+            target_type: Set(target_type),
+            key: Set(key),
+            value: Set(value),
+            created_at: Set(now),
+            updated_at: Set(now),
+        };
+
+        annotation
+            .insert(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to create annotation: {}", e)))
+    }
+
+    /// Phase 2.4: List annotations for a specific target (node or edge)
+    pub async fn list_annotations(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        target_id: String,
+    ) -> CoreResult<Vec<plan_dag_annotations::Model>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        plan_dag_annotations::Entity::find()
+            .filter(
+                plan_dag_annotations::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_annotations::Column::TargetId.eq(target_id)),
+            )
+            .order_by_asc(plan_dag_annotations::Column::Key)
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))
+    }
+
+    /// Phase 2.4: Get a specific annotation by ID
+    pub async fn get_annotation(
+        &self,
+        annotation_id: i32,
+    ) -> CoreResult<Option<plan_dag_annotations::Model>> {
+        plan_dag_annotations::Entity::find_by_id(annotation_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))
+    }
+
+    /// Phase 2.4: Update an annotation value
+    pub async fn update_annotation(
+        &self,
+        annotation_id: i32,
+        value: String,
+    ) -> CoreResult<plan_dag_annotations::Model> {
+        let annotation = self
+            .get_annotation(annotation_id)
+            .await?
+            .ok_or_else(|| CoreError::not_found("Annotation", annotation_id.to_string()))?;
+
+        let mut active_model: plan_dag_annotations::ActiveModel = annotation.into();
+        active_model.value = Set(value);
+        active_model.updated_at = Set(Utc::now());
+
+        active_model
+            .update(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to update annotation: {}", e)))
+    }
+
+    /// Phase 2.4: Delete an annotation
+    pub async fn delete_annotation(
+        &self,
+        annotation_id: i32,
+    ) -> CoreResult<plan_dag_annotations::Model> {
+        let annotation = self
+            .get_annotation(annotation_id)
+            .await?
+            .ok_or_else(|| CoreError::not_found("Annotation", annotation_id.to_string()))?;
+
+        let active_model: plan_dag_annotations::ActiveModel = annotation.clone().into();
+        active_model
+            .delete(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to delete annotation: {}", e)))?;
+
+        Ok(annotation)
+    }
+
+    /// Phase 2.4: List all annotations for a plan (optionally filtered by key)
+    pub async fn list_plan_annotations(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        key_filter: Option<String>,
+    ) -> CoreResult<Vec<plan_dag_annotations::Model>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        let mut query = plan_dag_annotations::Entity::find()
+            .filter(plan_dag_annotations::Column::PlanId.eq(plan.id));
+
+        if let Some(key) = key_filter {
+            query = query.filter(plan_dag_annotations::Column::Key.eq(key));
+        }
+
+        query
+            .order_by_asc(plan_dag_annotations::Column::TargetId)
+            .order_by_asc(plan_dag_annotations::Column::Key)
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))
     }
 }
 

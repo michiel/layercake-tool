@@ -114,6 +114,42 @@ pub struct SearchPayload {
     pub edge_filter: Option<String>, // "noOutgoing", "noIncoming", "isolated"
 }
 
+// Phase 2.4: Annotations
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationCreatePayload {
+    pub target_id: String,
+    pub target_type: String, // "node" or "edge"
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationListPayload {
+    pub target_id: Option<String>, // If provided, filter by target
+    pub key: Option<String>,        // If provided, filter by key
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationGetPayload {
+    pub id: i32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationUpdatePayload {
+    pub id: i32,
+    pub value: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationDeletePayload {
+    pub id: i32,
+}
+
 // Phase 2.5: Clone Operations
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]

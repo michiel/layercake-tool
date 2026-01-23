@@ -71,8 +71,9 @@ pub enum QueryEntity {
     Nodes,
     Edges,
     Exports,
-    Schema,   // Phase 1.4
-    Analysis, // Phase 2.3
+    Schema,      // Phase 1.4
+    Analysis,    // Phase 2.3
+    Annotations, // Phase 2.4
 }
 
 impl QueryEntity {
@@ -85,6 +86,7 @@ impl QueryEntity {
             QueryEntity::Exports => "exports",
             QueryEntity::Schema => "schema",
             QueryEntity::Analysis => "analysis",
+            QueryEntity::Annotations => "annotations",
         }
     }
 }
@@ -665,6 +667,99 @@ pub async fn execute_query_action(
             use layercake_core::services::cli_graphql_helpers::CliPlanDagNode;
             let cli_node = CliPlanDagNode::new(project_id, plan_id, cloned_node);
             Ok(serde_json::to_value(cli_node)?)
+        }
+        (QueryEntity::Annotations, QueryAction::Create) => {
+            // Phase 2.4: Create annotation
+            let project_id = require_project_id(args)?;
+            let payload_value = require_payload(payload, "annotations create")?;
+            let create_payload: crate::query_payloads::AnnotationCreatePayload =
+                serde_json::from_value(payload_value).context("parsing annotation create payload")?;
+
+            let annotation = ctx
+                .app
+                .plan_dag_service()
+                .create_annotation(
+                    project_id,
+                    args.plan,
+                    create_payload.target_id,
+                    create_payload.target_type,
+                    create_payload.key,
+                    create_payload.value,
+                )
+                .await
+                .context("creating annotation")?;
+
+            Ok(serde_json::to_value(annotation)?)
+        }
+        (QueryEntity::Annotations, QueryAction::List) => {
+            // Phase 2.4: List annotations
+            let project_id = require_project_id(args)?;
+            let payload_value = require_payload(payload, "annotations list")?;
+            let list_payload: crate::query_payloads::AnnotationListPayload =
+                serde_json::from_value(payload_value).context("parsing annotation list payload")?;
+
+            let annotations = if let Some(target_id) = list_payload.target_id {
+                // List annotations for specific target
+                ctx.app
+                    .plan_dag_service()
+                    .list_annotations(project_id, args.plan, target_id)
+                    .await
+                    .context("listing annotations")?
+            } else {
+                // List all annotations for plan (optionally filtered by key)
+                ctx.app
+                    .plan_dag_service()
+                    .list_plan_annotations(project_id, args.plan, list_payload.key)
+                    .await
+                    .context("listing plan annotations")?
+            };
+
+            Ok(serde_json::to_value(annotations)?)
+        }
+        (QueryEntity::Annotations, QueryAction::Get) => {
+            // Phase 2.4: Get specific annotation
+            let payload_value = require_payload(payload, "annotations get")?;
+            let get_payload: crate::query_payloads::AnnotationGetPayload =
+                serde_json::from_value(payload_value).context("parsing annotation get payload")?;
+
+            let annotation = ctx
+                .app
+                .plan_dag_service()
+                .get_annotation(get_payload.id)
+                .await
+                .context("getting annotation")?;
+
+            Ok(serde_json::to_value(annotation)?)
+        }
+        (QueryEntity::Annotations, QueryAction::Update) => {
+            // Phase 2.4: Update annotation
+            let payload_value = require_payload(payload, "annotations update")?;
+            let update_payload: crate::query_payloads::AnnotationUpdatePayload =
+                serde_json::from_value(payload_value).context("parsing annotation update payload")?;
+
+            let annotation = ctx
+                .app
+                .plan_dag_service()
+                .update_annotation(update_payload.id, update_payload.value)
+                .await
+                .context("updating annotation")?;
+
+            Ok(serde_json::to_value(annotation)?)
+        }
+        (QueryEntity::Annotations, QueryAction::Delete) => {
+            // Phase 2.4: Delete annotation
+            let payload_value = require_payload(payload, "annotations delete")?;
+            let delete_payload: crate::query_payloads::AnnotationDeletePayload =
+                serde_json::from_value(payload_value).context("parsing annotation delete payload")?;
+
+            let annotation = ctx
+                .app
+                .plan_dag_service()
+                .delete_annotation(delete_payload.id)
+                .await
+                .context("deleting annotation")?;
+
+            Ok(serde_json::to_value(annotation)?)
         }
         _ => bail!(
             "action '{}' is not available for entity '{}'",

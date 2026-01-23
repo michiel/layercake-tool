@@ -116,6 +116,41 @@ layercake query --database $DB --entity nodes --action create \
 echo ""
 
 # Phase 2.1: Batch Operations
+# Phase 2.4: Annotations
+echo "Test 2.4a: Create annotation on a node"
+echo "--------------------"
+layercake query --database $DB --entity annotations --action create \
+  --project $PROJECT_ID --plan $PLAN_ID \
+  --payload-json '{
+    "targetId":"graph_42b0374af121",
+    "targetType":"node",
+    "key":"status",
+    "value":"reviewed"
+  }' --pretty
+echo ""
+
+echo "Test 2.4b: List annotations for a target"
+echo "--------------------"
+layercake query --database $DB --entity annotations --action list \
+  --project $PROJECT_ID --plan $PLAN_ID \
+  --payload-json '{"targetId":"graph_42b0374af121"}' --pretty
+echo ""
+
+echo "Test 2.4c: List all annotations in plan"
+echo "--------------------"
+layercake query --database $DB --entity annotations --action list \
+  --project $PROJECT_ID --plan $PLAN_ID \
+  --payload-json '{}' --pretty
+echo ""
+
+echo "Test 2.4d: Filter annotations by key"
+echo "--------------------"
+layercake query --database $DB --entity annotations --action list \
+  --project $PROJECT_ID --plan $PLAN_ID \
+  --payload-json '{"key":"status"}' --pretty
+echo ""
+
+# Phase 2.1: Batch Operations
 echo "Test 2.1: Batch create nodes and edges"
 echo "--------------------"
 cat > /tmp/batch_test.json <<'EOF'
