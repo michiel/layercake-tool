@@ -13,6 +13,7 @@ mod console;
 
 mod query;
 mod query_payloads;
+mod schema_introspection;
 use query::QueryArgs;
 mod repl;
 use repl::ReplArgs;

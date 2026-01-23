@@ -1,6 +1,7 @@
 use chrono::Utc;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, DatabaseConnection, EntityTrait, QueryFilter,
+    QueryOrder, Set,
 };
 
 use crate::database::entities::{data_sets, plan_dag_edges, plan_dag_nodes, plans};
@@ -558,6 +559,79 @@ impl PlanDagService {
         Ok(edges.into_iter().map(PlanDagEdge::from).collect())
     }
 
+    /// Phase 1.1: Get nodes with optional filtering
+    pub async fn get_nodes_filtered(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        node_type: Option<String>,
+        label_pattern: Option<String>,
+        bounds: Option<(f64, f64, f64, f64)>,
+    ) -> CoreResult<Vec<PlanDagNode>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        let mut query = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id));
+
+        // Filter by node type if provided
+        if let Some(nt) = node_type {
+            query = query.filter(plan_dag_nodes::Column::NodeType.eq(nt));
+        }
+
+        // Filter by position bounds if provided
+        if let Some((min_x, max_x, min_y, max_y)) = bounds {
+            query = query
+                .filter(
+                    Condition::all()
+                        .add(plan_dag_nodes::Column::PositionX.gte(min_x))
+                        .add(plan_dag_nodes::Column::PositionX.lte(max_x)),
+                )
+                .filter(
+                    Condition::all()
+                        .add(plan_dag_nodes::Column::PositionY.gte(min_y))
+                        .add(plan_dag_nodes::Column::PositionY.lte(max_y)),
+                );
+        }
+
+        let nodes = query
+            .order_by_asc(plan_dag_nodes::Column::CreatedAt)
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+
+        let mut result: Vec<PlanDagNode> = nodes.into_iter().map(PlanDagNode::from).collect();
+
+        // Filter by label pattern if provided
+        if let Some(pattern) = label_pattern {
+            let pattern_lower = pattern.to_lowercase();
+            result.retain(|node| node.metadata.label.to_lowercase().contains(&pattern_lower));
+        }
+
+        Ok(result)
+    }
+
+    /// Phase 1.2: Get a single node by ID
+    pub async fn get_node_by_id(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        node_id: &str,
+    ) -> CoreResult<Option<PlanDagNode>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        let node = plan_dag_nodes::Entity::find()
+            .filter(
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(node_id)),
+            )
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+
+        Ok(node.map(PlanDagNode::from))
+    }
+
     /// Update metadata for a Plan DAG edge
     pub async fn update_edge(
         &self,
@@ -717,6 +791,465 @@ impl PlanDagService {
 
         Ok(outcome)
     }
+
+    /// Phase 1.3: Traverse graph from a starting node
+    pub async fn traverse_from_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        start_node_id: &str,
+        direction: &str, // "upstream", "downstream", "both"
+        max_depth: usize,
+    ) -> CoreResult<(Vec<PlanDagNode>, Vec<PlanDagEdge>)> {
+        use std::collections::{HashMap, HashSet, VecDeque};
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        // Load all edges for traversal
+        let all_edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        // Build adjacency lists
+        let mut downstream: HashMap<String, Vec<String>> = HashMap::new();
+        let mut upstream: HashMap<String, Vec<String>> = HashMap::new();
+
+        for edge in &all_edges {
+            downstream
+                .entry(edge.source.clone())
+                .or_default()
+                .push(edge.target.clone());
+            upstream
+                .entry(edge.target.clone())
+                .or_default()
+                .push(edge.source.clone());
+        }
+
+        // BFS traversal
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        queue.push_back((start_node_id.to_string(), 0));
+        visited.insert(start_node_id.to_string());
+
+        let mut found_node_ids = vec![start_node_id.to_string()];
+
+        while let Some((node_id, depth)) = queue.pop_front() {
+            if depth >= max_depth {
+                continue;
+            }
+
+            let neighbors: Vec<String> = match direction {
+                "downstream" => downstream.get(&node_id).cloned().unwrap_or_default(),
+                "upstream" => upstream.get(&node_id).cloned().unwrap_or_default(),
+                "both" => {
+                    let mut both = downstream.get(&node_id).cloned().unwrap_or_default();
+                    both.extend(upstream.get(&node_id).cloned().unwrap_or_default());
+                    both
+                }
+                _ => vec![],
+            };
+
+            for neighbor in neighbors {
+                if !visited.contains(&neighbor) {
+                    visited.insert(neighbor.clone());
+                    found_node_ids.push(neighbor.clone());
+                    queue.push_back((neighbor, depth + 1));
+                }
+            }
+        }
+
+        // Fetch the discovered nodes
+        let nodes = plan_dag_nodes::Entity::find()
+            .filter(
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.is_in(found_node_ids.clone())),
+            )
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+
+        // Filter edges to only those connecting found nodes
+        let found_set: HashSet<String> = found_node_ids.into_iter().collect();
+        let relevant_edges: Vec<PlanDagEdge> = all_edges
+            .into_iter()
+            .filter(|e| found_set.contains(&e.source) && found_set.contains(&e.target))
+            .collect();
+
+        Ok((
+            nodes.into_iter().map(PlanDagNode::from).collect(),
+            relevant_edges,
+        ))
+    }
+
+    /// Phase 1.3: Find shortest path between two nodes
+    pub async fn find_path(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        start_node_id: &str,
+        end_node_id: &str,
+    ) -> CoreResult<Option<Vec<String>>> {
+        use std::collections::{HashMap, VecDeque};
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+        let all_edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        // Build adjacency for directed graph
+        let mut adjacency: HashMap<String, Vec<String>> = HashMap::new();
+        for edge in &all_edges {
+            adjacency
+                .entry(edge.source.clone())
+                .or_default()
+                .push(edge.target.clone());
+        }
+
+        // BFS for shortest path
+        let mut queue = VecDeque::new();
+        let mut parent: HashMap<String, String> = HashMap::new();
+        queue.push_back(start_node_id.to_string());
+        parent.insert(start_node_id.to_string(), String::new());
+
+        while let Some(node_id) = queue.pop_front() {
+            if node_id == end_node_id {
+                // Reconstruct path
+                let mut path = Vec::new();
+                let mut current = end_node_id.to_string();
+                while !current.is_empty() {
+                    path.push(current.clone());
+                    current = parent.get(&current).cloned().unwrap_or_default();
+                }
+                path.reverse();
+                return Ok(Some(path));
+            }
+
+            if let Some(neighbors) = adjacency.get(&node_id) {
+                for neighbor in neighbors {
+                    if !parent.contains_key(neighbor) {
+                        parent.insert(neighbor.clone(), node_id.clone());
+                        queue.push_back(neighbor.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Phase 2.2: Search nodes by query string
+    pub async fn search_nodes(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        query: &str,
+        fields: Vec<String>,
+    ) -> CoreResult<Vec<PlanDagNode>> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        let nodes = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::PlanId.eq(plan.id))
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
+
+        let query_lower = query.to_lowercase();
+        let result: Vec<PlanDagNode> = nodes
+            .into_iter()
+            .filter(|node| {
+                let node_dag = PlanDagNode::from(node.clone());
+
+                // Search in label
+                if fields.contains(&"label".to_string()) || fields.is_empty() {
+                    if node_dag.metadata.label.to_lowercase().contains(&query_lower) {
+                        return true;
+                    }
+                }
+
+                // Search in description
+                if fields.contains(&"description".to_string()) || fields.is_empty() {
+                    if let Some(desc) = &node_dag.metadata.description {
+                        if desc.to_lowercase().contains(&query_lower) {
+                            return true;
+                        }
+                    }
+                }
+
+                // Search in config
+                if node_dag.config.to_lowercase().contains(&query_lower) {
+                    return true;
+                }
+
+                false
+            })
+            .map(PlanDagNode::from)
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Phase 2.2: Find nodes by edge filter
+    pub async fn find_nodes_by_edge_filter(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        filter: &str,
+    ) -> CoreResult<Vec<PlanDagNode>> {
+        use std::collections::HashSet;
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        let nodes = self.get_nodes(project_id, Some(plan.id)).await?;
+        let edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        let mut outgoing: HashSet<String> = HashSet::new();
+        let mut incoming: HashSet<String> = HashSet::new();
+
+        for edge in &edges {
+            outgoing.insert(edge.source.clone());
+            incoming.insert(edge.target.clone());
+        }
+
+        let result: Vec<PlanDagNode> = nodes
+            .into_iter()
+            .filter(|node| match filter {
+                "noOutgoing" => !outgoing.contains(&node.id),
+                "noIncoming" => !incoming.contains(&node.id),
+                "isolated" => !outgoing.contains(&node.id) && !incoming.contains(&node.id),
+                _ => true,
+            })
+            .collect();
+
+        Ok(result)
+    }
+
+    /// Phase 2.3: Analyze plan statistics
+    pub async fn analyze_plan_stats(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> CoreResult<PlanStats> {
+        use std::collections::{HashMap, HashSet};
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+        let nodes = self.get_nodes(project_id, Some(plan.id)).await?;
+        let edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        let mut nodes_by_type: HashMap<String, usize> = HashMap::new();
+        for node in &nodes {
+            *nodes_by_type
+                .entry(format!("{:?}", node.node_type))
+                .or_insert(0) += 1;
+        }
+
+        // Find leaf nodes (no outgoing edges)
+        let outgoing: HashSet<String> = edges.iter().map(|e| e.source.clone()).collect();
+        let leaf_count = nodes.iter().filter(|n| !outgoing.contains(&n.id)).count();
+
+        // Find isolated nodes
+        let connected: HashSet<String> = edges
+            .iter()
+            .flat_map(|e| vec![e.source.clone(), e.target.clone()])
+            .collect();
+        let isolated_count = nodes.iter().filter(|n| !connected.contains(&n.id)).count();
+
+        Ok(PlanStats {
+            node_count: nodes.len(),
+            edge_count: edges.len(),
+            nodes_by_type,
+            leaf_nodes: leaf_count,
+            avg_degree: if nodes.is_empty() {
+                0.0
+            } else {
+                (edges.len() * 2) as f64 / nodes.len() as f64
+            },
+            isolated_nodes: isolated_count,
+        })
+    }
+
+    /// Phase 2.3: Find bottleneck nodes (high degree)
+    pub async fn find_bottlenecks(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        threshold: usize,
+    ) -> CoreResult<Vec<BottleneckInfo>> {
+        use std::collections::HashMap;
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+        let nodes = self.get_nodes(project_id, Some(plan.id)).await?;
+        let edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        let mut degree: HashMap<String, usize> = HashMap::new();
+        for edge in &edges {
+            *degree.entry(edge.source.clone()).or_insert(0) += 1;
+            *degree.entry(edge.target.clone()).or_insert(0) += 1;
+        }
+
+        let bottlenecks: Vec<BottleneckInfo> = nodes
+            .into_iter()
+            .filter_map(|node| {
+                let deg = *degree.get(&node.id).unwrap_or(&0);
+                if deg >= threshold {
+                    Some(BottleneckInfo {
+                        node_id: node.id.clone(),
+                        label: node.metadata.label.clone(),
+                        degree: deg,
+                        node_type: format!("{:?}", node.node_type),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        Ok(bottlenecks)
+    }
+
+    /// Phase 2.3: Detect cycles in the graph
+    pub async fn detect_cycles(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+    ) -> CoreResult<Vec<Vec<String>>> {
+        use std::collections::{HashMap, HashSet};
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+        let edges = self.get_edges(project_id, Some(plan.id)).await?;
+
+        // Build adjacency list
+        let mut adj: HashMap<String, Vec<String>> = HashMap::new();
+        for edge in &edges {
+            adj.entry(edge.source.clone())
+                .or_default()
+                .push(edge.target.clone());
+        }
+
+        // DFS-based cycle detection
+        let mut cycles = Vec::new();
+        let mut visited = HashSet::new();
+        let mut rec_stack = HashSet::new();
+        let mut path = Vec::new();
+
+        fn detect_cycle_dfs(
+            node: &str,
+            adj: &HashMap<String, Vec<String>>,
+            visited: &mut HashSet<String>,
+            rec_stack: &mut HashSet<String>,
+            path: &mut Vec<String>,
+            cycles: &mut Vec<Vec<String>>,
+        ) {
+            visited.insert(node.to_string());
+            rec_stack.insert(node.to_string());
+            path.push(node.to_string());
+
+            if let Some(neighbors) = adj.get(node) {
+                for neighbor in neighbors {
+                    if !visited.contains(neighbor) {
+                        detect_cycle_dfs(neighbor, adj, visited, rec_stack, path, cycles);
+                    } else if rec_stack.contains(neighbor) {
+                        // Found a cycle
+                        if let Some(pos) = path.iter().position(|n| n == neighbor) {
+                            cycles.push(path[pos..].to_vec());
+                        }
+                    }
+                }
+            }
+
+            path.pop();
+            rec_stack.remove(node);
+        }
+
+        for node in adj.keys() {
+            if !visited.contains(node) {
+                detect_cycle_dfs(
+                    node,
+                    &adj,
+                    &mut visited,
+                    &mut rec_stack,
+                    &mut path,
+                    &mut cycles,
+                );
+            }
+        }
+
+        Ok(cycles)
+    }
+
+    /// Phase 2.5: Clone a node
+    pub async fn clone_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        source_node_id: &str,
+        new_position: Option<Position>,
+        update_label: Option<String>,
+    ) -> CoreResult<PlanDagNode> {
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+
+        // Fetch source node
+        let source_node = self
+            .get_node_by_id(project_id, Some(plan.id), source_node_id)
+            .await?
+            .ok_or_else(|| CoreError::not_found("Node", source_node_id.to_string()))?;
+
+        // Generate new ID using UUID
+        let uuid = uuid::Uuid::new_v4().simple().to_string();
+        let short_uuid = uuid.chars().take(12).collect::<String>();
+        let node_type_prefix = match source_node.node_type {
+            crate::plan_dag::PlanDagNodeType::DataSet => "dataset",
+            crate::plan_dag::PlanDagNodeType::Graph => "graph",
+            crate::plan_dag::PlanDagNodeType::GraphArtefact => "graphartefact",
+            crate::plan_dag::PlanDagNodeType::TreeArtefact => "treeartefact",
+            crate::plan_dag::PlanDagNodeType::Projection => "projection",
+            crate::plan_dag::PlanDagNodeType::Story => "story",
+            _ => "node",
+        };
+        let new_id = format!("{}_{}", node_type_prefix, short_uuid);
+
+        // Update position and label
+        let position = new_position.unwrap_or(Position {
+            x: source_node.position.x + 100.0,
+            y: source_node.position.y + 100.0,
+        });
+
+        let mut new_metadata = source_node.metadata.clone();
+        if let Some(new_label) = update_label {
+            new_metadata.label = new_label;
+        } else {
+            new_metadata.label = format!("{} (copy)", new_metadata.label);
+        }
+
+        let metadata_json = serde_json::to_string(&new_metadata)
+            .map_err(|e| CoreError::validation(format!("Invalid metadata: {}", e)))?;
+
+        // Create new node
+        self.create_node(
+            project_id,
+            Some(plan.id),
+            new_id,
+            format!("{:?}", source_node.node_type).replace("Node", "Node"), // Keep format consistent
+            position,
+            metadata_json,
+            source_node.config.clone(),
+        )
+        .await
+    }
+}
+
+#[derive(serde::Serialize)]
+pub struct PlanStats {
+    pub node_count: usize,
+    pub edge_count: usize,
+    pub nodes_by_type: std::collections::HashMap<String, usize>,
+    pub leaf_nodes: usize,
+    pub avg_degree: f64,
+    pub isolated_nodes: usize,
+}
+
+#[derive(serde::Serialize)]
+pub struct BottleneckInfo {
+    pub node_id: String,
+    pub label: String,
+    pub degree: usize,
+    pub node_type: String,
 }
 
 fn normalize_legacy_node_type(node_type: &str) -> (String, Option<String>) {
