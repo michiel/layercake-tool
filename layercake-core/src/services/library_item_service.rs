@@ -19,6 +19,7 @@ use crate::services::source_processing;
 
 const REPO_LIBRARY_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/library");
 const REPO_PROMPTS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/prompts");
+const REPO_LIBRARY_METADATA: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/library.json");
 
 pub const ITEM_TYPE_DATASET: &str = "dataset";
 pub const ITEM_TYPE_PROJECT: &str = "project";
@@ -44,6 +45,31 @@ pub struct DatasetMetadata {
     #[serde(rename = "columnCount")]
     pub column_count: Option<usize>,
     pub headers: Option<Vec<String>>,
+}
+
+/// Library metadata from library.json
+#[derive(Debug, Clone, Deserialize)]
+pub struct LibraryManifest {
+    pub version: String,
+    pub description: String,
+    pub items: Vec<LibraryItem>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct LibraryItem {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    #[serde(rename = "type")]
+    pub item_type: String,
+    pub format: String,
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub usage: String,
 }
 
 pub struct LibraryItemService {
@@ -226,6 +252,18 @@ impl LibraryItemService {
             failed_files: Vec::new(),
         };
 
+        // Load library metadata if available
+        let library_manifest = self.load_library_manifest();
+        let mut file_metadata_map = std::collections::HashMap::new();
+
+        if let Ok(manifest) = library_manifest {
+            for item in manifest.items {
+                for file in &item.files {
+                    file_metadata_map.insert(file.clone(), item.clone());
+                }
+            }
+        }
+
         // Seed datasets from library directory
         let library_dir = PathBuf::from(REPO_LIBRARY_PATH);
         if library_dir.is_dir() {
@@ -265,7 +303,8 @@ impl LibraryItemService {
                     continue;
                 }
 
-                match self.seed_local_file(actor, &path, &filename).await {
+                let metadata = file_metadata_map.get(&filename);
+                match self.seed_local_file_with_metadata(actor, &path, &filename, metadata).await {
                     Ok(_) => {
                         result.created_count += 1;
                         existing_filenames.insert(filename);
@@ -333,11 +372,29 @@ impl LibraryItemService {
         Ok(result)
     }
 
-    async fn seed_local_file(
+    fn load_library_manifest(&self) -> CoreResult<LibraryManifest> {
+        let metadata_path = PathBuf::from(REPO_LIBRARY_METADATA);
+        let contents = fs::read_to_string(&metadata_path).map_err(|e| {
+            CoreError::internal(format!(
+                "Failed to read library.json from {}: {}",
+                metadata_path.display(),
+                e
+            ))
+        })?;
+
+        let manifest: LibraryManifest = serde_json::from_str(&contents).map_err(|e| {
+            CoreError::internal(format!("Failed to parse library.json: {}", e))
+        })?;
+
+        Ok(manifest)
+    }
+
+    async fn seed_local_file_with_metadata(
         &self,
         actor: &Actor,
         path: &PathBuf,
         filename: &str,
+        metadata: Option<&LibraryItem>,
     ) -> CoreResult<()> {
         let file_bytes = fs::read(path).map_err(|e| {
             CoreError::internal(format!("Failed to read {}: {}", path.display(), e))
@@ -348,14 +405,27 @@ impl LibraryItemService {
         })?;
 
         let data_type = infer_data_type(filename, &file_format, &file_bytes)?;
-        let name = derive_name(filename);
-        let description = Some("Seeded from resources/library".to_string());
+
+        // Use metadata from library.json if available, otherwise derive from filename
+        let (name, description, tags) = if let Some(meta) = metadata {
+            (
+                meta.name.clone(),
+                Some(meta.description.clone()),
+                meta.tags.clone(),
+            )
+        } else {
+            (
+                derive_name(filename),
+                Some("Seeded from resources/library".to_string()),
+                vec![],
+            )
+        };
 
         self.create_dataset_item(
             actor,
             name,
             description,
-            vec![],
+            tags,
             filename.to_string(),
             file_format,
             Some(data_type),
