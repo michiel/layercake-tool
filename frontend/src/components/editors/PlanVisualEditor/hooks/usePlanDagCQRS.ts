@@ -198,6 +198,11 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         case PlanDagNodeType.GRAPH:
           hasValidConfig = true
           break
+        case PlanDagNodeType.PROJECTION: {
+          // Projection node is valid if it has name and projectionType
+          hasValidConfig = !!(parsedConfig as any)?.name && !!(parsedConfig as any)?.projectionType
+          break
+        }
         default:
           hasValidConfig = Object.keys(parsedConfig as Record<string, unknown>).length > 0
           break

@@ -1047,7 +1047,6 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           nodeId={editNodeDialog.nodeId}
           config={editNodeDialog.config}
           metadata={editNodeDialog.metadata}
-          graphIdHint={null}
         />
       )}
     </>

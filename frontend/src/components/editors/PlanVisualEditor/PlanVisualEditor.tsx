@@ -137,8 +137,6 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     outputGraphRef: ''
   } as DataSetNodeConfig)
   const [configNodeMetadata, setConfigNodeMetadata] = useState<NodeMetadata>({ label: '', description: '' })
-  const [configGraphIdHint, setConfigGraphIdHint] = useState<number | null>(null)
-  const [configGraphSourceNodeId, setConfigGraphSourceNodeId] = useState<string | null>(null)
   const [draggingNode, setDraggingNode] = useState<{ type: PlanDagNodeType, position: { x: number, y: number } } | null>(null);
 
   // Node type selector for edge drop
@@ -167,20 +165,6 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       setConfigNodeType(resolvedType)
       setConfigNodeConfig(node.data.config || {})
       setConfigNodeMetadata(node.data.metadata || { label: '', description: '' })
-
-      // Infer upstream graph ID for projection nodes
-      const incoming = edgesRef.current.find(e => e.target === nodeId)
-      if (incoming) {
-        const sourceNode = nodesRef.current.find(n => n.id === incoming.source)
-        const graphExec = (sourceNode as any)?.data?.graphExecution
-        // Prefer graphDataId (graph_data tables) and fall back to legacy graphId
-        const graphExecId = graphExec?.graphDataId ?? graphExec?.graphId
-        setConfigGraphIdHint(typeof graphExecId === 'number' ? graphExecId : null)
-        setConfigGraphSourceNodeId(sourceNode?.id ?? null)
-      } else {
-        setConfigGraphIdHint(null)
-        setConfigGraphSourceNodeId(null)
-      }
     } else {
       console.warn('Node not found:', nodeId)
     }
@@ -1364,6 +1348,17 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       showSuccessNotification('Execution Started', data.executePlan.message);
       // Refresh the plan DAG data to update node execution states on the canvas
       refreshData();
+
+      // Poll for config updates (e.g., projectionId written back by backend)
+      // Backend updates node configs during execution but doesn't publish delta events
+      const pollInterval = setInterval(() => {
+        refreshData();
+      }, 2000); // Poll every 2 seconds
+
+      // Stop polling after 30 seconds
+      setTimeout(() => {
+        clearInterval(pollInterval);
+      }, 30000);
     },
     onError: (error: any) => {
       showErrorNotification('Execution Failed', error.message);
@@ -2001,8 +1996,6 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         metadata={configNodeMetadata}
         projectId={projectId}
         storyIdHint={sequenceStoryId}
-        graphIdHint={configGraphIdHint}
-        graphSourceNodeIdHint={configGraphSourceNodeId}
         onSave={handleNodeConfigSave}
       />
 
