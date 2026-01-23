@@ -3728,7 +3728,7 @@ dependencies = [
  "axum",
  "layercake-core",
  "layercake-server",
- "rand 0.8.5",
+ "rand 0.9.2",
  "reqwest",
  "sea-orm",
  "sea-orm-migration",
