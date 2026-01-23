@@ -215,6 +215,7 @@ async fn process_command(ctx: &mut CliContext, state: &mut ReplState, line: &str
                 pretty: false,
                 database: None,
                 session: None,
+                dry_run: false,
             };
 
             match execute_query_action(ctx, &args, payload).await {

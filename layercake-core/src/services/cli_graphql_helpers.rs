@@ -372,4 +372,228 @@ impl CliContext {
             .preview_graph_export(&self.actor, graph_id, format, render_config, max_rows)
             .await
     }
+
+    /// Phase 1.1: List nodes with optional filtering
+    pub async fn list_nodes_filtered(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        node_type: Option<String>,
+        label_pattern: Option<String>,
+        bounds: Option<(f64, f64, f64, f64)>,
+    ) -> CoreResult<Vec<CliPlanDagNode>> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        let nodes = self
+            .app
+            .plan_dag_service()
+            .get_nodes_filtered(project_id, Some(resolved_plan_id), node_type, label_pattern, bounds)
+            .await?;
+
+        Ok(nodes
+            .into_iter()
+            .map(|n| CliPlanDagNode::new(project_id, resolved_plan_id, n))
+            .collect())
+    }
+
+    /// Phase 1.2: Get a single node by ID with metadata enrichment
+    pub async fn get_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        node_id: String,
+    ) -> CoreResult<Option<CliPlanDagNode>> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        let node = self
+            .app
+            .plan_dag_service()
+            .get_node_by_id(project_id, Some(resolved_plan_id), &node_id)
+            .await?;
+
+        if let Some(node) = node {
+            // Enrich with execution metadata by loading as a single-node DAG
+            // This reuses the existing enrichment logic from load_plan_dag
+            let enriched = self.enrich_single_node(node).await?;
+            Ok(Some(CliPlanDagNode::new(
+                project_id,
+                resolved_plan_id,
+                enriched,
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Helper to enrich a single node with execution metadata
+    async fn enrich_single_node(&self, mut node: PlanDagNode) -> CoreResult<PlanDagNode> {
+        use crate::plan_dag::{DataSetExecutionMetadata, GraphExecutionMetadata, PlanDagNodeType};
+        use crate::services::GraphDataService;
+
+        match node.node_type {
+            PlanDagNodeType::DataSet => {
+                if let Ok(config) = serde_json::from_str::<Value>(&node.config) {
+                    if let Some(data_set_id) = config
+                        .get("dataSetId")
+                        .and_then(|v| v.as_i64())
+                        .map(|v| v as i32)
+                    {
+                        use crate::database::entities::data_sets;
+                        use sea_orm::EntityTrait;
+
+                        if let Some(data_set) = data_sets::Entity::find_by_id(data_set_id)
+                            .one(self.app.db())
+                            .await
+                            .map_err(|e| {
+                                CoreError::internal(format!(
+                                    "Failed to load data set {}: {}",
+                                    data_set_id, e
+                                ))
+                            })?
+                        {
+                            let execution_state = match data_set.status.as_str() {
+                                "active" => "completed",
+                                "processing" => "processing",
+                                "error" => "error",
+                                _ => "not_started",
+                            }
+                            .to_string();
+
+                            node.dataset_execution = Some(DataSetExecutionMetadata {
+                                data_set_id: data_set.id,
+                                filename: data_set.filename.clone(),
+                                status: data_set.status.clone(),
+                                processed_at: data_set.processed_at.map(|d| d.to_rfc3339()),
+                                execution_state,
+                                error_message: data_set.error_message.clone(),
+                            });
+                        }
+                    }
+                }
+            }
+            PlanDagNodeType::Graph => {
+                let gd_service = GraphDataService::new(self.app.db().clone());
+                if let Ok(Some(gd)) = gd_service.get_by_dag_node(&node.id).await {
+                    let execution_state = match gd.status.as_str() {
+                        "active" => "completed".to_string(),
+                        "processing" => "processing".to_string(),
+                        "pending" => "pending".to_string(),
+                        "error" => "error".to_string(),
+                        other => other.to_string(),
+                    };
+                    node.graph_execution = Some(GraphExecutionMetadata {
+                        graph_id: gd.id,
+                        graph_data_id: Some(gd.id),
+                        node_count: gd.node_count,
+                        edge_count: gd.edge_count,
+                        execution_state,
+                        computed_date: gd.computed_date.map(|d| d.to_rfc3339()),
+                        error_message: gd.error_message.clone(),
+                        annotations: gd
+                            .annotations
+                            .as_ref()
+                            .and_then(|v| v.as_str().map(|s| s.to_string())),
+                    });
+                }
+            }
+            _ => {}
+        }
+
+        Ok(node)
+    }
+
+    /// Phase 1.3: Traverse graph from a starting node
+    pub async fn traverse_from_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        start_node: String,
+        direction: String,
+        max_depth: usize,
+    ) -> CoreResult<(Vec<CliPlanDagNode>, Vec<CliPlanDagEdge>)> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        let (nodes, edges) = self
+            .app
+            .plan_dag_service()
+            .traverse_from_node(
+                project_id,
+                Some(resolved_plan_id),
+                &start_node,
+                &direction,
+                max_depth,
+            )
+            .await?;
+
+        let cli_nodes: Vec<CliPlanDagNode> = nodes
+            .into_iter()
+            .map(|n| CliPlanDagNode::new(project_id, resolved_plan_id, n))
+            .collect();
+
+        let cli_edges: Vec<CliPlanDagEdge> = edges
+            .into_iter()
+            .map(|e| CliPlanDagEdge::new(project_id, resolved_plan_id, e))
+            .collect();
+
+        Ok((cli_nodes, cli_edges))
+    }
+
+    /// Phase 1.3: Find path between two nodes
+    pub async fn find_path(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        start_node: String,
+        end_node: String,
+    ) -> CoreResult<Option<Vec<String>>> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        self.app
+            .plan_dag_service()
+            .find_path(project_id, Some(resolved_plan_id), &start_node, &end_node)
+            .await
+    }
+
+    /// Phase 2.2: Search nodes
+    pub async fn search_nodes(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        query: String,
+        fields: Vec<String>,
+    ) -> CoreResult<Vec<CliPlanDagNode>> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        let nodes = self
+            .app
+            .plan_dag_service()
+            .search_nodes(project_id, Some(resolved_plan_id), &query, fields)
+            .await?;
+
+        Ok(nodes
+            .into_iter()
+            .map(|n| CliPlanDagNode::new(project_id, resolved_plan_id, n))
+            .collect())
+    }
+
+    /// Phase 2.2: Find nodes by edge filter
+    pub async fn find_nodes_by_edge_filter(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        filter: String,
+    ) -> CoreResult<Vec<CliPlanDagNode>> {
+        let resolved_plan_id = self.resolve_plan_id(project_id, plan_id).await?;
+
+        let nodes = self
+            .app
+            .plan_dag_service()
+            .find_nodes_by_edge_filter(project_id, Some(resolved_plan_id), &filter)
+            .await?;
+
+        Ok(nodes
+            .into_iter()
+            .map(|n| CliPlanDagNode::new(project_id, resolved_plan_id, n))
+            .collect())
+    }
 }

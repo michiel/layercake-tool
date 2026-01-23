@@ -2,6 +2,7 @@ pub mod code_analysis_profiles;
 pub mod common_types;
 pub mod data_sets;
 pub mod library_items;
+pub mod plan_dag_annotations;
 pub mod plan_dag_edges;
 pub mod plan_dag_nodes;
 pub mod plans;
