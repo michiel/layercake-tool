@@ -22,8 +22,6 @@ interface ProjectionNodeConfigFormProps {
   setConfig: (config: ProjectionNodeConfig) => void
   setIsValid: (isValid: boolean) => void
   projectId: number
-  graphIdHint?: number | null
-  graphSourceNodeIdHint?: string | null
 }
 
 const PROJECTION_EDIT_QUERY = gql`
@@ -43,32 +41,12 @@ const PROJECTION_EDIT_QUERY = gql`
   }
 `
 
-const CREATE_PROJECTION = gql`
-  mutation CreateProjection($input: CreateProjectionInput!) {
-    createProjection(input: $input) {
-      id
-      name
-      projectionType
-      graphId
-    }
-  }
-`
-
 const UPDATE_PROJECTION = gql`
   mutation UpdateProjection($id: ID!, $input: UpdateProjectionInput!) {
     updateProjection(id: $id, input: $input) {
       id
       name
       projectionType
-    }
-  }
-`
-
-const GRAPH_DATA_BY_DAG_NODE = gql`
-  query GraphDataByDagNode($dagNodeId: String!) {
-    graphDataByDagNode(dagNodeId: $dagNodeId) {
-      id
-      name
     }
   }
 `
@@ -118,8 +96,6 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   setConfig,
   setIsValid,
   projectId,
-  graphIdHint,
-  graphSourceNodeIdHint,
 }) => {
   const projectionsClient = useMemo(
     () =>
@@ -130,12 +106,6 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     []
   )
 
-  const [localConfig, setLocalConfig] = useState<ProjectionNodeConfig>({
-    projectionId: config.projectionId,
-    name: config.name || 'New Projection',
-    projectionType: config.projectionType || 'force3d',
-    storyMode: config.storyMode,
-  })
   const [projectionName, setProjectionName] = useState(config.name || 'New Projection')
   const [projectionType, setProjectionType] = useState<'force3d' | 'layer3d'>(config.projectionType || 'force3d')
   const [storyModeEnabled, setStoryModeEnabled] = useState(config.storyMode?.enabled || false)
@@ -147,7 +117,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     missing: { storyId: number; sequenceId: number; missingEdges: { datasetId: number; edgeId: string }[] }[]
   } | null>(null)
 
-  const projectionId = localConfig.projectionId
+  const projectionId = config.projectionId
 
   const { data: projectionData, loading: loadingProjection, refetch: refetchProjection } = useQuery(
     PROJECTION_EDIT_QUERY,
@@ -171,9 +141,6 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     }
   )
 
-  const [createProjection, { loading: creatingProjection }] = useMutation(CREATE_PROJECTION, {
-    client: projectionsClient,
-  })
   const [updateProjection, { loading: updatingProjection }] = useMutation(UPDATE_PROJECTION, {
     client: projectionsClient,
   })
@@ -185,21 +152,6 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
   const projection = (projectionData as any)?.projection
   const projectionState = (projectionData as any)?.projectionState
   const stories = (storiesData as any)?.stories ?? []
-  const { data: graphDataLookup } = useQuery(GRAPH_DATA_BY_DAG_NODE, {
-    variables: { dagNodeId: graphSourceNodeIdHint ?? '' },
-    skip: !graphSourceNodeIdHint,
-    fetchPolicy: 'cache-first',
-  })
-
-  const resolvedGraphDataId: number | null = useMemo(() => {
-    const lookupId = (graphDataLookup as any)?.graphDataByDagNode?.id
-    if (lookupId !== undefined && lookupId !== null) {
-      const parsed = Number(lookupId)
-      if (Number.isFinite(parsed)) return parsed
-    }
-    if (graphIdHint && Number.isFinite(graphIdHint)) return graphIdHint
-    return null
-  }, [graphIdHint, graphDataLookup])
 
   // Reset state when switching projections
   useEffect(() => {
@@ -208,7 +160,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     setSequenceCache({})
     setVerificationResult(null)
     // Don't reset name/type - those come from config now
-  }, [projectionId, resolvedGraphDataId])
+  }, [projectionId])
 
   const ensureSequences = useCallback(
     async (storyId: number) => {
@@ -221,49 +173,13 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     [loadSequences, sequenceCache]
   )
 
-  // Auto-create projection is now disabled - projections are created during DAG execution
-  // This allows users to configure projection settings before the DAG runs
-
-  // If the linked projection points at a different graph, recreate and relink
-  useEffect(() => {
-    const relinkIfNeeded = async () => {
-      if (!projection || !resolvedGraphDataId) return
-      if (projectionId && Number(projection.id) !== projectionId) return
-      const projectionGraphId = Number(projection.graphId)
-      if (Number.isFinite(projectionGraphId) && projectionGraphId === resolvedGraphDataId) {
-        return
-      }
-      try {
-        const { data } = await createProjection({
-          variables: {
-            input: {
-              projectId,
-              graphId: resolvedGraphDataId,
-              name: projection.name || `Projection ${resolvedGraphDataId}`,
-              projectionType: projection.projectionType || 'force3d',
-            },
-          },
-        })
-        const newProjection = (data as any)?.createProjection
-        if (newProjection?.id) {
-          setLocalConfig({ projectionId: Number(newProjection.id) })
-          setProjectionName(newProjection.name)
-          setProjectionType((newProjection.projectionType as 'force3d' | 'layer3d') ?? 'force3d')
-          setIsValid(true)
-          showSuccessNotification('Projection relinked', 'Projection now points at the computed graph output.')
-        }
-      } catch (err: any) {
-        console.error('Failed to relink projection to graph data', err)
-        showErrorNotification('Projection relink failed', err?.message || 'Unable to recreate projection')
-      }
-    }
-    void relinkIfNeeded()
-  }, [projection, resolvedGraphDataId, projectId, createProjection, setIsValid])
+  // Projections are created during DAG execution - no auto-creation in the UI
+  // This form only configures the pre-execution settings (name, type, story mode)
 
   // Keep parent config in sync
   useEffect(() => {
     const nextConfig: ProjectionNodeConfig = {
-      projectionId: localConfig.projectionId,
+      projectionId: projectionId,
       name: projectionName,
       projectionType: projectionType,
       storyMode: storyModeEnabled ? {
@@ -272,7 +188,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
       } : undefined,
     }
     setConfig(nextConfig)
-  }, [localConfig.projectionId, projectionName, projectionType, storyModeEnabled, storySelections, setConfig])
+  }, [projectionId, projectionName, projectionType, storyModeEnabled, storySelections, setConfig])
 
   // Node is valid if it has configuration (name, type), even without a projection ID yet
   useEffect(() => {
@@ -416,8 +332,7 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
     }
   }
 
-  const busy = loadingProjection || loadingStories || creatingProjection
-  const hasUpstreamNode = !!graphSourceNodeIdHint
+  const busy = loadingProjection || loadingStories
 
   return (
     <Stack gap="md">
@@ -429,12 +344,27 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
             </svg>
             <div className="flex-1 space-y-1">
               <div className="font-semibold text-blue-900 dark:text-blue-100 text-sm">
-                Configure now, create on execution
+                Projection lifecycle
               </div>
               <div className="text-sm text-blue-800 dark:text-blue-200">
-                {hasUpstreamNode
-                  ? "Settings are saved to the DAG. The projection will be created automatically when you execute the DAG."
-                  : "Connect this node to a graph computation node, then configure its projection settings."}
+                Configure the projection name and type here. The projection will be created automatically when you execute the DAG, and a projection ID will be assigned.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {projectionId && (
+        <div className="rounded border border-emerald-500/50 bg-emerald-50 dark:bg-emerald-950/20 p-4">
+          <div className="flex items-start gap-2">
+            <svg className="h-5 w-5 text-emerald-600 dark:text-emerald-400 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div className="flex-1 space-y-1">
+              <div className="font-semibold text-emerald-900 dark:text-emerald-100 text-sm">
+                Projection #{projectionId}
+              </div>
+              <div className="text-sm text-emerald-800 dark:text-emerald-200">
+                This projection has been created. You can now open it, download it, or configure story mode.
               </div>
             </div>
           </div>
@@ -478,7 +408,11 @@ export const ProjectionNodeConfigForm: React.FC<ProjectionNodeConfigFormProps> =
                 <SelectItem value="layer3d">Layer 3D</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">Projection nodes are created with a dedicated projection entity and inherit their input graph.</p>
+            <p className="text-xs text-muted-foreground">
+              {projectionId
+                ? 'These settings are saved to the projection entity.'
+                : 'These settings are saved to the DAG and used when creating the projection during execution.'}
+            </p>
           </div>
           {projectionId && (
             <Group justify="end" gap="sm">

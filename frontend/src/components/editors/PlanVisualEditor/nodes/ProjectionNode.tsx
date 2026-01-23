@@ -30,14 +30,30 @@ interface ExtendedNodeProps extends NodeProps {
   readonly?: boolean
 }
 
+const parseConfig = (config: any): ProjectionNodeConfig => {
+  if (!config) return {}
+  if (typeof config === 'string') {
+    try {
+      return JSON.parse(config)
+    } catch {
+      return {}
+    }
+  }
+  return config
+}
+
 export const ProjectionNode = memo((props: ExtendedNodeProps) => {
   const { data, readonly = false } = props
   const { onEdit: resolvedOnEdit, onDelete: resolvedOnDelete } = resolveNodeHandlers(props)
 
-  const config = data.config as ProjectionNodeConfig
+  const config = parseConfig(data.config)
   const edges = data.edges || []
-  const hasValidConfig = data.hasValidConfig !== false && !!config?.projectionId
+
+  // Node is valid if it has name and type configured, even without projectionId yet
+  // Compute this directly from config, don't rely on data.hasValidConfig
+  const hasValidConfig = !!config?.name && !!config?.projectionType
   const [downloading, setDownloading] = useState(false)
+
 
   const projectionsClient = useMemo(
     () =>
@@ -163,35 +179,35 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
       extraToolButtons={
         config.projectionId ? (
           <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 nodrag"
-                    onPointerDown={stopPointerInteraction}
-                    onClick={handleActionClick(handleOpenProjection)}
-                  >
-                    <IconExternalLink size={13} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Open projection</TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100 nodrag"
-                    disabled={downloading}
-                    onPointerDown={stopPointerInteraction}
-                    onClick={handleActionClick(handleDownloadProjection)}
-                  >
-                    <IconDownload size={13} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Download projection</TooltipContent>
-              </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-blue-600 hover:text-blue-700 hover:bg-blue-100 nodrag"
+                  onPointerDown={stopPointerInteraction}
+                  onClick={handleActionClick(handleOpenProjection)}
+                >
+                  <IconExternalLink size={13} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Open projection</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7 text-green-600 hover:text-green-700 hover:bg-green-100 nodrag"
+                  disabled={downloading}
+                  onPointerDown={stopPointerInteraction}
+                  onClick={handleActionClick(handleDownloadProjection)}
+                >
+                  <IconDownload size={13} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download projection</TooltipContent>
+            </Tooltip>
           </TooltipProvider>
         ) : null
       }
@@ -203,9 +219,15 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
             <span>Projection #{config.projectionId}</span>
           </div>
         )}
-        {!config.projectionId && (
+        {!config.projectionId && config.name && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <IconPresentation size={14} />
+            <span>{config.name} ({config.projectionType})</span>
+          </div>
+        )}
+        {!config.projectionId && !config.name && (
           <p className="text-xs text-muted-foreground">
-            No projection selected
+            Configure projection settings
           </p>
         )}
       </Stack>

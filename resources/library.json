@@ -1,0 +1,208 @@
+{
+  "version": "1.0.0",
+  "description": "Layercake internal library of pre-built graph assets, security frameworks, and visualization configurations",
+  "updated": "2026-01-23",
+  "items": [
+    {
+      "id": "cisv8-complete",
+      "name": "CIS Controls v8 - Complete Framework",
+      "description": "The CIS Critical Security Controls v8 is a prioritized set of actions for cyber defense that provides specific and actionable ways to stop today's most pervasive and dangerous attacks. Includes all 18 controls, 153 safeguards, and asset relationships.",
+      "type": "graph-dataset",
+      "format": "csv-multi-file",
+      "files": [
+        "CISv8 Controls (nodes).csv",
+        "CISv8 Asset links (edges).csv",
+        "CISv8 layers.csv"
+      ],
+      "tags": [
+        "security",
+        "compliance",
+        "framework",
+        "cis",
+        "controls",
+        "cybersecurity",
+        "nist"
+      ],
+      "category": "security-frameworks",
+      "structure": {
+        "nodes": 153,
+        "edges": "asset-links",
+        "layers": [
+          "identify",
+          "protect",
+          "detect",
+          "respond",
+          "recover",
+          "govern"
+        ],
+        "hierarchy": true
+      },
+      "usage": "import-as-graph",
+      "license": "CC-BY-NC-SA-4.0",
+      "source": "https://www.cisecurity.org/controls/v8",
+      "version": "8.0"
+    },
+    {
+      "id": "owasp-llm-risks-2025",
+      "name": "OWASP LLM Top 10 Risks 2025",
+      "description": "The OWASP Top 10 for Large Language Model Applications 2025 edition identifies the most critical security risks when building, deploying, and managing LLM applications. Includes all 10 risks with detailed descriptions and citation references.",
+      "type": "graph-dataset",
+      "format": "json",
+      "files": [
+        "OWASP-LLM-Top-10-Risks-2025.json"
+      ],
+      "alternateFormats": [
+        "OWASP-LLM-Top-10-Risks-2025.csv"
+      ],
+      "tags": [
+        "security",
+        "ai",
+        "llm",
+        "owasp",
+        "machine-learning",
+        "risks",
+        "vulnerabilities",
+        "generative-ai"
+      ],
+      "category": "security-frameworks",
+      "structure": {
+        "nodes": 11,
+        "edges": 0,
+        "layers": ["risk"],
+        "hierarchy": true
+      },
+      "usage": "import-as-graph",
+      "license": "CC-BY-SA-4.0",
+      "source": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "version": "2.0-2025"
+    },
+    {
+      "id": "owasp-llm-controls",
+      "name": "OWASP LLM Security Controls & Mitigations",
+      "description": "A comprehensive set of security controls mapped to OWASP LLM Top 10 risks. Includes 16 mitigation controls with detailed mappings showing which controls mitigate which risks. Perfect for building defense-in-depth strategies for LLM applications.",
+      "type": "graph-dataset",
+      "format": "json",
+      "files": [
+        "OWASP-LLM-Controls.json"
+      ],
+      "tags": [
+        "security",
+        "ai",
+        "llm",
+        "owasp",
+        "controls",
+        "mitigations",
+        "defense",
+        "generative-ai"
+      ],
+      "category": "security-frameworks",
+      "structure": {
+        "nodes": 16,
+        "edges": 26,
+        "layers": ["control"],
+        "hierarchy": true,
+        "relationships": "risk-mitigation"
+      },
+      "usage": "import-as-graph",
+      "relatedTo": ["owasp-llm-risks-2025"],
+      "license": "CC-BY-SA-4.0",
+      "source": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "version": "2.0-2025"
+    },
+    {
+      "id": "owasp-llm-complete",
+      "name": "OWASP LLM Complete - Risks + Controls",
+      "description": "Combined dataset containing both OWASP LLM Top 10 risks and their corresponding security controls with full mitigation mappings. Use this for comprehensive LLM security analysis and control gap assessment.",
+      "type": "graph-dataset-composite",
+      "format": "json-multi-file",
+      "files": [
+        "OWASP-LLM-Top-10-Risks-2025.json",
+        "OWASP-LLM-Controls.json"
+      ],
+      "tags": [
+        "security",
+        "ai",
+        "llm",
+        "owasp",
+        "risks",
+        "controls",
+        "complete",
+        "generative-ai"
+      ],
+      "category": "security-frameworks",
+      "structure": {
+        "nodes": 27,
+        "edges": 26,
+        "layers": ["risk", "control"],
+        "hierarchy": true,
+        "relationships": "risk-control-mapping"
+      },
+      "usage": "import-as-merged-graph",
+      "relatedTo": ["owasp-llm-risks-2025", "owasp-llm-controls"],
+      "license": "CC-BY-SA-4.0",
+      "source": "https://owasp.org/www-project-top-10-for-large-language-model-applications/",
+      "version": "2.0-2025"
+    },
+    {
+      "id": "default-layers",
+      "name": "Default Visualization Layers",
+      "description": "Standard color scheme and styling configuration for graph visualization layers. Includes 16 pre-configured layer styles with carefully chosen color palettes for backgrounds, text, and borders. Use this as a foundation for custom layer configurations.",
+      "type": "layer-configuration",
+      "format": "csv",
+      "files": [
+        "Default Layers.csv"
+      ],
+      "tags": [
+        "visualization",
+        "styling",
+        "layers",
+        "colors",
+        "theme",
+        "ui"
+      ],
+      "category": "visualization",
+      "structure": {
+        "layers": 16,
+        "colorSchemes": [
+          "main-blue-gradient",
+          "alt-orange-gradient",
+          "highlight-yellow",
+          "semantic-colors"
+        ]
+      },
+      "usage": "import-as-layer-config",
+      "license": "MIT",
+      "version": "1.0"
+    }
+  ],
+  "categories": {
+    "security-frameworks": {
+      "name": "Security Frameworks",
+      "description": "Pre-built security control frameworks, risk taxonomies, and compliance mappings",
+      "icon": "shield"
+    },
+    "visualization": {
+      "name": "Visualization",
+      "description": "Layer configurations, color schemes, and styling templates",
+      "icon": "palette"
+    }
+  },
+  "usageTypes": {
+    "import-as-graph": {
+      "description": "Import as a new graph dataset in an existing project",
+      "capabilities": ["nodes", "edges", "layers"]
+    },
+    "import-as-merged-graph": {
+      "description": "Import and merge multiple graph files into a single dataset",
+      "capabilities": ["multi-file-merge", "relationship-preservation"]
+    },
+    "import-as-layer-config": {
+      "description": "Import as layer styling configuration",
+      "capabilities": ["layer-styles", "color-schemes"]
+    },
+    "start-new-project": {
+      "description": "Use this asset as the foundation for a new project",
+      "capabilities": ["project-template", "pre-configured"]
+    }
+  }
+}

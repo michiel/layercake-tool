@@ -109,7 +109,8 @@ export const getDefaultNodeConfig = (type: PlanDagNodeType): NodeConfig => {
 
     case PlanDagNodeType.PROJECTION:
       return {
-        projectionId: undefined,
+        name: 'New Projection',
+        projectionType: 'force3d',
       };
 
     case PlanDagNodeType.STORY:
