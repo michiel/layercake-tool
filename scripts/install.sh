@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Layercake Installation Script
-# This script downloads and installs the latest Layercake release for your platform
+# Layercake CLI Installation Script
+# This script downloads and installs the latest Layercake CLI release for your platform
 
 set -e
 
@@ -18,6 +18,7 @@ GITHUB_API="https://api.github.com/repos/${REPO}"
 GITHUB_RELEASES="${GITHUB_API}/releases/latest"
 INSTALL_DIR="$HOME/.local/bin"
 BINARY_NAME="layercake"
+BASE_NAMES=("layercake-cli" "layercake")
 
 # Logging functions
 log_info() {
@@ -125,27 +126,40 @@ get_latest_release() {
 # Find the appropriate asset for the current platform
 find_asset() {
     log_info "Looking for ${PLATFORM}-${ARCH} release asset..."
-    
-    # Common naming patterns for release assets
-    local patterns=(
-        "layercake-${LATEST_VERSION}-${PLATFORM}-${ARCH}.tar.gz"
-        "layercake-${PLATFORM}-${ARCH}.tar.gz"
-        "layercake-${LATEST_VERSION#v}-${PLATFORM}-${ARCH}.tar.gz"
-        "layercake_${LATEST_VERSION#v}_${PLATFORM}_${ARCH}.tar.gz"
+
+    # Build naming patterns for CLI releases first, then fall back to the generic binary
+    local base_names=("${BASE_NAMES[@]}")
+    local patterns=()
+
+    for base in "${base_names[@]}"; do
+        patterns+=(
+            "${base}-${LATEST_VERSION}-${PLATFORM}-${ARCH}.tar.gz"
+            "${base}-${PLATFORM}-${ARCH}.tar.gz"
+            "${base}-${LATEST_VERSION#v}-${PLATFORM}-${ARCH}.tar.gz"
+            "${base}_${LATEST_VERSION#v}_${PLATFORM}_${ARCH}.tar.gz"
+        )
+    done
+
+    patterns+=(
         "${PLATFORM}-${ARCH}.tar.gz"
     )
-    
+
     # Windows uses .zip typically
     if [ "$PLATFORM" = "windows" ]; then
+        for base in "${base_names[@]}"; do
+            patterns+=(
+                "${base}-${LATEST_VERSION}-${PLATFORM}-${ARCH}.zip"
+                "${base}-${PLATFORM}-${ARCH}.zip"
+                "${base}-${LATEST_VERSION#v}-${PLATFORM}-${ARCH}.zip"
+                "${base}_${LATEST_VERSION#v}_${PLATFORM}_${ARCH}.zip"
+            )
+        done
+
         patterns+=(
-            "layercake-${LATEST_VERSION}-${PLATFORM}-${ARCH}.zip"
-            "layercake-${PLATFORM}-${ARCH}.zip"
-            "layercake-${LATEST_VERSION#v}-${PLATFORM}-${ARCH}.zip"
-            "layercake_${LATEST_VERSION#v}_${PLATFORM}_${ARCH}.zip"
             "${PLATFORM}-${ARCH}.zip"
         )
     fi
-    
+
     # Search for matching assets
     local assets
     assets=$(echo "$RELEASE_DATA" | jq -r '.assets[].name')
@@ -219,19 +233,43 @@ download_and_extract() {
     esac
     
     # Find the binary in the extracted files
-    local binary_path
-    binary_path=$(find "$temp_dir" -name "$BINARY_NAME" -type f -executable | head -1)
-    
+    local binary_path=""
+    local binary_candidates=(
+        "$BINARY_NAME"
+        "layercake-cli"
+        "${BINARY_NAME}.exe"
+        "layercake-cli.exe"
+        "${BINARY_NAME}-${PLATFORM}-${ARCH}"
+        "layercake-cli-${PLATFORM}-${ARCH}"
+        "${BINARY_NAME}_${PLATFORM}_${ARCH}"
+        "layercake-cli_${PLATFORM}_${ARCH}"
+    )
+
+    for name in "${binary_candidates[@]}"; do
+        binary_path=$(find "$temp_dir" -name "$name" -type f -executable 2>/dev/null | head -1)
+        if [ -n "$binary_path" ]; then
+            break
+        fi
+    done
+
     if [ -z "$binary_path" ]; then
-        # Try common variations
-        for name in "layercake" "layercake.exe" "layercake-${PLATFORM}-${ARCH}" "layercake_${PLATFORM}_${ARCH}"; do
-            binary_path=$(find "$temp_dir" -name "$name" -type f | head -1)
+        for name in "${binary_candidates[@]}"; do
+            binary_path=$(find "$temp_dir" -name "$name" -type f 2>/dev/null | head -1)
             if [ -n "$binary_path" ]; then
                 break
             fi
         done
     fi
-    
+
+    if [ -z "$binary_path" ]; then
+        for base in "${BASE_NAMES[@]}"; do
+            binary_path=$(find "$temp_dir" -iname "${base}*" -type f 2>/dev/null | head -1)
+            if [ -n "$binary_path" ]; then
+                break
+            fi
+        done
+    fi
+
     if [ -z "$binary_path" ]; then
         log_error "Could not find layercake binary in extracted archive"
         log_info "Archive contents:"
@@ -266,7 +304,7 @@ install_binary() {
     # Make sure it's executable
     chmod +x "$target_path"
     
-    log_success "Layercake installed to $target_path"
+    log_success "Layercake CLI installed to $target_path"
     
     # Cleanup
     rm -rf "$TEMP_DIR"
@@ -329,7 +367,7 @@ verify_installation() {
     
     # Test if the binary runs and shows version/help
     if "$binary_path" --version >/dev/null 2>&1 || "$binary_path" --help >/dev/null 2>&1; then
-        log_success "Layercake installation verified successfully!"
+        log_success "Layercake CLI installation verified successfully!"
         
         # Show version if available
         if version_output=$("$binary_path" --version 2>/dev/null); then
@@ -346,7 +384,7 @@ verify_installation() {
 
 # Show usage information
 show_usage() {
-    log_info "Layercake has been installed! Here's how to use it:"
+    log_info "Layercake CLI has been installed! Here's how to use it:"
     echo
     echo "  Process a plan file:"
     echo "    layercake -p <plan.yaml>"
@@ -365,7 +403,7 @@ show_usage() {
 
 # Main installation function
 main() {
-    log_info "🎂 Layercake Installation Script"
+    log_info "🎂 Layercake CLI Installation Script"
     log_info "================================="
     echo
     
@@ -397,12 +435,12 @@ main() {
     echo
     if verify_installation; then
         echo
-        log_success "🎉 Layercake installation completed successfully!"
+        log_success "🎉 Layercake CLI installation completed successfully!"
         
         if [ $path_ok -eq 0 ]; then
             show_usage
         else
-            log_info "Add $INSTALL_DIR to your PATH to use layercake from anywhere"
+            log_info "Add $INSTALL_DIR to your PATH to use the layercake CLI from anywhere"
         fi
     else
         log_error "Installation completed but verification failed"
@@ -414,11 +452,11 @@ main() {
 # Handle script arguments
 case "${1:-}" in
     --help|-h)
-        echo "Layercake Installation Script"
+        echo "Layercake CLI Installation Script"
         echo
         echo "Usage: $0 [OPTIONS]"
         echo
-        echo "This script downloads and installs the latest Layercake release"
+        echo "This script downloads and installs the latest Layercake CLI release"
         echo "from GitHub for your platform."
         echo
         echo "Options:"
@@ -435,7 +473,7 @@ case "${1:-}" in
         exit 0
         ;;
     --version)
-        echo "Layercake Installation Script v1.0.0"
+        echo "Layercake CLI Installation Script v1.0.0"
         exit 0
         ;;
     "")

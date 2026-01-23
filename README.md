@@ -14,6 +14,25 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 - Automation & Exporters – run plans headlessly from the CLI, watch for file changes, and emit PlantUML, Graphviz, Mermaid, GML, or custom Handlebars templates.
 - Persistent Storage & Audit – all projects, DAGs, edits, and plan runs are stored in SQLite via SeaORM migrations.
 
+## Installation
+
+- **Quick install on Linux/macOS:** download and run the installer that grabs the latest CLI release for your platform.
+  ```bash
+  curl -sL https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.sh | bash
+  ```
+  Optionally override the install path for a user-local location:
+  ```bash
+  LAYERCAKE_INSTALL_DIR="/opt/bin" curl -sL https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.sh | bash
+  ```
+
+- **Windows install (PowerShell):** invoke the installer that now tracks the CLI release. Run from PowerShell 5.1+ or `pwsh`:
+  ```powershell
+  irm https://raw.githubusercontent.com/michiel/layercake-tool/master/scripts/install.ps1 | pwsh -NoProfile -
+  ```
+  Use `-InstallDir C:\tools\layercake` to override the default `~\.local\bin` path.
+
+- **Post-install:** ensure the chosen install directory is on `PATH` (the scripts remind you how) and verify by running `layercake --version`.
+
 ## Removed Features
 - The chat, RAG, and MCP surfaces have been pulled from this workspace so the product now focuses on the plan editor, graph tools, data acquisition, and exporter flows. See `plans/20260122-de-feature.md` for the implementation log and rationale behind the de-feature effort.
 

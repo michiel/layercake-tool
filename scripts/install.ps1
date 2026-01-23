@@ -1,5 +1,5 @@
-# Layercake Installation Script for Windows PowerShell
-# This script downloads and installs the latest Layercake release for Windows
+# Layercake CLI Installation Script for Windows PowerShell
+# This script downloads and installs the latest Layercake CLI release for Windows
 
 param(
     [string]$InstallDir = "$env:USERPROFILE\.local\bin",
@@ -15,6 +15,7 @@ $Repo = "michiel/layercake-tool"
 $GitHubApi = "https://api.github.com/repos/$Repo"
 $GitHubReleases = "$GitHubApi/releases/latest"
 $BinaryName = "layercake.exe"
+$BaseNames = @("layercake-cli", "layercake")
 
 # Colors for output (if supported)
 $Colors = @{
@@ -48,11 +49,11 @@ function Write-Error {
 
 # Show help
 function Show-Help {
-    Write-Host "Layercake Installation Script for Windows PowerShell"
+    Write-Host "Layercake CLI Installation Script for Windows PowerShell"
     Write-Host ""
     Write-Host "Usage: .\install.ps1 [OPTIONS]"
     Write-Host ""
-    Write-Host "This script downloads and installs the latest Layercake release"
+    Write-Host "This script downloads and installs the latest Layercake CLI release"
     Write-Host "from GitHub for Windows."
     Write-Host ""
     Write-Host "Options:"
@@ -71,7 +72,7 @@ function Show-Help {
 
 # Show version
 function Show-Version {
-    Write-Host "Layercake Installation Script v1.0.0 for Windows PowerShell"
+    Write-Host "Layercake CLI Installation Script v1.0.0 for Windows PowerShell"
 }
 
 # Detect platform and architecture
@@ -159,12 +160,19 @@ function Find-Asset {
     $version = $ReleaseData.tag_name
     $versionNoV = $version -replace '^v', ''
     
-    # Common naming patterns for Windows release assets
-    $patterns = @(
-        "layercake-$version-windows-*.zip",
-        "layercake-windows-*.zip",
-        "layercake-$versionNoV-windows-*.zip",
-        "layercake_${versionNoV}_windows_*.zip",
+    $baseNames = $BaseNames
+    $patterns = @()
+
+    foreach ($base in $baseNames) {
+        $patterns += @(
+            "$base-$version-windows-*.zip",
+            "$base-windows-*.zip",
+            "$base-$versionNoV-windows-*.zip",
+            "$base_${versionNoV}_windows_*.zip"
+        )
+    }
+
+    $patterns += @(
         "windows-*.zip",
         "*windows*.zip"
     )
@@ -230,7 +238,14 @@ function Install-LayercakeBinary {
         
         # Find the binary in the extracted files
         $binaryPath = $null
-        $searchNames = @("layercake.exe", "layercake", "layercake-windows-*.exe")
+        $searchNames = @(
+            "layercake.exe",
+            "layercake-cli.exe",
+            "layercake",
+            "layercake-cli",
+            "layercake-windows-*.exe",
+            "layercake-cli-windows-*.exe"
+        )
         
         foreach ($name in $searchNames) {
             $found = Get-ChildItem -Path $tempDir -Filter $name -Recurse -File | Select-Object -First 1
@@ -265,7 +280,7 @@ function Install-LayercakeBinary {
             return $false
         }
         
-        Write-Success "Layercake installed to $targetPath"
+        Write-Success "Layercake CLI installed to $targetPath"
         return $true
         
     } finally {
@@ -326,13 +341,13 @@ function Test-Installation {
         return $false
     }
     
-    Write-Info "Testing layercake installation..."
+    Write-Info "Testing layercake CLI installation..."
     
     # Test if the binary runs and shows version/help
     try {
         $output = & $binaryPath --version 2>$null
         if ($LASTEXITCODE -eq 0) {
-            Write-Success "Layercake installation verified successfully!"
+            Write-Success "Layercake CLI installation verified successfully!"
             Write-Info "Installed version: $output"
             return $true
         }
@@ -341,7 +356,7 @@ function Test-Installation {
         try {
             $null = & $binaryPath --help 2>$null
             if ($LASTEXITCODE -eq 0) {
-                Write-Success "Layercake installation verified successfully!"
+                Write-Success "Layercake CLI installation verified successfully!"
                 return $true
             }
         } catch {
@@ -356,7 +371,7 @@ function Test-Installation {
 
 # Show usage information
 function Show-Usage {
-    Write-Info "Layercake has been installed! Here's how to use it:"
+    Write-Info "Layercake CLI has been installed! Here's how to use it:"
     Write-Host ""
     Write-Host "  Process a plan file:"
     Write-Host "    layercake -p <plan.yaml>"
@@ -386,7 +401,7 @@ if ($Version) {
 
 # Main installation function
 function Install-Layercake {
-    Write-Info "🎂 Layercake Installation Script for Windows"
+    Write-Info "🎂 Layercake CLI Installation Script for Windows"
     Write-Info "============================================"
     Write-Host ""
     
@@ -407,12 +422,12 @@ function Install-Layercake {
     Write-Host ""
     if (Test-Installation -InstallDirectory $InstallDir) {
         Write-Host ""
-        Write-Success "🎉 Layercake installation completed successfully!"
+        Write-Success "🎉 Layercake CLI installation completed successfully!"
         
         if ($pathOk) {
             Show-Usage
         } else {
-            Write-Info "Add $InstallDir to your PATH to use layercake from anywhere"
+            Write-Info "Add $InstallDir to your PATH to use the layercake CLI from anywhere"
         }
     } else {
         Write-Error "Installation completed but verification failed"
