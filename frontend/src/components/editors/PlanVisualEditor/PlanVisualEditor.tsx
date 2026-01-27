@@ -1860,7 +1860,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       `}</style>
 
-      {/* Simplified Toolbar - Node palette, auto-layout, fit view, and execution controls */}
+      {/* Simplified Toolbar - Node palette, auto-layout, fit view, refresh, and execution controls */}
       <AdvancedToolbar
         readonly={readonly}
         onNodeDragStart={handleNodeDragStart}
@@ -1868,6 +1868,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         onAutoLayoutHorizontal={handleAutoLayoutHorizontal}
         onAutoLayoutVertical={handleAutoLayoutVertical}
         onFitView={handleFitView}
+        onRefresh={refreshData}
         onPlay={handlePlay}
         onStop={handleStop}
         onClear={handleClear}

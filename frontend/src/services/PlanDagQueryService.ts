@@ -103,15 +103,18 @@ export class PlanDagQueryService {
 
     return asGraphQLSubscribable<any>(subscription).subscribe({
       next: (result: any) => {
-        console.log('[PlanDagQueryService] Raw subscription result:', result)
+        const timestamp = new Date().toISOString()
+        console.log('[PlanDagQueryService] Raw subscription result:', { timestamp, result })
         const deltaData = result.data?.planDagDeltaChanged
 
         if (deltaData) {
-          console.log('[PlanDagQueryService] Received delta update:', {
+          console.log('[PlanDagQueryService] Subscription received:', {
+            timestamp,
             version: deltaData.version,
-            operations: deltaData.operations.length,
+            operationCount: deltaData.operations.length,
+            operations: deltaData.operations.map((op: any) => `${op.op} ${op.path}`),
             userId: deltaData.userId,
-            clientId: this.clientId
+            localClientId: this.clientId
           })
 
           // Skip subscription updates shortly after own mutations to prevent echo
@@ -119,9 +122,11 @@ export class PlanDagQueryService {
           const commandTimestamp = (this as any).getCommandTimestamp?.() || this.lastMutationTimestamp
           const timeSinceLastMutation = Date.now() - commandTimestamp
           if (timeSinceLastMutation < this.MUTATION_ECHO_WINDOW_MS) {
-            console.log('[PlanDagQueryService] Skipping subscription update (recent mutation echo):', {
+            console.log('[PlanDagQueryService] Echo suppressed:', {
+              timestamp,
+              reason: 'recent-mutation',
               timeSinceLastMutation: `${timeSinceLastMutation}ms`,
-              window: `${this.MUTATION_ECHO_WINDOW_MS}ms`,
+              echoWindow: `${this.MUTATION_ECHO_WINDOW_MS}ms`,
               usingCommandTimestamp: !!(this as any).getCommandTimestamp
             })
             return
