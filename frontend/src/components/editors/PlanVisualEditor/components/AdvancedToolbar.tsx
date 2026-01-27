@@ -11,6 +11,7 @@ import {
   IconArrowRight,
   IconArrowDown,
   IconZoomScan,
+  IconRefresh,
   IconPlayerPlay,
   IconPlayerStop,
   IconTrash
@@ -28,6 +29,7 @@ interface AdvancedToolbarProps {
   onAutoLayoutHorizontal: () => void;
   onAutoLayoutVertical: () => void;
   onFitView: () => void;
+  onRefresh: () => void;
   onPlay: () => void;
   onStop: () => void;
   onClear: () => void;
@@ -42,6 +44,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   onAutoLayoutHorizontal,
   onAutoLayoutVertical,
   onFitView,
+  onRefresh,
   onPlay,
   onStop,
   onClear,
@@ -166,16 +169,27 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
             </Tooltip>
           </Group>
 
-          {/* Fit View */}
+          {/* Fit View & Refresh */}
           <Separator orientation="vertical" className="h-6" />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={onFitView}>
-                <IconZoomScan className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Fit View (Zoom to see all nodes)</TooltipContent>
-          </Tooltip>
+          <Group gap="xs">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onFitView}>
+                  <IconZoomScan className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Fit View (Zoom to see all nodes)</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onRefresh}>
+                  <IconRefresh className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh canvas data</TooltipContent>
+            </Tooltip>
+          </Group>
         </Group>
 
         {/* Right side - Execution Controls */}

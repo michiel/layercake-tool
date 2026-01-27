@@ -116,6 +116,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       isExternalSync: false,
       isInitialized: false,
       previousChangeId: 0,
+      pendingRefresh: false, // Flag to track if subscription arrived during drag
     },
     subscriptions: null as any,
   })
@@ -238,14 +239,29 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
 
   // Sync ReactFlow state when external data changes - FIXED: prevent infinite loop
   useEffect(() => {
+    const timestamp = new Date().toISOString()
+
     // Skip if we're currently syncing from external changes (prevents React 18 double render issues)
     if (editorStateRef.current.sync.isExternalSync) {
+      console.log('[usePlanDagCQRS] Sync skipped:', {
+        timestamp,
+        reason: 'external-sync-in-progress',
+        changeId: reactFlowDataChange.changeId
+      })
       return
     }
 
     // Skip syncing during drag operations to prevent subscription echo interference
     // Position changes during drag are cosmetic only - actual save happens in handleNodeDragStop
     if (editorStateRef.current.sync.isDragging) {
+      // Mark that a refresh is pending so we can apply it when drag ends
+      editorStateRef.current.sync.pendingRefresh = true
+      console.log('[usePlanDagCQRS] Sync skipped:', {
+        timestamp,
+        reason: 'drag-in-progress',
+        pendingRefresh: true,
+        changeId: reactFlowDataChange.changeId
+      })
       return
     }
 
@@ -303,6 +319,22 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         hasEdgeChanges
       )
 
+      if (!shouldSync) {
+        console.log('[usePlanDagCQRS] Sync skipped:', {
+          timestamp,
+          reason: 'no-significant-changes',
+          changeId: reactFlowDataChange.changeId,
+          hasNewData,
+          isCurrentEmpty,
+          hasMoreNodes,
+          hasMoreEdges,
+          hasFewerNodes,
+          hasFewerEdges,
+          hasNodeChanges,
+          hasEdgeChanges
+        })
+      }
+
       if (shouldSync) {
         const reason = isCurrentEmpty ? 'empty' :
                       hasMoreNodes ? 'nodes-added' :
@@ -312,13 +344,14 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
                       hasNodeChanges ? 'node-changed' :
                       hasEdgeChanges ? 'edge-changed' : 'unknown'
 
-        console.log('[usePlanDagCQRS] Syncing ReactFlow state from external data change:', {
+        console.log('[usePlanDagCQRS] Sync applied:', {
+          timestamp,
           changeId: reactFlowDataChange.changeId,
+          reason,
           newNodes: reactFlowData.nodes.length,
           newEdges: reactFlowData.edges.length,
           currentNodes: nodes.length,
-          currentEdges: edges.length,
-          reason
+          currentEdges: edges.length
         })
         editorStateRef.current.sync.isExternalSync = true
 
@@ -379,10 +412,10 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
 
         setEdges(reactFlowData.edges)
         editorStateRef.current.sync.previousChangeId = reactFlowDataChange.changeId
-        // Use setTimeout to clear the flag after state updates have propagated
-        setTimeout(() => {
+        // Use queueMicrotask for tighter timing - clears flag after state updates propagate
+        queueMicrotask(() => {
           editorStateRef.current.sync.isExternalSync = false
-        }, 0)
+        })
       }
     }
     // Depend on reactFlowDataChange to detect all changes (positions, length, etc.)
@@ -529,10 +562,20 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     }
   }, [cqrsService, projectId])
 
-  // Drag state control
+  // Drag state control - handles pending refresh when drag ends
   const setDragging = useCallback((dragging: boolean) => {
     editorStateRef.current.sync.isDragging = dragging
-  }, [])
+
+    // When drag ends, check if we missed any subscriptions and refresh if needed
+    if (!dragging && editorStateRef.current.sync.pendingRefresh) {
+      console.log('[usePlanDagCQRS] Drag ended with pendingRefresh, triggering data refresh')
+      editorStateRef.current.sync.pendingRefresh = false
+      // Delay refresh slightly to allow mutation to complete
+      setTimeout(() => {
+        refreshData()
+      }, 200)
+    }
+  }, [refreshData])
 
   // Optimistic update for planDag (used after mutations to prevent stale data syncs)
   const updatePlanDagOptimistically = useCallback((updater: (current: PlanDag | null) => PlanDag | null) => {
