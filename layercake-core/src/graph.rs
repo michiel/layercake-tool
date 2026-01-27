@@ -1644,6 +1644,32 @@ impl Graph {
             warn!("Some edges have missing source and/or target nodes");
         }
 
+        // Validate that edges don't connect to partition nodes
+        // Partition nodes should only act as containers, not as edge endpoints
+        let partition_nodes: HashSet<String> = self
+            .nodes
+            .iter()
+            .filter(|n| n.is_partition)
+            .map(|n| n.id.clone())
+            .collect();
+
+        for edge in &self.edges {
+            if partition_nodes.contains(&edge.source) {
+                let err = format!(
+                    "Edge id:[{}] has source {:?} which is a partition node. Edges cannot connect to partition nodes.",
+                    edge.id, edge.source
+                );
+                errors.push(err);
+            }
+            if partition_nodes.contains(&edge.target) {
+                let err = format!(
+                    "Edge id:[{}] has target {:?} which is a partition node. Edges cannot connect to partition nodes.",
+                    edge.id, edge.target
+                );
+                errors.push(err);
+            }
+        }
+
         // Validate belongs_to references when present
         // Empty string is treated as None (no parent)
         self.nodes.iter().for_each(|n| {
@@ -3132,7 +3158,7 @@ mod tests {
             }
         };
 
-        // Create a graph with edges to/from partition nodes (now allowed)
+        // Create a graph with edges to/from partition nodes (NOT allowed - structural rule)
         let partition_edge_graph = Graph {
             name: "Partition Edge Graph".to_string(),
             nodes: vec![
@@ -3162,7 +3188,7 @@ mod tests {
                 },
             ],
             edges: vec![
-                // Edge connecting partition to non-partition (now allowed)
+                // Edge connecting partition to non-partition (NOT allowed)
                 Edge {
                     id: "e1".to_string(),
                     source: "1".to_string(), // Partition node
@@ -3188,9 +3214,19 @@ mod tests {
             annotations: None,
         };
 
-        // Edges to/from partition nodes are now allowed (validation relaxed)
+        // Edges to/from partition nodes violate the layercake structural rule
         let result = partition_edge_graph.verify_graph_integrity();
-        assert!(result.is_ok(), "Partition edges should be allowed now");
+        assert!(
+            result.is_err(),
+            "Edges to partition nodes should be validation errors"
+        );
+        if let Err(errors) = result {
+            assert!(
+                errors.iter().any(|e| e.contains("partition node")),
+                "Should have error about partition node: {:?}",
+                errors
+            );
+        }
 
         // Create a graph with missing node reference
         let missing_node_graph = Graph {
