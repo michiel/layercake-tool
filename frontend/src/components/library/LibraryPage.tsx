@@ -53,6 +53,7 @@ import {
   getFileFormatDisplayName,
   getDataTypeDisplayName,
 } from '../../graphql/libraryItems'
+import { handleMutationErrors } from '../../utils/graphqlHelpers'
 import { showErrorNotification, showSuccessNotification } from '../../utils/notifications'
 
 const typeFilters: { label: string; value: LibraryItemType | 'ALL' }[] = [
@@ -218,12 +219,15 @@ export const LibraryPage: React.FC = () => {
   const handleCreateProject = async () => {
     if (!projectModalItem) return
     try {
-      await createProjectFromLibrary({
+      const result = await createProjectFromLibrary({
         variables: {
           libraryItemId: projectModalItem.id,
           name: newProjectName.trim() || undefined,
         },
       })
+      if (handleMutationErrors(result, 'Failed to create project')) {
+        return
+      }
       showSuccessNotification('Project created', `"${newProjectName}" is ready.`)
       setProjectModalItem(null)
     } catch (err: any) {
