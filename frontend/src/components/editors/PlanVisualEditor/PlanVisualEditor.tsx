@@ -141,7 +141,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
 
   // Node type selector for edge drop
   const [showNodeTypeMenu, setShowNodeTypeMenu] = useState(false)
-  const [newNodePosition, setNewNodePosition] = useState<{ x: number; y: number } | null>(null)
+  const newNodePositionRef = useRef<{ x: number; y: number } | null>(null)
   const connectionSourceRef = useRef<{ nodeId: string; handleId: string } | null>(null)
   const [allowedNodeTypes, setAllowedNodeTypes] = useState<PlanDagNodeType[]>(NODE_TYPE_SELECTOR_DEFAULTS)
 
@@ -1467,7 +1467,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         });
 
         // Store connection info for when user selects node type
-        setNewNodePosition(position);
+        newNodePositionRef.current = position;
         const sourceNode = nodesRef.current.find((node) => node.id === connectionSourceRef.current?.nodeId)
         const nextAllowed = sourceNode
           ? getValidTargetNodeTypes(sourceNode.data?.nodeType as PlanDagNodeType)
@@ -1488,7 +1488,10 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   // Handle node type selection after dropping on canvas
   const handleNodeTypeSelect = useCallback(
     async (nodeType: PlanDagNodeType) => {
-      if (!newNodePosition) return;
+      if (!newNodePositionRef.current) return;
+
+      // Capture position immediately to avoid stale closure issues
+      const nodePosition = newNodePositionRef.current;
 
       setShowNodeTypeMenu(false);
 
@@ -1503,7 +1506,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         const planDagNode: Partial<PlanDagNode> = {
           // Omit id - backend will generate it
           nodeType,
-          position: newNodePosition,
+          position: nodePosition,
           metadata,
           config: JSON.stringify(config) as any,
         };
@@ -1647,11 +1650,11 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         alert(`Failed to create node: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         // Clear state
-        setNewNodePosition(null);
+        newNodePositionRef.current = null;
         connectionSourceRef.current = null;
       }
     },
-    [newNodePosition, mutations, nodes, edges, planDag, readonly, handleNodeEdit, handleNodeDelete, setNodes, setEdges, updatePlanDagOptimistically]
+    [mutations, nodes, edges, planDag, readonly, handleNodeEdit, handleNodeDelete, setNodes, setEdges, updatePlanDagOptimistically]
   );
 
   // Use stable nodeTypes reference directly
