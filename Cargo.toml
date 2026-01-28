@@ -75,7 +75,7 @@ dashmap = "6.0"
 # Spreadsheet dependencies
 calamine = "0.26"
 rust_xlsxwriter = "0.80"
-spreadsheet-ods = "0.25"
+spreadsheet-ods = "1.0"
 icu_locid = "1.5"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
