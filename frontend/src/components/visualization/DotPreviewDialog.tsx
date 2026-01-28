@@ -140,30 +140,79 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     const svgElement = containerRef.current.querySelector('svg')
     if (!svgElement) return
 
-    const svgData = new XMLSerializer().serializeToString(svgElement)
+    // Get SVG dimensions - try multiple methods
+    let width = svgElement.clientWidth || svgElement.width.baseVal.value
+    let height = svgElement.clientHeight || svgElement.height.baseVal.value
+
+    // If still no dimensions, try viewBox
+    if (!width || !height) {
+      const viewBox = svgElement.getAttribute('viewBox')
+      if (viewBox) {
+        const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number)
+        width = vbWidth
+        height = vbHeight
+      }
+    }
+
+    // If still no dimensions, try getBBox
+    if (!width || !height) {
+      try {
+        const bbox = svgElement.getBBox()
+        width = bbox.width
+        height = bbox.height
+      } catch (e) {
+        console.error('Failed to get SVG dimensions', e)
+        return
+      }
+    }
+
+    // Ensure we have valid dimensions
+    if (!width || !height || width <= 0 || height <= 0) {
+      console.error('Invalid SVG dimensions', { width, height })
+      return
+    }
+
+    // Clone the SVG and ensure it has explicit dimensions
+    const svgClone = svgElement.cloneNode(true) as SVGSVGElement
+    svgClone.setAttribute('width', String(width))
+    svgClone.setAttribute('height', String(height))
+
+    const svgData = new XMLSerializer().serializeToString(svgClone)
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     if (!ctx) return
+
+    // Use 2x scale for better quality
+    const scale = 2
+    canvas.width = width * scale
+    canvas.height = height * scale
 
     const img = new Image()
     const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
     const url = URL.createObjectURL(svgBlob)
 
+    img.onerror = (err) => {
+      console.error('Failed to load SVG as image', err)
+      URL.revokeObjectURL(url)
+    }
+
     img.onload = () => {
-      canvas.width = img.width
-      canvas.height = img.height
-      ctx.drawImage(img, 0, 0)
+      ctx.scale(scale, scale)
+      ctx.drawImage(img, 0, 0, width, height)
       URL.revokeObjectURL(url)
 
       canvas.toBlob((blob) => {
-        if (!blob) return
+        if (!blob) {
+          console.error('Failed to create PNG blob')
+          return
+        }
         const pngUrl = URL.createObjectURL(blob)
         const link = document.createElement('a')
         link.href = pngUrl
         link.download = 'diagram.png'
         link.click()
         URL.revokeObjectURL(pngUrl)
-      })
+      }, 'image/png')
     }
 
     img.src = url
@@ -175,23 +224,72 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     if (!svgElement) return
 
     try {
-      const svgData = new XMLSerializer().serializeToString(svgElement)
+      // Get SVG dimensions - try multiple methods
+      let width = svgElement.clientWidth || svgElement.width.baseVal.value
+      let height = svgElement.clientHeight || svgElement.height.baseVal.value
+
+      // If still no dimensions, try viewBox
+      if (!width || !height) {
+        const viewBox = svgElement.getAttribute('viewBox')
+        if (viewBox) {
+          const [, , vbWidth, vbHeight] = viewBox.split(' ').map(Number)
+          width = vbWidth
+          height = vbHeight
+        }
+      }
+
+      // If still no dimensions, try getBBox
+      if (!width || !height) {
+        try {
+          const bbox = svgElement.getBBox()
+          width = bbox.width
+          height = bbox.height
+        } catch (e) {
+          console.error('Failed to get SVG dimensions', e)
+          return
+        }
+      }
+
+      // Ensure we have valid dimensions
+      if (!width || !height || width <= 0 || height <= 0) {
+        console.error('Invalid SVG dimensions', { width, height })
+        return
+      }
+
+      // Clone the SVG and ensure it has explicit dimensions
+      const svgClone = svgElement.cloneNode(true) as SVGSVGElement
+      svgClone.setAttribute('width', String(width))
+      svgClone.setAttribute('height', String(height))
+
+      const svgData = new XMLSerializer().serializeToString(svgClone)
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
       if (!ctx) return
+
+      // Use 2x scale for better quality
+      const scale = 2
+      canvas.width = width * scale
+      canvas.height = height * scale
 
       const img = new Image()
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' })
       const url = URL.createObjectURL(svgBlob)
 
+      img.onerror = (err) => {
+        console.error('Failed to load SVG as image', err)
+        URL.revokeObjectURL(url)
+      }
+
       img.onload = async () => {
-        canvas.width = img.width
-        canvas.height = img.height
-        ctx.drawImage(img, 0, 0)
+        ctx.scale(scale, scale)
+        ctx.drawImage(img, 0, 0, width, height)
         URL.revokeObjectURL(url)
 
         canvas.toBlob(async (blob) => {
-          if (!blob) return
+          if (!blob) {
+            console.error('Failed to create PNG blob')
+            return
+          }
           try {
             await navigator.clipboard.write([
               new ClipboardItem({
