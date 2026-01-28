@@ -121,6 +121,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
                 let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
+                let is_partition = map.get("is_partition").and_then(|v| v.as_bool()).unwrap_or(false);
                 let comment = map
                     .get("comment")
                     .and_then(|v| v.as_str())
@@ -137,7 +138,8 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 } else {
                     format!("{}rectangle \"{}\" as {} ", indent, label, id)
                 };
-                if !children.is_empty() {
+                // Only render as container if this is a partition node
+                if is_partition && !children.is_empty() {
                     result += "{\n";
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), layermap, acc + 1, apply_layers, add_notes, note_position)
@@ -146,6 +148,13 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     result += &format!("{}}}\n", indent);
                 } else {
                     result += "\n";
+                    // If this non-partition node has children, render them separately
+                    if !children.is_empty() {
+                        let children_rendered: Vec<String> = children.iter().map(|child| {
+                            render_tree(child.clone(), layermap, acc, apply_layers, add_notes, note_position)
+                        }).collect();
+                        result += &children_rendered.join("");
+                    }
                 }
                 if add_notes && has_comment {
                     result += &format!(
@@ -208,13 +217,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
             if let Value::Object(map) = node {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
+                let is_partition = map.get("is_partition").and_then(|v| v.as_bool()).unwrap_or(false);
                 let empty_vec = vec![];
                 let children = map.get("children").and_then(|v| v.as_array()).unwrap_or(&empty_vec);
 
                 let indent = " ".repeat((acc * 2) as usize);
                 let mut result = String::new();
 
-                if !children.is_empty() {
+                // Only render as subgraph if this is a partition node
+                if is_partition && !children.is_empty() {
                     result += &format!("{}subgraph \"{}\"\n", indent, label);
                     let children_rendered: Vec<String> = children.iter().map(|child| {
                         render_tree(child.clone(), _layermap, acc + 1, _apply_layers)
@@ -222,7 +233,15 @@ pub fn get_handlebars() -> Handlebars<'static> {
                     result += &children_rendered.join("");
                     result += &format!("{}end\n", indent);
                 } else {
+                    // Always render the node itself for non-partition nodes
                     result += &format!("{}{}[\"{}\"]\n", indent, id, label);
+                    // If this non-partition node has children, render them too (flat)
+                    if !children.is_empty() {
+                        let children_rendered: Vec<String> = children.iter().map(|child| {
+                            render_tree(child.clone(), _layermap, acc, _apply_layers)
+                        }).collect();
+                        result += &children_rendered.join("");
+                    }
                 }
 
                 result
@@ -276,6 +295,7 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let id = map.get("id").and_then(|v| v.as_str()).unwrap_or("no-id");
                 let label = map.get("label").and_then(|v| v.as_str()).unwrap_or("Unnamed");
                 let layer = map.get("layer").and_then(|v| v.as_str()).unwrap_or("no-layer");
+                let is_partition = map.get("is_partition").and_then(|v| v.as_bool()).unwrap_or(false);
                 let comment = map
                     .get("comment")
                     .and_then(|v| v.as_str())
@@ -291,7 +311,8 @@ pub fn get_handlebars() -> Handlebars<'static> {
                 let (default_fill, default_font, default_border, default_container_border) =
                     theme_palette(built_in_style);
 
-                if !children.is_empty() {
+                // Only render as cluster if this is a partition node with children
+                if is_partition && !children.is_empty() {
                     result += &format!("{}subgraph cluster_{} {{\n", indent, id);
                     result += &format!("{}  label=\"{}\"\n", indent, label);
 
@@ -374,6 +395,22 @@ pub fn get_handlebars() -> Handlebars<'static> {
                         "{}{} [label=\"{}\", layer=\"{}\", style=\"filled,rounded\", fillcolor=\"#{}\", fontcolor=\"#{}\", color=\"#{}\"{}];\n",
                         indent, id, label, layer, fillcolor, fontcolor, bordercolor, comment_attr
                     );
+
+                    // If this non-partition node has children, render them separately
+                    if !children.is_empty() {
+                        let children_rendered: Vec<String> = children.iter().map(|child| {
+                            render_tree(
+                                child.clone(),
+                                layermap,
+                                acc,
+                                apply_layers,
+                                built_in_style,
+                                add_notes,
+                                comment_style,
+                            )
+                        }).collect();
+                        result += &children_rendered.join("");
+                    }
                 } else {
                     let escaped_comment = comment.replace('"', "\\\"");
                     let comment_attr = if has_comment {
@@ -388,6 +425,22 @@ pub fn get_handlebars() -> Handlebars<'static> {
                         "{}{} [label=\"{}\", layer=\"{}\", style=\"rounded\"{}];\n",
                         indent, id, label, layer, comment_attr
                     );
+
+                    // If this non-partition node has children, render them separately
+                    if !children.is_empty() {
+                        let children_rendered: Vec<String> = children.iter().map(|child| {
+                            render_tree(
+                                child.clone(),
+                                layermap,
+                                acc,
+                                apply_layers,
+                                built_in_style,
+                                add_notes,
+                                comment_style,
+                            )
+                        }).collect();
+                        result += &children_rendered.join("");
+                    }
                 }
 
                 result
