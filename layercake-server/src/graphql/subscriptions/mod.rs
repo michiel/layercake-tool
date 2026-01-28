@@ -3,7 +3,6 @@ use futures_util::Stream;
 use std::pin::Pin;
 
 use crate::graphql::context::GraphQLContext;
-use crate::graphql::errors::StructuredError;
 use crate::graphql::types::{
     NodeExecutionStatusEvent, PlanDagDeltaEvent, PlanDagEdge, PlanDagNode,
 };

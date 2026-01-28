@@ -52,7 +52,7 @@ indexmap = { workspace = true }
 calamine = { workspace = true }
 rust_xlsxwriter = { workspace = true }
 spreadsheet-ods = { workspace = true }
-icu_locid = { workspace = true }
+icu_locale_core = { workspace = true }
 zip = { workspace = true }
 bcrypt = { workspace = true }
 tokio-stream = "0.1"

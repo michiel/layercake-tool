@@ -1,4 +1,4 @@
-use icu_locid::locale;
+use icu_locale_core::locale;
 use rust_xlsxwriter::*;
 use sea_orm::{DatabaseConnection, EntityTrait};
 use spreadsheet_ods::{Sheet, Value, WorkBook};
@@ -318,7 +318,7 @@ impl DataSetBulkService {
     /// Export datasets to ODS format
     /// Each dataset becomes a separate sheet named with its name containing CSV data
     pub async fn export_to_ods(&self, dataset_ids: &[i32]) -> CoreResult<Vec<u8>> {
-        let mut workbook = WorkBook::new(locale!("en_US"));
+        let mut workbook = WorkBook::new(locale!("en-US"));
 
         // Fetch all requested datasets
         let datasets = data_sets::Entity::find()

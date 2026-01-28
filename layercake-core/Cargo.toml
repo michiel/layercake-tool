@@ -54,7 +54,7 @@ bcrypt = { workspace = true }
 calamine = { workspace = true }
 rust_xlsxwriter = { workspace = true }
 spreadsheet-ods = { workspace = true }
-icu_locid = { workspace = true }
+icu_locale_core = { workspace = true }
 zip = { workspace = true }
 
 layercake-code-analysis = { path = "../layercake-code-analysis" }
