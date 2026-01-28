@@ -982,9 +982,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.48"
+version = "4.5.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2134bb3ea021b78629caa971416385309e0131b351b25e01dc16fb54e1b5fae"
+checksum = "c6e6ff9dcd79cff5cd969a17a545d79e84ab086e444102a591e288a8aa3ce394"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -996,7 +996,7 @@ version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ffd4e57297ee7a10fb637964a79fd4bf5c8d22fd4ceaac5d3964d55df9e9e38"
 dependencies = [
- "clap 4.5.48",
+ "clap 4.5.54",
  "clap_complete",
  "console",
  "nu-ansi-term 0.50.3",
@@ -1006,9 +1006,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.48"
+version = "4.5.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2ba64afa3c0a6df7fa517765e31314e983f51dda798ffba27b988194fb65dc9"
+checksum = "fa42cf4d2b7a41bc8f663a7cab4031ebafa1bf3875705bfaf8466dc60ab52c00"
 dependencies = [
  "anstream",
  "anstyle",
@@ -1022,7 +1022,7 @@ version = "4.5.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c677cd0126f3026d8b093fa29eae5d812fde5c05bc66dbb29d0374eea95113a"
 dependencies = [
- "clap 4.5.48",
+ "clap 4.5.54",
  "clap_lex",
  "is_executable",
  "pathdiff",
@@ -1032,9 +1032,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.47"
+version = "4.5.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbfd7eae0b0f1a6e63d4b13c9c478de77c2eb546fba158ad50b4203dc24b9f9c"
+checksum = "2a0b5487afeab2deb2ff4e03a807ad1a03ac532ff5a2cee5d86884440c7f7671"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -3546,7 +3546,7 @@ dependencies = [
  "anyhow",
  "atty",
  "chrono",
- "clap 4.5.48",
+ "clap 4.5.54",
  "clap-repl",
  "layercake-code-analysis",
  "layercake-core",
@@ -3572,7 +3572,7 @@ version = "0.3.8"
 dependencies = [
  "anyhow",
  "chrono",
- "clap 4.5.48",
+ "clap 4.5.54",
  "csv",
  "hcl-rs",
  "ignore",
@@ -3685,7 +3685,7 @@ dependencies = [
  "bcrypt",
  "calamine",
  "chrono",
- "clap 4.5.48",
+ "clap 4.5.54",
  "csv",
  "dashmap 6.1.0",
  "futures-util",
@@ -5442,7 +5442,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
