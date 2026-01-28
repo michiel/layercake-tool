@@ -73,7 +73,7 @@ url = "2.0"
 dashmap = "6.0"
 
 # Spreadsheet dependencies
-calamine = "0.26"
+calamine = "0.32"
 rust_xlsxwriter = "0.80"
 spreadsheet-ods = "1.0"
 icu_locale_core = "2.0"
