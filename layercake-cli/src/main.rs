@@ -86,6 +86,11 @@ enum Commands {
         #[clap(long)]
         dry_run: bool,
     },
+    /// Output documentation guides
+    Guide {
+        #[clap(subcommand)]
+        command: GuideCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -106,6 +111,14 @@ enum DbCommands {
 enum GenerateCommands {
     Template { name: String },
     Sample { sample: String, dir: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum GuideCommands {
+    /// Output the AI agent guide for the query interface
+    Agent,
+    /// Output the graph model documentation
+    Model,
 }
 
 #[tokio::main]
@@ -190,6 +203,16 @@ async fn main() -> Result<()> {
             };
             update_cmd.execute().await?;
         }
+        Commands::Guide { command } => match command {
+            GuideCommands::Agent => {
+                const AGENT_GUIDE: &str = include_str!("../../LAYERCAKE_AGENT_GUIDE.md");
+                print!("{}", AGENT_GUIDE);
+            }
+            GuideCommands::Model => {
+                const MODEL_GUIDE: &str = include_str!("../../LAYERCAKE_MODEL_GUIDE.md");
+                print!("{}", MODEL_GUIDE);
+            }
+        },
     }
 
     Ok(())
