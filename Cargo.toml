@@ -86,4 +86,4 @@ rig = { version = "0.25.0", package = "rig-core" }
 tauri = { version = "2.0", features = ["macos-private-api"] }
 tauri-build = { version = "2.0", features = [] }
 tauri-plugin-dialog = { version = "2.0" }
-tauri-plugin-shell = { version = "2.0" }
+tauri-plugin-shell = { version = "2.3" }
