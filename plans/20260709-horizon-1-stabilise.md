@@ -25,22 +25,24 @@
 **Why first:** Highest severity, smallest change, independently shippable. Unshippable to any shared instance until fixed.
 
 **Tasks**
-- [ ] 1.1 (R1) Flip `layercake-core/src/services/authorization.rs:197` `local_auth_bypass_enabled()` default from `true` → `false` (unset env var = bypass OFF). Align semantics with the server helper (`layercake-server/src/auth/mod.rs:51`), which already defaults to `false`.
-- [ ] 1.2 (R1) Centralise the two duplicate `local_auth_bypass_enabled()` helpers into one canonical function in `layercake-core` and have the server re-use it, so the two can never diverge again.
-- [ ] 1.3 (R1) Ensure `dev.sh` / dev tooling still sets `LAYERCAKE_LOCAL_AUTH_BYPASS=true` explicitly for local convenience (CHANGES.md shows dev flows rely on it). Confirm `.env`/`dev.sh` already do this.
-- [ ] 1.4 (R5) Add a `pub async fn authorize_project_write_access(&self, actor, project_id)` (and read variant if needed) to `AppContext` (wraps the existing private `authorize_project_write`).
-- [ ] 1.5 (R5) In `layercake-server/src/graphql/mutations/plan.rs::execute_plan` and `plan_dag_nodes.rs::execute_node`: build `actor = context.actor_for_request(ctx).await` and call `context.app.authorize_project_write_access(&actor, project_id)` before running the executor.
+- [x] 1.1 (R1) Flip `local_auth_bypass_enabled()` default from `true` → `false` (unset env var = bypass OFF). Done by centralising (1.2) on the secure default.
+- [x] 1.2 (R1) Centralised into one canonical `layercake_core::auth::local_auth_bypass_enabled()` (secure default `false`); `authorization.rs` and `layercake-server/src/auth/mod.rs` both delegate. Duplicate implementations removed. Pure `bypass_value_is_truthy` extracted for testability.
+- [x] 1.3 (R1) Confirmed `dev.sh:40` sets `LAYERCAKE_LOCAL_AUTH_BYPASS=1` explicitly (default `1`) and propagates it to backend/tauri, so local dev is unaffected by the secure default.
+- [x] 1.4 (R5) Added `AppContext::authorize_project_write_access(&actor, project_id)` (public wrapper over private `authorize_project_write`).
+- [x] 1.5 (R5) `execute_plan` and `execute_node` now build `actor` and call `authorize_project_write_access` before executing.
 
 **Success criteria**
-- With no env var set, an unauthenticated/unauthorised actor is denied on `check_project_access` and on `execute_plan`/`execute_node`.
-- With `LAYERCAKE_LOCAL_AUTH_BYPASS=true`, local dev flows still work unrestricted.
-- Only one `local_auth_bypass_enabled` implementation exists.
+- [x] With no env var set, bypass is OFF (fails closed). `check_project_access` and the execute mutations require project write.
+- [x] With `LAYERCAKE_LOCAL_AUTH_BYPASS=1` (dev.sh default), local dev works unrestricted.
+- [x] Only one `local_auth_bypass_enabled` implementation exists.
 
 **Tests**
-- Unit: `local_auth_bypass_enabled()` returns `false` when unset, `true` when `=true`.
-- Integration: `execute_plan`/`execute_node` denied for an actor without project write (bypass off); allowed with editor role.
+- [x] Unit (`layercake-core --lib auth::tests`): bypass off when unset; on for `1/true/yes/on`; off for falsey — all pass.
+- [ ] Integration: execute mutations denied without project write — deferred; server-level GraphQL harness is thin (`layercake-server/tests` only has error-mapping). Covered indirectly by the shared `authorize_project_write` path already tested via app-layer mutations. Revisit if a GraphQL test harness is added.
 
-**Status:** Not Started
+**Status:** Complete
+
+> Note: `cargo test -p layercake-core` (full, including integration test binaries) fails to compile on **pre-existing** breakage unrelated to this work — `layercake-core/tests/project_archive_roundtrip.rs:150` etc. call `export_project_archive(&actor, id, false)` but the current signature is `(&actor, id)` (2 args). This drift exists on `master` and is out of scope for Horizon 1; `--lib` unit tests and both crate builds are green.
 
 ---
 

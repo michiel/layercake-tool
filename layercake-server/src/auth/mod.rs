@@ -1,4 +1,4 @@
-use layercake_core::auth::{Actor, Authorizer};
+use layercake_core::auth::{local_auth_bypass_enabled, Actor, Authorizer};
 use layercake_core::errors::CoreError;
 
 pub struct DefaultAuthorizer;
@@ -46,14 +46,4 @@ impl Authorizer for DefaultAuthorizer {
             action
         )))
     }
-}
-
-fn local_auth_bypass_enabled() -> bool {
-    std::env::var("LAYERCAKE_LOCAL_AUTH_BYPASS")
-        .ok()
-        .map(|value| {
-            let normalized = value.trim().to_ascii_lowercase();
-            matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
-        })
-        .unwrap_or(false)
 }

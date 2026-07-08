@@ -204,6 +204,17 @@ impl AppContext {
         &self.plan_service
     }
 
+    /// Public authorization gate for project write access. Callers that run
+    /// operations directly (e.g. DAG execution mutations that bypass the
+    /// service layer) must call this before mutating project state.
+    pub async fn authorize_project_write_access(
+        &self,
+        actor: &Actor,
+        project_id: i32,
+    ) -> crate::errors::CoreResult<()> {
+        self.authorize_project_write(actor, project_id).await
+    }
+
     pub fn code_analysis_service(&self) -> &Arc<CodeAnalysisService> {
         &self.code_analysis_service
     }
