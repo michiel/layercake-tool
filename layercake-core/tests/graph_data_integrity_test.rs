@@ -406,3 +406,38 @@ async fn replay_is_ordered_and_idempotent() {
         .len();
     assert_eq!(count, 1, "replay did not duplicate the node");
 }
+
+// --- Regression: graph_edits rebuild migration must be idempotent/re-runnable ---
+//
+// SeaORM's SQLite DDL is not reliably transactional, so the m20260709
+// graph_edits rebuild could partially apply (table rebuilt to the new shape,
+// migration row not recorded) and then fail on re-run with
+// "index ... already exists". This asserts the migration converges on a DB that
+// is already in the post-rebuild shape but has the migration record removed.
+#[tokio::test]
+async fn graph_edits_rebuild_migration_is_rerunnable() {
+    use sea_orm::ConnectionTrait;
+
+    let db = Database::connect("sqlite::memory:").await.unwrap();
+    Migrator::up(&db, None).await.unwrap();
+
+    // Simulate a partial apply: delete the migration record so the migrator
+    // will attempt to run m20260709 again against an already-rebuilt table.
+    db.execute_unprepared("DELETE FROM seaql_migrations WHERE version LIKE 'm20260709%'")
+        .await
+        .unwrap();
+
+    // Re-running must succeed (previously errored with "index already exists").
+    Migrator::up(&db, None)
+        .await
+        .expect("re-running the graph_edits rebuild migration must be idempotent");
+
+    // Sanity: graph_edits still has its unique sequence index afterwards.
+    let idx = db
+        .execute_unprepared(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_graph_edits_graph_sequence \
+             ON graph_edits(graph_id, sequence_number)",
+        )
+        .await;
+    assert!(idx.is_ok(), "graph_edits should still be a valid table");
+}

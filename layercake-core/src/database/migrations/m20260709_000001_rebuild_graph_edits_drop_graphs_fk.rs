@@ -21,7 +21,13 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         let backend = manager.get_database_backend();
 
+        // Every statement is written to be safe to re-run: SeaORM's SQLite DDL is
+        // not reliably transactional, so a mid-migration failure can leave the
+        // rebuild partially applied. Making each step idempotent lets the
+        // migration converge to the canonical end state on retry.
         let stmts = [
+            // Clean up any leftover scratch table from a prior partial run.
+            "DROP TABLE IF EXISTS graph_edits_new",
             // New table with identical columns but NO foreign key to graphs.
             r#"
             CREATE TABLE graph_edits_new (
@@ -39,9 +45,10 @@ impl MigrationTrait for Migration {
                 created_by INTEGER
             )
             "#,
-            // Preserve any existing rows.
+            // Preserve existing rows. INSERT OR IGNORE so a re-run (where
+            // graph_edits already has the new shape) does not error on the copy.
             r#"
-            INSERT INTO graph_edits_new
+            INSERT OR IGNORE INTO graph_edits_new
                 (id, graph_id, target_type, target_id, operation, field_name,
                  old_value, new_value, sequence_number, applied, created_at, created_by)
             SELECT
@@ -51,11 +58,14 @@ impl MigrationTrait for Migration {
             "#,
             "DROP TABLE graph_edits",
             "ALTER TABLE graph_edits_new RENAME TO graph_edits",
-            // Recreate indexes (names match the original migration).
-            "CREATE INDEX idx_graph_edits_graph_id ON graph_edits(graph_id)",
-            "CREATE INDEX idx_graph_edits_target ON graph_edits(graph_id, target_type, target_id)",
-            "CREATE INDEX idx_graph_edits_sequence ON graph_edits(graph_id, sequence_number)",
-            "CREATE UNIQUE INDEX uq_graph_edits_graph_sequence ON graph_edits(graph_id, sequence_number)",
+            // Recreate indexes idempotently. SQLite carries an index's definition
+            // across a table rebuild in some paths, so CREATE ... IF NOT EXISTS
+            // is required — it is a no-op if the index already exists and creates
+            // it otherwise, converging to the same state on fresh or retried runs.
+            "CREATE INDEX IF NOT EXISTS idx_graph_edits_graph_id ON graph_edits(graph_id)",
+            "CREATE INDEX IF NOT EXISTS idx_graph_edits_target ON graph_edits(graph_id, target_type, target_id)",
+            "CREATE INDEX IF NOT EXISTS idx_graph_edits_sequence ON graph_edits(graph_id, sequence_number)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_graph_edits_graph_sequence ON graph_edits(graph_id, sequence_number)",
         ];
 
         for stmt in stmts {
