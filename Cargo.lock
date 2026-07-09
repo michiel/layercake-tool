@@ -3598,6 +3598,7 @@ dependencies = [
  "include_dir",
  "indexmap 2.13.0",
  "layercake-code-analysis",
+ "layercake-core",
  "layercake-projections",
  "notify",
  "once_cell",

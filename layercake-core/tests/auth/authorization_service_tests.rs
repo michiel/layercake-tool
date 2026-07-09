@@ -1,8 +1,8 @@
 use chrono::{Duration, Utc};
-use layercake_core::database::entities::{project_collaborators, projects, user_sessions, users};
-use layercake_core::database::test_utils::setup_test_db;
-use layercake_core::errors::CoreErrorKind;
-use layercake_core::services::authorization::{AuthorizationService, ProjectRole};
+use layercake::database::entities::{project_collaborators, projects, user_sessions, users};
+use layercake::database::test_utils::setup_test_db;
+use layercake::errors::CoreErrorKind;
+use layercake::services::authorization::{AuthorizationService, ProjectRole};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
 
 async fn seed_project(db: &DatabaseConnection) -> projects::Model {
