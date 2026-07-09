@@ -15,14 +15,6 @@ async fn seed_project(db: &DatabaseConnection, project_id: i32) {
     project.insert(db).await.expect("Failed to seed project");
 }
 
-// FIXME: This test asserts that merging two datasets preserves 2 nodes from
-// each, but both test datasets use the same external ids ("node1"/"node2"), so
-// the merge dedupes by id and dataset 2's nodes are overwritten by dataset 1's.
-// It's unclear whether the intended merge semantics should preserve per-dataset
-// provenance on id collision (a real gap) or whether the test's fixture is
-// wrong (should use distinct ids). Left ignored pending a decision on merge
-// provenance semantics rather than silently changed. Tracked as a follow-up.
-#[ignore = "merge provenance semantics on id collision undecided - see FIXME"]
 #[tokio::test]
 async fn test_dataset_source_preserved_in_merge() {
     let db = setup_test_db().await;
@@ -97,8 +89,8 @@ async fn test_filter_preserves_dataset_source() {
     let (_, nodes, edges) = service.load_full(dataset.id).await.unwrap();
     let mut graph = db_models_to_graph(nodes, edges);
 
-    // Filter to keep only node1
-    graph.nodes.retain(|n| n.id == "node1");
+    // Filter to keep only the first node
+    graph.nodes.retain(|n| n.id == "ds1-node1");
 
     // Verify filtered nodes still have dataset field
     assert_eq!(graph.nodes.len(), 1);
@@ -181,10 +173,14 @@ async fn create_test_dataset(
         .await
         .unwrap();
 
-    // Add nodes with source_dataset_id
+    // Add nodes with source_dataset_id. External ids are namespaced per dataset
+    // so merging distinct datasets preserves all nodes (real datasets don't share
+    // node ids; identical ids would legitimately dedupe).
+    let n1 = format!("ds{}-node1", dataset_id);
+    let n2 = format!("ds{}-node2", dataset_id);
     let nodes = vec![
         GraphDataNodeInput {
-            external_id: "node1".into(),
+            external_id: n1.clone(),
             label: Some("Node 1".into()),
             layer: Some("default".into()),
             weight: Some(1.0),
@@ -196,7 +192,7 @@ async fn create_test_dataset(
             created_at: Some(chrono::Utc::now()),
         },
         GraphDataNodeInput {
-            external_id: "node2".into(),
+            external_id: n2.clone(),
             label: Some("Node 2".into()),
             layer: Some("default".into()),
             weight: Some(1.0),
@@ -213,9 +209,9 @@ async fn create_test_dataset(
 
     // Add edges with source_dataset_id
     let edges = vec![GraphDataEdgeInput {
-        external_id: "edge1".into(),
-        source: "node1".into(),
-        target: "node2".into(),
+        external_id: format!("ds{}-edge1", dataset_id),
+        source: n1,
+        target: n2,
         label: Some("Edge 1".into()),
         layer: Some("default".into()),
         weight: Some(1.0),

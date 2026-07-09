@@ -169,20 +169,19 @@ async fn test_graph_data_builder_merge_upstream() {
     assert!(external_ids.contains(&"n2".to_string()));
 }
 
-// FIXME (pre-existing): expects graph build to fail on a missing layer, but the
-// builder now tolerates it. Reflects a change in layer-validation behaviour that
-// predates Horizon 1; ignored pending a decision on whether strict layer
-// validation should be restored or the expectation updated.
-#[ignore = "pre-existing: layer-validation behaviour changed - see FIXME"]
+// A node may reference a layer not yet in the project palette. The builder
+// auto-heals this by adding a neutral default palette entry (see
+// GraphDataBuilder::ensure_layers) rather than failing the whole build — a
+// missing layer style should not block ingesting the data.
 #[tokio::test]
-async fn test_graph_data_builder_layer_validation() {
+async fn test_graph_data_builder_auto_creates_missing_layer() {
     let db = setup_db().await;
     let project_id = seed_project_and_palette(&db).await;
 
     let service = Arc::new(GraphDataService::new(db.clone()));
     let palette_service = Arc::new(LayerPaletteService::new(db.clone()));
 
-    // Create dataset with invalid layer
+    // Dataset with a node referencing a layer not in the palette.
     let ds1 = create_test_graph_data(&service, project_id, "Dataset 1", "dataset").await;
     service
         .replace_nodes(
@@ -190,7 +189,7 @@ async fn test_graph_data_builder_layer_validation() {
             vec![GraphDataNodeInput {
                 external_id: "n1".to_string(),
                 label: Some("Node 1".to_string()),
-                layer: Some("INVALID_LAYER".to_string()), // Not in palette
+                layer: Some("NEW_LAYER".to_string()), // not yet in palette
                 weight: Some(1.0),
                 is_partition: Some(false),
                 belongs_to: None,
@@ -203,20 +202,33 @@ async fn test_graph_data_builder_layer_validation() {
         .await
         .unwrap();
 
-    // Build should fail due to missing layer
-    let builder = GraphDataBuilder::new(service, palette_service);
+    let builder = GraphDataBuilder::new(service, palette_service.clone());
     let result = builder
         .build_graph(
             project_id,
             "test-dag-node".to_string(),
-            "Graph with invalid layer".to_string(),
+            "Graph with new layer".to_string(),
             vec![ds1.id],
         )
         .await;
 
-    assert!(result.is_err(), "Graph build should fail for missing layer");
-    let err = result.unwrap_err();
-    assert!(err.to_string().contains("Missing layers"));
+    assert!(
+        result.is_ok(),
+        "build should succeed and auto-heal the layer"
+    );
+
+    // The missing layer was added to the project palette.
+    let missing = palette_service
+        .validate_layer_references(
+            project_id,
+            &std::iter::once("NEW_LAYER".to_string()).collect(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        missing.missing_layers.is_empty(),
+        "NEW_LAYER should now exist in the palette"
+    );
 }
 
 #[tokio::test]
