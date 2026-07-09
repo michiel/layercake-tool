@@ -1,6 +1,6 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait,
+    PaginatorTrait, QueryFilter, Set,
 };
 use tracing::{debug, warn};
 
@@ -32,18 +32,29 @@ impl GraphDataEditApplicator {
         Self { db }
     }
 
-    /// Apply a single graph edit to the database
+    /// Apply a single graph edit against the applicator's own connection.
     ///
-    /// Returns ApplyResult indicating success, skip, or error
+    /// Returns ApplyResult indicating success, skip, or error.
     pub async fn apply_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+        self.apply_edit_on(&self.db, edit).await
+    }
+
+    /// Apply a single graph edit against the given connection (which may be a
+    /// transaction). Used by the replay loop so an edit's mutation and its
+    /// `mark_edit_applied` commit atomically.
+    pub async fn apply_edit_on<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         debug!(
             "Applying edit #{} on {}:{} ({})",
             edit.sequence_number, edit.target_type, edit.target_id, edit.operation
         );
 
         let result = match edit.target_type.as_str() {
-            "node" => self.apply_node_edit(edit).await?,
-            "edge" => self.apply_edge_edit(edit).await?,
+            "node" => self.apply_node_edit(conn, edit).await?,
+            "edge" => self.apply_edge_edit(conn, edit).await?,
             "layer" => {
                 // Layer edits are skipped for graph_data - Phase 5 will remove layer storage
                 ApplyResult::Skipped {
@@ -63,23 +74,31 @@ impl GraphDataEditApplicator {
     }
 
     /// Apply edit to a graph_data node
-    async fn apply_node_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn apply_node_edit<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         match edit.operation.as_str() {
-            "create" => self.create_node(edit).await,
-            "update" => self.update_node(edit).await,
-            "delete" => self.delete_node(edit).await,
+            "create" => self.create_node(conn, edit).await,
+            "update" => self.update_node(conn, edit).await,
+            "delete" => self.delete_node(conn, edit).await,
             _ => Ok(ApplyResult::Error {
                 reason: format!("Unknown node operation: {}", edit.operation),
             }),
         }
     }
 
-    async fn create_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn create_node<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         // Check if node already exists
         let existing = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
-            .one(&self.db)
+            .one(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?;
 
@@ -138,7 +157,7 @@ impl GraphDataEditApplicator {
             created_at: Set(chrono::Utc::now()),
         };
 
-        node.insert(&self.db)
+        node.insert(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to create graph_data node").with_source(e))?;
 
@@ -147,11 +166,15 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn update_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn update_node<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         let node = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
-            .one(&self.db)
+            .one(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?;
 
@@ -199,7 +222,7 @@ impl GraphDataEditApplicator {
         }
 
         active_model
-            .update(&self.db)
+            .update(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to update graph_data node").with_source(e))?;
 
@@ -211,11 +234,15 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn delete_node(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn delete_node<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         let result = GraphDataNodes::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&edit.target_id))
-            .exec(&self.db)
+            .exec(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to delete graph_data node").with_source(e))?;
 
@@ -231,23 +258,31 @@ impl GraphDataEditApplicator {
     }
 
     /// Apply edit to a graph_data edge
-    async fn apply_edge_edit(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn apply_edge_edit<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         match edit.operation.as_str() {
-            "create" => self.create_edge(edit).await,
-            "update" => self.update_edge(edit).await,
-            "delete" => self.delete_edge(edit).await,
+            "create" => self.create_edge(conn, edit).await,
+            "update" => self.update_edge(conn, edit).await,
+            "delete" => self.delete_edge(conn, edit).await,
             _ => Ok(ApplyResult::Error {
                 reason: format!("Unknown edge operation: {}", edit.operation),
             }),
         }
     }
 
-    async fn create_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn create_edge<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         // Check if edge already exists
         let existing = GraphDataEdges::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
-            .one(&self.db)
+            .one(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data edge").with_source(e))?;
 
@@ -278,7 +313,7 @@ impl GraphDataEditApplicator {
         let source_exists = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&source))
-            .count(&self.db)
+            .count(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?
             > 0;
@@ -286,7 +321,7 @@ impl GraphDataEditApplicator {
         let target_exists = GraphDataNodes::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_nodes::Column::ExternalId.eq(&target))
-            .count(&self.db)
+            .count(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data node").with_source(e))?
             > 0;
@@ -334,7 +369,7 @@ impl GraphDataEditApplicator {
             created_at: Set(chrono::Utc::now()),
         };
 
-        edge.insert(&self.db)
+        edge.insert(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to create graph_data edge").with_source(e))?;
 
@@ -343,11 +378,15 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn update_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn update_edge<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         let edge = GraphDataEdges::find()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
-            .one(&self.db)
+            .one(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data edge").with_source(e))?;
 
@@ -387,7 +426,7 @@ impl GraphDataEditApplicator {
         }
 
         active_model
-            .update(&self.db)
+            .update(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to update graph_data edge").with_source(e))?;
 
@@ -399,11 +438,15 @@ impl GraphDataEditApplicator {
         })
     }
 
-    async fn delete_edge(&self, edit: &graph_edits::Model) -> CoreResult<ApplyResult> {
+    async fn delete_edge<C: ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit: &graph_edits::Model,
+    ) -> CoreResult<ApplyResult> {
         let result = GraphDataEdges::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(edit.graph_id))
             .filter(graph_data_edges::Column::ExternalId.eq(&edit.target_id))
-            .exec(&self.db)
+            .exec(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to delete graph_data edge").with_source(e))?;
 

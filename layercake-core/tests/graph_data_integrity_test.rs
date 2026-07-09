@@ -494,3 +494,104 @@ async fn app_replay_graph_edits_applies_on_graph_data() {
         .unwrap();
     assert!(node.is_some(), "replayed edit should create the node");
 }
+
+// --- Per-edit transactional replay (Horizon 1 deferral, now implemented) ---
+//
+// Each edit's data mutation and its applied-marker commit in one transaction.
+// This test drives create+update+delete over several edits and asserts that,
+// after replay, every applied edit's data effect is present AND it is marked
+// applied — never a partial state — and a re-replay is a no-op.
+#[tokio::test]
+async fn replay_marks_and_applies_each_edit_atomically() {
+    use layercake_core::database::entities::graph_edits;
+
+    let db = setup_test_db().await.unwrap();
+    ensure_project(&db, 1).await;
+    let gd_service = GraphDataService::new(db.clone());
+    let gd = create_graph_data(&gd_service, 1).await;
+
+    async fn insert_edit(
+        db: &DatabaseConnection,
+        graph_id: i32,
+        seq: i32,
+        target: &str,
+        op: &str,
+        field: Option<&str>,
+        new_value: serde_json::Value,
+    ) {
+        graph_edits::ActiveModel {
+            id: sea_orm::ActiveValue::NotSet,
+            graph_id: Set(graph_id),
+            target_type: Set("node".to_string()),
+            target_id: Set(target.to_string()),
+            operation: Set(op.to_string()),
+            field_name: Set(field.map(|s| s.to_string())),
+            old_value: Set(None),
+            new_value: Set(Some(new_value)),
+            sequence_number: Set(seq),
+            applied: Set(false),
+            created_at: Set(chrono::Utc::now()),
+            created_by: Set(None),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    // create n1, update n1.label, create n2, delete n2  -> final: only n1 (label "Renamed")
+    insert_edit(
+        &db,
+        gd.id,
+        1,
+        "n1",
+        "create",
+        None,
+        json!({"label": "First"}),
+    )
+    .await;
+    insert_edit(
+        &db,
+        gd.id,
+        2,
+        "n1",
+        "update",
+        Some("label"),
+        json!("Renamed"),
+    )
+    .await;
+    insert_edit(&db, gd.id, 3, "n2", "create", None, json!({"label": "Two"})).await;
+    insert_edit(&db, gd.id, 4, "n2", "delete", None, json!({})).await;
+
+    let summary = gd_service.replay_edits(gd.id).await.unwrap();
+    assert_eq!(summary.applied, 4, "all four edits applied");
+
+    // Data effect: only n1 remains, renamed.
+    let nodes = graph_data_nodes::Entity::find()
+        .filter(graph_data_nodes::Column::GraphDataId.eq(gd.id))
+        .all(&db)
+        .await
+        .unwrap();
+    assert_eq!(nodes.len(), 1);
+    assert_eq!(nodes[0].external_id, "n1");
+    assert_eq!(nodes[0].label.as_deref(), Some("Renamed"));
+
+    // Every edit is marked applied (marker committed with the data mutation).
+    let unapplied = graph_edits::Entity::find()
+        .filter(graph_edits::Column::GraphId.eq(gd.id))
+        .filter(graph_edits::Column::Applied.eq(false))
+        .all(&db)
+        .await
+        .unwrap();
+    assert!(unapplied.is_empty(), "no edit left unapplied after replay");
+
+    // Re-replay is a no-op (nothing left to apply) — proves marker+data are consistent.
+    let again = gd_service.replay_edits(gd.id).await.unwrap();
+    assert_eq!(again.applied, 0);
+    let count = graph_data_nodes::Entity::find()
+        .filter(graph_data_nodes::Column::GraphDataId.eq(gd.id))
+        .all(&db)
+        .await
+        .unwrap()
+        .len();
+    assert_eq!(count, 1, "re-replay did not duplicate or alter data");
+}
