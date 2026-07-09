@@ -133,8 +133,10 @@ pub async fn fetch_current_plan_dag(
 }
 
 /// Publish a delta event after a mutation
+#[allow(clippy::too_many_arguments)]
 pub async fn publish_plan_dag_delta(
     project_id: i32,
+    plan_id: i32,
     version: i32,
     user_id: String,
     client_id: String,
@@ -142,6 +144,7 @@ pub async fn publish_plan_dag_delta(
 ) -> Result<(), String> {
     let event = PlanDagDeltaEvent {
         project_id,
+        plan_id,
         version,
         user_id,
         client_id,

@@ -639,8 +639,18 @@ impl GraphDataService {
 
     /// Mark an edit as applied
     pub async fn mark_edit_applied(&self, edit_id: i32) -> CoreResult<()> {
+        self.mark_edit_applied_on(&self.db, edit_id).await
+    }
+
+    /// Mark an edit as applied against the given connection (which may be a
+    /// transaction), so it can commit atomically with the edit's own mutation.
+    async fn mark_edit_applied_on<C: sea_orm::ConnectionTrait>(
+        &self,
+        conn: &C,
+        edit_id: i32,
+    ) -> CoreResult<()> {
         let edit = GraphEdits::find_by_id(edit_id)
-            .one(&self.db)
+            .one(conn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph edit").with_source(e))?
             .ok_or_else(|| CoreError::not_found("GraphEdit", edit_id.to_string()))?;
@@ -648,7 +658,7 @@ impl GraphDataService {
         let mut active_model: graph_edits::ActiveModel = edit.into();
         active_model.applied = Set(true);
         active_model
-            .update(&self.db)
+            .update(conn)
             .await
             .map(|_| ())
             .map_err(|e| CoreError::internal("Failed to mark edit applied").with_source(e))
@@ -697,14 +707,36 @@ impl GraphDataService {
         // Create applicator
         let applicator = GraphDataEditApplicator::new(self.db.clone());
 
-        // Apply each edit in sequence
+        // Apply each edit in sequence. Each edit runs in its own transaction so
+        // its mutation and its applied-marker commit atomically: on a crash an
+        // edit is never left applied-in-data-but-unmarked (or vice versa), and a
+        // subsequent replay resumes cleanly from the first unapplied edit.
         for edit in edits {
             debug!(
                 "Replaying edit #{}: {} {} {}",
                 edit.sequence_number, edit.operation, edit.target_type, edit.target_id
             );
 
-            match applicator.apply_edit(&edit).await {
+            // Run apply + mark-applied inside one transaction. The closure
+            // returns the ApplyResult; on Success we also mark it applied before
+            // committing. Skipped/Error results still commit (no data mutation
+            // that needs rolling back, but the txn cleanly closes).
+            let txn_result: CoreResult<ApplyResult> = async {
+                let txn = self.db.begin().await.map_err(|e| {
+                    CoreError::internal("Failed to begin replay transaction").with_source(e)
+                })?;
+                let apply = applicator.apply_edit_on(&txn, &edit).await?;
+                if matches!(apply, ApplyResult::Success { .. }) {
+                    self.mark_edit_applied_on(&txn, edit.id).await?;
+                }
+                txn.commit().await.map_err(|e| {
+                    CoreError::internal("Failed to commit replay transaction").with_source(e)
+                })?;
+                Ok(apply)
+            }
+            .await;
+
+            match txn_result {
                 Ok(ApplyResult::Success { message }) => {
                     summary.applied += 1;
                     summary.details.push(GraphDataEditResult {
@@ -715,11 +747,6 @@ impl GraphDataService {
                         result: "success".to_string(),
                         message,
                     });
-
-                    // Mark as applied
-                    if let Err(e) = self.mark_edit_applied(edit.id).await {
-                        warn!("Failed to mark edit {} as applied: {}", edit.id, e);
-                    }
                 }
                 Ok(ApplyResult::Skipped { reason }) => {
                     summary.skipped += 1;
