@@ -69,6 +69,48 @@ async fn seed_project_and_palette(db: &DatabaseConnection) -> i32 {
     1
 }
 
+/// Create a real `data_sets` row (with graph_json) that a DataSetNode can
+/// reference — this is how source data actually enters the DAG. Returns its id.
+async fn create_data_set(db: &DatabaseConnection, project_id: i32, name: &str) -> i32 {
+    use layercake_core::database::entities::data_sets;
+    let graph_json = json!({
+        "nodes": [
+            {"id": format!("{}-n1", name), "label": format!("{} Node 1", name), "layer": "L1", "weight": 1},
+            {"id": format!("{}-n2", name), "label": format!("{} Node 2", name), "layer": "L1", "weight": 1},
+        ],
+        "edges": [
+            {"id": format!("{}-e1", name), "source": format!("{}-n1", name), "target": format!("{}-n2", name), "label": "", "layer": "L1", "weight": 1},
+        ],
+        "layers": [],
+    })
+    .to_string();
+
+    let ds = data_sets::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        project_id: Set(project_id),
+        name: Set(name.to_string()),
+        description: Set(None),
+        file_format: Set("json".to_string()),
+        data_type: Set("graph".to_string()),
+        origin: Set("manual_edit".to_string()),
+        filename: Set(format!("{}.json", name)),
+        blob: Set(Vec::new()),
+        graph_json: Set(graph_json),
+        status: Set("active".to_string()),
+        error_message: Set(None),
+        file_size: Set(0),
+        processed_at: Set(Some(Utc::now())),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        annotations: Set(None),
+    }
+    .insert(db)
+    .await
+    .unwrap();
+    ds.id
+}
+
+#[allow(dead_code)]
 async fn create_graph_data_dataset(
     service: &GraphDataService,
     project_id: i32,
@@ -154,26 +196,48 @@ async fn create_graph_data_dataset(
     dataset
 }
 
-// The FilterNode legacy-table bug this test used to hit is fixed (see
-// filter_node_test.rs for direct coverage). It now blocks on a *separate*
-// pre-existing bug: the GraphNode executor arm resolves inputs only from DAG
-// edges and ignores the `graphDataIds` config, so source GraphNodes build empty
-// graphs and node_count propagates as 0. Ignored until that GraphNode-input
-// resolution is fixed. (Test setup was also corrected to seed the plan + DAG
-// node rows so execution reaches the filter/projection nodes.)
-#[ignore = "pre-existing: GraphNode arm ignores graphDataIds config -> empty source graphs; FilterNode part is fixed and covered by filter_node_test"]
+// Full pipeline: DataSetNode -> GraphNode -> Merge -> Transform -> Filter ->
+// Projection. Source data enters the DAG via DataSetNodes referencing data_sets
+// rows (GraphNodes get their input from DAG edges, not config — see the
+// GraphNodeConfig "Removed: graphId" note in the frontend types).
 #[tokio::test]
 async fn graph_data_pipeline_end_to_end() {
     let db = setup_db().await;
     let project_id = seed_project_and_palette(&db).await;
     let service = GraphDataService::new(db.clone());
 
-    // Seed two dataset graph_data records
-    let ds1 = create_graph_data_dataset(&service, project_id, "DS1", "ds1-node").await;
-    let ds2 = create_graph_data_dataset(&service, project_id, "DS2", "ds2-node").await;
+    // Seed two real datasets that DataSetNodes will reference.
+    let ds1 = create_data_set(&db, project_id, "DS1").await;
+    let ds2 = create_data_set(&db, project_id, "DS2").await;
 
-    // Plan DAG nodes covering merge -> transform -> filter -> projection
+    // Plan DAG nodes covering dataset -> graph -> merge -> transform -> filter -> projection
     let nodes = vec![
+        plan_dag_nodes::Model {
+            id: "dataset-a".to_string(),
+            plan_id: 1,
+            node_type: "DataSetNode".to_string(),
+            position_x: -150.0,
+            position_y: 0.0,
+            source_position: None,
+            target_position: None,
+            metadata_json: json!({"label": "Dataset A"}).to_string(),
+            config_json: json!({"dataSetId": ds1}).to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        },
+        plan_dag_nodes::Model {
+            id: "dataset-b".to_string(),
+            plan_id: 1,
+            node_type: "DataSetNode".to_string(),
+            position_x: -150.0,
+            position_y: 50.0,
+            source_position: None,
+            target_position: None,
+            metadata_json: json!({"label": "Dataset B"}).to_string(),
+            config_json: json!({"dataSetId": ds2}).to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        },
         plan_dag_nodes::Model {
             id: "graph-a".to_string(),
             plan_id: 1,
@@ -183,7 +247,7 @@ async fn graph_data_pipeline_end_to_end() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Graph A"}).to_string(),
-            config_json: json!({"graphDataIds": [ds1.id]}).to_string(),
+            config_json: json!({}).to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
@@ -196,7 +260,7 @@ async fn graph_data_pipeline_end_to_end() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Graph B"}).to_string(),
-            config_json: json!({"graphDataIds": [ds2.id]}).to_string(),
+            config_json: json!({}).to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
@@ -266,6 +330,8 @@ async fn graph_data_pipeline_end_to_end() {
     ];
 
     let edges = vec![
+        ("dataset-a".to_string(), "graph-a".to_string()),
+        ("dataset-b".to_string(), "graph-b".to_string()),
         ("graph-a".to_string(), "merge-1".to_string()),
         ("graph-b".to_string(), "merge-1".to_string()),
         ("merge-1".to_string(), "transform-1".to_string()),
