@@ -35,12 +35,9 @@ fn validate_attributes(value: &Value) -> Result<(), String> {
         if val.is_string() {
             continue;
         }
-        if let Some(n) = val.as_i64() {
+        if val.as_i64().is_some() {
             // ensure value is an integer (reject floats)
-            if val.as_f64().map(|f| f.fract() == 0.0).unwrap_or(true)
-                && n >= i64::MIN
-                && n <= i64::MAX
-            {
+            if val.as_f64().map(|f| f.fract() == 0.0).unwrap_or(true) {
                 continue;
             }
         }
