@@ -46,35 +46,62 @@ impl GraphEditService {
         created_by: Option<i32>,
         applied: bool,
     ) -> CoreResult<graph_edits::Model> {
-        // Get the next sequence number for this graph
-        let next_sequence = self.get_next_sequence_number(graph_id).await?;
+        // Insert the edit, allocating a sequence number as max+1. A unique index
+        // on (graph_id, sequence_number) turns a concurrent-allocation collision
+        // into an insert error, which we retry with a freshly computed number
+        // instead of silently writing a duplicate sequence (ambiguous replay).
+        // Under contention many writers can read the same max before any
+        // commits, so allow generous retries; SQLite serialises writes, so a
+        // fresh max read after each conflict converges quickly.
+        const MAX_ATTEMPTS: usize = 50;
+        let mut last_err: Option<sea_orm::DbErr> = None;
 
-        // Create the edit record
-        let edit = graph_edits::ActiveModel {
-            id: ActiveValue::NotSet,
-            graph_id: Set(graph_id),
-            target_type: Set(target_type),
-            target_id: Set(target_id),
-            operation: Set(operation),
-            field_name: Set(field_name),
-            old_value: Set(old_value),
-            new_value: Set(new_value),
-            sequence_number: Set(next_sequence),
-            applied: Set(applied),
-            created_at: Set(chrono::Utc::now()),
-            created_by: Set(created_by),
-        };
+        for _ in 0..MAX_ATTEMPTS {
+            let next_sequence = self.get_next_sequence_number(graph_id).await?;
 
-        let edit = edit
-            .insert(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to insert graph edit: {}", e)))?;
+            let edit = graph_edits::ActiveModel {
+                id: ActiveValue::NotSet,
+                graph_id: Set(graph_id),
+                target_type: Set(target_type.clone()),
+                target_id: Set(target_id.clone()),
+                operation: Set(operation.clone()),
+                field_name: Set(field_name.clone()),
+                old_value: Set(old_value.clone()),
+                new_value: Set(new_value.clone()),
+                sequence_number: Set(next_sequence),
+                applied: Set(applied),
+                created_at: Set(chrono::Utc::now()),
+                created_by: Set(created_by),
+            };
 
-        // Update the graph's last_edit_sequence and has_pending_edits (only if not applied)
-        self.update_graph_edit_metadata(graph_id, next_sequence, applied)
-            .await?;
+            match edit.insert(&self.db).await {
+                Ok(inserted) => {
+                    // Update the graph's last_edit_sequence and has_pending_edits
+                    self.update_graph_edit_metadata(graph_id, next_sequence, applied)
+                        .await?;
+                    return Ok(inserted);
+                }
+                Err(e) if is_unique_violation(&e) => {
+                    // Another writer took this sequence number; recompute and retry.
+                    last_err = Some(e);
+                    continue;
+                }
+                Err(e) => {
+                    return Err(CoreError::internal(format!(
+                        "Failed to insert graph edit: {}",
+                        e
+                    )));
+                }
+            }
+        }
 
-        Ok(edit)
+        Err(CoreError::internal(format!(
+            "Failed to insert graph edit after {} attempts due to sequence contention: {}",
+            MAX_ATTEMPTS,
+            last_err
+                .map(|e| e.to_string())
+                .unwrap_or_else(|| "unknown".to_string())
+        )))
     }
 
     /// Get the next sequence number for a graph
@@ -447,4 +474,12 @@ pub struct EditResult {
     pub operation: String,
     pub result: String, // "success", "skipped", "failed"
     pub message: String,
+}
+
+/// Detect a unique-constraint violation across backends. SeaORM surfaces the
+/// underlying driver error; for SQLite the message contains "UNIQUE constraint
+/// failed", for Postgres "duplicate key value violates unique constraint".
+fn is_unique_violation(err: &sea_orm::DbErr) -> bool {
+    let msg = err.to_string().to_ascii_lowercase();
+    msg.contains("unique constraint failed") || msg.contains("duplicate key value")
 }
