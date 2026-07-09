@@ -30,6 +30,25 @@ async fn seed_project_and_palette(db: &DatabaseConnection) -> i32 {
     };
     project.insert(db).await.unwrap();
 
+    // Plan (id 1) so plan_dag_nodes referencing plan_id = 1 satisfy their FK.
+    use layercake_core::database::entities::plans;
+    plans::ActiveModel {
+        id: Set(1),
+        project_id: Set(1),
+        name: Set("Pipeline Plan".into()),
+        description: Set(None),
+        tags: Set("[]".into()),
+        yaml_content: Set("{}".into()),
+        dependencies: Set(None),
+        status: Set("draft".to_string()),
+        version: Set(1),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+    }
+    .insert(db)
+    .await
+    .unwrap();
+
     // Palette layer
     let layer = project_layers::ActiveModel {
         id: sea_orm::ActiveValue::NotSet,
@@ -135,12 +154,14 @@ async fn create_graph_data_dataset(
     dataset
 }
 
-// FIXME (pre-existing PRODUCT BUG): FilterNode execution queries the legacy
-// `graph_nodes` table, which was dropped by m20251215. Under FK/strict schema
-// this fails with "no such table: graph_nodes". The filter path needs porting
-// to graph_data (like the rest of the pipeline). Predates Horizon 1; ignored
-// here to keep the build green, but this is a real bug to fix, not just a test.
-#[ignore = "pre-existing product bug: FilterNode queries dropped legacy graph_nodes table - see FIXME"]
+// The FilterNode legacy-table bug this test used to hit is fixed (see
+// filter_node_test.rs for direct coverage). It now blocks on a *separate*
+// pre-existing bug: the GraphNode executor arm resolves inputs only from DAG
+// edges and ignores the `graphDataIds` config, so source GraphNodes build empty
+// graphs and node_count propagates as 0. Ignored until that GraphNode-input
+// resolution is fixed. (Test setup was also corrected to seed the plan + DAG
+// node rows so execution reaches the filter/projection nodes.)
+#[ignore = "pre-existing: GraphNode arm ignores graphDataIds config -> empty source graphs; FilterNode part is fixed and covered by filter_node_test"]
 #[tokio::test]
 async fn graph_data_pipeline_end_to_end() {
     let db = setup_db().await;
@@ -251,6 +272,15 @@ async fn graph_data_pipeline_end_to_end() {
         ("transform-1".to_string(), "filter-1".to_string()),
         ("filter-1".to_string(), "projection-1".to_string()),
     ];
+
+    // Persist the plan DAG nodes so nodes that write back to their own config
+    // (e.g. ProjectionNode storing the created projectionId) have a real row to
+    // update. execute_dag takes the node models by value but expects them to
+    // exist in the database.
+    for node in &nodes {
+        let active: plan_dag_nodes::ActiveModel = node.clone().into();
+        active.insert(&db).await.unwrap();
+    }
 
     let executor = DagExecutor::new(db.clone());
     executor

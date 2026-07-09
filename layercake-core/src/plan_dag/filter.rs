@@ -1,5 +1,5 @@
 use anyhow::{Context, Result as AnyResult};
-use sea_orm::{ConnectionTrait, DatabaseConnection, FromQueryResult, Statement};
+use sea_orm::DatabaseConnection;
 use serde::{de, Deserialize, Serialize};
 use serde_json::json;
 use serde_json::Value as JsonValue;
@@ -171,19 +171,34 @@ mod query_filter_executor {
         let mut selected_edges = HashSet::new();
         let mut selected_layers = HashSet::new();
 
+        // Evaluate the rule group against the in-memory graph. The graph is
+        // already fully loaded here, so there is no need (and, since the legacy
+        // graph_nodes/graph_edges/graph_layers tables were dropped, no ability)
+        // to re-query the database. `_context` is retained for API stability.
+        let _ = context;
+
         if targets.contains(&QueryFilterTarget::Nodes) {
-            let nodes = query_nodes(context.db, context.graph_id, &rule_group).await?;
-            selected_nodes.extend(nodes);
+            for node in &graph.nodes {
+                if eval_rule_group(&rule_group, &node_field_value(node))? {
+                    selected_nodes.insert(node.id.clone());
+                }
+            }
         }
 
         if targets.contains(&QueryFilterTarget::Edges) {
-            let edges = query_edges(context.db, context.graph_id, &rule_group).await?;
-            selected_edges.extend(edges);
+            for edge in &graph.edges {
+                if eval_rule_group(&rule_group, &edge_field_value(edge))? {
+                    selected_edges.insert(edge.id.clone());
+                }
+            }
         }
 
         if targets.contains(&QueryFilterTarget::Layers) {
-            let layers = query_layers(context.db, context.graph_id, &rule_group).await?;
-            selected_layers.extend(layers);
+            for layer in &graph.layers {
+                if eval_rule_group(&rule_group, &layer_field_value(layer))? {
+                    selected_layers.insert(layer.id.clone());
+                }
+            }
         }
 
         let should_include = matches!(config.mode, QueryFilterMode::Include);
@@ -268,129 +283,125 @@ mod query_filter_executor {
         Ok(())
     }
 
-    async fn query_nodes(
-        db: &DatabaseConnection,
-        graph_id: i32,
-        rule_group: &QueryRuleGroup,
-    ) -> AnyResult<HashSet<String>> {
-        let sql = build_query_sql("graph_nodes", graph_id, rule_group)?;
-        execute_query(db, &sql)
-            .await
-            .context("Failed to query nodes")
+    /// Resolve a filter `field` to a string value for a node. Known columns map
+    /// to struct fields; anything else is looked up in the `attributes` JSON.
+    fn node_field_value(node: &crate::graph::Node) -> impl Fn(&str) -> Option<String> + '_ {
+        move |field: &str| match field {
+            "id" | "external_id" => Some(node.id.clone()),
+            "label" => Some(node.label.clone()),
+            "layer" => Some(node.layer.clone()),
+            "weight" => Some(node.weight.to_string()),
+            "comment" => node.comment.clone(),
+            "belongs_to" | "belongsTo" => node.belongs_to.clone(),
+            "is_partition" | "isPartition" => Some(node.is_partition.to_string()),
+            "dataset" => node.dataset.map(|d| d.to_string()),
+            other => attribute_value(node.attributes.as_ref(), other),
+        }
     }
 
-    async fn query_edges(
-        db: &DatabaseConnection,
-        graph_id: i32,
-        rule_group: &QueryRuleGroup,
-    ) -> AnyResult<HashSet<String>> {
-        let sql = build_query_sql("graph_edges", graph_id, rule_group)?;
-        execute_query(db, &sql)
-            .await
-            .context("Failed to query edges")
+    fn edge_field_value(edge: &crate::graph::Edge) -> impl Fn(&str) -> Option<String> + '_ {
+        move |field: &str| match field {
+            "id" | "external_id" => Some(edge.id.clone()),
+            "source" => Some(edge.source.clone()),
+            "target" => Some(edge.target.clone()),
+            "label" => Some(edge.label.clone()),
+            "layer" => Some(edge.layer.clone()),
+            "weight" => Some(edge.weight.to_string()),
+            "comment" => edge.comment.clone(),
+            "dataset" => edge.dataset.map(|d| d.to_string()),
+            other => attribute_value(edge.attributes.as_ref(), other),
+        }
     }
 
-    async fn query_layers(
-        db: &DatabaseConnection,
-        graph_id: i32,
-        rule_group: &QueryRuleGroup,
-    ) -> AnyResult<HashSet<String>> {
-        let sql = build_query_sql("graph_layers", graph_id, rule_group)?;
-        execute_query(db, &sql)
-            .await
-            .context("Failed to query layers")
+    fn layer_field_value(layer: &crate::graph::Layer) -> impl Fn(&str) -> Option<String> + '_ {
+        move |field: &str| match field {
+            "id" => Some(layer.id.clone()),
+            "label" => Some(layer.label.clone()),
+            "alias" => layer.alias.clone(),
+            "dataset" => layer.dataset.map(|d| d.to_string()),
+            other => attribute_value(layer.attributes.as_ref(), other),
+        }
     }
 
-    async fn execute_query(db: &DatabaseConnection, sql: &str) -> AnyResult<HashSet<String>> {
-        #[derive(FromQueryResult)]
-        struct ResultRow {
-            id: String,
+    /// Look up a field in an optional `attributes` JSON object, returning its
+    /// value as a string (strings unquoted, numbers/bools stringified).
+    fn attribute_value(attributes: Option<&JsonValue>, field: &str) -> Option<String> {
+        let value = attributes?.get(field)?;
+        match value {
+            JsonValue::String(s) => Some(s.clone()),
+            JsonValue::Null => None,
+            other => Some(other.to_string()),
+        }
+    }
+
+    /// Evaluate a rule group against a single record's field resolver.
+    fn eval_rule_group(
+        rule_group: &QueryRuleGroup,
+        get_field: &impl Fn(&str) -> Option<String>,
+    ) -> AnyResult<bool> {
+        let is_and = !rule_group.combinator.eq_ignore_ascii_case("or");
+
+        // An empty rule group matches everything (parity with the previous "1=1").
+        if rule_group.rules.is_empty() {
+            return Ok(true);
         }
 
-        let statement = Statement::from_string(db.get_database_backend(), sql.to_string());
-        let rows: Vec<ResultRow> = ResultRow::find_by_statement(statement)
-            .all(db)
-            .await
-            .context("Failed to execute query")?;
-
-        Ok(rows.into_iter().map(|row| row.id).collect())
-    }
-
-    fn build_query_sql(
-        table: &str,
-        graph_id: i32,
-        rule_group: &QueryRuleGroup,
-    ) -> AnyResult<String> {
-        let rule_sql = build_rule_group_sql(rule_group)?;
-        Ok(format!(
-            "SELECT id FROM {} WHERE graph_id = {} AND {}",
-            table, graph_id, rule_sql
-        ))
-    }
-
-    fn build_rule_group_sql(rule_group: &QueryRuleGroup) -> AnyResult<String> {
-        let mut clauses = Vec::new();
+        let mut result = is_and;
         for rule in &rule_group.rules {
-            match rule {
-                QueryRule::Group(group) => {
-                    let group_sql = build_rule_group_sql(group)?;
-                    clauses.push(format!("({})", group_sql));
+            let matched = match rule {
+                QueryRule::Group(group) => eval_rule_group(group, get_field)?,
+                QueryRule::Rule(rule) => eval_rule(rule, get_field)?,
+            };
+            if is_and {
+                result = result && matched;
+                if !result {
+                    break;
                 }
-                QueryRule::Rule(rule) => {
-                    let clause = build_rule_clause(rule)?;
-                    clauses.push(clause);
+            } else {
+                result = result || matched;
+                if result {
+                    break;
                 }
             }
         }
-
-        let joiner = match rule_group.combinator.as_str() {
-            "and" => " AND ",
-            "or" => " OR ",
-            _ => " AND ",
-        };
-
-        if clauses.is_empty() {
-            Ok("1=1".to_string())
-        } else {
-            Ok(clauses.join(joiner))
-        }
+        Ok(result)
     }
 
-    fn build_rule_clause(rule: &QueryRuleConfig) -> AnyResult<String> {
-        let field = &rule.field;
-        let operator = rule.operator.as_str();
+    fn eval_rule(
+        rule: &QueryRuleConfig,
+        get_field: &impl Fn(&str) -> Option<String>,
+    ) -> AnyResult<bool> {
+        let field_value = get_field(&rule.field);
         let value = rule.value.as_deref().unwrap_or("");
         let comparator = rule.comparator.as_deref().unwrap_or("=");
 
-        let clause = match operator {
-            "isEmpty" => format!("({} IS NULL OR {} = '')", field, field),
-            "isNotEmpty" => format!("({} IS NOT NULL AND {} <> '')", field, field),
-            "contains" => format!("{} LIKE '%{}%'", field, value.replace('\'', "''")),
-            "notContains" => format!("{} NOT LIKE '%{}%'", field, value.replace('\'', "''")),
-            "equals" => format!("{} {} '{}'", field, comparator, value.replace('\'', "''")),
-            "notEquals" => format!("{} {} '{}'", field, comparator, value.replace('\'', "''")),
-            "startsWith" => format!("{} LIKE '{}%'", field, value.replace('\'', "''")),
-            "endsWith" => format!("{} LIKE '%{}'", field, value.replace('\'', "''")),
+        let as_str = field_value.as_deref();
+        let matched = match rule.operator.as_str() {
+            "isEmpty" => as_str.map(|s| s.is_empty()).unwrap_or(true),
+            "isNotEmpty" => as_str.map(|s| !s.is_empty()).unwrap_or(false),
+            "isNull" => field_value.is_none(),
+            "isNotNull" => field_value.is_some(),
+            "contains" => as_str.map(|s| s.contains(value)).unwrap_or(false),
+            "notContains" => as_str.map(|s| !s.contains(value)).unwrap_or(true),
+            "startsWith" => as_str.map(|s| s.starts_with(value)).unwrap_or(false),
+            "endsWith" => as_str.map(|s| s.ends_with(value)).unwrap_or(false),
+            "equals" => match comparator {
+                "<>" | "!=" => as_str != Some(value),
+                _ => as_str == Some(value),
+            },
+            "notEquals" => as_str != Some(value),
             "in" => {
-                let items: Vec<String> = value
-                    .split(',')
-                    .map(|item| format!("'{}'", item.trim().replace('\'', "''")))
-                    .collect();
-                format!("{} IN ({})", field, items.join(", "))
+                let set: HashSet<&str> = value.split(',').map(|s| s.trim()).collect();
+                as_str.map(|s| set.contains(s)).unwrap_or(false)
             }
             "notIn" => {
-                let items: Vec<String> = value
-                    .split(',')
-                    .map(|item| format!("'{}'", item.trim().replace('\'', "''")))
-                    .collect();
-                format!("{} NOT IN ({})", field, items.join(", "))
+                let set: HashSet<&str> = value.split(',').map(|s| s.trim()).collect();
+                as_str.map(|s| !set.contains(s)).unwrap_or(true)
             }
-            "isNull" => format!("{} IS NULL", field),
-            "isNotNull" => format!("{} IS NOT NULL", field),
-            "greaterThan" => format!("{} > {}", field, value),
-            "lessThan" => format!("{} < {}", field, value),
-            "greaterThanOrEqual" => format!("{} >= {}", field, value),
-            "lessThanOrEqual" => format!("{} <= {}", field, value),
+            "greaterThan" => numeric_cmp(as_str, value, |a, b| a > b),
+            "lessThan" => numeric_cmp(as_str, value, |a, b| a < b),
+            "greaterThanOrEqual" => numeric_cmp(as_str, value, |a, b| a >= b),
+            "lessThanOrEqual" => numeric_cmp(as_str, value, |a, b| a <= b),
             "between" => {
                 let parts: Vec<&str> = value.split(',').collect();
                 if parts.len() != 2 {
@@ -398,15 +409,31 @@ mod query_filter_executor {
                         "Between operator requires two values separated by comma"
                     ));
                 }
-                format!("{} BETWEEN {} AND {}", field, parts[0], parts[1])
+                let lo = parts[0].trim().parse::<f64>().ok();
+                let hi = parts[1].trim().parse::<f64>().ok();
+                match (as_str.and_then(|s| s.trim().parse::<f64>().ok()), lo, hi) {
+                    (Some(v), Some(lo), Some(hi)) => v >= lo && v <= hi,
+                    _ => false,
+                }
             }
-            _ => {
-                warn!("Unsupported operator: {}", operator);
-                "1=1".to_string()
+            other => {
+                warn!("Unsupported filter operator: {}", other);
+                true
             }
         };
+        Ok(matched)
+    }
 
-        Ok(clause)
+    /// Compare a field value and a target value numerically; if either is not a
+    /// number, no match (mirrors SQL comparison against non-numeric text).
+    fn numeric_cmp(field: Option<&str>, value: &str, op: impl Fn(f64, f64) -> bool) -> bool {
+        match (
+            field.and_then(|s| s.trim().parse::<f64>().ok()),
+            value.trim().parse::<f64>().ok(),
+        ) {
+            (Some(a), Some(b)) => op(a, b),
+            _ => false,
+        }
     }
 
     #[derive(Clone, Debug, Serialize, Deserialize)]
