@@ -137,12 +137,14 @@ pub async fn publish_plan_dag_delta(
     project_id: i32,
     version: i32,
     user_id: String,
+    client_id: String,
     operations: Vec<PatchOperation>,
 ) -> Result<(), String> {
     let event = PlanDagDeltaEvent {
         project_id,
         version,
         user_id,
+        client_id,
         timestamp: chrono::Utc::now().to_rfc3339(),
         operations,
     };

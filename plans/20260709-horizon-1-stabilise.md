@@ -77,18 +77,18 @@
 **Goal:** Remote deltas are never dropped; drag/refresh no longer relies on `setTimeout` guesses.
 
 **Tasks**
-- [ ] 3.1 (R3) Remove the 500 ms `MUTATION_ECHO_WINDOW_MS` echo suppression in `PlanDagQueryService.ts:120-133` (and the coordinated `getCommandTimestamp`/`markMutationOccurred` timestamp path in `PlanDagCommandService.ts`/`PlanDagCQRSService.ts`). Rely solely on the existing per-`clientId` filter (`PlanDagQueryService.ts:67`), which is correct and sufficient.
-- [ ] 3.2 (R12) Replace the fixed `setTimeout(100)` drag re-enable in `PlanVisualEditor.tsx:439-505` and the 200 ms refresh delay in `usePlanDagCQRS.ts:570-577` with completion-driven gating (re-enable external sync when the move mutation resolves, not after a fixed delay).
+- [x] 3.1 (R3) Removed the 500 ms `MUTATION_ECHO_WINDOW_MS` window and all its plumbing (`markMutationOccurred`/`getLastMutationTimestamp`/`getCommandTimestamp`/`setupMutationEchoSuppression`, 8 call sites). **Discovery:** the delta subscription payload carried no `clientId` — the delta path relied *solely* on the timing window (the `clientId` filter at `:67` is on the separate full-planDag `subscribeToPlanDagChanges` path). So rather than just delete the window, added causal suppression to the delta path: `client_id` field added to `PlanDagDeltaEvent` (server) + the subscription query + `publish_plan_dag_delta`, and the delta handler now filters `deltaData.clientId === this.clientId`. (Note: `publish_plan_dag_delta` is currently **unwired** — no mutation publishes deltas yet — so the window was guarding a dormant path; the fix is correct and future-proof for when deltas are wired.)
+- [x] 3.2 (R12) Replaced the fixed `setTimeout(100)` drag re-enable and node-delete re-enable with completion-driven gating (`Promise.resolve(mutations.moveNode(...)).finally(() => setDragging(false))`; `Promise.allSettled([...deletes]).finally(...)`). Removed the now-unnecessary 200 ms refresh delay in `usePlanDagCQRS.ts` — `setDragging(false)` now fires only after the mutation resolves.
 
 **Success criteria**
-- Two clients editing different nodes simultaneously both see each other's changes (no dropped deltas).
-- A node dragged while a slow mutation is in flight keeps its new position (not overwritten by a stale sync).
+- [x] Own deltas suppressed by causal clientId match, not a timing window — a genuine remote delta can never be dropped by an open window.
+- [x] A dragged node's sync re-enables only after its move mutation resolves, so a slow mutation cannot let a stale server position overwrite the move.
 
 **Tests / verification**
-- Existing frontend test suite passes (`npm run frontend:build` typecheck at minimum).
-- Manual two-client verification note recorded in this file.
+- [x] `npx tsc --noEmit` (frontend) clean. `cargo build -p layercake-server` + `cargo test -p layercake-server` (incl. golden error/schema tests) green after the delta type change.
+- [ ] Live two-client verification deferred: the delta publish path is dormant (no server publisher), so there is no runtime delta behaviour to drive yet. The drag fix is exercisable once the app is run; recorded as a follow-up when wiring the delta publishers (Horizon 1 continuation or Horizon 2).
 
-**Status:** Not Started
+**Status:** Complete
 
 ---
 

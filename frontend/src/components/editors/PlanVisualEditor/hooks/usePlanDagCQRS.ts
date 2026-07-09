@@ -566,14 +566,13 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
   const setDragging = useCallback((dragging: boolean) => {
     editorStateRef.current.sync.isDragging = dragging
 
-    // When drag ends, check if we missed any subscriptions and refresh if needed
+    // When drag ends, check if we missed any subscriptions and refresh if needed.
+    // setDragging(false) is now called only after the drag's mutation has
+    // resolved (see handleNodeDragStop), so no artificial delay is needed here.
     if (!dragging && editorStateRef.current.sync.pendingRefresh) {
       console.log('[usePlanDagCQRS] Drag ended with pendingRefresh, triggering data refresh')
       editorStateRef.current.sync.pendingRefresh = false
-      // Delay refresh slightly to allow mutation to complete
-      setTimeout(() => {
-        refreshData()
-      }, 200)
+      refreshData()
     }
   }, [refreshData])
 
