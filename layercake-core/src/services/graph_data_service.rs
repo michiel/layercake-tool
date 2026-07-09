@@ -9,8 +9,8 @@ use crate::services::graph_data_edit_applicator::{ApplyResult, GraphDataEditAppl
 use chrono::Utc;
 use sea_orm::ActiveValue::Set;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
-    TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, DatabaseTransaction, EntityTrait,
+    QueryFilter, QueryOrder, TransactionTrait,
 };
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -88,20 +88,97 @@ impl GraphDataService {
             CoreError::internal("Failed to begin graph_data transaction").with_source(e)
         })?;
 
+        let now = Utc::now();
+        // Replacing nodes deletes all edges (FK constraint), so edge_count is 0.
+        Self::replace_nodes_in_txn(&txn, graph_data_id, &nodes, now).await?;
+        Self::update_counts_in_txn(&txn, graph_data_id, nodes.len() as i32, 0, now).await?;
+
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit graph_data nodes").with_source(e))
+    }
+
+    pub async fn replace_edges(
+        &self,
+        graph_data_id: i32,
+        edges: Vec<GraphDataEdgeInput>,
+    ) -> CoreResult<()> {
+        let txn = self.db.begin().await.map_err(|e| {
+            CoreError::internal("Failed to begin graph_data transaction").with_source(e)
+        })?;
+
+        let now = Utc::now();
+        Self::replace_edges_in_txn(&txn, graph_data_id, &edges, now).await?;
+        // Node count is unchanged; only touch edge_count + updated_at.
+        graph_data::ActiveModel {
+            id: Set(graph_data_id),
+            edge_count: Set(edges.len() as i32),
+            updated_at: Set(now),
+            ..Default::default()
+        }
+        .update(&txn)
+        .await
+        .map_err(|e| CoreError::internal("Failed to update graph_data counts").with_source(e))?;
+
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit graph_data edges").with_source(e))
+    }
+
+    /// Replace both nodes and edges for a graph in a **single** transaction.
+    ///
+    /// Doing both in one transaction avoids the transient `edge_count = 0`
+    /// window (and the crash-leaves-edges-deleted failure) that occurs when
+    /// `replace_nodes` and `replace_edges` are called back-to-back as separate
+    /// transactions during DAG execution.
+    pub async fn replace_contents(
+        &self,
+        graph_data_id: i32,
+        nodes: Vec<GraphDataNodeInput>,
+        edges: Vec<GraphDataEdgeInput>,
+    ) -> CoreResult<()> {
+        let txn = self.db.begin().await.map_err(|e| {
+            CoreError::internal("Failed to begin graph_data transaction").with_source(e)
+        })?;
+
+        let now = Utc::now();
+        Self::replace_nodes_in_txn(&txn, graph_data_id, &nodes, now).await?;
+        Self::replace_edges_in_txn(&txn, graph_data_id, &edges, now).await?;
+        Self::update_counts_in_txn(
+            &txn,
+            graph_data_id,
+            nodes.len() as i32,
+            edges.len() as i32,
+            now,
+        )
+        .await?;
+
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit graph_data contents").with_source(e))
+    }
+
+    /// Delete existing nodes (and their edges) and insert the given nodes.
+    /// Does not update graph_data counts — the caller owns the final count.
+    async fn replace_nodes_in_txn(
+        txn: &DatabaseTransaction,
+        graph_data_id: i32,
+        nodes: &[GraphDataNodeInput],
+        now: chrono::DateTime<Utc>,
+    ) -> CoreResult<()> {
         // Remove edges first to satisfy FK constraints on graph_data_edges
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
-            .exec(&txn)
+            .exec(txn)
             .await
             .map_err(|e| CoreError::internal("Failed to delete graph_data edges").with_source(e))?;
 
         graph_data_nodes::Entity::delete_many()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
-            .exec(&txn)
+            .exec(txn)
             .await
             .map_err(|e| CoreError::internal("Failed to delete graph_data nodes").with_source(e))?;
 
-        let now = Utc::now();
         for node in nodes.iter() {
             let active = graph_data_nodes::ActiveModel {
                 graph_data_id: Set(graph_data_id),
@@ -118,42 +195,28 @@ impl GraphDataService {
                 ..Default::default()
             };
             graph_data_nodes::Entity::insert(active)
-                .exec(&txn)
+                .exec(txn)
                 .await
                 .map_err(|e| {
                     CoreError::internal("Failed to insert graph_data node").with_source(e)
                 })?;
         }
 
-        graph_data::ActiveModel {
-            id: Set(graph_data_id),
-            node_count: Set(nodes.len() as i32),
-            edge_count: Set(0),
-            updated_at: Set(now),
-            ..Default::default()
-        }
-        .update(&txn)
-        .await
-        .map_err(|e| CoreError::internal("Failed to update graph_data counts").with_source(e))?;
-
-        txn.commit()
-            .await
-            .map_err(|e| CoreError::internal("Failed to commit graph_data nodes").with_source(e))
+        Ok(())
     }
 
-    pub async fn replace_edges(
-        &self,
+    /// Delete existing edges and insert the given edges.
+    /// Does not update graph_data counts — the caller owns the final count.
+    async fn replace_edges_in_txn(
+        txn: &DatabaseTransaction,
         graph_data_id: i32,
-        edges: Vec<GraphDataEdgeInput>,
+        edges: &[GraphDataEdgeInput],
+        now: chrono::DateTime<Utc>,
     ) -> CoreResult<()> {
-        let txn = self.db.begin().await.map_err(|e| {
-            CoreError::internal("Failed to begin graph_data transaction").with_source(e)
-        })?;
-
         // Gather node ids for informational logging about external references
         let node_ids: std::collections::HashSet<String> = graph_data_nodes::Entity::find()
             .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
-            .all(&txn)
+            .all(txn)
             .await
             .map_err(|e| CoreError::internal("Failed to load graph_data nodes").with_source(e))?
             .into_iter()
@@ -162,11 +225,10 @@ impl GraphDataService {
 
         graph_data_edges::Entity::delete_many()
             .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
-            .exec(&txn)
+            .exec(txn)
             .await
             .map_err(|e| CoreError::internal("Failed to delete graph_data edges").with_source(e))?;
 
-        let now = Utc::now();
         let mut external_ref_count = 0;
         for edge in edges.iter() {
             // Allow edges that reference external nodes (nodes from other datasets)
@@ -195,7 +257,7 @@ impl GraphDataService {
                 ..Default::default()
             };
             graph_data_edges::Entity::insert(active)
-                .exec(&txn)
+                .exec(txn)
                 .await
                 .map_err(|e| {
                     CoreError::internal("Failed to insert graph_data edge").with_source(e)
@@ -210,19 +272,27 @@ impl GraphDataService {
             );
         }
 
+        Ok(())
+    }
+
+    async fn update_counts_in_txn(
+        txn: &DatabaseTransaction,
+        graph_data_id: i32,
+        node_count: i32,
+        edge_count: i32,
+        now: chrono::DateTime<Utc>,
+    ) -> CoreResult<()> {
         graph_data::ActiveModel {
             id: Set(graph_data_id),
-            edge_count: Set(edges.len() as i32),
+            node_count: Set(node_count),
+            edge_count: Set(edge_count),
             updated_at: Set(now),
             ..Default::default()
         }
-        .update(&txn)
+        .update(txn)
         .await
         .map_err(|e| CoreError::internal("Failed to update graph_data counts").with_source(e))?;
-
-        txn.commit()
-            .await
-            .map_err(|e| CoreError::internal("Failed to commit graph_data edges").with_source(e))
+        Ok(())
     }
 
     pub async fn load_nodes(&self, graph_data_id: i32) -> CoreResult<Vec<graph_data_nodes::Model>> {
@@ -333,6 +403,51 @@ impl GraphDataService {
     pub async fn mark_processing(&self, graph_data_id: i32) -> CoreResult<()> {
         self.mark_status(graph_data_id, GraphDataStatus::Processing, None)
             .await
+    }
+
+    /// Reconcile rows left in the transitional `Processing` state by an
+    /// interrupted execution (crash, deploy, OOM). Any such row is moved to
+    /// `Error` so it is visibly recoverable rather than silently stuck.
+    ///
+    /// Returns the number of rows reconciled. Intended to run once at startup.
+    pub async fn reconcile_interrupted_processing(&self) -> CoreResult<u64> {
+        let processing: String = GraphDataStatus::Processing.into();
+        let error_status: String = GraphDataStatus::Error.into();
+
+        let stuck = graph_data::Entity::find()
+            .filter(graph_data::Column::Status.eq(processing))
+            .all(&self.db)
+            .await
+            .map_err(|e| {
+                CoreError::internal("Failed to query processing graph_data").with_source(e)
+            })?;
+
+        let count = stuck.len() as u64;
+        if count == 0 {
+            return Ok(0);
+        }
+
+        let now = Utc::now();
+        for model in stuck {
+            let id = model.id;
+            let mut active: graph_data::ActiveModel = model.into();
+            active.status = Set(error_status.clone());
+            active.error_message = Set(Some(
+                "Execution was interrupted before completion; graph may be inconsistent. \
+                 Re-run to regenerate."
+                    .to_string(),
+            ));
+            active.updated_at = Set(now);
+            active.update(&self.db).await.map_err(|e| {
+                CoreError::internal(format!("Failed to reconcile graph_data {}", id)).with_source(e)
+            })?;
+        }
+
+        warn!(
+            "Reconciled {} graph_data row(s) stuck in Processing to Error at startup",
+            count
+        );
+        Ok(count)
     }
 
     /// Mark a graph_data as error with an error message
@@ -641,7 +756,15 @@ impl GraphDataService {
                         message: e.to_string(),
                     });
 
-                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, e);
+                    // A hard error (DB failure) means we cannot safely continue:
+                    // later edits may depend on this one, and applying them out of
+                    // order would corrupt the graph. Stop and leave the remaining
+                    // edits unapplied so a subsequent replay can resume in order.
+                    warn!(
+                        "Aborting replay at edit #{} due to error: {}",
+                        edit.sequence_number, e
+                    );
+                    break;
                 }
             }
         }
