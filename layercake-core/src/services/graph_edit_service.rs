@@ -1,4 +1,3 @@
-use super::graph_edit_applicator::{ApplyResult, GraphEditApplicator};
 use crate::database::entities::graph_data;
 use crate::database::entities::graph_edits::{self, Entity as GraphEdits};
 use crate::errors::{CoreError, CoreResult};
@@ -7,7 +6,6 @@ use sea_orm::{
     ActiveModelTrait, ActiveValue, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait,
     QueryFilter, QueryOrder, Set,
 };
-use tracing::{debug, info, warn};
 
 /// Service for managing graph edit operations
 ///
@@ -151,41 +149,6 @@ impl GraphEditService {
             if !applied {
                 active_model.has_pending_edits = Set(true);
             }
-            active_model.updated_at = Set(chrono::Utc::now());
-
-            active_model
-                .update(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
-        }
-        Ok(())
-    }
-
-    async fn set_graph_pending_state(&self, graph_id: i32, has_pending: bool) -> CoreResult<()> {
-        if graph_data::Entity::find_by_id(graph_id)
-            .one(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to load graph data: {}", e)))?
-            .is_some()
-        {
-            let graph_data_service = GraphDataService::new(self.db.clone());
-            graph_data_service
-                .set_pending_state(graph_id, has_pending)
-                .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to update graph data pending state: {}", e))
-                })?;
-        } else {
-            use crate::database::entities::graphs::{self, Entity as Graphs};
-
-            let graph = Graphs::find_by_id(graph_id)
-                .one(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
-                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
-
-            let mut active_model: graphs::ActiveModel = graph.into();
-            active_model.has_pending_edits = Set(has_pending);
             active_model.updated_at = Set(chrono::Utc::now());
 
             active_model
@@ -350,108 +313,6 @@ impl GraphEditService {
             .await
             .map_err(|e| CoreError::internal(format!("Failed to count graph edits: {}", e)))?;
         Ok(count)
-    }
-
-    /// Replay all unapplied edits for a graph
-    ///
-    /// Returns a summary of the replay operation
-    pub async fn replay_graph_edits(&self, graph_id: i32) -> CoreResult<ReplaySummary> {
-        info!("Starting replay of edits for graph {}", graph_id);
-
-        // Get all unapplied edits in sequence order
-        let edits = self.get_edits_for_graph(graph_id, true).await?;
-        let total_edits = edits.len();
-
-        info!("Found {} unapplied edits to replay", total_edits);
-
-        let mut summary = ReplaySummary {
-            total: total_edits,
-            applied: 0,
-            skipped: 0,
-            failed: 0,
-            details: Vec::new(),
-        };
-
-        // Create applicator
-        let applicator = GraphEditApplicator::new(self.db.clone());
-
-        // Apply each edit in sequence
-        for edit in edits {
-            debug!(
-                "Replaying edit #{}: {} {} {}",
-                edit.sequence_number, edit.operation, edit.target_type, edit.target_id
-            );
-
-            match applicator.apply_edit(&edit).await {
-                Ok(ApplyResult::Success { message }) => {
-                    summary.applied += 1;
-                    summary.details.push(EditResult {
-                        sequence_number: edit.sequence_number,
-                        target_type: edit.target_type.clone(),
-                        target_id: edit.target_id.clone(),
-                        operation: edit.operation.clone(),
-                        result: "success".to_string(),
-                        message,
-                    });
-
-                    // Mark as applied
-                    if let Err(e) = self.mark_edit_applied(edit.id).await {
-                        warn!("Failed to mark edit {} as applied: {}", edit.id, e);
-                    }
-                }
-                Ok(ApplyResult::Skipped { reason }) => {
-                    summary.skipped += 1;
-                    summary.details.push(EditResult {
-                        sequence_number: edit.sequence_number,
-                        target_type: edit.target_type.clone(),
-                        target_id: edit.target_id.clone(),
-                        operation: edit.operation.clone(),
-                        result: "skipped".to_string(),
-                        message: reason,
-                    });
-                }
-                Ok(ApplyResult::Error { reason }) => {
-                    summary.failed += 1;
-                    summary.details.push(EditResult {
-                        sequence_number: edit.sequence_number,
-                        target_type: edit.target_type.clone(),
-                        target_id: edit.target_id.clone(),
-                        operation: edit.operation.clone(),
-                        result: "failed".to_string(),
-                        message: reason.clone(),
-                    });
-
-                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, reason);
-                }
-                Err(e) => {
-                    summary.failed += 1;
-                    summary.details.push(EditResult {
-                        sequence_number: edit.sequence_number,
-                        target_type: edit.target_type.clone(),
-                        target_id: edit.target_id.clone(),
-                        operation: edit.operation.clone(),
-                        result: "failed".to_string(),
-                        message: e.to_string(),
-                    });
-
-                    warn!("Failed to apply edit #{}: {}", edit.sequence_number, e);
-                }
-            }
-        }
-
-        // Update last_replay_at
-        self.mark_graph_replayed(graph_id).await?;
-
-        if self.get_edit_count(graph_id, true).await? == 0 {
-            self.set_graph_pending_state(graph_id, false).await?;
-        }
-
-        info!(
-            "Replay complete for graph {}: {} applied, {} skipped, {} failed",
-            graph_id, summary.applied, summary.skipped, summary.failed
-        );
-
-        Ok(summary)
     }
 }
 

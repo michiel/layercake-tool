@@ -27,6 +27,133 @@ async fn setup_db() -> DatabaseConnection {
     db
 }
 
+/// Create a real `data_sets` row (with graph_json) for a DataSetNode to
+/// reference. This is how source data actually enters the DAG — GraphNodes take
+/// their input from upstream DAG edges, not from config.
+async fn create_data_set(
+    db: &DatabaseConnection,
+    project_id: i32,
+    name: &str,
+    nodes: usize,
+) -> i32 {
+    use layercake_core::database::entities::data_sets;
+    let node_json: Vec<_> = (1..=nodes)
+        .map(|i| json!({"id": format!("{}-n{}", name, i), "label": format!("{} {}", name, i), "layer": "L1", "weight": 1}))
+        .collect();
+    let edge_json = if nodes >= 2 {
+        vec![
+            json!({"id": format!("{}-e1", name), "source": format!("{}-n1", name), "target": format!("{}-n2", name), "label": "", "layer": "L1", "weight": 1}),
+        ]
+    } else {
+        vec![]
+    };
+    let graph_json = json!({"nodes": node_json, "edges": edge_json, "layers": []}).to_string();
+
+    let ds = data_sets::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        project_id: Set(project_id),
+        name: Set(name.to_string()),
+        description: Set(None),
+        file_format: Set("json".to_string()),
+        data_type: Set("graph".to_string()),
+        origin: Set("manual_edit".to_string()),
+        filename: Set(format!("{}.json", name)),
+        blob: Set(Vec::new()),
+        graph_json: Set(graph_json),
+        status: Set("active".to_string()),
+        error_message: Set(None),
+        file_size: Set(0),
+        processed_at: Set(Some(Utc::now())),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        annotations: Set(None),
+    }
+    .insert(db)
+    .await
+    .unwrap();
+    ds.id
+}
+
+/// Create a data_sets row whose graph_json is built from node/edge inputs,
+/// preserving partition/belongs_to flags and edge ids for merge tests.
+async fn create_data_set_from_inputs(
+    db: &DatabaseConnection,
+    project_id: i32,
+    name: &str,
+    nodes: &[GraphDataNodeInput],
+    edges: &[GraphDataEdgeInput],
+) -> i32 {
+    use layercake_core::database::entities::data_sets;
+    let node_json: Vec<_> = nodes
+        .iter()
+        .map(|n| {
+            json!({
+                "id": n.external_id,
+                "label": n.label,
+                "layer": n.layer,
+                "weight": n.weight.unwrap_or(1.0) as i64,
+                "is_partition": n.is_partition.unwrap_or(false),
+                "belongs_to": n.belongs_to,
+            })
+        })
+        .collect();
+    let edge_json: Vec<_> = edges
+        .iter()
+        .map(|e| {
+            json!({
+                "id": e.external_id,
+                "source": e.source,
+                "target": e.target,
+                "label": e.label,
+                "layer": e.layer,
+                "weight": e.weight.unwrap_or(1.0) as i64,
+            })
+        })
+        .collect();
+    let graph_json = json!({"nodes": node_json, "edges": edge_json, "layers": []}).to_string();
+
+    let ds = data_sets::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        project_id: Set(project_id),
+        name: Set(name.to_string()),
+        description: Set(None),
+        file_format: Set("json".to_string()),
+        data_type: Set("graph".to_string()),
+        origin: Set("manual_edit".to_string()),
+        filename: Set(format!("{}.json", name)),
+        blob: Set(Vec::new()),
+        graph_json: Set(graph_json),
+        status: Set("active".to_string()),
+        error_message: Set(None),
+        file_size: Set(0),
+        processed_at: Set(Some(Utc::now())),
+        created_at: Set(Utc::now()),
+        updated_at: Set(Utc::now()),
+        annotations: Set(None),
+    }
+    .insert(db)
+    .await
+    .unwrap();
+    ds.id
+}
+
+/// A DataSetNode plan_dag_nodes model referencing the given data_set.
+fn dataset_node(id: &str, data_set_id: i32) -> plan_dag_nodes::Model {
+    plan_dag_nodes::Model {
+        id: id.to_string(),
+        plan_id: 1,
+        node_type: "DataSetNode".to_string(),
+        position_x: 0.0,
+        position_y: 0.0,
+        source_position: None,
+        target_position: None,
+        metadata_json: json!({"label": id}).to_string(),
+        config_json: json!({"dataSetId": data_set_id}).to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    }
+}
+
 async fn seed_project_and_palette(db: &DatabaseConnection) -> i32 {
     // Create project
     let project = projects::ActiveModel {
@@ -157,74 +284,66 @@ async fn create_dataset_with_edges(
     dataset
 }
 
-#[ignore = "pre-existing: GraphNode build from dataset yields 0 nodes (legacy schema drift), not caused by Horizon 1 - see follow-up"]
 #[tokio::test]
 async fn test_dag_executor_simple_graph_build() {
     let db = setup_db().await;
     let project_id = seed_project_and_palette(&db).await;
     let service = GraphDataService::new(db.clone());
 
-    // Create a source dataset (via graph_data)
-    let dataset = create_test_dataset(&service, project_id, "Source").await;
+    // Source data enters via a DataSetNode; the GraphNode consumes it via an edge.
+    let ds = create_data_set(&db, project_id, "Source", 2).await;
+    let nodes = vec![
+        dataset_node("dataset-node", ds),
+        plan_dag_nodes::Model {
+            id: "graph-node".to_string(),
+            plan_id: 1,
+            node_type: "GraphNode".to_string(),
+            position_x: 0.0,
+            position_y: 0.0,
+            source_position: None,
+            target_position: None,
+            metadata_json: json!({"label": "Graph Node"}).to_string(),
+            config_json: json!({}).to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        },
+    ];
 
-    // Create DAG with just GraphNode referencing the dataset
-    // (No DataSetNode needed - that's for legacy data_sets table)
-    let nodes = vec![plan_dag_nodes::Model {
-        id: "graph-node".to_string(),
-        plan_id: 1,
-        node_type: "GraphNode".to_string(),
-        position_x: 0.0,
-        position_y: 0.0,
-        source_position: None,
-        target_position: None,
-        metadata_json: json!({"label": "Graph Node"}).to_string(),
-        config_json: json!({"graphDataIds": [dataset.id]}).to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    }];
-
-    let edges: Vec<(String, String)> = vec![];
+    let edges: Vec<(String, String)> = vec![("dataset-node".to_string(), "graph-node".to_string())];
 
     // Execute DAG
     let executor = DagExecutor::new(db.clone());
     let result = executor.execute_dag(project_id, 1, &nodes, &edges).await;
 
-    assert!(result.is_ok(), "DAG execution should succeed");
+    assert!(result.is_ok(), "DAG execution should succeed: {:?}", result);
 
-    // Verify graph was created via GraphDataBuilder
-    let computed_graphs = service.list_computed(project_id).await.unwrap();
-    assert_eq!(
-        computed_graphs.len(),
-        1,
-        "Should have created one computed graph"
-    );
-
-    let graph = &computed_graphs[0];
-    assert_eq!(graph.dag_node_id, Some("graph-node".to_string()));
+    // The GraphNode produced a computed graph with the dataset's 2 nodes.
+    let graph = service
+        .get_by_dag_node("graph-node")
+        .await
+        .unwrap()
+        .expect("GraphNode should produce graph_data");
     assert_eq!(graph.source_type, "computed");
-    assert_eq!(
-        graph.node_count, 2,
-        "Should have merged 2 nodes from dataset"
-    );
+    assert_eq!(graph.node_count, 2, "should copy 2 nodes from the dataset");
 
-    // Verify nodes were copied
-    let nodes = service.load_nodes(graph.id).await.unwrap();
-    assert_eq!(nodes.len(), 2);
+    let loaded_nodes = service.load_nodes(graph.id).await.unwrap();
+    assert_eq!(loaded_nodes.len(), 2);
 }
 
-#[ignore = "pre-existing: GraphNode build from dataset yields 0 nodes (legacy schema drift), not caused by Horizon 1 - see follow-up"]
 #[tokio::test]
 async fn test_dag_executor_graph_chaining() {
     let db = setup_db().await;
     let project_id = seed_project_and_palette(&db).await;
     let service = GraphDataService::new(db.clone());
 
-    // Create two source datasets
-    let dataset1 = create_test_dataset(&service, project_id, "DS1").await;
-    let dataset2 = create_test_dataset(&service, project_id, "DS2").await;
+    // Two datasets feed graph1 (which merges them); graph2 chains from graph1.
+    // ds1 -> graph1 <- ds2, then graph1 -> graph2.
+    let ds1 = create_data_set(&db, project_id, "DS1", 2).await;
+    let ds2 = create_data_set(&db, project_id, "DS2", 2).await;
 
-    // Create DAG: Graph1 (merges DS1 + DS2) -> Graph2 (chains from Graph1)
     let nodes = vec![
+        dataset_node("ds1-node", ds1),
+        dataset_node("ds2-node", ds2),
         plan_dag_nodes::Model {
             id: "graph1-node".to_string(),
             plan_id: 1,
@@ -234,7 +353,7 @@ async fn test_dag_executor_graph_chaining() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Merged Graph"}).to_string(),
-            config_json: json!({"graphDataIds": [dataset1.id, dataset2.id]}).to_string(),
+            config_json: json!({}).to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
@@ -247,51 +366,40 @@ async fn test_dag_executor_graph_chaining() {
             source_position: None,
             target_position: None,
             metadata_json: json!({"label": "Chained Graph"}).to_string(),
-            // Will be updated after graph1 is built
-            config_json: json!({"graphDataIds": []}).to_string(),
+            config_json: json!({}).to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
         },
     ];
 
-    let edges = vec![("graph1-node".to_string(), "graph2-node".to_string())];
+    let edges = vec![
+        ("ds1-node".to_string(), "graph1-node".to_string()),
+        ("ds2-node".to_string(), "graph1-node".to_string()),
+        ("graph1-node".to_string(), "graph2-node".to_string()),
+    ];
 
-    // Execute DAG for graph1 only
     let executor = DagExecutor::new(db.clone());
     executor
-        .execute_dag(project_id, 1, &nodes[0..1], &[])
+        .execute_dag(project_id, 1, &nodes, &edges)
         .await
         .unwrap();
 
-    // Get graph1's ID to use in graph2
-    let graph1 = service.get_by_dag_node("graph1-node").await.unwrap();
-    assert!(graph1.is_some(), "Graph1 should be created");
-    let graph1 = graph1.unwrap();
+    // Verify both computed graphs exist and chain correctly.
+    let graph1 = service
+        .get_by_dag_node("graph1-node")
+        .await
+        .unwrap()
+        .expect("Graph1 should be created");
     assert_eq!(
         graph1.node_count, 4,
         "Graph1 should merge 4 nodes (2 from each dataset)"
     );
 
-    // Update graph2 config to chain from graph1
-    let mut nodes_with_chain = nodes.clone();
-    nodes_with_chain[1].config_json = json!({"graphDataIds": [graph1.id]}).to_string();
-
-    // Execute complete DAG including graph2
-    executor
-        .execute_dag(project_id, 1, &nodes_with_chain, &edges)
+    let graph2 = service
+        .get_by_dag_node("graph2-node")
         .await
-        .unwrap();
-
-    // Verify both graphs exist
-    let computed_graphs = service.list_computed(project_id).await.unwrap();
-    assert_eq!(computed_graphs.len(), 2, "Should have two computed graphs");
-
-    // Verify graph2 was built from graph1
-    let graph2 = service.get_by_dag_node("graph2-node").await.unwrap();
-    assert!(graph2.is_some(), "Graph2 should be created");
-    let graph2 = graph2.unwrap();
-
-    // Graph2 should have the same nodes as graph1 (4 total: 2 from DS1 + 2 from DS2)
+        .unwrap()
+        .expect("Graph2 should be created");
     assert_eq!(
         graph2.node_count, graph1.node_count,
         "Graph2 should inherit graph1's merged nodes"
@@ -299,18 +407,17 @@ async fn test_dag_executor_graph_chaining() {
     assert_eq!(graph2.node_count, 4, "Should have 4 nodes total");
 }
 
-#[ignore = "pre-existing: GraphNode build from dataset yields 0 nodes (legacy schema drift), not caused by Horizon 1 - see follow-up"]
 #[tokio::test]
 async fn test_merge_preserves_edges_and_partition_flags() {
     let db = setup_db().await;
     let project_id = seed_project_and_palette(&db).await;
     let service = GraphDataService::new(db.clone());
 
-    let dataset_a = create_dataset_with_edges(
-        &service,
+    let ds_a = create_data_set_from_inputs(
+        &db,
         project_id,
         "A",
-        vec![
+        &[
             GraphDataNodeInput {
                 external_id: "A-root".into(),
                 label: Some("Root".into()),
@@ -336,7 +443,7 @@ async fn test_merge_preserves_edges_and_partition_flags() {
                 created_at: None,
             },
         ],
-        (0..3)
+        &(0..3)
             .map(|i| GraphDataEdgeInput {
                 external_id: format!("A-e{}", i),
                 source: "A-root".into(),
@@ -349,15 +456,15 @@ async fn test_merge_preserves_edges_and_partition_flags() {
                 attributes: None,
                 created_at: None,
             })
-            .collect(),
+            .collect::<Vec<_>>(),
     )
     .await;
 
-    let dataset_b = create_dataset_with_edges(
-        &service,
+    let ds_b = create_data_set_from_inputs(
+        &db,
         project_id,
         "B",
-        vec![
+        &[
             GraphDataNodeInput {
                 external_id: "B-n1".into(),
                 label: Some("B1".into()),
@@ -395,7 +502,7 @@ async fn test_merge_preserves_edges_and_partition_flags() {
                 created_at: None,
             },
         ],
-        (0..12)
+        &(0..12)
             .map(|i| GraphDataEdgeInput {
                 external_id: format!("B-e{}", i),
                 source: if i % 2 == 0 {
@@ -412,24 +519,31 @@ async fn test_merge_preserves_edges_and_partition_flags() {
                 attributes: None,
                 created_at: None,
             })
-            .collect(),
+            .collect::<Vec<_>>(),
     )
     .await;
 
-    let nodes = vec![plan_dag_nodes::Model {
-        id: "merge-node".to_string(),
-        plan_id: 1,
-        node_type: "GraphNode".to_string(),
-        position_x: 0.0,
-        position_y: 0.0,
-        source_position: None,
-        target_position: None,
-        metadata_json: json!({"label": "Merged Graph"}).to_string(),
-        config_json: json!({"graphDataIds": [dataset_a.id, dataset_b.id]}).to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-    }];
-    let edges: Vec<(String, String)> = vec![];
+    let nodes = vec![
+        dataset_node("ds-a-node", ds_a),
+        dataset_node("ds-b-node", ds_b),
+        plan_dag_nodes::Model {
+            id: "merge-node".to_string(),
+            plan_id: 1,
+            node_type: "GraphNode".to_string(),
+            position_x: 0.0,
+            position_y: 0.0,
+            source_position: None,
+            target_position: None,
+            metadata_json: json!({"label": "Merged Graph"}).to_string(),
+            config_json: json!({}).to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        },
+    ];
+    let edges: Vec<(String, String)> = vec![
+        ("ds-a-node".to_string(), "merge-node".to_string()),
+        ("ds-b-node".to_string(), "merge-node".to_string()),
+    ];
 
     let executor = DagExecutor::new(db.clone());
     executor

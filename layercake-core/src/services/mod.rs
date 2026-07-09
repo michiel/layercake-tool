@@ -12,7 +12,6 @@ pub mod file_type_detection;
 pub mod graph_analysis_service;
 pub mod graph_data_edit_applicator;
 pub mod graph_data_service;
-pub mod graph_edit_applicator;
 pub mod graph_edit_service;
 pub mod graph_service;
 pub mod import_service;
