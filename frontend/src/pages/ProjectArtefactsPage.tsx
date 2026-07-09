@@ -42,6 +42,7 @@ import { MermaidPreviewDialog, DotPreviewDialog } from '../components/visualizat
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import { PlanDagNodeType } from '../types/plan-dag'
 import { useProjectPlanSelection } from '../hooks/useProjectPlanSelection'
+import { fallbackExportFilename } from '../utils/exportFilename'
 import { cn } from '../lib/utils'
 
 const GET_PROJECTS = gql`
@@ -308,12 +309,13 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           const url = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = result.filename
+          const downloadName = result.filename || fallbackExportFilename('artefact', undefined, result.mimeType)
+          link.download = downloadName
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
           window.URL.revokeObjectURL(url)
-          showSuccessNotification('Download Complete', result.filename)
+          showSuccessNotification('Download Complete', downloadName)
         } catch (error) {
           console.error('Failed to decode and download export', error)
           showErrorNotification('Download Failed', 'Unable to decode export content')

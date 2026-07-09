@@ -21,6 +21,7 @@ import { BaseNode } from './BaseNode'
 import { resolveNodeHandlers } from './nodeHandlers'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog } from '../../../visualization'
+import { fallbackExportFilename } from '@/utils/exportFilename'
 
 interface ExtendedNodeProps extends NodeProps {
   onEdit?: (nodeId: string) => void
@@ -65,12 +66,15 @@ export const SequenceArtefactNode = memo((props: ExtendedNodeProps) => {
           const url = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = result.filename
+          // Empty filename (no configured outputPath) → fall back to a name.
+          const downloadName =
+            result.filename || fallbackExportFilename(config.renderTarget, data.metadata?.label, result.mimeType)
+          link.download = downloadName
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
           window.URL.revokeObjectURL(url)
-          showSuccessNotification('Download Complete', result.filename)
+          showSuccessNotification('Download Complete', downloadName)
         } catch (error) {
           console.error('Failed to decode and download:', error)
           showErrorNotification('Download Failed', 'Failed to decode export content')

@@ -22,6 +22,7 @@ import { resolveNodeHandlers } from './nodeHandlers'
 import { showErrorNotification, showSuccessNotification } from '../../../../utils/notifications'
 import { MermaidPreviewDialog, DotPreviewDialog } from '../../../visualization'
 import { usePlanVisualEditorContext } from '../context'
+import { fallbackExportFilename } from '@/utils/exportFilename'
 
 type ArtefactConfig = GraphArtefactNodeConfig | TreeArtefactNodeConfig
 
@@ -166,12 +167,17 @@ const ArtefactNodeBase = memo((props: ArtefactNodeProps) => {
           const url = window.URL.createObjectURL(blob)
           const link = document.createElement('a')
           link.href = url
-          link.download = result.filename
+          // The backend returns an empty filename when the artefact node has no
+          // outputPath configured; fall back to a sensible name so the browser
+          // doesn't download a nameless file.
+          const downloadName =
+            result.filename || fallbackExportFilename(config.renderTarget, data.metadata?.label, result.mimeType)
+          link.download = downloadName
           document.body.appendChild(link)
           link.click()
           document.body.removeChild(link)
           window.URL.revokeObjectURL(url)
-          showSuccessNotification('Download Complete', result.filename)
+          showSuccessNotification('Download Complete', downloadName)
         } catch (error) {
           console.error('Failed to decode and download:', error)
           showErrorNotification('Download Failed', 'Failed to decode export content')

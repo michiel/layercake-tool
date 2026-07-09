@@ -12,6 +12,7 @@ import {
   IconFileTypeCsv,
   IconBraces,
 } from '@tabler/icons-react'
+import { fallbackExportFilename } from '@/utils/exportFilename'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group, Stack } from '@/components/layout-primitives'
@@ -120,7 +121,7 @@ export const StoriesPage = () => {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = result.filename
+        a.download = result.filename || fallbackExportFilename('story', undefined, result.mimeType)
         document.body.appendChild(a)
         a.click()
         document.body.removeChild(a)
