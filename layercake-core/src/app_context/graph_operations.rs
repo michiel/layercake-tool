@@ -586,10 +586,35 @@ impl AppContext {
         graph_id: i32,
     ) -> CoreResult<GraphEditReplaySummary> {
         self.authorize_graph_write(actor, graph_id).await?;
-        self.graph_edit_service
-            .replay_graph_edits(graph_id)
+
+        // `graph_id` is a graph_data id in the current schema. Route through the
+        // graph_data replay path; the legacy GraphEditService/GraphEditApplicator
+        // queries the dropped graph_nodes/graph_edges/graph_layers tables and
+        // would fail with "no such table: graph_nodes".
+        let service = crate::services::GraphDataService::new(self.db.clone());
+        let summary = service
+            .replay_edits(graph_id)
             .await
-            .map_err(|e| CoreError::internal(format!("Failed to replay graph edits: {}", e)))
+            .map_err(|e| CoreError::internal(format!("Failed to replay graph edits: {}", e)))?;
+
+        Ok(GraphEditReplaySummary {
+            total: summary.total,
+            applied: summary.applied,
+            skipped: summary.skipped,
+            failed: summary.failed,
+            details: summary
+                .details
+                .into_iter()
+                .map(|d| crate::services::graph_edit_service::EditResult {
+                    sequence_number: d.sequence_number,
+                    target_type: d.target_type,
+                    target_id: d.target_id,
+                    operation: d.operation,
+                    result: d.result,
+                    message: d.message,
+                })
+                .collect(),
+        })
     }
 
     pub async fn create_graph_edit(
