@@ -441,3 +441,56 @@ async fn graph_edits_rebuild_migration_is_rerunnable() {
         .await;
     assert!(idx.is_ok(), "graph_edits should still be a valid table");
 }
+
+// --- Regression: app-level replay_graph_edits must work on graph_data ---
+//
+// The GraphQL `replayGraphEdits` mutation (used by the edit-history modal)
+// routed through the legacy GraphEditApplicator, which queried the dropped
+// graph_nodes/graph_edges/graph_layers tables and failed at runtime with
+// "no such table: graph_nodes". It now delegates to the graph_data replay path.
+#[tokio::test]
+async fn app_replay_graph_edits_applies_on_graph_data() {
+    use layercake_core::auth::SystemActor;
+    use layercake_core::AppContext;
+
+    let db = setup_test_db().await.unwrap();
+    ensure_project(&db, 1).await;
+    let service = GraphDataService::new(db.clone());
+    let gd = create_graph_data(&service, 1).await;
+
+    // Queue a create-node edit (unapplied) directly.
+    graph_edits::ActiveModel {
+        id: sea_orm::ActiveValue::NotSet,
+        graph_id: Set(gd.id),
+        target_type: Set("node".to_string()),
+        target_id: Set("n1".to_string()),
+        operation: Set("create".to_string()),
+        field_name: Set(None),
+        old_value: Set(None),
+        new_value: Set(Some(json!({ "label": "Replayed" }))),
+        sequence_number: Set(1),
+        applied: Set(false),
+        created_at: Set(chrono::Utc::now()),
+        created_by: Set(None),
+    }
+    .insert(&db)
+    .await
+    .unwrap();
+
+    // The app-level call must succeed (previously errored on dropped tables).
+    let app = AppContext::new(db.clone());
+    let summary = app
+        .replay_graph_edits(&SystemActor::internal(), gd.id)
+        .await
+        .expect("replay_graph_edits should apply against graph_data");
+    assert_eq!(summary.applied, 1);
+
+    // The node was actually created in graph_data.
+    let node = graph_data_nodes::Entity::find()
+        .filter(graph_data_nodes::Column::GraphDataId.eq(gd.id))
+        .filter(graph_data_nodes::Column::ExternalId.eq("n1"))
+        .one(&db)
+        .await
+        .unwrap();
+    assert!(node.is_some(), "replayed edit should create the node");
+}
