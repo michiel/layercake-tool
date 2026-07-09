@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@apollo/client/react'
 import { gql } from '@apollo/client'
+import { hexToRgb } from '@/utils/color'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group, Stack } from '@/components/layout-primitives'
@@ -103,15 +104,6 @@ const hslToHex = (h: number, s: number, l: number) => {
   const toHex = (component: number) => component.toString(16).padStart(2, '0')
 
   return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`.toUpperCase()
-}
-
-const hexToRgb = (value: string) => {
-  const hex = value.replace('#', '')
-  const bigint = parseInt(hex, 16)
-  const r = (bigint >> 16) & 255
-  const g = (bigint >> 8) & 255
-  const b = bigint & 255
-  return { r, g, b }
 }
 
 const getContrastText = (background: string) => {

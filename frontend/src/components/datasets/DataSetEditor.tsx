@@ -73,6 +73,17 @@ const GET_PROJECTS = gql`
 
 interface DataSetEditorProps {}
 
+/// Pretty-print a JSON string; if it's malformed (or empty), fall back to the
+/// raw string instead of throwing during render.
+function prettyJsonOrRaw(raw: string | null | undefined): string {
+  if (!raw) return ''
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2)
+  } catch {
+    return raw
+  }
+}
+
 export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const navigate = useNavigate()
   const location = useLocation()
@@ -752,7 +763,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
                   <p className="text-sm text-muted-foreground">
                     {summaryData?.graphSummary
                       ? `${summaryData.graphSummary.nodeCount} nodes · ${summaryData.graphSummary.edgeCount} edges`
-                      : `${dataSource.graphJson.length} characters`}
+                      : `${dataSource.graphJson?.length ?? 0} characters`}
                   </p>
                 </Group>
 
@@ -787,7 +798,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
                 ) : (
                   <ScrollArea className="h-[400px]">
                     <pre className="text-xs bg-muted p-4 rounded-md overflow-x-auto">
-                      <code>{JSON.stringify(JSON.parse(dataSource.graphJson), null, 2)}</code>
+                      <code>{prettyJsonOrRaw(dataSource.graphJson)}</code>
                     </pre>
                   </ScrollArea>
                 )}

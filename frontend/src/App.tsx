@@ -1582,11 +1582,21 @@ const ProjectDetailPage = () => {
         })
       }
       if (node.config) {
-        const config = typeof node.config === 'string' ? JSON.parse(node.config) : node.config
-        yaml += `    config:\n`
-        Object.entries(config).forEach(([key, value]) => {
-          yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
-        })
+        let config: any = node.config
+        if (typeof node.config === 'string') {
+          try {
+            config = JSON.parse(node.config)
+          } catch {
+            // Malformed config shouldn't abort the whole YAML export.
+            config = null
+          }
+        }
+        if (config && typeof config === 'object') {
+          yaml += `    config:\n`
+          Object.entries(config).forEach(([key, value]) => {
+            yaml += `      ${key}: ${serializeValue(value, 3).trim()}\n`
+          })
+        }
       }
       yaml += '\n'
     })
