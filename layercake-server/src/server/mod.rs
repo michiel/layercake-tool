@@ -16,7 +16,7 @@ pub enum MigrateDirection {
 use anyhow::Result;
 use layercake_core::database::{connection::*, migrations::Migrator};
 use sea_orm_migration::prelude::*;
-use tracing::info;
+use tracing::{info, warn};
 
 pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&str>) -> Result<()> {
     let database_url = get_database_url(Some(database_path));
@@ -25,6 +25,17 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
     // Run migrations
     Migrator::up(&db, None).await?;
     info!("Database migrations completed");
+
+    // Reconcile any graph_data rows left in the transitional Processing state
+    // by a previously interrupted execution so they are not silently stuck.
+    match layercake_core::services::GraphDataService::new(db.clone())
+        .reconcile_interrupted_processing()
+        .await
+    {
+        Ok(0) => {}
+        Ok(n) => info!("Reconciled {} interrupted graph execution(s) at startup", n),
+        Err(e) => warn!("Failed to reconcile interrupted graph executions: {}", e),
+    }
 
     let app = app::create_app(db, cors_origin).await?;
 

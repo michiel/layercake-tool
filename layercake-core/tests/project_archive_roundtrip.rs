@@ -7,8 +7,8 @@ use layercake_core::database::entities::{
     data_sets, layer_aliases, plan_dag_nodes, plans, project_layers, sequences, stories,
 };
 use layercake_core::database::migrations::Migrator;
-use layercake_core::graphql::types::plan_dag::{PlanDagNodeType, Position};
-use layercake_core::graphql::types::sequence::SequenceEdgeRef;
+use layercake_core::plan_dag::{PlanDagNodeType, Position};
+use layercake_core::sequence_types::SequenceEdgeRef;
 use layercake_core::services::data_set_service::DataSetService;
 use layercake_core::services::plan_service::PlanCreateRequest;
 use sea_orm::{
@@ -146,9 +146,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
     .await?;
 
     let actor = layercake_core::auth::SystemActor::internal();
-    let archive = app
-        .export_project_archive(&actor, project.id, false)
-        .await?;
+    let archive = app.export_project_archive(&actor, project.id).await?;
     let archive_bytes = archive.bytes.clone();
     let mut archive_reader = ZipArchive::new(Cursor::new(archive_bytes.clone()))?;
     {

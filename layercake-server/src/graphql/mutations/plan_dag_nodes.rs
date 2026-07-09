@@ -190,6 +190,13 @@ impl PlanDagNodesMutation {
     ) -> Result<NodeExecutionResult> {
         let context = ctx.data::<GraphQLContext>()?;
 
+        let actor = context.actor_for_request(ctx).await;
+        context
+            .app
+            .authorize_project_write_access(&actor, project_id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+
         // Find the plan for this project
         let plan = if let Some(plan_id) = plan_id {
             let plan = plans::Entity::find_by_id(plan_id)

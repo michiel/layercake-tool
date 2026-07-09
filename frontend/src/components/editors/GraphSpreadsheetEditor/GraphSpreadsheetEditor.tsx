@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { IconTable, IconDeviceFloppy, IconClipboard, IconClipboardCopy, IconTrash, IconPlus, IconX } from '@tabler/icons-react';
 import { Stack, Group } from '@/components/layout-primitives';
 import { Button } from '@/components/ui/button';
@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { AttributesMap, attributesToInlineString, attributesToJson, parseAttributesInline, parseAttributesJson, sanitizeAttributes } from '@/utils/attributes';
 import { AttributesEditorDialog } from '@/components/attributes/AttributesEditorDialog';
 import { IconEdit } from '@tabler/icons-react';
+import { showErrorNotification, showInfoNotification } from '@/utils/notifications';
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning';
 
 export interface GraphNode {
   id: string;
@@ -92,6 +94,12 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   );
   const [localLayers, setLocalLayers] = useState<GraphLayer[]>(graphData.layers || []);
   const [hasChanges, setHasChanges] = useState(false);
+  // Mirror of hasChanges readable inside the graphData sync effect without
+  // adding hasChanges to its deps (which would re-run the reset on every edit).
+  const hasChangesRef = useRef(false);
+  useEffect(() => {
+    hasChangesRef.current = hasChanges;
+  }, [hasChanges]);
   const [saving, setSaving] = useState(false);
   const [attributesDialog, setAttributesDialog] = useState<{ type: 'node' | 'edge'; index: number } | null>(null);
   const [attributesTextNodes, setAttributesTextNodes] = useState<Record<string, string>>({});
@@ -99,7 +107,20 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
   const [attributesErrors, setAttributesErrors] = useState<Record<string, string>>({});
   const layerEditingDisabled = readOnly || layersReadOnly;
 
+  // Warn on tab close/reload while there are unsaved spreadsheet edits.
+  useUnsavedChangesWarning(hasChanges);
+
   useEffect(() => {
+    // Do not clobber unsaved local edits when new graphData arrives (e.g. a
+    // background refetch or subscription). Overwriting here would silently
+    // discard the user's in-progress work and reset the dirty flag.
+    if (hasChangesRef.current) {
+      showInfoNotification(
+        'Newer data available',
+        'The underlying graph changed while you have unsaved edits. Save or discard your changes to load the latest.'
+      );
+      return;
+    }
     setLocalNodes((graphData.nodes || []).map(normalizeNode));
     setLocalEdges((graphData.edges || []).map(normalizeEdge));
     setLocalLayers(graphData.layers || []);
@@ -299,6 +320,12 @@ export const GraphSpreadsheetEditor: React.FC<GraphSpreadsheetEditorProps> = ({
       setHasChanges(false);
     } catch (error) {
       console.error('Failed to save graph data:', error);
+      // Keep hasChanges true so the edit is retryable, and tell the user the
+      // save did NOT succeed (previously this failed silently).
+      showErrorNotification(
+        'Failed to save changes',
+        error instanceof Error ? error.message : 'Your edits are still unsaved. Please try again.'
+      );
     } finally {
       setSaving(false);
     }

@@ -5,7 +5,8 @@
 //!
 //! # Examples
 //!
-//! ```rust
+//! ```rust,ignore
+//! // Requires the `graphql` feature (ToGraphQLError is gated behind it).
 //! use layercake::errors::GraphError;
 //! use layercake::errors::common::ToGraphQLError;
 //!

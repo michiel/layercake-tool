@@ -9,30 +9,15 @@ import { createMutationContext } from '../hooks/useGraphQLSubscriptionFilter'
  * Does not listen to subscriptions - only executes commands
  */
 export class PlanDagCommandService {
-  private lastMutationTimestamp: number = 0
-
   constructor(
     private apollo: ApolloClient,
     private clientId: string
   ) {}
 
-  // Mark that a mutation occurred to help query service suppress echo
-  private markMutationOccurred(): void {
-    this.lastMutationTimestamp = Date.now()
-  }
-
-  // Get timestamp for coordination with query service
-  getLastMutationTimestamp(): number {
-    return this.lastMutationTimestamp
-  }
-
   // Core Plan DAG Commands
   async createNode(command: CreateNodeCommand): Promise<PlanDagNode> {
     try {
       console.log('[PlanDagCommandService] Creating node:', command.nodeType)
-
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_NODE,
@@ -59,9 +44,6 @@ export class PlanDagCommandService {
   async updateNode(command: UpdateNodeCommand): Promise<PlanDagNode> {
     try {
       console.log('[PlanDagCommandService] Updating node:', command.nodeId)
-
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_NODE,
@@ -90,9 +72,6 @@ export class PlanDagCommandService {
     try {
       console.log('[PlanDagCommandService] Deleting node:', command.nodeId)
 
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
-
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_NODE,
         variables: {
@@ -115,9 +94,6 @@ export class PlanDagCommandService {
   async moveNode(command: MoveNodeCommand): Promise<boolean> {
     try {
       console.log('[PlanDagCommandService] Moving node:', command.nodeId, command.position)
-
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.MOVE_PLAN_DAG_NODE,
@@ -142,9 +118,6 @@ export class PlanDagCommandService {
     try {
       console.log('[PlanDagCommandService] Batch moving nodes:', command.nodePositions.length)
 
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
-
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.BATCH_MOVE_PLAN_DAG_NODES,
         variables: {
@@ -167,9 +140,6 @@ export class PlanDagCommandService {
   async createEdge(command: CreateEdgeCommand): Promise<ReactFlowEdge> {
     try {
       console.log('[PlanDagCommandService] Creating edge:', command.edge.source, '->', command.edge.target)
-
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.ADD_PLAN_DAG_EDGE,
@@ -197,9 +167,6 @@ export class PlanDagCommandService {
     try {
       console.log('[PlanDagCommandService] Deleting edge:', command.edgeId)
 
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
-
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.DELETE_PLAN_DAG_EDGE,
         variables: {
@@ -222,9 +189,6 @@ export class PlanDagCommandService {
   async updateEdge(command: UpdateEdgeCommand): Promise<ReactFlowEdge> {
     try {
       console.log('[PlanDagCommandService] Updating edge:', command.edgeId)
-
-      // Mark mutation to suppress subscription echo
-      this.markMutationOccurred()
 
       const result = await this.apollo.mutate({
         mutation: PlanDagGraphQL.UPDATE_PLAN_DAG_EDGE,

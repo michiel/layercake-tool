@@ -10,18 +10,10 @@ import { asGraphQLSubscribable } from '../utils/graphqlSubscription'
  * Only listens to subscriptions, never triggers mutations
  */
 export class PlanDagQueryService {
-  private lastMutationTimestamp = 0
-  private readonly MUTATION_ECHO_WINDOW_MS = 500 // Ignore subscription echos for 500ms after mutation
-
   constructor(
     private apollo: ApolloClient,
     private clientId: string
   ) {}
-
-  // Call this method after any mutation to suppress echo
-  markMutationOccurred(): void {
-    this.lastMutationTimestamp = Date.now()
-  }
 
   // Query Operations
   async getPlanDag(query: GetPlanDagQuery): Promise<PlanDag | null> {
@@ -114,21 +106,15 @@ export class PlanDagQueryService {
             operationCount: deltaData.operations.length,
             operations: deltaData.operations.map((op: any) => `${op.op} ${op.path}`),
             userId: deltaData.userId,
+            fromClientId: deltaData.clientId,
             localClientId: this.clientId
           })
 
-          // Skip subscription updates shortly after own mutations to prevent echo
-          // Use command service timestamp if available (coordinated via CQRS service)
-          const commandTimestamp = (this as any).getCommandTimestamp?.() || this.lastMutationTimestamp
-          const timeSinceLastMutation = Date.now() - commandTimestamp
-          if (timeSinceLastMutation < this.MUTATION_ECHO_WINDOW_MS) {
-            console.log('[PlanDagQueryService] Echo suppressed:', {
-              timestamp,
-              reason: 'recent-mutation',
-              timeSinceLastMutation: `${timeSinceLastMutation}ms`,
-              echoWindow: `${this.MUTATION_ECHO_WINDOW_MS}ms`,
-              usingCommandTimestamp: !!(this as any).getCommandTimestamp
-            })
+          // Suppress the echo of our own mutation by comparing the originating
+          // client id, not a timing window. This is causal (never drops a
+          // genuine remote delta) rather than time-based.
+          if (deltaData.clientId && deltaData.clientId === this.clientId) {
+            console.log('[PlanDagQueryService] Filtered out own delta (clientId match)')
             return
           }
 

@@ -182,26 +182,34 @@ impl DagExecutor {
                     .mark_processing(graph_data_record.id)
                     .await?;
 
-                // Persist merge output to graph_data tables
-                self.persist_graph_contents(graph_data_record.id, &graph)
-                    .await?;
+                // Persist merge output and completion state; on failure transition
+                // the row to Error so it is never left stuck in Processing.
+                let graph_data_record_id = graph_data_record.id;
+                let persist_result = async {
+                    self.persist_graph_contents(graph_data_record_id, &graph)
+                        .await?;
 
-                // Update metadata, annotations, and completion state
-                let graph_annotations_json = graph.annotations.as_ref().map(|s| {
-                    serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
-                });
-                let mut active: crate::database::entities::graph_data::ActiveModel =
-                    graph_data_record.into();
-                active.metadata = Set(metadata);
-                active.annotations = Set(graph_annotations_json);
-                active.source_hash = Set(Some(merge_hash));
-                active.computed_date = Set(Some(Utc::now()));
-                active.node_count = Set(graph.nodes.len() as i32);
-                active.edge_count = Set(graph.edges.len() as i32);
-                active.status =
-                    Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
-                active.updated_at = Set(Utc::now());
-                let _updated = active.update(&self.db).await?;
+                    // Update metadata, annotations, and completion state
+                    let graph_annotations_json = graph.annotations.as_ref().map(|s| {
+                        serde_json::from_str::<JsonValue>(s).unwrap_or(JsonValue::String(s.clone()))
+                    });
+                    let mut active: crate::database::entities::graph_data::ActiveModel =
+                        graph_data_record.into();
+                    active.metadata = Set(metadata);
+                    active.annotations = Set(graph_annotations_json);
+                    active.source_hash = Set(Some(merge_hash));
+                    active.computed_date = Set(Some(Utc::now()));
+                    active.node_count = Set(graph.nodes.len() as i32);
+                    active.edge_count = Set(graph.edges.len() as i32);
+                    active.status =
+                        Set(crate::database::entities::graph_data::GraphDataStatus::Active.into());
+                    active.updated_at = Set(Utc::now());
+                    let _updated = active.update(&self.db).await?;
+                    Ok(())
+                }
+                .await;
+                self.mark_error_on_failure(graph_data_record_id, persist_result)
+                    .await?;
 
                 if let Some(ctx) = context.as_deref_mut() {
                     ctx.set_graph(node_id.to_string(), graph.clone());
@@ -829,12 +837,18 @@ impl DagExecutor {
         // .await;
 
         // Persist graph contents to graph_data tables (nodes, edges with layer info in attributes)
-        self.persist_graph_contents(graph_record.id, &graph).await?;
-
-        // Update to completed state with source hash
-        self.graph_data_builder
-            .graph_data_service
-            .mark_complete(graph_record.id, dataset_hash)
+        // and mark complete. On any failure, transition the row to Error so it is
+        // never left stuck in Processing.
+        let persist_result = async {
+            self.persist_graph_contents(graph_record.id, &graph).await?;
+            self.graph_data_builder
+                .graph_data_service
+                .mark_complete(graph_record.id, dataset_hash)
+                .await?;
+            Ok(())
+        }
+        .await;
+        self.mark_error_on_failure(graph_record.id, persist_result)
             .await?;
 
         // TODO: Publish completion status for graph_data
@@ -971,20 +985,28 @@ impl DagExecutor {
         // )
         // .await;
 
-        // Persist graph contents to graph_data tables
-        self.persist_graph_contents(graph_record.id, graph).await?;
+        // Persist graph contents and mark complete; on failure transition the
+        // row to Error so it is never left stuck in Processing.
+        let graph_record_id = graph_record.id;
+        let persist_result = async {
+            self.persist_graph_contents(graph_record_id, graph).await?;
 
-        // Update metadata, annotations, and mark as complete
-        let mut active: graph_data::ActiveModel = graph_record.into();
-        active.metadata = Set(metadata);
-        active.annotations = Set(graph_annotations_json);
-        active.source_hash = Set(Some(transform_hash));
-        active.computed_date = Set(Some(Utc::now()));
-        active.node_count = Set(graph.nodes.len() as i32);
-        active.edge_count = Set(graph.edges.len() as i32);
-        active.status = Set(graph_data::GraphDataStatus::Active.into());
-        active.updated_at = Set(Utc::now());
-        let _updated = active.update(&self.db).await?;
+            // Update metadata, annotations, and mark as complete
+            let mut active: graph_data::ActiveModel = graph_record.into();
+            active.metadata = Set(metadata);
+            active.annotations = Set(graph_annotations_json);
+            active.source_hash = Set(Some(transform_hash));
+            active.computed_date = Set(Some(Utc::now()));
+            active.node_count = Set(graph.nodes.len() as i32);
+            active.edge_count = Set(graph.edges.len() as i32);
+            active.status = Set(graph_data::GraphDataStatus::Active.into());
+            active.updated_at = Set(Utc::now());
+            let _updated = active.update(&self.db).await?;
+            Ok(())
+        }
+        .await;
+        self.mark_error_on_failure(graph_record_id, persist_result)
+            .await?;
 
         // TODO: Publish completion status for graph_data
         // #[cfg(feature = "graphql")]
@@ -1093,19 +1115,26 @@ impl DagExecutor {
             .mark_processing(graph_record.id)
             .await?;
 
-        self.persist_graph_contents(graph_record.id, graph).await?;
+        let graph_record_id = graph_record.id;
+        let persist_result = async {
+            self.persist_graph_contents(graph_record_id, graph).await?;
 
-        // Update metadata, annotations, and mark as complete
-        let mut active: graph_data::ActiveModel = graph_record.into();
-        active.metadata = Set(metadata);
-        active.annotations = Set(graph_annotations_json);
-        active.source_hash = Set(Some(filter_hash));
-        active.computed_date = Set(Some(Utc::now()));
-        active.node_count = Set(graph.nodes.len() as i32);
-        active.edge_count = Set(graph.edges.len() as i32);
-        active.status = Set(graph_data::GraphDataStatus::Active.into());
-        active.updated_at = Set(Utc::now());
-        let _updated = active.update(&self.db).await?;
+            // Update metadata, annotations, and mark as complete
+            let mut active: graph_data::ActiveModel = graph_record.into();
+            active.metadata = Set(metadata);
+            active.annotations = Set(graph_annotations_json);
+            active.source_hash = Set(Some(filter_hash));
+            active.computed_date = Set(Some(Utc::now()));
+            active.node_count = Set(graph.nodes.len() as i32);
+            active.edge_count = Set(graph.edges.len() as i32);
+            active.status = Set(graph_data::GraphDataStatus::Active.into());
+            active.updated_at = Set(Utc::now());
+            let _updated = active.update(&self.db).await?;
+            Ok(())
+        }
+        .await;
+        self.mark_error_on_failure(graph_record_id, persist_result)
+            .await?;
 
         // TODO: Publish graph_data execution status change when graph_data events are wired
         // #[cfg(feature = "graphql")]
@@ -1283,6 +1312,29 @@ impl DagExecutor {
         Ok(format!("{:x}", hasher.finalize()))
     }
 
+    /// If `result` is an error, mark the given graph_data row as `Error` (so it
+    /// is not left stuck in `Processing`) before returning the original error.
+    ///
+    /// The `mark_error` call is best-effort: if it fails we log and still return
+    /// the original error, which is the more useful diagnostic.
+    async fn mark_error_on_failure<T>(&self, graph_data_id: i32, result: Result<T>) -> Result<T> {
+        if let Err(err) = &result {
+            if let Err(mark_err) = self
+                .graph_data_builder
+                .graph_data_service
+                .mark_error(graph_data_id, err.to_string())
+                .await
+            {
+                tracing::error!(
+                    "Failed to mark graph_data {} as error after execution failure: {}",
+                    graph_data_id,
+                    mark_err
+                );
+            }
+        }
+        result
+    }
+
     /// Persist graph contents to graph_data schema
     /// Replaces nodes and edges for the given graph_data_id
     /// Stores layer information in node attributes
@@ -1295,16 +1347,11 @@ impl DagExecutor {
         let node_inputs = nodes_to_graph_data_inputs(&graph.nodes);
         let edge_inputs = edges_to_graph_data_inputs(&graph.edges);
 
-        // Replace nodes using GraphDataService (handles deletion + insertion + count update)
+        // Replace nodes and edges atomically in a single transaction so a
+        // failure/crash cannot leave the graph with nodes but no edges.
         self.graph_data_builder
             .graph_data_service
-            .replace_nodes(graph_data_id, node_inputs)
-            .await?;
-
-        // Replace edges using GraphDataService (handles deletion + insertion + count update)
-        self.graph_data_builder
-            .graph_data_service
-            .replace_edges(graph_data_id, edge_inputs)
+            .replace_contents(graph_data_id, node_inputs, edge_inputs)
             .await?;
 
         // Note: Layer information is now stored in graph_data_nodes.attributes

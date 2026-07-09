@@ -316,6 +316,7 @@ export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
       projectId
       version
       userId
+      clientId
       timestamp
       operations {
         op

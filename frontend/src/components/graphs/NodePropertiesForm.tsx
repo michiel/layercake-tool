@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { GraphNode, Layer } from '../../graphql/graphs';
-import { IconCheck } from '@tabler/icons-react';
+import { IconCheck, IconAlertTriangle } from '@tabler/icons-react';
 import { Stack } from '../layout-primitives';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -10,7 +10,9 @@ import { Spinner } from '../ui/spinner';
 interface NodePropertiesFormProps {
   node: GraphNode;
   layers: Layer[];
-  onUpdate: (updates: Partial<GraphNode>) => void;
+  // May be synchronous (optimistic) or return a Promise; when a Promise is
+  // returned the save indicator reflects its actual settled state.
+  onUpdate: (updates: Partial<GraphNode>) => void | Promise<unknown>;
 }
 
 export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
@@ -22,6 +24,7 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
   const [layer, setLayer] = useState<string | null>(node.layer || null);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Reset form when node changes
   useEffect(() => {
@@ -29,29 +32,51 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
     setLayer(node.layer || null);
   }, [node.id, node.label, node.layer]);
 
+  // Drive the save indicator off the actual result of onUpdate rather than a
+  // fixed timeout, so a failed save is reported as failed (not "Saved").
+  const runUpdate = (updates: Partial<GraphNode>) => {
+    setIsSaving(true);
+    setSaveError(null);
+    Promise.resolve(onUpdate(updates))
+      .then(() => {
+        setLastSaved(new Date());
+      })
+      .catch((err) => {
+        console.error('Failed to save node properties:', err);
+        setSaveError(err instanceof Error ? err.message : 'Save failed');
+      })
+      .finally(() => {
+        setIsSaving(false);
+      });
+  };
+
+  // Keep the latest pending label edit available to the unmount flush so a
+  // label typed but not yet blurred is not lost when the panel closes.
+  const pendingLabelRef = useRef<{ label: string; base: string } | null>(null);
+  useEffect(() => {
+    pendingLabelRef.current = label !== (node.label || '') ? { label, base: node.label || '' } : null;
+  }, [label, node.label]);
+  useEffect(() => {
+    return () => {
+      const pending = pendingLabelRef.current;
+      if (pending && pending.label !== pending.base) {
+        // Fire-and-forget flush of the unsaved label on unmount.
+        void Promise.resolve(onUpdate({ label: pending.label }));
+      }
+    };
+    // Intentionally run only on unmount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleLabelBlur = () => {
     if (label !== node.label) {
-      // Update happens optimistically in parent, just track save state
-      setIsSaving(true);
-      onUpdate({ label });
-      // Mark as saved immediately since update is optimistic
-      setTimeout(() => {
-        setIsSaving(false);
-        setLastSaved(new Date());
-      }, 100);
+      runUpdate({ label });
     }
   };
 
   const handleLayerChange = (value: string | null) => {
     setLayer(value);
-    // Update happens optimistically in parent, just track save state
-    setIsSaving(true);
-    onUpdate({ layer: value || undefined });
-    // Mark as saved immediately since update is optimistic
-    setTimeout(() => {
-      setIsSaving(false);
-      setLastSaved(new Date());
-    }, 100);
+    runUpdate({ layer: value || undefined });
   };
 
   // Build layer options with "None" as first option
@@ -108,7 +133,13 @@ export const NodePropertiesForm: React.FC<NodePropertiesFormProps> = ({
             <span>Saving...</span>
           </>
         )}
-        {!isSaving && lastSaved && (
+        {!isSaving && saveError && (
+          <>
+            <IconAlertTriangle className="h-3.5 w-3.5 text-red-500" />
+            <span className="text-red-500">Not saved: {saveError}</span>
+          </>
+        )}
+        {!isSaving && !saveError && lastSaved && (
           <>
             <IconCheck className="h-3.5 w-3.5 text-green-500" />
             <span>

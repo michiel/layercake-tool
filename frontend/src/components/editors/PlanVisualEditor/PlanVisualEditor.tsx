@@ -46,6 +46,7 @@ import { NodeTypeSelector, NODE_TYPE_SELECTOR_DEFAULTS } from './dialogs/NodeTyp
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning'
 import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 import { autoLayout } from './utils/autoLayout'
 import { useMutation } from '@apollo/client/react'
@@ -207,6 +208,9 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     refreshData,
   } = planDagState
 
+  // Warn before tab close/reload while plan edits are still queued for save.
+  useUnsavedChangesWarning((updateManager?.queueSize ?? 0) > 0)
+
   // Keep nodesRef updated for handleNodeEdit
   useEffect(() => {
     nodesRef.current = nodes
@@ -338,12 +342,14 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       })
 
-      // Persist deletions to backend
-      mutations.deleteNode(nodeId)
-      backendEdgeIdsToDelete.forEach(edgeId => mutations.deleteEdge(edgeId))
-
-      // Re-enable external syncs after a short delay to allow mutations to complete
-      setTimeout(() => setDragging(false), 100)
+      // Persist deletions to backend, and re-enable external syncs only once
+      // all deletion mutations have actually resolved (rather than after a
+      // fixed delay that can re-enable sync before the deletes land).
+      const deletions = [
+        Promise.resolve(mutations.deleteNode(nodeId)),
+        ...backendEdgeIdsToDelete.map(edgeId => Promise.resolve(mutations.deleteEdge(edgeId)))
+      ]
+      Promise.allSettled(deletions).finally(() => setDragging(false))
     }
   }, [setNodes, setEdges, mutations, setDragging, edges, deleteProjectionMutation, updatePlanDagOptimistically])
 
@@ -455,10 +461,6 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
             // DELTA MIGRATION: Disabled bulk update - granular moveNode mutation generates deltas
             // updateManager.scheduleCosmeticUpdate(planDag!, 'node-position-change')
 
-            // Update via granular mutation for delta-based sync
-            mutations.moveNode(node.id, node.position)
-            console.log('Node position saved:', node.id, node.position)
-
             // Optimistically update both ReactFlow nodes AND planDag (prevents stale sync)
             setNodes((nds) =>
               nds.map((n) =>
@@ -482,8 +484,20 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
               }
             })
 
-            // Re-enable external syncs after a short delay to allow mutation to complete
-            setTimeout(() => setDragging(false), 100)
+            // Update via granular mutation for delta-based sync, and re-enable
+            // external syncs only once the mutation has actually resolved (not
+            // after a fixed delay that can re-enable sync before the move lands
+            // and let a stale server position overwrite it).
+            Promise.resolve(mutations.moveNode(node.id, node.position))
+              .then(() => {
+                console.log('Node position saved:', node.id, node.position)
+              })
+              .catch((err) => {
+                console.error('Failed to save node position:', node.id, err)
+              })
+              .finally(() => {
+                setDragging(false)
+              })
           } else {
             console.log('Node not moved significantly, skipping position save:', node.id)
             // Re-enable external syncs immediately if no mutation was sent

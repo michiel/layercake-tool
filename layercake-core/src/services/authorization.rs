@@ -5,6 +5,7 @@ use async_graphql::{Context, Error};
 use chrono::Utc;
 use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
 
+use crate::auth::local_auth_bypass_enabled;
 use crate::database::entities::{project_collaborators, user_sessions, users};
 use crate::errors::{CoreError, CoreResult};
 #[cfg(feature = "graphql")]
@@ -185,16 +186,6 @@ impl AuthorizationService {
     ) -> CoreResult<()> {
         self.check_project_admin_access(user_id, project_id).await?;
         Ok(())
-    }
-}
-
-fn local_auth_bypass_enabled() -> bool {
-    match std::env::var("LAYERCAKE_LOCAL_AUTH_BYPASS") {
-        Ok(value) => {
-            let normalized = value.trim().to_ascii_lowercase();
-            matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
-        }
-        Err(_) => true,
     }
 }
 

@@ -13,6 +13,9 @@ path = "src/lib.rs"
 [features]
 default = []
 graphql = []
+# Exposes database::test_utils (in-memory DB + migrate helper) to integration
+# test crates. Enabled automatically for this crate's own test build.
+test-utils = []
 
 [dependencies]
 # Core dependencies
@@ -61,6 +64,9 @@ layercake-code-analysis = { path = "../layercake-code-analysis" }
 layercake-projections = { path = "../layercake-projections" }
 
 [dev-dependencies]
+# Self-reference enabling the test-utils feature so integration test crates can
+# use database::test_utils (in-memory DB + migrate helper).
+layercake-core = { path = ".", features = ["test-utils"] }
 # Test dependencies for E2E tests
 tokio-test = "0.4"
 futures-util = { workspace = true }

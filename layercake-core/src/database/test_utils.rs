@@ -1,7 +1,5 @@
-#[cfg(test)]
 use sea_orm::{Database, DatabaseConnection};
 
-#[cfg(test)]
 pub async fn setup_test_db() -> DatabaseConnection {
     // Create an in-memory SQLite database for testing
     let db = Database::connect("sqlite::memory:")

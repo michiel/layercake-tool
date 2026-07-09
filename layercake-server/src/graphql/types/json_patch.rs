@@ -66,6 +66,11 @@ pub struct PlanDagDeltaEvent {
     /// User ID who made the change
     pub user_id: String,
 
+    /// Client ID that originated the change, so a client can suppress the echo
+    /// of its own mutation without relying on a timing window. Empty when the
+    /// origin client is unknown.
+    pub client_id: String,
+
     /// Timestamp of the change
     pub timestamp: String,
 

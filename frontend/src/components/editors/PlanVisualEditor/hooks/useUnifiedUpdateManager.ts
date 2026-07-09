@@ -226,19 +226,42 @@ export const useUnifiedUpdateManager = (options: UseUnifiedUpdateManagerOptions 
     updateState()
   }, [clearTimers, updateState])
 
-  // Force process queue immediately
-  const flushOperations = useCallback(async () => {
+  // Drain the ENTIRE queue (all pending operations), not just one deferred op
+  // per cycle. Used by flush and on unmount so no pending save is lost.
+  const drainQueue = useCallback(async () => {
     clearTimers()
-    await processQueue()
-  }, [clearTimers, processQueue])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      clearTimers()
-      operationQueueRef.current = []
+    const pending = [...operationQueueRef.current].sort((a, b) => a.timestamp - b.timestamp)
+    operationQueueRef.current = []
+    for (const op of pending) {
+      try {
+        await op.operation()
+        metricsRef.current.operationsProcessed++
+      } catch (error) {
+        console.error(`Failed to flush operation ${op.id}:`, error)
+      }
     }
   }, [clearTimers])
+
+  // Force process queue immediately (drains everything, not just one op)
+  const flushOperations = useCallback(async () => {
+    await drainQueue()
+  }, [drainQueue])
+
+  // Cleanup on unmount: flush any pending debounced/throttled saves before
+  // tearing down, so navigating away does not silently discard queued edits.
+  // Keep a ref to the latest drain function so the cleanup runs once on real
+  // unmount without re-subscribing on every render.
+  const drainQueueRef = useRef(drainQueue)
+  useEffect(() => {
+    drainQueueRef.current = drainQueue
+  }, [drainQueue])
+  useEffect(() => {
+    return () => {
+      // Fire-and-forget: unmount cleanup can't await, but dispatching the
+      // mutations here means they still reach the server.
+      void drainQueueRef.current()
+    }
+  }, [])
 
   // Memoize the returned object to prevent infinite loops
   return useMemo(() => ({
