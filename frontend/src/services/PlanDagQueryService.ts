@@ -88,7 +88,9 @@ export class PlanDagQueryService {
 
     const subscription = this.apollo.subscribe({
       query: PlanDagGraphQL.PLAN_DAG_DELTA_SUBSCRIPTION,
-      variables: { projectId: query.projectId }
+      // Scope to the plan being edited so a multi-plan project doesn't deliver
+      // (and misapply) a JSON patch generated for a different plan.
+      variables: { projectId: query.projectId, planId: query.planId ?? null }
     })
 
     console.log('[PlanDagQueryService] Delta subscription created, waiting for updates...')
@@ -109,6 +111,17 @@ export class PlanDagQueryService {
             fromClientId: deltaData.clientId,
             localClientId: this.clientId
           })
+
+          // Defensively ignore deltas for a different plan (the server also
+          // filters by planId, but never misapply a cross-plan JSON patch).
+          if (
+            query.planId != null &&
+            deltaData.planId != null &&
+            deltaData.planId !== query.planId
+          ) {
+            console.log('[PlanDagQueryService] Ignoring delta for a different plan', deltaData.planId)
+            return
+          }
 
           // Suppress the echo of our own mutation by comparing the originating
           // client id, not a timing window. This is causal (never drops a

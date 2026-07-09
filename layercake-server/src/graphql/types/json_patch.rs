@@ -60,6 +60,11 @@ pub struct PlanDagDeltaEvent {
     /// Project ID
     pub project_id: i32,
 
+    /// Plan ID the delta applies to. A project can have multiple plans; a
+    /// subscriber must ignore deltas for plans other than the one it is editing,
+    /// otherwise a JSON patch for a different plan would be misapplied.
+    pub plan_id: i32,
+
     /// New version after applying patch
     pub version: i32,
 

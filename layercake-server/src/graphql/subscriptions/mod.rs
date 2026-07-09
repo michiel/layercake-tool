@@ -260,22 +260,28 @@ impl Subscription {
     // Real-time presence data is available through the WebSocket collaboration system at /ws/collaboration
 
     /// Subscribe to Plan DAG delta changes (JSON Patch format) for efficient updates
+    ///
+    /// When `plan_id` is provided, only deltas for that plan are delivered, so a
+    /// client editing one plan of a multi-plan project never receives (and
+    /// misapplies) a patch generated for a different plan.
     async fn plan_dag_delta_changed(
         &self,
         ctx: &Context<'_>,
         project_id: i32,
+        plan_id: Option<i32>,
     ) -> Result<Pin<Box<dyn Stream<Item = PlanDagDeltaEvent> + Send>>> {
         let _context = ctx.data::<GraphQLContext>()?;
 
         // Subscribe to delta events for this project
         let mut receiver = DELTA_EVENTS.subscribe(project_id).await;
 
-        // Stream delta events for this project
+        // Stream delta events for this project (and plan, if specified)
         let stream = async_stream::stream! {
             loop {
                 match receiver.recv().await {
                     Ok(event) => {
-                        if event.project_id == project_id {
+                        let plan_matches = plan_id.map_or(true, |pid| event.plan_id == pid);
+                        if event.project_id == project_id && plan_matches {
                             yield event;
                         }
                     }
