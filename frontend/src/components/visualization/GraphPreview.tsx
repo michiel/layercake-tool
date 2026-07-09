@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import ForceGraph from 'force-graph';
 import { Pane } from 'tweakpane';
+import { hexToRgb } from '@/utils/color';
 
 export interface GraphNode {
   id: string;
@@ -386,11 +387,8 @@ export const GraphPreview = ({ data, width, height }: GraphPreviewProps) => {
           return baseColor.replace(/[\d.]+\)$/, `${isHighlighted ? 1 : 0.2})`);
         }
 
-        // Convert hex to rgba for opacity
-        const rgb = parseInt(baseColor.slice(1), 16);
-        const r = (rgb >> 16) & 255;
-        const g = (rgb >> 8) & 255;
-        const b = rgb & 255;
+        // Convert hex to rgba for opacity (handles #abc and #aabbcc)
+        const { r, g, b } = hexToRgb(baseColor);
         return `rgba(${r}, ${g}, ${b}, ${isHighlighted ? 1 : 0.2})`;
       })
       .linkWidth((link: any) => {

@@ -150,6 +150,16 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   const nodesRef = useRef<Node[]>([])
   const edgesRef = useRef<Edge[]>([])
 
+  // Tracks the post-execution config-poll timers so they can be cleared before
+  // starting a new poll (no stacking) and on unmount (no post-unmount refresh).
+  const execPollRef = useRef<{ interval?: ReturnType<typeof setInterval>; stop?: ReturnType<typeof setTimeout> }>({})
+  const stopExecPoll = useCallback(() => {
+    if (execPollRef.current.interval) clearInterval(execPollRef.current.interval)
+    if (execPollRef.current.stop) clearTimeout(execPollRef.current.stop)
+    execPollRef.current = {}
+  }, [])
+  useEffect(() => stopExecPoll, [stopExecPoll])
+
   // Node action handlers (defined with stable references)
   const handleNodeEdit = useCallback((nodeId: string) => {
     console.log('Edit node triggered:', nodeId)
@@ -1364,14 +1374,17 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       refreshData();
 
       // Poll for config updates (e.g., projectionId written back by backend)
-      // Backend updates node configs during execution but doesn't publish delta events
-      const pollInterval = setInterval(() => {
+      // Backend updates node configs during execution but doesn't publish delta events.
+      // Clear any in-flight poll first so repeated executions don't stack intervals,
+      // and track the timers so they can be cancelled on unmount.
+      stopExecPoll();
+      execPollRef.current.interval = setInterval(() => {
         refreshData();
       }, 2000); // Poll every 2 seconds
 
       // Stop polling after 30 seconds
-      setTimeout(() => {
-        clearInterval(pollInterval);
+      execPollRef.current.stop = setTimeout(() => {
+        stopExecPoll();
       }, 30000);
     },
     onError: (error: any) => {

@@ -122,6 +122,18 @@ const GET_DATASETS = gql`
   }
 `
 
+/// Parse a JSON options string into an object, returning {} for missing or
+/// malformed values instead of throwing in the click handler.
+function safeParseObject(raw: string | null | undefined): Record<string, any> {
+  if (!raw) return {}
+  try {
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
 export const CodeAnalysisPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -224,8 +236,8 @@ export const CodeAnalysisPage: React.FC = () => {
     setFilePath(profile?.filePath ?? '')
     setDatasetId(profile?.datasetId ?? undefined)
     setNoInfra(profile?.noInfra ?? false)
-    const opts = profile?.options ? JSON.parse(profile.options) : {}
-    const solOpts = profile?.solutionOptions ? JSON.parse(profile.solutionOptions) : {}
+    const opts = safeParseObject(profile?.options)
+    const solOpts = safeParseObject(profile?.solutionOptions)
     setAnalysisType(profile?.analysisType || 'code')
     setIncludeDataFlow(opts.includeDataFlow ?? true)
     setIncludeControlFlow(opts.includeControlFlow ?? true)

@@ -38,12 +38,14 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     }
 
     let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
     setIsRendering(true)
 
     const renderDiagram = () => {
+      if (cancelled) return
       // Wait for container to be ready
       if (!containerRef.current) {
-        setTimeout(renderDiagram, 50)
+        retryTimer = setTimeout(renderDiagram, 50)
         return
       }
 
@@ -105,6 +107,7 @@ export const DotPreviewDialog = ({ open, onClose, diagram, title }: DotPreviewDi
     return () => {
       cancelled = true
       clearTimeout(timeoutId)
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [diagram, open, renderId])
 

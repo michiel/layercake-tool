@@ -560,7 +560,9 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     } finally {
       setLoading(false)
     }
-  }, [cqrsService, projectId])
+    // planId must be a dependency: refreshData reads it, and it changes when the
+    // user switches plans within the same project (projectId unchanged).
+  }, [cqrsService, projectId, planId])
 
   // Drag state control - handles pending refresh when drag ends
   const setDragging = useCallback((dragging: boolean) => {

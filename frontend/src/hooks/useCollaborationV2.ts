@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { useMutation } from '@apollo/client/react';
 import {
   JOIN_PROJECT_COLLABORATION,
@@ -99,22 +99,26 @@ export const useCollaborationV2 = (options: UseCollaborationV2Options) => {
            webSocket.connectionState === ConnectionState.CONNECTED;
   }, [enableWebSocket, webSocket.connectionState]);
 
-  // Auto-join session when WebSocket connects and user info is available
+  // Auto-join session when WebSocket connects and user info is available.
+  // Done in an effect (not the render body) so the side effect only runs for
+  // committed renders — a render-phase joinSession can fire on a discarded
+  // render under StrictMode/concurrent React and send duplicate/spurious joins.
   const hasAutoJoinedRef = useRef(false);
-  if (useWebSocketMode && userInfo && !hasAutoJoinedRef.current) {
-    webSocket.joinSession({
-      userId: userInfo.id,
-      userName: userInfo.name,
-      avatarColor: userInfo.avatarColor,
-      documentId
-    });
-    hasAutoJoinedRef.current = true;
-  }
-
-  // Reset auto-join flag when disconnected
-  if (webSocket.connectionState === ConnectionState.DISCONNECTED) {
-    hasAutoJoinedRef.current = false;
-  }
+  useEffect(() => {
+    if (webSocket.connectionState === ConnectionState.DISCONNECTED) {
+      hasAutoJoinedRef.current = false;
+      return;
+    }
+    if (useWebSocketMode && userInfo && !hasAutoJoinedRef.current) {
+      webSocket.joinSession({
+        userId: userInfo.id,
+        userName: userInfo.name,
+        avatarColor: userInfo.avatarColor,
+        documentId
+      });
+      hasAutoJoinedRef.current = true;
+    }
+  }, [useWebSocketMode, webSocket.connectionState, userInfo, documentId, webSocket]);
 
   // Broadcast cursor position
   const broadcastCursorPosition = useCallback((positionX: number, positionY: number, selectedNodeId?: string) => {
