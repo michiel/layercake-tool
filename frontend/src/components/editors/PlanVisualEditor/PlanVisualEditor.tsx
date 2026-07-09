@@ -46,6 +46,7 @@ import { NodeTypeSelector, NODE_TYPE_SELECTOR_DEFAULTS } from './dialogs/NodeTyp
 // Import extracted components and hooks
 import { AdvancedToolbar } from './components/AdvancedToolbar'
 import { usePlanDagCQRS } from './hooks/usePlanDagCQRS'
+import { useUnsavedChangesWarning } from '@/hooks/useUnsavedChangesWarning'
 import { getDefaultNodeConfig, getDefaultNodeMetadata } from './utils/nodeDefaults'
 import { autoLayout } from './utils/autoLayout'
 import { useMutation } from '@apollo/client/react'
@@ -206,6 +207,9 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     updatePlanDagOptimistically,
     refreshData,
   } = planDagState
+
+  // Warn before tab close/reload while plan edits are still queued for save.
+  useUnsavedChangesWarning((updateManager?.queueSize ?? 0) > 0)
 
   // Keep nodesRef updated for handleNodeEdit
   useEffect(() => {

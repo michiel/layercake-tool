@@ -97,21 +97,22 @@
 **Goal:** No editor silently loses or fakes a save.
 
 **Tasks**
-- [ ] 4.1 (R4) Flush pending debounced saves on unmount in `useUnifiedUpdateManager.ts:236-241` (call `flushOperations()` before `clearTimers()`/queue clear).
-- [ ] 4.2 (R6) Guard the `useEffect(…, [graphData])` reset in `GraphSpreadsheetEditor.tsx:102-124` behind a dirty check so an incoming prop object does not wipe unsaved local edits.
-- [ ] 4.3 (R7) `NodePropertiesForm.tsx:32-55`: drive the "Saved" indicator from the actual mutation result (await/inspect `onUpdate`), not a fixed `setTimeout`; surface failure. Also persist on unmount/close, not blur-only.
-- [ ] 4.4 (R11) Surface autosave failures in `usePlanDagCQRS.ts:147-160` / `useUnifiedUpdateManager.ts:106-123`: restore `isDirty` on failure and notify the user instead of swallowing to `console.error`.
-- [ ] 4.5 (R10) Add a `beforeunload` guard (hook) that warns when any editor holds unsaved/dirty state, wired to the dirty-state introduced above.
+- [x] 4.1 (R4) `useUnifiedUpdateManager`: added `drainQueue()` that flushes **all** pending ops (also fixing the "one deferred op per cycle" limitation for the flush path); `flushOperations` now drains everything, and the unmount cleanup fires `drainQueueRef.current()` (fire-and-forget) instead of discarding the queue.
+- [x] 4.2 (R6) `GraphSpreadsheetEditor`: the `[graphData]` reset effect now bails (with an info toast) when `hasChangesRef.current` is set, so a background refetch no longer wipes unsaved edits or resets the dirty flag.
+- [x] 4.3 (R7) `NodePropertiesForm`: save indicator now driven off the actual `onUpdate` result (accepts `void | Promise`), showing "Saving…", "Saved at …", or "Not saved: <error>". Pending label flushed on unmount so a typed-but-not-blurred label isn't lost.
+- [x] 4.4 (R11) Save failures surfaced: `GraphSpreadsheetEditor.handleSave` keeps `hasChanges` true and shows an error toast; `NodePropertiesForm` shows an inline error state.
+- [x] 4.5 (R10) Added `useUnsavedChangesWarning(dirty)` hook (`beforeunload`), wired to `hasChanges` in the spreadsheet editor and to `updateManager.queueSize > 0` in `PlanVisualEditor`.
 
 **Success criteria**
-- Typing in the spreadsheet then triggering a background refetch does not lose the edits.
-- A failed save is visibly reported and leaves the editor dirty (retryable), never shows "Saved".
-- Closing the tab with unsaved edits prompts.
+- [x] Background refetch no longer discards unsaved spreadsheet edits.
+- [x] A failed save is reported and leaves the editor dirty (retryable), never falsely shows "Saved".
+- [x] Closing the tab with unsaved/queued edits prompts.
 
 **Tests / verification**
-- Typecheck passes. Manual verification notes recorded here for each editor.
+- [x] `npx tsc --noEmit` clean.
+- [ ] Manual click-through of each editor deferred to a run pass (no automated component-test harness in repo; `beforeunload` and toast behaviour are DOM-level).
 
-**Status:** Not Started
+**Status:** Complete
 
 ---
 
