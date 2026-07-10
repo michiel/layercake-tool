@@ -1,4 +1,4 @@
-use super::{AppContext, GraphLayerUpdateRequest, GraphNodeUpdateRequest};
+use super::{AppContext, GraphNodeUpdateRequest};
 use crate::auth::Actor;
 use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_analysis_service::GraphConnectivityReport;
@@ -67,34 +67,6 @@ impl AppContext {
         self.graph_service
             .delete_graph_node(graph_id, node_id)
             .await
-    }
-    pub async fn create_layer(
-        &self,
-        actor: &Actor,
-        graph_id: i32,
-        layer_id: String,
-        name: String,
-    ) -> CoreResult<crate::database::entities::graph_layers::Model> {
-        self.authorize_graph_write(actor, graph_id).await?;
-        use crate::database::entities::graph_layers;
-        use sea_orm::{ActiveModelTrait, Set};
-        let layer = graph_layers::ActiveModel {
-            id: sea_orm::ActiveValue::NotSet,
-            graph_id: Set(graph_id),
-            layer_id: Set(layer_id),
-            name: Set(name),
-            background_color: Set(None),
-            text_color: Set(None),
-            border_color: Set(None),
-            alias: Set(None),
-            comment: Set(None),
-            properties: Set(None),
-            dataset_id: Set(None),
-        };
-        layer
-            .insert(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to insert graph layer: {}", e)))
     }
     pub async fn add_graph_edge(
         &self,
@@ -408,97 +380,11 @@ impl AppContext {
         }
         Ok(updated_node)
     }
-    pub async fn update_layer_properties(
-        &self,
-        actor: &Actor,
-        layer_id: i32,
-        name: Option<String>,
-        alias: Option<String>,
-        properties: Option<Value>,
-    ) -> CoreResult<crate::database::entities::graph_layers::Model> {
-        use crate::database::entities::graph_layers::Entity as Layers;
-        use sea_orm::EntityTrait;
-        let old_layer = Layers::find_by_id(layer_id)
-            .one(&self.db)
-            .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to load layer {}: {}", layer_id, e))
-            })?;
-        if let Some(layer) = &old_layer {
-            self.authorize_graph_write(actor, layer.graph_id).await?;
-        }
-        let updated_layer = self
-            .graph_service
-            .update_layer_properties(layer_id, name.clone(), alias.clone(), properties.clone())
-            .await
-            .map_err(|e| {
-                CoreError::internal(format!("Failed to update layer {}: {}", layer_id, e))
-            })?;
-        if let Some(old_layer) = old_layer {
-            if let Some(new_name) = &name {
-                if &old_layer.name != new_name {
-                    let _ = self
-                        .graph_edit_service
-                        .create_edit(
-                            old_layer.graph_id,
-                            "layer".to_string(),
-                            old_layer.layer_id.clone(),
-                            "update".to_string(),
-                            Some("name".to_string()),
-                            Some(json!(old_layer.name)),
-                            Some(json!(new_name)),
-                            None,
-                            true,
-                        )
-                        .await;
-                }
-            }
-            if old_layer.alias != updated_layer.alias {
-                let _ = self
-                    .graph_edit_service
-                    .create_edit(
-                        old_layer.graph_id,
-                        "layer".to_string(),
-                        old_layer.layer_id.clone(),
-                        "update".to_string(),
-                        Some("alias".to_string()),
-                        old_layer.alias.as_ref().map(|value| json!(value)),
-                        updated_layer.alias.as_ref().map(|value| json!(value)),
-                        None,
-                        true,
-                    )
-                    .await;
-            }
-            if let Some(new_properties) = &properties {
-                let old_props = old_layer
-                    .properties
-                    .and_then(|p| serde_json::from_str::<Value>(&p).ok());
-                if old_props.as_ref() != Some(new_properties) {
-                    let _ = self
-                        .graph_edit_service
-                        .create_edit(
-                            old_layer.graph_id,
-                            "layer".to_string(),
-                            old_layer.layer_id.clone(),
-                            "update".to_string(),
-                            Some("properties".to_string()),
-                            old_props,
-                            Some(new_properties.clone()),
-                            None,
-                            true,
-                        )
-                        .await;
-                }
-            }
-        }
-        Ok(updated_layer)
-    }
     pub async fn bulk_update_graph_data(
         &self,
         actor: &Actor,
         graph_id: i32,
         node_updates: Vec<GraphNodeUpdateRequest>,
-        layer_updates: Vec<GraphLayerUpdateRequest>,
     ) -> CoreResult<()> {
         self.authorize_graph_write(actor, graph_id).await?;
         for node_update in node_updates {
@@ -510,16 +396,6 @@ impl AppContext {
                 node_update.layer,
                 node_update.attributes,
                 node_update.belongs_to,
-            )
-            .await?;
-        }
-        for layer_update in layer_updates {
-            self.update_layer_properties(
-                actor,
-                layer_update.id,
-                layer_update.name,
-                layer_update.alias,
-                layer_update.properties,
             )
             .await?;
         }

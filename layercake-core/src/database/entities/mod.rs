@@ -24,9 +24,6 @@ pub mod dataset_nodes;
 pub mod dataset_rows;
 pub mod execution_state;
 pub mod graph_edits;
-// Retained pending the WS3 layer-editing migration to `project_layers`; the
-// `graph_layers` table itself was dropped in m20251215.
-pub mod graph_layers;
 pub mod layer_aliases;
 
 // Unified graph data model (Phase 1 of refactoring)

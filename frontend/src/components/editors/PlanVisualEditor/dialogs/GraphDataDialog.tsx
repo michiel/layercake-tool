@@ -17,8 +17,7 @@ import {
   ADD_GRAPH_NODE,
   ADD_GRAPH_EDGE,
   DELETE_GRAPH_NODE,
-  DELETE_GRAPH_EDGE,
-  CREATE_LAYER
+  DELETE_GRAPH_EDGE
 } from '../../../../graphql/graphs';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 import { sanitizeAttributes } from '@/utils/attributes';
@@ -47,7 +46,6 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
   const [addGraphEdge] = useMutation(ADD_GRAPH_EDGE);
   const [deleteGraphNode] = useMutation(DELETE_GRAPH_NODE);
   const [deleteGraphEdge] = useMutation(DELETE_GRAPH_EDGE);
-  const [createLayer] = useMutation(CREATE_LAYER);
 
   const getGraphData = (): GraphData | null => {
     if (!data?.graph) return null;
@@ -102,7 +100,6 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
       const newNodeIds = new Set(newGraphData.nodes.map(n => n.id));
       const oldEdgeIds = new Set(oldGraph.graphEdges.map(e => e.id));
       const newEdgeIds = new Set(newGraphData.edges.map(e => e.id));
-      const oldLayerIds = new Set(oldGraph.layers.map(l => l.layerId));
 
       // Identify added nodes
       const addedNodes = newGraphData.nodes.filter(n => !oldNodeIds.has(n.id));
@@ -141,46 +138,11 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
       // Identify deleted edges
       const deletedEdgeIds = Array.from(oldEdgeIds).filter(id => !newEdgeIds.has(id));
 
-      // Identify added layers (will create them)
-      const addedLayers = newGraphData.layers.filter(l => !oldLayerIds.has(l.id));
-
-      // Identify updated layers
-      const updatedLayers: any[] = [];
-      for (const newLayer of newGraphData.layers) {
-        const oldLayer = oldGraph.layers.find(l => l.layerId === newLayer.id);
-        if (!oldLayer) continue;
-
-        const oldName = normalizeValue(oldLayer.name);
-        const newName = normalizeValue(newLayer.label);
-
-        const { id, label, alias, ...properties } = newLayer;
-        const cleanedProperties: Record<string, any> = {};
-        for (const [key, value] of Object.entries(properties)) {
-          const normalized = normalizeValue(value);
-          if (normalized !== undefined) {
-            cleanedProperties[key] = normalized;
-          }
-        }
-
-        const oldProperties = oldLayer.properties || {};
-        const propertiesChanged = JSON.stringify(cleanedProperties) !== JSON.stringify(oldProperties);
-        const oldAlias = oldLayer.alias ?? '';
-        const newAlias = typeof alias === 'string' ? alias.trim() : '';
-        const aliasChanged = oldAlias !== newAlias;
-
-        if (oldName !== newName || propertiesChanged || aliasChanged) {
-          updatedLayers.push({
-            id: oldLayer.id,
-            name: oldName !== newName ? newName : null,
-            alias: aliasChanged ? (newAlias.length > 0 ? newAlias : null) : null,
-            properties: propertiesChanged ? cleanedProperties : null,
-          });
-        }
-      }
+      // Layers are read-only in this dialog (project-scoped layers are edited via
+      // the project layer palette), so no layer create/update is performed here.
 
       console.log(`Changes: ${addedNodes.length} new nodes, ${deletedNodeIds.length} deleted nodes, ${updatedNodes.length} updated nodes`);
       console.log(`Changes: ${addedEdges.length} new edges, ${deletedEdgeIds.length} deleted edges`);
-      console.log(`Changes: ${addedLayers.length} new layers, ${updatedLayers.length} updated layers`);
 
       // Delete nodes first (to avoid constraint issues)
       for (const nodeId of deletedNodeIds) {
@@ -232,36 +194,12 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
         });
       }
 
-      // Add new layers
-      for (const layer of addedLayers) {
-        const { id, label, ...properties } = layer;
-        const cleanedProperties: Record<string, any> = {};
-        for (const [key, value] of Object.entries(properties)) {
-          const normalized = normalizeValue(value);
-          if (normalized !== undefined) {
-            cleanedProperties[key] = normalized;
-          }
-        }
-
-        await createLayer({
-          variables: {
-            input: {
-              graphId: parseInt(String(graphId)),
-              layerId: id,
-              name: label || id,
-              properties: Object.keys(cleanedProperties).length > 0 ? cleanedProperties : null,
-            }
-          }
-        });
-      }
-
-      // Update existing nodes/layers in bulk if there are any
-      if (updatedNodes.length > 0 || updatedLayers.length > 0) {
+      // Update existing nodes in bulk if there are any
+      if (updatedNodes.length > 0) {
         await bulkUpdateGraphData({
           variables: {
             graphId: parseInt(String(graphId)),
-            nodes: updatedNodes.length > 0 ? updatedNodes : null,
-            layers: updatedLayers.length > 0 ? updatedLayers : null,
+            nodes: updatedNodes,
           }
         });
       }

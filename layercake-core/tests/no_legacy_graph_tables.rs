@@ -8,9 +8,8 @@
 //! those dropped tables, so the incomplete-cutover class of bug (see
 //! `plans/20260710-phase0-graph-data-cutover.md`) cannot silently return.
 //!
-//! Note: `graph_layers` is intentionally NOT guarded yet — the per-graph
-//! layer-editing surface is still being migrated to `project_layers` (WS3
-//! deferred item). Add it here once that work lands.
+//! `graph_layers` is included: the per-graph layer-editing surface was removed
+//! in favour of the project-layer mutations, so nothing should reference it.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,6 +19,7 @@ const DROPPED_TABLES: &[&str] = &[
     "graphs",
     "graph_nodes",
     "graph_edges",
+    "graph_layers",
     "dataset_graph_nodes",
     "dataset_graph_edges",
     "dataset_graph_layers",

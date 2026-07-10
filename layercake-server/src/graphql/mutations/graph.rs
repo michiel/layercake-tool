@@ -2,9 +2,9 @@ use async_graphql::*;
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::{
-    CreateGraphInput, CreateLayerInput, Graph, GraphValidationResult, UpdateGraphInput,
+    CreateGraphInput, Graph, GraphValidationResult, UpdateGraphInput,
 };
-use layercake_core::app_context::{GraphLayerUpdateRequest, GraphNodeUpdateRequest};
+use layercake_core::app_context::GraphNodeUpdateRequest;
 use serde_json::Value;
 
 #[derive(Default)]
@@ -111,24 +111,6 @@ impl GraphMutation {
         Ok(true)
     }
 
-    /// Create a new Layer
-    async fn create_layer(
-        &self,
-        ctx: &Context<'_>,
-        input: CreateLayerInput,
-    ) -> Result<crate::graphql::types::Layer> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let actor = context.actor_for_request(ctx).await;
-
-        let inserted_layer = context
-            .app
-            .create_layer(&actor, input.graph_id, input.layer_id, input.name)
-            .await
-            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-
-        Ok(crate::graphql::types::Layer::from(inserted_layer))
-    }
-
     /// Update a graph node's properties
     async fn update_graph_node(
         &self,
@@ -156,27 +138,6 @@ impl GraphMutation {
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(crate::graphql::types::graph_node::GraphNode::from(node))
-    }
-
-    /// Update layer properties (name, colors, etc.)
-    async fn update_layer_properties(
-        &self,
-        ctx: &Context<'_>,
-        id: i32,
-        name: Option<String>,
-        alias: Option<String>,
-        properties: Option<crate::graphql::types::scalars::JSON>,
-    ) -> Result<crate::graphql::types::layer::Layer> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let actor = context.actor_for_request(ctx).await;
-
-        let layer = context
-            .app
-            .update_layer_properties(&actor, id, name, alias, properties)
-            .await
-            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-
-        Ok(crate::graphql::types::layer::Layer::from(layer))
     }
 
     /// Add a new node to a graph
@@ -290,13 +251,12 @@ impl GraphMutation {
         Ok(true)
     }
 
-    /// Bulk update graph nodes and layers in a single transaction
+    /// Bulk update graph nodes in a single transaction
     async fn bulk_update_graph_data(
         &self,
         ctx: &Context<'_>,
         graph_id: i32,
         nodes: Option<Vec<crate::graphql::types::graph_node::GraphNodeUpdateInput>>,
-        layers: Option<Vec<crate::graphql::types::layer::LayerUpdateInput>>,
     ) -> Result<bool> {
         let context = ctx.data::<GraphQLContext>()?;
         let actor = context.actor_for_request(ctx).await;
@@ -318,20 +278,9 @@ impl GraphMutation {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        let layer_requests = layers
-            .unwrap_or_default()
-            .into_iter()
-            .map(|layer_update| GraphLayerUpdateRequest {
-                id: layer_update.id,
-                name: layer_update.name,
-                properties: layer_update.properties,
-                alias: layer_update.alias,
-            })
-            .collect();
-
         context
             .app
-            .bulk_update_graph_data(&actor, graph_id, node_requests, layer_requests)
+            .bulk_update_graph_data(&actor, graph_id, node_requests)
             .await
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 

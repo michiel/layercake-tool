@@ -196,23 +196,6 @@ export const DELETE_GRAPH = gql`
   }
 `
 
-export const CREATE_LAYER = gql`
-  mutation CreateLayer($input: CreateLayerInput!) {
-    createLayer(input: $input) {
-      id
-      layerId
-      name
-      backgroundColor
-      textColor
-      borderColor
-      alias
-      comment
-      properties
-      datasetId
-    }
-  }
-`
-
 export const EXECUTE_NODE = gql`
   mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
     executeNode(projectId: $projectId, nodeId: $nodeId) {
@@ -366,38 +349,14 @@ export const DELETE_GRAPH_NODE = gql`
   }
 `
 
-export const UPDATE_LAYER_PROPERTIES = gql`
-  mutation UpdateLayerProperties(
-    $id: Int!
-    $name: String
-    $alias: String
-    $properties: JSON
-  ) {
-    updateLayerProperties(
-      id: $id
-      name: $name
-      alias: $alias
-      properties: $properties
-    ) {
-      id
-      layerId
-      name
-      alias
-      properties
-    }
-  }
-`
-
 export const BULK_UPDATE_GRAPH_DATA = gql`
   mutation BulkUpdateGraphData(
     $graphId: Int!
     $nodes: [GraphNodeUpdateInput!]
-    $layers: [LayerUpdateInput!]
   ) {
     bulkUpdateGraphData(
       graphId: $graphId
       nodes: $nodes
-      layers: $layers
     )
   }
 `

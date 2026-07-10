@@ -177,15 +177,6 @@ pub struct UpdateGraphInput {
     pub name: Option<String>,
 }
 
-#[derive(InputObject)]
-pub struct CreateLayerInput {
-    #[graphql(name = "graphId")]
-    pub graph_id: i32,
-    #[graphql(name = "layerId")]
-    pub layer_id: String,
-    pub name: String,
-}
-
 #[derive(SimpleObject)]
 #[graphql(name = "GraphValidationResult")]
 pub struct GraphValidationResult {
