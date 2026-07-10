@@ -249,21 +249,7 @@ impl GraphService {
         Ok(())
     }
 
-    /// Get database graph_layers for a graph
-    #[allow(dead_code)]
-    pub async fn get_layers_for_graph(
-        &self,
-        graph_id: i32,
-    ) -> CoreResult<Vec<graph_layers::Model>> {
-        let db_layers = Layers::find()
-            .filter(graph_layers::Column::GraphId.eq(graph_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
-        Ok(db_layers)
-    }
-
-    /// Build a Graph from a DAG-built graph; graph_data-first, fallback to legacy graphs table.
+    /// Build a Graph from a graph_data record (the single canonical store).
     pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> CoreResult<Graph> {
         let normalize_hex = |value: &str| value.trim_start_matches('#').to_string();
 

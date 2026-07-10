@@ -4,7 +4,7 @@ use crate::graphql::types::*;
 ///
 /// This module provides convenience functions to publish execution status
 /// updates via GraphQL subscriptions when datasets or graphs change state.
-use layercake_core::database::entities::{datasets, graphs};
+use layercake_core::database::entities::datasets;
 use sea_orm::DatabaseConnection;
 
 /// Publish dataset execution status change event
@@ -48,41 +48,3 @@ pub async fn publish_dataset_status(
     });
 }
 
-/// Publish graph execution status change event
-///
-/// Finds the Plan DAG node associated with this graph and broadcasts
-/// the execution status change to all subscribed clients.
-///
-/// This is fire-and-forget - failures to publish are logged but don't
-/// affect graph computation.
-pub async fn publish_graph_status(
-    _db: &DatabaseConnection,
-    project_id: i32,
-    node_id: &str,
-    graph: &graphs::Model,
-) {
-    let event = NodeExecutionStatusEvent {
-        project_id,
-        node_id: node_id.to_string(),
-        node_type: PlanDagNodeType::Graph,
-        dataset_execution: None,
-        graph_execution: Some(GraphExecutionMetadata {
-            graph_id: graph.id,
-            graph_data_id: None,
-            node_count: graph.node_count,
-            edge_count: graph.edge_count,
-            execution_state: graph.execution_state.clone(),
-            computed_date: graph.computed_date.map(|dt| dt.to_rfc3339()),
-            error_message: graph.error_message.clone(),
-            annotations: graph.annotations.clone(),
-        }),
-        timestamp: chrono::Utc::now().to_rfc3339(),
-    };
-
-    // Fire and forget - spawn async task so it doesn't block computation
-    tokio::spawn(async move {
-        if let Err(e) = publish_execution_status_event(event).await {
-            tracing::debug!("Failed to publish graph status: {}", e);
-        }
-    });
-}

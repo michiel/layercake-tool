@@ -25,21 +25,10 @@ pub struct Model {
     pub created_by: Option<i32>,
 }
 
+// `graph_id` refers to a `graph_data` row in the current single-schema model.
+// The former foreign key to the dropped `graphs` table was removed in migration
+// m20260709_000001_rebuild_graph_edits_drop_graphs_fk; no ORM relation is defined.
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::graphs::Entity",
-        from = "Column::GraphId",
-        to = "super::graphs::Column::Id",
-        on_delete = "Cascade"
-    )]
-    Graphs,
-}
-
-impl Related<super::graphs::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Graphs.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}

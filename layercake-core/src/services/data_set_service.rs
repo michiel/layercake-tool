@@ -1,16 +1,13 @@
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter,
-    QueryOrder, QuerySelect, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, Set,
+    TransactionTrait,
 };
 use std::collections::{HashMap, HashSet};
 
 use crate::app_context::DataSetValidationSummary;
 use crate::database::entities::common_types::{DataType, FileFormat};
 use crate::database::entities::data_sets::{self};
-use crate::database::entities::{
-    dataset_graph_edges, dataset_graph_layers, dataset_graph_nodes, graph_data, graph_data_edges,
-    graph_data_nodes,
-};
+use crate::database::entities::{graph_data, graph_data_edges, graph_data_nodes};
 use crate::database::entities::{plan_dag_edges, plan_dag_nodes, projects};
 use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -287,20 +284,6 @@ impl DataSetService {
             .begin()
             .await
             .map_err(|e| CoreError::internal(format!("Failed to start transaction: {}", e)))?;
-        // Legacy tables removed; keep dataset_graph_* cleanup for back-compat but ignore errors if tables are gone
-        let _ = dataset_graph_nodes::Entity::delete_many()
-            .filter(dataset_graph_nodes::Column::DatasetId.eq(id))
-            .exec(&txn)
-            .await;
-        let _ = dataset_graph_edges::Entity::delete_many()
-            .filter(dataset_graph_edges::Column::DatasetId.eq(id))
-            .exec(&txn)
-            .await;
-        let _ = dataset_graph_layers::Entity::delete_many()
-            .filter(dataset_graph_layers::Column::DatasetId.eq(id))
-            .exec(&txn)
-            .await;
-
         // Ensure a graph_data row exists for this dataset (id is reused)
         let gd_existing = graph_data::Entity::find_by_id(id)
             .one(&txn)
@@ -472,32 +455,8 @@ impl DataSetService {
     }
 
     pub async fn get_graph_summary(&self, dataset_id: i32) -> CoreResult<GraphSummaryData> {
-        let layer_rows = dataset_graph_layers::Entity::find()
-            .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to load dataset layers: {}", e)))?;
-        let node_count = dataset_graph_nodes::Entity::find()
-            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
-            .count(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to count dataset nodes: {}", e)))?;
-        let edge_count = dataset_graph_edges::Entity::find()
-            .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
-            .count(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to count dataset edges: {}", e)))?;
-        if node_count > 0 || edge_count > 0 {
-            let mut layers: Vec<String> = layer_rows.into_iter().map(|l| l.id).collect();
-            layers.sort();
-            return Ok(GraphSummaryData {
-                node_count: node_count as usize,
-                edge_count: edge_count as usize,
-                layer_count: layers.len(),
-                layers,
-            });
-        }
-
+        // Dataset graph content is stored as the parsed graph on the data_sets row
+        // (`graph_json`); the legacy dataset_graph_* tables have been dropped.
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await
@@ -524,101 +483,8 @@ impl DataSetService {
         offset: usize,
         filter_layers: Option<Vec<String>>,
     ) -> CoreResult<GraphPageData> {
-        let filter_set: Option<HashSet<String>> =
-            filter_layers.clone().map(|v| v.into_iter().collect());
-        let mut node_query = dataset_graph_nodes::Entity::find()
-            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
-            .order_by_asc(dataset_graph_nodes::Column::Id)
-            .limit(limit as u64)
-            .offset(offset as u64);
-        if let Some(filter) = &filter_set {
-            node_query =
-                node_query.filter(dataset_graph_nodes::Column::Layer.is_in(filter.clone()));
-        }
-        let nodes_rows = node_query
-            .all(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to load dataset nodes: {}", e)))?;
-        let total_rows = dataset_graph_nodes::Entity::find()
-            .filter(dataset_graph_nodes::Column::DatasetId.eq(dataset_id))
-            .count(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Failed to count dataset nodes: {}", e)))?
-            as usize;
-
-        if !nodes_rows.is_empty() {
-            let node_ids: HashSet<String> = nodes_rows.iter().map(|n| n.id.clone()).collect();
-            let mut edges_rows = dataset_graph_edges::Entity::find()
-                .filter(dataset_graph_edges::Column::DatasetId.eq(dataset_id))
-                .all(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to load dataset edges: {}", e)))?;
-            if let Some(filter) = &filter_set {
-                edges_rows.retain(|e| filter.contains(&e.layer));
-            }
-            edges_rows.retain(|e| node_ids.contains(&e.source) && node_ids.contains(&e.target));
-
-            let mut layers_rows = dataset_graph_layers::Entity::find()
-                .filter(dataset_graph_layers::Column::DatasetId.eq(dataset_id))
-                .all(&self.db)
-                .await
-                .map_err(|e| {
-                    CoreError::internal(format!("Failed to load dataset layers: {}", e))
-                })?;
-            if let Some(filter) = &filter_set {
-                layers_rows.retain(|l| filter.contains(&l.id));
-            }
-
-            let nodes = nodes_rows
-                .into_iter()
-                .map(|n| Node {
-                    id: n.id,
-                    label: n.label,
-                    layer: n.layer,
-                    belongs_to: n.belongs_to,
-                    weight: n.weight,
-                    is_partition: n.is_partition,
-                    comment: n.comment,
-                    dataset: n.dataset,
-                    attributes: n.attributes,
-                })
-                .collect();
-            let edges = edges_rows
-                .into_iter()
-                .map(|e| Edge {
-                    id: e.id,
-                    source: e.source,
-                    target: e.target,
-                    label: e.label,
-                    layer: e.layer,
-                    weight: e.weight,
-                    comment: e.comment,
-                    dataset: e.dataset,
-                    attributes: e.attributes,
-                })
-                .collect();
-            let layers = layers_rows
-                .into_iter()
-                .map(|l| Layer {
-                    id: l.id,
-                    label: l.label,
-                    background_color: l.background_color,
-                    text_color: l.text_color,
-                    border_color: l.border_color,
-                    alias: None,
-                    dataset: None,
-                    attributes: None,
-                })
-                .collect();
-
-            return Ok(GraphPageData {
-                nodes,
-                edges,
-                layers,
-                has_more: offset + limit < total_rows,
-            });
-        }
-
+        // Dataset graph content is stored as the parsed graph on the data_sets row
+        // (`graph_json`); the legacy dataset_graph_* tables have been dropped.
         let model = data_sets::Entity::find_by_id(dataset_id)
             .one(&self.db)
             .await

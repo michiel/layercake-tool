@@ -18,20 +18,11 @@ pub struct Model {
     pub properties: Option<String>, // JSON
 }
 
+// NOTE: The `graph_layers` table was dropped in
+// m20251215_000001_drop_legacy_graph_tables. This entity is retained only until
+// the per-graph layer-editing surface is migrated to `project_layers`
+// (tracked in plans/20260710-phase0-graph-data-cutover.md, WS3 deferred item).
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {
-    #[sea_orm(
-        belongs_to = "super::graphs::Entity",
-        from = "Column::GraphId",
-        to = "super::graphs::Column::Id"
-    )]
-    Graphs,
-}
-
-impl Related<super::graphs::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Graphs.def()
-    }
-}
+pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}

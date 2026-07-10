@@ -294,11 +294,13 @@ impl AppContext {
         belongs_to: Option<String>,
     ) -> CoreResult<crate::database::entities::graph_data_nodes::Model> {
         self.authorize_graph_write(actor, graph_id).await?;
-        use crate::database::entities::graph_nodes::{Column as NodeColumn, Entity as GraphNodes};
+        use crate::database::entities::graph_data_nodes::{
+            Column as NodeColumn, Entity as GraphDataNodes,
+        };
         use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-        let old_node = GraphNodes::find()
-            .filter(NodeColumn::GraphId.eq(graph_id))
-            .filter(NodeColumn::Id.eq(&node_id))
+        let old_node = GraphDataNodes::find()
+            .filter(NodeColumn::GraphDataId.eq(graph_id))
+            .filter(NodeColumn::ExternalId.eq(&node_id))
             .one(&self.db)
             .await
             .map_err(|e| {
@@ -368,7 +370,7 @@ impl AppContext {
                 }
             }
             if let Some(new_attrs) = &attributes {
-                if old_node.attrs.as_ref() != Some(new_attrs) {
+                if old_node.attributes.as_ref() != Some(new_attrs) {
                     let _ = self
                         .graph_edit_service
                         .create_edit(
@@ -377,7 +379,7 @@ impl AppContext {
                             node_id.clone(),
                             "update".to_string(),
                             Some("attributes".to_string()),
-                            old_node.attrs.clone(),
+                            old_node.attributes.clone(),
                             Some(new_attrs.clone()),
                             None,
                             true,

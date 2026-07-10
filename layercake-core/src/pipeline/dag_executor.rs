@@ -7,8 +7,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::{debug_span, info, warn, Instrument};
 
 use crate::database::entities::graph_data;
-use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
-use crate::database::entities::{graphs, plan_dag_nodes, projections, sequence_contexts};
+use crate::database::entities::{plan_dag_nodes, projections, sequence_contexts};
 use crate::pipeline::dag_context::DagExecutionContext;
 use crate::pipeline::graph_data_persist_utils::{
     edges_to_graph_data_inputs, nodes_to_graph_data_inputs,
@@ -18,7 +17,6 @@ use crate::plan_dag::{
     config::StoryNodeConfig, FilterEvaluationContext, FilterNodeConfig, TransformNodeConfig,
 };
 use crate::sequence_context::{build_story_context, SequenceStoryContext};
-use crate::services::graph_service::GraphService;
 use chrono::Utc;
 
 /// DAG executor that processes nodes in topological order
@@ -886,52 +884,19 @@ impl DagExecutor {
         upstream_node_id: &str,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
-        // Try to load upstream graph metadata to include in hash computation
-        // Try graph_data first, then fall back to legacy
-        let upstream_graph_for_hash = if let Some(gd) = self
+        // Load upstream graph metadata (from graph_data, the single canonical store)
+        // to include in hash computation.
+        let upstream_graph_for_hash = self
             .graph_data_builder
             .graph_data_service
             .get_by_dag_node(upstream_node_id)
             .await?
-        {
-            // Create a minimal graphs::Model compatible structure for hash computation
-            // Note: This is a temporary solution during migration
-            // graph_data doesn't have execution_state, but for hash computation we assume "completed"
-            graphs::Model {
-                id: gd.id,
-                project_id,
-                node_id: upstream_node_id.to_string(),
-                name: gd.name,
-                execution_state: "completed".to_string(),
-                computed_date: gd.computed_date,
-                source_hash: gd.source_hash,
-                node_count: gd.node_count,
-                edge_count: gd.edge_count,
-                error_message: None, // graph_data doesn't track error_message separately
-                metadata: gd.metadata,
-                annotations: gd
-                    .annotations
-                    .and_then(|v| v.as_str().map(|s| s.to_string())),
-                last_edit_sequence: gd.last_edit_sequence,
-                has_pending_edits: gd.has_pending_edits,
-                last_replay_at: gd.last_replay_at,
-                created_at: gd.created_at,
-                updated_at: gd.updated_at,
-            }
-        } else {
-            // Fall back to legacy graphs table
-            GraphEntity::find()
-                .filter(GraphColumn::ProjectId.eq(project_id))
-                .filter(GraphColumn::NodeId.eq(upstream_node_id))
-                .one(&self.db)
-                .await?
-                .ok_or_else(|| {
-                    anyhow!(
-                        "No graph metadata found for upstream node {} in either schema",
-                        upstream_node_id
-                    )
-                })?
-        };
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph metadata found for upstream node {} in graph_data",
+                    upstream_node_id
+                )
+            })?;
 
         let metadata = Some(json!({
             "transforms": config.transforms,
@@ -1027,51 +992,19 @@ impl DagExecutor {
         upstream_node_id: &str,
         graph: &crate::graph::Graph,
     ) -> Result<()> {
-        // Try to load upstream graph metadata to include in hash computation
-        // Try graph_data first, then fall back to legacy
-        let upstream_graph_for_hash = if let Some(gd) = self
+        // Load upstream graph metadata (from graph_data, the single canonical store)
+        // to include in hash computation.
+        let upstream_graph_for_hash = self
             .graph_data_builder
             .graph_data_service
             .get_by_dag_node(upstream_node_id)
             .await?
-        {
-            // Create a minimal graphs::Model compatible structure for hash computation
-            // graph_data doesn't have execution_state, but for hash computation we assume "completed"
-            graphs::Model {
-                id: gd.id,
-                project_id,
-                node_id: upstream_node_id.to_string(),
-                name: gd.name,
-                execution_state: "completed".to_string(),
-                computed_date: gd.computed_date,
-                source_hash: gd.source_hash,
-                node_count: gd.node_count,
-                edge_count: gd.edge_count,
-                error_message: None, // graph_data doesn't track error_message separately
-                metadata: gd.metadata,
-                annotations: gd
-                    .annotations
-                    .and_then(|v| v.as_str().map(|s| s.to_string())),
-                last_edit_sequence: gd.last_edit_sequence,
-                has_pending_edits: gd.has_pending_edits,
-                last_replay_at: gd.last_replay_at,
-                created_at: gd.created_at,
-                updated_at: gd.updated_at,
-            }
-        } else {
-            // Fall back to legacy graphs table
-            GraphEntity::find()
-                .filter(GraphColumn::ProjectId.eq(project_id))
-                .filter(GraphColumn::NodeId.eq(upstream_node_id))
-                .one(&self.db)
-                .await?
-                .ok_or_else(|| {
-                    anyhow!(
-                        "No graph metadata found for upstream node {} in either schema",
-                        upstream_node_id
-                    )
-                })?
-        };
+            .ok_or_else(|| {
+                anyhow!(
+                    "No graph metadata found for upstream node {} in graph_data",
+                    upstream_node_id
+                )
+            })?;
 
         let metadata = Some(json!({
             "query": config.query,
@@ -1252,7 +1185,7 @@ impl DagExecutor {
     fn compute_transform_hash(
         &self,
         node_id: &str,
-        upstream_graph: &graphs::Model,
+        upstream_graph: &graph_data::Model,
         config: &TransformNodeConfig,
     ) -> Result<String> {
         let mut hasher = Sha256::new();
@@ -1270,7 +1203,7 @@ impl DagExecutor {
     fn compute_filter_hash(
         &self,
         node_id: &str,
-        upstream_graph: &graphs::Model,
+        upstream_graph: &graph_data::Model,
         config: &FilterNodeConfig,
     ) -> Result<String> {
         let mut hasher = Sha256::new();
@@ -1637,7 +1570,7 @@ impl DagExecutor {
     /// Returns the Graph struct and a metadata tuple (graph_data_id OR legacy_graph_id, is_from_graph_data)
     async fn load_graph_by_dag_node(
         &self,
-        project_id: i32,
+        _project_id: i32,
         dag_node_id: &str,
     ) -> Result<(crate::graph::Graph, (i32, bool))> {
         // Try graph_data first (new schema)
@@ -1758,36 +1691,11 @@ impl DagExecutor {
             return Ok((graph, (gd.id, true)));
         }
 
-        // Fall back to legacy graphs table
-        tracing::debug!(
-            "Graph for node {} not found in graph_data, trying legacy graphs table",
+        // graph_data is the single canonical store; there is no legacy fallback.
+        Err(anyhow!(
+            "No graph output found for node {} in graph_data",
             dag_node_id
-        );
-
-        let legacy_graph = GraphEntity::find()
-            .filter(GraphColumn::ProjectId.eq(project_id))
-            .filter(GraphColumn::NodeId.eq(dag_node_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "No graph output found for node {} in either graph_data or legacy graphs table",
-                    dag_node_id
-                )
-            })?;
-
-        let graph_service = GraphService::new(self.db.clone());
-        let graph = graph_service
-            .build_graph_from_dag_graph(legacy_graph.id)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to materialize graph from legacy table for node {}",
-                    dag_node_id
-                )
-            })?;
-
-        Ok((graph, (legacy_graph.id, false)))
+        ))
     }
 
     async fn persist_story_context(

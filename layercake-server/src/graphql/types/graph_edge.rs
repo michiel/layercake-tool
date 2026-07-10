@@ -22,25 +22,6 @@ pub struct GraphEdge {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl From<layercake_core::database::entities::graph_edges::Model> for GraphEdge {
-    fn from(model: layercake_core::database::entities::graph_edges::Model) -> Self {
-        Self {
-            id: model.id,
-            graph_id: model.graph_id,
-            source: model.source,
-            target: model.target,
-            label: model.label,
-            layer: model.layer,
-            weight: model.weight,
-            comment: model.comment,
-            attrs: model.attrs.clone(),
-            attributes: model.attrs,
-            dataset_id: model.dataset_id,
-            created_at: model.created_at,
-        }
-    }
-}
-
 impl From<graph_data_edges::Model> for GraphEdge {
     fn from(model: graph_data_edges::Model) -> Self {
         Self {

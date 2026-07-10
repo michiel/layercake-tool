@@ -163,18 +163,45 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked/needs deci
 | WS | Description | Status | Notes |
 |----|-------------|--------|-------|
 | — | Baseline: targeted build of core/server/cli green | ☑ | `cargo build -p layercake-core -p layercake-server -p layercake-cli` exit 0 |
-| WS1 | Dataset preview/summary → graph_data | ☐ | |
-| WS2 | DAG/merge/graph_service legacy fallbacks removed | ☐ | |
-| WS3 | Layer/node editing → project_layers/graph_data | ☐ | |
-| WS4 | graph_edit_service else-branch removed | ☐ | |
-| WS5 | GraphQL legacy mappers removed/repointed | ☐ | |
-| WS6 | Legacy entity modules deleted | ☐ | last; blocks build until WS1–5 done |
-| WS7 | Guard test + verification (§3) | ☐ | |
+| WS1 | Dataset preview/summary → graph_data | ☑ | `get_graph_summary`/`get_graph_page` now read the parsed graph from `data_sets.graph_json`; `update_graph_data` dropped-table cleanup removed |
+| WS2 | DAG/merge/graph_service legacy fallbacks removed | ☑ | `dag_executor`/`merge_builder` fallbacks gone; hash helpers now take `&graph_data::Model`; `graph_service` doc/dead-code cleaned |
+| WS3 | Layer/node editing → project_layers/graph_data | ◐ | node old-value fetch repointed to `graph_data_nodes` (fixes silently-broken edit history). **Layer editing deferred — needs a product decision (see §7).** |
+| WS4 | graph_edit_service else-branch removed | ☑ | three `graphs` else-branches now return `not_found` |
+| WS5 | GraphQL legacy mappers removed/repointed | ☑ | deleted 5 dead `From<legacy::Model>` impls (graph/graph_node/graph_edge/preview) + dead `publish_graph_status` |
+| WS6 | Legacy entity modules deleted | ☑ | deleted `graphs`, `graph_nodes`, `graph_edges`, `dataset_graph_{nodes,edges,layers}`; removed `graphs` relations from `graph_edits`/`graph_layers`. `graph_layers` retained (WS3 deferral). |
+| WS7 | Guard test + verification (§3) | ☑ | `layercake-core/tests/no_legacy_graph_tables.rs` guards the 6 dropped tables; §3 grep clean; all crate tests green |
+
+### Deferred item (needs decision)
+
+The per-graph **layer-editing** surface still targets the dropped `graph_layers`
+table: `graph_service::update_layer_properties`,
+`app_context::{create_layer, update_layer_properties}`,
+`import_service` layer write, and the GraphQL `From<graph_layers::Model> for Layer`.
+These are wired to a graph-layer-shaped GraphQL `Layer` type (fields `graph_id`,
+`comment`, `properties`) that is **distinct** from the `ProjectLayer` type. Layers
+now live in `project_layers`, so resolving this changes the GraphQL API contract —
+an architecturally significant decision, not a mechanical cutover. Options:
+
+- **A. Repoint to `project_layers`**, changing `create_layer`/`update_layer_properties`
+  to return `ProjectLayer` (drops the `graph_id`/`comment`/`properties` fields;
+  frontend must migrate to the ProjectLayer mutations).
+- **B. Remove the per-graph layer mutations** entirely and rely on the existing
+  project-layer mutations (`upsert_project_layer` etc.).
+- **C. Keep the `Layer` type but back it with `project_layers`** via a compatibility
+  adapter (synthetic ids; `properties`/`comment` become no-ops).
+
+Once chosen, the `graph_layers` entity module and its guard exclusion are removed,
+fully closing Phase 0.
 
 ### Change log
 
 - 2026-07-10 — Plan created; legacy-reference inventory completed (12 source files).
   Review and assessment updated to promote Phase 0 to a verified gate.
+- 2026-07-10 — Implemented WS1, WS2, WS4, WS5, WS6, WS7 and the node half of WS3.
+  Six dropped-table entity modules deleted; §3 grep clean for all six; guard test
+  added. Build green for core/server/cli; core (175 unit + integration + doctests),
+  server, cli, and integration-tests suites all pass. Layer-editing (WS3 remainder)
+  deferred pending the decision above.
 
 ---
 
