@@ -203,3 +203,8 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
 - `docs/` – collaboration model, mutation refactors, error handling guides, and architecture discussions.
 
 Layercake is evolving rapidly toward distributed collaborative graph editing and automation-focused workflows. Issues, pull requests, and design discussions are welcome!
+
+## Code flow card
+
+<img src=".github/codeflow-card.svg" alt="CodeFlow card" />
+
