@@ -1,7 +1,7 @@
 # Phase 0 — Complete the graph_data single-schema cutover
 
 **Date:** 2026-07-10
-**Status:** In progress
+**Status:** Complete
 **Owner:** Data model direction workstream
 **Related:**
 `reviews/20260710-data-model-direction-roadmap.md` (§15 Phase 0),
@@ -163,18 +163,48 @@ Legend: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked/needs deci
 | WS | Description | Status | Notes |
 |----|-------------|--------|-------|
 | — | Baseline: targeted build of core/server/cli green | ☑ | `cargo build -p layercake-core -p layercake-server -p layercake-cli` exit 0 |
-| WS1 | Dataset preview/summary → graph_data | ☐ | |
-| WS2 | DAG/merge/graph_service legacy fallbacks removed | ☐ | |
-| WS3 | Layer/node editing → project_layers/graph_data | ☐ | |
-| WS4 | graph_edit_service else-branch removed | ☐ | |
-| WS5 | GraphQL legacy mappers removed/repointed | ☐ | |
-| WS6 | Legacy entity modules deleted | ☐ | last; blocks build until WS1–5 done |
-| WS7 | Guard test + verification (§3) | ☐ | |
+| WS1 | Dataset preview/summary → graph_data | ☑ | `get_graph_summary`/`get_graph_page` now read the parsed graph from `data_sets.graph_json`; `update_graph_data` dropped-table cleanup removed |
+| WS2 | DAG/merge/graph_service legacy fallbacks removed | ☑ | `dag_executor`/`merge_builder` fallbacks gone; hash helpers now take `&graph_data::Model`; `graph_service` doc/dead-code cleaned |
+| WS3 | Layer/node editing → project_layers/graph_data | ☑ | node old-value fetch repointed to `graph_data_nodes`; per-graph layer-editing **removed** (decision below) across backend + frontend |
+| WS4 | graph_edit_service else-branch removed | ☑ | three `graphs` else-branches now return `not_found` |
+| WS5 | GraphQL legacy mappers removed/repointed | ☑ | deleted 5 dead `From<legacy::Model>` impls (graph/graph_node/graph_edge/preview) + dead `publish_graph_status` |
+| WS6 | Legacy entity modules deleted | ☑ | deleted all 7 legacy modules (`graphs`, `graph_nodes`, `graph_edges`, `graph_layers`, `dataset_graph_{nodes,edges,layers}`); removed `graphs` relations from `graph_edits`/`graph_layers` |
+| WS7 | Guard test + verification (§3) | ☑ | `layercake-core/tests/no_legacy_graph_tables.rs` guards all 7 dropped tables; §3 grep clean; all crate tests green; frontend `tsc` clean |
+
+### Resolved decision — per-graph layer editing (was deferred)
+
+**Decision (user): Option B — remove the per-graph layer mutations.** The
+mutations targeted the dropped `graph_layers` table and were wired to a
+graph-scoped GraphQL `Layer` type distinct from `ProjectLayer`. Layers now live
+in `project_layers`. Removed across the stack:
+
+- backend: `create_layer` / `update_layer_properties` GraphQL mutations;
+  `bulk_update_graph_data` no longer accepts `layers`; `AppContext::{create_layer,
+  update_layer_properties}`; `GraphService::update_layer_properties`;
+  `From<graph_layers::Model> for Layer`; dead `ImportService` layer-import methods;
+  unused `CreateLayerInput` / `LayerUpdateInput` / `GraphLayerUpdateRequest` types;
+  the `graph_layers` entity module.
+- frontend: `GraphDataDialog` no longer calls `createLayer` / sends `layers` to
+  `bulkUpdateGraphData` (its layer grid was already `layersReadOnly`, so no UX
+  regression); removed `CREATE_LAYER` / `UPDATE_LAYER_PROPERTIES` gql and the
+  `layers` arg on `BULK_UPDATE_GRAPH_DATA`. Verified with `tsc --noEmit`.
+
+Project-scoped layer styling continues to be edited via the existing
+project-layer mutations (`upsertProjectLayer` etc.). Phase 0 is fully closed.
 
 ### Change log
 
 - 2026-07-10 — Plan created; legacy-reference inventory completed (12 source files).
   Review and assessment updated to promote Phase 0 to a verified gate.
+- 2026-07-10 — Implemented WS1, WS2, WS4, WS5, WS6, WS7 and the node half of WS3.
+  Six dropped-table entity modules deleted; §3 grep clean for all six; guard test
+  added. Build green for core/server/cli; core (175 unit + integration + doctests),
+  server, cli, and integration-tests suites all pass. Layer-editing (WS3 remainder)
+  deferred pending a decision.
+- 2026-07-10 — WS3 resolved (Option B: remove per-graph layer editing). Deleted the
+  `graph_layers` module and all layer-mutation code across backend and frontend;
+  guard now covers all 7 tables. §3 grep clean; backend suites green; frontend
+  `tsc --noEmit` clean. **Phase 0 complete.**
 
 ---
 

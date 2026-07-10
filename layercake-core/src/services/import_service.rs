@@ -1,112 +1,13 @@
-use csv::ReaderBuilder;
-use sea_orm::{ActiveModelTrait, DatabaseConnection, Set};
-use serde_json::Value;
-use std::collections::HashMap;
-use tracing::warn;
-
-use crate::database::entities::graph_layers;
-use crate::errors::{CoreError, CoreResult};
+use sea_orm::DatabaseConnection;
 
 pub struct ImportService {
+    #[allow(dead_code)]
     db: DatabaseConnection,
 }
 
 impl ImportService {
     pub fn new(db: DatabaseConnection) -> Self {
         Self { db }
-    }
-
-    /// Import layers from CSV content (convenience method for MCP)
-    pub async fn import_layers_from_csv(
-        &self,
-        graph_id: i32,
-        csv_content: &str,
-    ) -> CoreResult<usize> {
-        self.import_layers(graph_id, csv_content).await
-    }
-
-    async fn import_layers(&self, graph_id: i32, csv_data: &str) -> CoreResult<usize> {
-        let mut reader = ReaderBuilder::new().from_reader(csv_data.as_bytes());
-        let headers = reader
-            .headers()
-            .map_err(|e| CoreError::validation(format!("Invalid CSV headers: {}", e)))?
-            .clone();
-
-        let mut count = 0;
-        for record in reader.records() {
-            let record =
-                record.map_err(|e| CoreError::validation(format!("Invalid CSV record: {}", e)))?;
-
-            let layer_id = record.get(0).unwrap_or("").to_string();
-            let name = record.get(1).unwrap_or(&layer_id).to_string();
-
-            if layer_id.is_empty() {
-                warn!("Skipping layer with empty ID");
-                continue;
-            }
-
-            // Extract color fields and other properties from headers
-            let mut background_color = None;
-            let mut text_color = None;
-            let mut border_color = None;
-            let mut comment = None;
-            let mut alias = None;
-            let mut properties = HashMap::new();
-
-            for (i, value) in record.iter().enumerate() {
-                if let Some(header) = headers.get(i) {
-                    if !value.is_empty() {
-                        match header {
-                            "background_color" => background_color = Some(value.to_string()),
-                            "text_color" => text_color = Some(value.to_string()),
-                            "border_color" => border_color = Some(value.to_string()),
-                            "comment" => comment = Some(value.to_string()),
-                            "alias" => {
-                                let trimmed = value.trim();
-                                if !trimmed.is_empty() {
-                                    alias = Some(trimmed.to_string());
-                                }
-                            }
-                            // Skip layer_id and name columns (0 and 1)
-                            _ if i > 1 => {
-                                properties
-                                    .insert(header.to_string(), Value::String(value.to_string()));
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-
-            let properties_json = if properties.is_empty() {
-                None
-            } else {
-                Some(serde_json::to_string(&properties).map_err(|e| {
-                    CoreError::internal("Failed to serialize layer properties").with_source(e)
-                })?)
-            };
-
-            let layer = graph_layers::ActiveModel {
-                graph_id: Set(graph_id),
-                layer_id: Set(layer_id),
-                name: Set(name),
-                background_color: Set(background_color),
-                text_color: Set(text_color),
-                border_color: Set(border_color),
-                alias: Set(alias),
-                comment: Set(comment),
-                properties: Set(properties_json),
-                ..Default::default()
-            };
-
-            layer
-                .insert(&self.db)
-                .await
-                .map_err(|e| CoreError::internal("Failed to insert layer").with_source(e))?;
-            count += 1;
-        }
-
-        Ok(count)
     }
 }
 

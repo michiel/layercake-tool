@@ -135,26 +135,10 @@ impl GraphEditService {
                     CoreError::internal(format!("Failed to update graph data metadata: {}", e))
                 })?;
         } else {
-            use crate::database::entities::graphs::{self, Entity as Graphs};
-
-            let graph = Graphs::find_by_id(graph_id)
-                .one(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
-                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
-
-            let mut active_model: graphs::ActiveModel = graph.into();
-            active_model.last_edit_sequence = Set(sequence_number);
-            // Only mark as pending if the edit is not yet applied
-            if !applied {
-                active_model.has_pending_edits = Set(true);
-            }
-            active_model.updated_at = Set(chrono::Utc::now());
-
-            active_model
-                .update(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
+            // `graph_id` is a graph_data id in the current single-schema model; the
+            // legacy `graphs` table has been dropped. An id absent from graph_data
+            // is a genuine not-found rather than a legacy-table lookup.
+            return Err(CoreError::not_found("GraphData", graph_id.to_string()));
         }
         Ok(())
     }
@@ -213,8 +197,6 @@ impl GraphEditService {
 
     /// Clear all edits for a graph
     pub async fn clear_graph_edits(&self, graph_id: i32) -> CoreResult<u64> {
-        use crate::database::entities::graphs::{self, Entity as Graphs};
-
         // Delete all edits
         let result = GraphEdits::delete_many()
             .filter(graph_edits::Column::GraphId.eq(graph_id))
@@ -243,22 +225,7 @@ impl GraphEditService {
                     CoreError::internal(format!("Failed to mark graph data replayed: {}", e))
                 })?;
         } else {
-            let graph = Graphs::find_by_id(graph_id)
-                .one(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
-                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
-
-            let mut active_model: graphs::ActiveModel = graph.into();
-            active_model.last_edit_sequence = Set(0);
-            active_model.has_pending_edits = Set(false);
-            active_model.last_replay_at = Set(None);
-            active_model.updated_at = Set(chrono::Utc::now());
-
-            active_model
-                .update(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
+            return Err(CoreError::not_found("GraphData", graph_id.to_string()));
         }
 
         Ok(result.rows_affected)
@@ -280,22 +247,7 @@ impl GraphEditService {
                     CoreError::internal(format!("Failed to mark graph data replayed: {}", e))
                 })?;
         } else {
-            use crate::database::entities::graphs::{self, Entity as Graphs};
-
-            let graph = Graphs::find_by_id(graph_id)
-                .one(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to load graph: {}", e)))?
-                .ok_or_else(|| CoreError::not_found("Graph", graph_id.to_string()))?;
-
-            let mut active_model: graphs::ActiveModel = graph.into();
-            active_model.last_replay_at = Set(Some(chrono::Utc::now()));
-            active_model.updated_at = Set(chrono::Utc::now());
-
-            active_model
-                .update(&self.db)
-                .await
-                .map_err(|e| CoreError::internal(format!("Failed to update graph: {}", e)))?;
+            return Err(CoreError::not_found("GraphData", graph_id.to_string()));
         }
         Ok(())
     }

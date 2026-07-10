@@ -79,21 +79,6 @@ pub struct GraphEdgePreview {
     pub attributes: Option<serde_json::Value>,
 }
 
-impl From<layercake_core::database::entities::graph_nodes::Model> for GraphNodePreview {
-    fn from(model: layercake_core::database::entities::graph_nodes::Model) -> Self {
-        Self {
-            id: model.id,
-            label: model.label,
-            layer: model.layer,
-            weight: model.weight,
-            belongs_to: model.belongs_to,
-            is_partition: model.is_partition,
-            attrs: model.attrs.clone(),
-            attributes: model.attrs,
-        }
-    }
-}
-
 impl From<layercake_core::database::entities::graph_data_nodes::Model> for GraphNodePreview {
     fn from(model: layercake_core::database::entities::graph_data_nodes::Model) -> Self {
         Self {
@@ -105,21 +90,6 @@ impl From<layercake_core::database::entities::graph_data_nodes::Model> for Graph
             is_partition: model.is_partition,
             attrs: model.attributes.clone(),
             attributes: model.attributes,
-        }
-    }
-}
-
-impl From<layercake_core::database::entities::graph_edges::Model> for GraphEdgePreview {
-    fn from(model: layercake_core::database::entities::graph_edges::Model) -> Self {
-        Self {
-            id: model.id,
-            source: model.source,
-            target: model.target,
-            label: model.label,
-            layer: model.layer,
-            weight: model.weight,
-            attrs: model.attrs.clone(),
-            attributes: model.attrs,
         }
     }
 }

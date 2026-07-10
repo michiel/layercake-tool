@@ -1,7 +1,7 @@
 use crate::app_context::GraphValidationSummary;
 use crate::database::entities::{
-    data_sets, graph_data, graph_data_edges, graph_data_nodes, graph_layers,
-    graph_layers::Entity as Layers, layer_aliases, plan_dag_edges, plan_dag_nodes, project_layers,
+    data_sets, graph_data, graph_data_edges, graph_data_nodes, layer_aliases, plan_dag_edges,
+    plan_dag_nodes, project_layers,
 };
 use crate::errors::{CoreError, CoreResult};
 use crate::graph::{Edge, Graph, Layer, Node};
@@ -249,21 +249,7 @@ impl GraphService {
         Ok(())
     }
 
-    /// Get database graph_layers for a graph
-    #[allow(dead_code)]
-    pub async fn get_layers_for_graph(
-        &self,
-        graph_id: i32,
-    ) -> CoreResult<Vec<graph_layers::Model>> {
-        let db_layers = Layers::find()
-            .filter(graph_layers::Column::GraphId.eq(graph_id))
-            .all(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
-        Ok(db_layers)
-    }
-
-    /// Build a Graph from a DAG-built graph; graph_data-first, fallback to legacy graphs table.
+    /// Build a Graph from a graph_data record (the single canonical store).
     pub async fn build_graph_from_dag_graph(&self, graph_id: i32) -> CoreResult<Graph> {
         let normalize_hex = |value: &str| value.trim_start_matches('#').to_string();
 
@@ -657,45 +643,6 @@ impl GraphService {
 
         if let Some(belongs_to_value) = belongs_to {
             active_model.belongs_to = Set(belongs_to_value);
-        }
-
-        let updated = active_model
-            .update(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?;
-        Ok(updated)
-    }
-
-    pub async fn update_layer_properties(
-        &self,
-        layer_id: i32,
-        name: Option<String>,
-        alias: Option<String>,
-        properties: Option<serde_json::Value>,
-    ) -> CoreResult<graph_layers::Model> {
-        use sea_orm::{ActiveModelTrait, Set};
-
-        let layer = Layers::find_by_id(layer_id)
-            .one(&self.db)
-            .await
-            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
-            .ok_or_else(|| CoreError::not_found("GraphLayer", layer_id.to_string()))?;
-
-        let mut active_model: graph_layers::ActiveModel = layer.into();
-
-        if let Some(name) = name {
-            active_model.name = Set(name);
-        }
-
-        if let Some(alias_value) = alias {
-            active_model.alias = Set(Self::normalize_alias(Some(alias_value)));
-        }
-
-        if let Some(properties) = properties {
-            let properties_string = serde_json::to_string(&properties).map_err(|e| {
-                CoreError::validation(format!("Invalid layer properties JSON: {}", e))
-            })?;
-            active_model.properties = Set(Some(properties_string));
         }
 
         let updated = active_model

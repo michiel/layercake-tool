@@ -20,17 +20,10 @@ pub mod users;
 // REMOVED: nodes, edges - dead code, no longer used
 
 // Pipeline entities for DAG execution
-pub mod dataset_graph_edges;
-pub mod dataset_graph_layers;
-pub mod dataset_graph_nodes;
 pub mod dataset_nodes;
 pub mod dataset_rows;
 pub mod execution_state;
-pub mod graph_edges;
 pub mod graph_edits;
-pub mod graph_layers;
-pub mod graph_nodes;
-pub mod graphs;
 pub mod layer_aliases;
 
 // Unified graph data model (Phase 1 of refactoring)

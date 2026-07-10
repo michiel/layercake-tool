@@ -122,30 +122,6 @@ impl Graph {
     }
 }
 
-impl From<layercake_core::database::entities::graphs::Model> for Graph {
-    fn from(model: layercake_core::database::entities::graphs::Model) -> Self {
-        Self {
-            id: model.id,
-            project_id: model.project_id,
-            graph_data_id: None,
-            legacy_graph_id: Some(model.id),
-            source_type: Some("computed".to_string()),
-            name: model.name,
-            node_id: model.node_id,
-            execution_state: model.execution_state,
-            computed_date: model.computed_date,
-            source_hash: model.source_hash,
-            node_count: model.node_count,
-            edge_count: model.edge_count,
-            error_message: model.error_message,
-            metadata: model.metadata,
-            annotations: model.annotations,
-            created_at: model.created_at,
-            updated_at: model.updated_at,
-        }
-    }
-}
-
 /// Facade: Convert graph_data (with source_type="computed") to Graph
 /// This allows Graph GraphQL type to work with the unified graph_data table
 impl From<layercake_core::database::entities::graph_data::Model> for Graph {
@@ -199,15 +175,6 @@ pub struct CreateGraphInput {
 #[derive(InputObject)]
 pub struct UpdateGraphInput {
     pub name: Option<String>,
-}
-
-#[derive(InputObject)]
-pub struct CreateLayerInput {
-    #[graphql(name = "graphId")]
-    pub graph_id: i32,
-    #[graphql(name = "layerId")]
-    pub layer_id: String,
-    pub name: String,
 }
 
 #[derive(SimpleObject)]

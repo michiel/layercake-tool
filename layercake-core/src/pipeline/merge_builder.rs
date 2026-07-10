@@ -1,31 +1,23 @@
 use anyhow::{anyhow, Result};
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter};
+use sea_orm::DatabaseConnection;
 use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
-use crate::database::entities::graphs::{Column as GraphColumn, Entity as GraphEntity};
 use crate::graph::{Edge, Graph, Layer, Node};
 use crate::services::graph_data_service::GraphDataService;
-use crate::services::graph_service::GraphService;
 
-/// Service for merging data from multiple upstream sources using graph_data-first resolution.
+/// Service for merging data from multiple upstream sources using the unified
+/// graph_data store.
 pub struct MergeBuilder {
-    db: DatabaseConnection,
     graph_data_service: std::sync::Arc<GraphDataService>,
-    graph_service: GraphService,
 }
 
 impl MergeBuilder {
     pub fn new(
-        db: DatabaseConnection,
+        _db: DatabaseConnection,
         graph_data_service: std::sync::Arc<GraphDataService>,
     ) -> Self {
-        let graph_service = GraphService::new(db.clone());
-        Self {
-            db,
-            graph_data_service,
-            graph_service,
-        }
+        Self { graph_data_service }
     }
 
     /// Merge data from upstream nodes into a single Graph struct (in-memory).
@@ -189,7 +181,7 @@ impl MergeBuilder {
         })
     }
 
-    async fn load_graph_by_dag_node(&self, project_id: i32, dag_node_id: &str) -> Result<Graph> {
+    async fn load_graph_by_dag_node(&self, _project_id: i32, dag_node_id: &str) -> Result<Graph> {
         // Try graph_data first
         if let Some(gd) = self.graph_data_service.get_by_dag_node(dag_node_id).await? {
             let (gd, nodes, edges) = self
@@ -241,25 +233,11 @@ impl MergeBuilder {
             });
         }
 
-        // Fallback to legacy graphs table
-        let legacy_graph = GraphEntity::find()
-            .filter(GraphColumn::ProjectId.eq(project_id))
-            .filter(GraphColumn::NodeId.eq(dag_node_id))
-            .one(&self.db)
-            .await?
-            .ok_or_else(|| {
-                anyhow!(
-                    "No graph found for dag node {} in graph_data or legacy graphs table",
-                    dag_node_id
-                )
-            })?;
-
-        let graph = self
-            .graph_service
-            .build_graph_from_dag_graph(legacy_graph.id)
-            .await?;
-
-        Ok(graph)
+        // graph_data is the single canonical store; there is no legacy fallback.
+        Err(anyhow!(
+            "No graph found for dag node {} in graph_data",
+            dag_node_id
+        ))
     }
 }
 

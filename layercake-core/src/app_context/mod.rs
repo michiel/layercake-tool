@@ -579,13 +579,6 @@ pub struct GraphNodeUpdateRequest {
     pub belongs_to: Option<String>,
 }
 
-#[derive(Clone)]
-pub struct GraphLayerUpdateRequest {
-    pub id: i32,
-    pub name: Option<String>,
-    pub alias: Option<String>,
-    pub properties: Option<Value>,
-}
 
 pub fn summarize_graph_counts(graph_json: &str) -> (Option<usize>, Option<usize>, Option<usize>) {
     serde_json::from_str::<Value>(graph_json)

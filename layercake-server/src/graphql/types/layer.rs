@@ -4,16 +4,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::scalars::JSON;
-use layercake_core::database::entities::{graph_data, graph_layers, layer_aliases, project_layers};
-
-// Input type for bulk layer updates
-#[derive(InputObject, Clone, Debug)]
-pub struct LayerUpdateInput {
-    pub id: i32,
-    pub name: Option<String>,
-    pub properties: Option<JSON>,
-    pub alias: Option<String>,
-}
+use layercake_core::database::entities::{graph_data, layer_aliases, project_layers};
 
 #[derive(InputObject, Clone, Debug)]
 #[graphql(rename_fields = "camelCase")]
@@ -42,26 +33,6 @@ pub struct Layer {
     pub comment: Option<String>,
     pub properties: Option<JSON>,
     pub dataset_id: Option<i32>,
-}
-
-impl From<graph_layers::Model> for Layer {
-    fn from(model: graph_layers::Model) -> Self {
-        let properties = model.properties.and_then(|p| serde_json::from_str(&p).ok());
-
-        Self {
-            id: model.id,
-            graph_id: model.graph_id,
-            layer_id: model.layer_id,
-            name: model.name,
-            background_color: model.background_color,
-            text_color: model.text_color,
-            border_color: model.border_color,
-            alias: model.alias,
-            comment: model.comment,
-            properties,
-            dataset_id: model.dataset_id,
-        }
-    }
 }
 
 #[derive(Clone, Debug, SimpleObject)]

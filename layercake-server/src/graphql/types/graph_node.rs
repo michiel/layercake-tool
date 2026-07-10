@@ -36,25 +36,6 @@ pub struct GraphNode {
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl From<layercake_core::database::entities::graph_nodes::Model> for GraphNode {
-    fn from(model: layercake_core::database::entities::graph_nodes::Model) -> Self {
-        Self {
-            id: model.id,
-            graph_id: model.graph_id,
-            label: model.label,
-            layer: model.layer,
-            weight: model.weight,
-            is_partition: model.is_partition,
-            belongs_to: model.belongs_to,
-            comment: model.comment,
-            attrs: model.attrs.clone(),
-            attributes: model.attrs,
-            dataset_id: model.dataset_id,
-            created_at: model.created_at,
-        }
-    }
-}
-
 impl From<graph_data_nodes::Model> for GraphNode {
     fn from(model: graph_data_nodes::Model) -> Self {
         Self {
