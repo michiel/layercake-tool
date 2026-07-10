@@ -270,19 +270,20 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       const hasNewData = reactFlowData.nodes.length > 0 || reactFlowData.edges.length > 0
       const isCurrentEmpty = nodes.length === 0 && edges.length === 0
 
-      // Check if node positions or data have changed (for real-time collaboration)
-      const hasNodeChanges = reactFlowData.nodes.some((newNode, idx) => {
-        const currentNode = nodes[idx]
-        if (!currentNode) return true
+      // Check if node positions or data have changed (for real-time collaboration).
+      // Match by id, NOT array index: the current `nodes` array and the freshly
+      // converted `reactFlowData.nodes` are routinely in different orders (the
+      // merge appends new nodes to the end), so an index-based comparison would
+      // pair up different nodes and report spurious position/id changes.
+      const currentNodesById = new Map(nodes.map(n => [n.id, n]))
+      const hasNodeChanges = reactFlowData.nodes.some(newNode => {
+        const currentNode = currentNodesById.get(newNode.id)
+        if (!currentNode) return true // a node in the snapshot we don't have yet
 
-        // Check position changes
-        const posChanged = newNode.position.x !== currentNode.position.x ||
-                          newNode.position.y !== currentNode.position.y
-
-        // Check if node IDs are different (reordering/replacement)
-        const idChanged = newNode.id !== currentNode.id
-
-        return posChanged || idChanged
+        return (
+          newNode.position.x !== currentNode.position.x ||
+          newNode.position.y !== currentNode.position.y
+        )
       })
 
       // Check if external data has MORE/FEWER items (additions/removals from other users)
@@ -361,17 +362,25 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
           // First load - set directly
           setNodes(reactFlowData.nodes)
         } else {
-          // Merge updates: preserve existing nodes, update changed fields, add new nodes
+          // Merge updates: preserve existing nodes, update changed fields, add new nodes.
+          //
+          // This merge is intentionally NON-destructive: a current node that is
+          // absent from the incoming snapshot is KEPT, not dropped. Genuine
+          // deletions are already removed from `nodes` (and `planDag`) by the
+          // explicit delete path before this merge ever runs, so a node that is
+          // still present locally but missing from `reactFlowData` is almost
+          // always a stale/lagging/optimistic snapshot — dropping it here caused
+          // "delete one node → other nodes vanish".
           setNodes((currentNodes) => {
             const newNodesMap = new Map(reactFlowData.nodes.map(n => [n.id, n]))
             const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]))
 
-            // Merge existing nodes with updates
+            // Update existing nodes in place (preserving order and identity).
             const mergedNodes = currentNodes.map(currentNode => {
               const newNode = newNodesMap.get(currentNode.id)
               if (!newNode) {
-                // Node was deleted
-                return null
+                // Not in the incoming snapshot — keep the current node as-is.
+                return currentNode
               }
 
               // Check if anything actually changed
@@ -397,7 +406,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
                   onDelete: currentNode.data.onDelete || newNode.data.onDelete,
                 }
               }
-            }).filter(Boolean) as Node[]
+            })
 
             // Add any new nodes that don't exist in current
             reactFlowData.nodes.forEach(newNode => {
