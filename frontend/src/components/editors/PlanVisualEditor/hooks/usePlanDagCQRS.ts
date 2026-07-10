@@ -52,6 +52,8 @@ interface PlanDagCQRSResult {
   refreshData: () => void
   setDragging: (dragging: boolean) => void
   updatePlanDagOptimistically: (updater: (current: PlanDag | null) => PlanDag | null) => void
+  registerPendingMove: (nodeId: string, position: { x: number; y: number }) => void
+  clearPendingMove: (nodeId: string) => void
 }
 
 // Deep equality check for Plan DAG objects with performance optimisation
@@ -117,6 +119,10 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
       isInitialized: false,
       previousChangeId: 0,
       pendingRefresh: false, // Flag to track if subscription arrived during drag
+      // Nodes whose optimistic position has not yet been confirmed by the
+      // server. While a move is pending, an external sync/refresh must NOT
+      // overwrite that node's position with a stale server value (F4).
+      pendingMoves: new Map<string, { x: number; y: number }>(),
     },
     subscriptions: null as any,
   })
@@ -280,6 +286,11 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
         const currentNode = currentNodesById.get(newNode.id)
         if (!currentNode) return true // a node in the snapshot we don't have yet
 
+        // A node with an in-flight move carries a stale server position in the
+        // snapshot; don't treat that as a change (it would be ignored by the
+        // merge anyway, per F4).
+        if (editorStateRef.current.sync.pendingMoves.has(newNode.id)) return false
+
         return (
           newNode.position.x !== currentNode.position.x ||
           newNode.position.y !== currentNode.position.y
@@ -375,6 +386,8 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
             const newNodesMap = new Map(reactFlowData.nodes.map(n => [n.id, n]))
             const currentNodesMap = new Map(currentNodes.map(n => [n.id, n]))
 
+            const pendingMoves = editorStateRef.current.sync.pendingMoves
+
             // Update existing nodes in place (preserving order and identity).
             const mergedNodes = currentNodes.map(currentNode => {
               const newNode = newNodesMap.get(currentNode.id)
@@ -383,10 +396,17 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
                 return currentNode
               }
 
+              // If this node has an in-flight (unconfirmed) move, keep the local
+              // optimistic position rather than the incoming server value, which
+              // may be stale (pre-move). Otherwise the node would snap back to
+              // its pre-drag position on a refresh that raced the move (F4).
+              const hasPendingMove = pendingMoves.has(currentNode.id)
+              const targetPosition = hasPendingMove ? currentNode.position : newNode.position
+
               // Check if anything actually changed
               const positionChanged =
-                newNode.position.x !== currentNode.position.x ||
-                newNode.position.y !== currentNode.position.y
+                targetPosition.x !== currentNode.position.x ||
+                targetPosition.y !== currentNode.position.y
               const dataChanged = JSON.stringify(newNode.data) !== JSON.stringify(currentNode.data)
 
               if (!positionChanged && !dataChanged) {
@@ -397,7 +417,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
               // Update changed fields while preserving node identity
               return {
                 ...currentNode,
-                position: newNode.position,
+                position: targetPosition,
                 data: {
                   ...currentNode.data,
                   ...newNode.data,
@@ -601,6 +621,16 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     })
   }, [])
 
+  // Mark a node's move as in-flight so a racing refresh won't revert its
+  // position to a stale server value (F4). Cleared once the move mutation
+  // resolves (the server then holds the new position, so refreshes are safe).
+  const registerPendingMove = useCallback((nodeId: string, position: { x: number; y: number }) => {
+    editorStateRef.current.sync.pendingMoves.set(nodeId, position)
+  }, [])
+  const clearPendingMove = useCallback((nodeId: string) => {
+    editorStateRef.current.sync.pendingMoves.delete(nodeId)
+  }, [])
+
   return {
     // Data state
     planDag: stablePlanDag,
@@ -636,5 +666,7 @@ export const usePlanDagCQRS = (options: UsePlanDagCQRSOptions): PlanDagCQRSResul
     refreshData,
     setDragging, // Control drag state to suppress external syncs
     updatePlanDagOptimistically, // Optimistic updates to prevent sync overwrites
+    registerPendingMove, // Mark a node's move as unconfirmed (F4)
+    clearPendingMove, // Clear once the move mutation resolves (F4)
   }
 }

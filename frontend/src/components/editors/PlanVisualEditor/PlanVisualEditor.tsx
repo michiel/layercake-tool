@@ -215,6 +215,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
     cqrsService,
     setDragging,
     updatePlanDagOptimistically,
+    registerPendingMove,
+    clearPendingMove,
     refreshData,
   } = planDagState
 
@@ -510,6 +512,11 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
               }
             })
 
+            // Mark the move as in-flight so a refresh that races the mutation
+            // keeps this optimistic position instead of reverting to the stale
+            // pre-move server value.
+            registerPendingMove(node.id, node.position)
+
             // Update via granular mutation for delta-based sync, and re-enable
             // external syncs only once the mutation has actually resolved (not
             // after a fixed delay that can re-enable sync before the move lands
@@ -522,6 +529,8 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
                 console.error('Failed to save node position:', node.id, err)
               })
               .finally(() => {
+                // Server now holds the new position; refreshes are authoritative.
+                clearPendingMove(node.id)
                 setDragging(false)
               })
           } else {
@@ -541,7 +550,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         setDragging(false)
       }
     },
-    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging, setNodes, updatePlanDagOptimistically]
+    [mutations, readonly, updateManager, planDag, planDagState.performanceMonitor, setDragging, setNodes, updatePlanDagOptimistically, registerPendingMove, clearPendingMove]
   )
 
   // Note: Node editing is handled by individual icon clicks within node components
