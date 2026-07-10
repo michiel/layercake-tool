@@ -5,6 +5,22 @@
 **Scope:** Data model, semantic foundation, analysis products, presentation layers, UI, CLI, MCP, and agentic access  
 **Repository:** `michiel/layercake-tool`
 
+**Related documents:**
+
+- `reviews/20260710-data-model-direction-assessment.md` — independent validation of
+  this review's factual claims and a critique of its sequencing and risk weighting.
+- `plans/20260710-phase0-graph-data-cutover.md` — the detailed implementation plan
+  for Phase 0 below.
+
+> **Update (2026-07-10):** An independent code validation confirmed every structural
+> claim in this review and established that **Phase 0 is not merely stabilisation —
+> the previous single-schema cutover is genuinely unfinished**. Live services still
+> read tables that migrations have already dropped, and a silent breakage from the
+> same incomplete drop was fixed only this month
+> (`m20260709_000001_rebuild_graph_edits_drop_graphs_fk`). Phase 0 has therefore been
+> promoted to a **hard, verified gate** ahead of any semantic expansion, and its
+> scope is enumerated concretely in the linked plan. See §15 Phase 0 for the evidence.
+
 ---
 
 ## Executive summary
@@ -1583,6 +1599,33 @@ Adopt the following as explicit design rules:
 
 ## Phase 0 — Complete and stabilise the current graph foundation
 
+> **This phase is a verified gate, not a formality.** Code validation on 2026-07-10
+> found that the legacy tables were already dropped by
+> `m20251215_000001_drop_legacy_graph_tables`, yet live code still references them:
+>
+> - `services/data_set_service.rs` reads `dataset_graph_nodes` / `dataset_graph_edges`
+>   / `dataset_graph_layers` in `get_graph_summary` and `get_graph_page` — both
+>   reachable from GraphQL (`graphql/queries/mod.rs:109,127`) — and deletes them in
+>   `update_graph_data`;
+> - `pipeline/dag_executor.rs`, `pipeline/merge_builder.rs`, and
+>   `services/graph_service.rs` retain "fall back to legacy `graphs` table" branches,
+>   and `dag_executor` builds an in-memory `graphs::Model` purely for hash input;
+> - `app_context/graph_operations.rs` and `services/import_service.rs` write and read
+>   the dropped `graph_layers` / `graph_nodes` tables (layers now live in
+>   `project_layers`);
+> - `services/graph_edit_service.rs` has an `else` branch that loads/updates the
+>   dropped `graphs` table;
+> - GraphQL (`graphql/types/graph.rs`, `graph_node.rs`, `graph_edge.rs`, `preview.rs`)
+>   still maps from `graphs::Model` / `graph_nodes::Model` / `graph_edges::Model`;
+> - `database/entities/mod.rs` still declares the legacy entity modules and a
+>   `pub use dataset_nodes as datasets` compatibility alias.
+>
+> `m20260709_000001_rebuild_graph_edits_drop_graphs_fk` (this month) documents the
+> concrete failure mode: an incomplete drop left a dangling foreign key that
+> "silently breaks the entire graph-edit tracking / replay feature." The full
+> enumeration and step-by-step remediation are in
+> `plans/20260710-phase0-graph-data-cutover.md`.
+
 ### Objectives
 
 - finish the single-schema migration;
@@ -1605,7 +1648,9 @@ Adopt the following as explicit design rules:
 
 - one authoritative graph persistence path;
 - no dual writes;
-- no hidden legacy reads;
+- no hidden legacy reads (verified: no source reference to `graphs`, `graph_nodes`,
+  `graph_edges`, `graph_layers`, or `dataset_graph_*` outside migrations);
+- the legacy entity modules are deleted;
 - all graph operations use the same service layer.
 
 ---
