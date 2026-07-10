@@ -9,46 +9,22 @@ import { getEdgeColor, getEdgeLabel } from '../utils/edgeStyles'
  * Handles stable conversion between Plan DAG and ReactFlow formats
  */
 export class ReactFlowAdapter {
-  private static readonly CONVERSION_CACHE = new Map<string, any>()
-
   /**
-   * Convert Plan DAG to ReactFlow format
-   * Pure transformation with memoization for performance
+   * Convert Plan DAG to ReactFlow format.
+   *
+   * A pure, per-node transformation. There is deliberately NO conversion cache:
+   * the previous cache keyed on a `.substring(0, 50)` truncation of the node
+   * position hash, so with 36-char node ids it only captured the *first* node's
+   * position. Moving any other node produced the same key and returned a stale
+   * conversion — the direct cause of positions reverting and nodes being served
+   * from an outdated set. Callers already memoize via `stablePlanDag`, so this
+   * conversion only runs when the plan DAG actually changes.
    */
   static planDagToReactFlow(planDag: PlanDag): { nodes: Node[], edges: Edge[] } {
-    // Create a more reliable cache key that includes node positions and edge metadata
-    const positionHash = planDag.nodes
-      .map(n => `${n.id}:${n.position.x},${n.position.y}`)
-      .join('|')
-      .substring(0, 50) // Limit length
-    const edgeHash = planDag.edges
-      .map(e => `${e.id}:${e.source}->${e.target}:${e.metadata?.dataType ?? ''}:${e.metadata?.label ?? ''}`)
-      .join('|')
-      .substring(0, 50)
-    const cacheKey = `plandag-${planDag.version}-${planDag.nodes.length}-${planDag.edges.length}-${positionHash}-${edgeHash}`
-
-    if (this.CONVERSION_CACHE.has(cacheKey)) {
-      console.log('[ReactFlowAdapter] Using cached ReactFlow conversion for version', planDag.version)
-      return this.CONVERSION_CACHE.get(cacheKey)
-    }
-
-    console.log('[ReactFlowAdapter] Converting Plan DAG to ReactFlow format, version:', planDag.version)
-
-    const result = {
+    return {
       nodes: planDag.nodes.map(node => this.convertPlanDagNodeToReactFlow(node)),
       edges: planDag.edges.map(edge => this.convertPlanDagEdgeToReactFlow(edge))
     }
-
-    // Cache the result with a reasonable limit
-    if (this.CONVERSION_CACHE.size > 10) {
-      const firstKey = this.CONVERSION_CACHE.keys().next().value
-      if (firstKey !== undefined) {
-        this.CONVERSION_CACHE.delete(firstKey)
-      }
-    }
-    this.CONVERSION_CACHE.set(cacheKey, result)
-
-    return result
   }
 
   /**
@@ -411,12 +387,6 @@ export class ReactFlowAdapter {
     }
   }
 
-  /**
-   * Clear conversion cache (useful for testing or memory management)
-   */
-  static clearCache(): void {
-    this.CONVERSION_CACHE.clear()
-  }
 }
 
 interface ValidationResult {
@@ -424,6 +394,3 @@ interface ValidationResult {
   errors: string[]
   warnings: string[]
 }
-
-// Clear cache on module load to ensure FilterNode type mappings are picked up
-ReactFlowAdapter.clearCache()

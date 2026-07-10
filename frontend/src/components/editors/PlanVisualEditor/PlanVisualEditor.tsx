@@ -396,8 +396,24 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
   // Handle node changes (position, selection, etc.)
   const handleNodesChange = useCallback(
     (changes: NodeChange[]) => {
+      // Route keyboard (Delete/Backspace) node removals through the real delete
+      // path so they persist to planDag + backend. Applying a raw ReactFlow
+      // `remove` here would delete the node visually only — planDag/backend keep
+      // it, and the next sync re-adds it (flicker), while connected edges are
+      // orphaned. handleNodeDelete performs its own optimistic removal, so we
+      // must NOT also pass these `remove` changes to onNodesChange.
+      const removeChanges = changes.filter(
+        (c): c is Extract<NodeChange, { type: 'remove' }> => c.type === 'remove'
+      )
+      if (removeChanges.length > 0 && !readonly) {
+        removeChanges.forEach(c => handleNodeDelete(c.id))
+      }
+      const nonRemoveChanges = removeChanges.length > 0
+        ? changes.filter(c => c.type !== 'remove')
+        : changes
+
       // PERFORMANCE: Always apply changes to ReactFlow for visual updates (fast)
-      onNodesChange(changes)
+      onNodesChange(nonRemoveChanges)
 
       // PERFORMANCE FIX (Phase 1.2): Skip expensive processing during drag
       // Position and dimension changes during drag are cosmetic only - actual save happens in handleNodeDragStop
@@ -434,7 +450,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         }
       })
     },
-    [onNodesChange, onNodeSelect, updateManager, planDag, planDagState.performanceMonitor]
+    [onNodesChange, onNodeSelect, updateManager, planDag, planDagState.performanceMonitor, handleNodeDelete, readonly]
   )
 
   // Track initial positions when drag starts
@@ -617,8 +633,9 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
         return
       }
 
-      // Generate new edge ID (simplified since no handles)
-      const newEdgeId = `${newConnection.source}-${newConnection.target}-${Date.now()}`
+      // Generate new edge ID (simplified since no handles). Use a UUID rather
+      // than Date.now() so two edges created in the same millisecond can't collide.
+      const newEdgeId = `${newConnection.source}-${newConnection.target}-${crypto.randomUUID()}`
 
       // Create the new edge with the updated connection (floating edges don't use handles)
       const resolvedLabel = getEdgeLabel(isValid.dataType)
@@ -815,7 +832,7 @@ const PlanVisualEditorInner = ({ projectId, planId, onNodeSelect, onEdgeSelect, 
       }
 
       const newEdge = {
-        id: `edge-${Date.now()}`,
+        id: `edge-${crypto.randomUUID()}`,
         source: connection.source!,
         target: connection.target!,
         // Floating edges don't use sourceHandle/targetHandle
