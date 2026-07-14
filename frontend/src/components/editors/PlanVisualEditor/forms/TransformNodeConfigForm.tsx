@@ -111,6 +111,7 @@ const transformsEqual = (a: GraphTransform[], b: GraphTransform[]): boolean =>
   JSON.stringify(a) === JSON.stringify(b);
 
 const isPositive = (value?: number) => typeof value === 'number' && value > 0;
+const isNonNegative = (value?: number) => typeof value === 'number' && value >= 0;
 
 const coerceTransformConfig = (raw: any): TransformNodeConfig => {
   if (raw && Array.isArray(raw.transforms)) {
@@ -168,11 +169,11 @@ const isTransformValid = (transform: GraphTransform): boolean => {
     case 'PartitionWidthLimit':
       return isPositive(transform.params.maxPartitionWidth);
     case 'NodeLabelMaxLength':
-      return isPositive(transform.params.nodeLabelMaxLength);
+      return isNonNegative(transform.params.nodeLabelMaxLength);
     case 'NodeLabelInsertNewlines':
       return isPositive(transform.params.nodeLabelInsertNewlinesAt);
     case 'EdgeLabelMaxLength':
-      return isPositive(transform.params.edgeLabelMaxLength);
+      return isNonNegative(transform.params.edgeLabelMaxLength);
     case 'EdgeLabelInsertNewlines':
       return isPositive(transform.params.edgeLabelInsertNewlinesAt);
     case 'InvertGraph':
@@ -362,7 +363,7 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
             <Input
               id={`node-label-max-length-${index}`}
               type="number"
-              min={1}
+              min={0}
               max={200}
               value={transform.params.nodeLabelMaxLength ?? ''}
               onChange={e => {
@@ -402,7 +403,7 @@ export const TransformNodeConfigForm: React.FC<TransformNodeConfigFormProps> = (
             <Input
               id={`edge-label-max-length-${index}`}
               type="number"
-              min={1}
+              min={0}
               max={200}
               value={transform.params.edgeLabelMaxLength ?? ''}
               onChange={e => {

@@ -37,11 +37,11 @@ const formatTransform = (transform: GraphTransform): string | null => {
     case 'PartitionWidthLimit':
       return params.maxPartitionWidth ? `Width ≤ ${params.maxPartitionWidth}` : FRIENDLY_NAMES[kind]
     case 'NodeLabelMaxLength':
-      return params.nodeLabelMaxLength ? `Node labels ≤ ${params.nodeLabelMaxLength}` : FRIENDLY_NAMES[kind]
+      return params.nodeLabelMaxLength != null ? `Node labels ≤ ${params.nodeLabelMaxLength}` : FRIENDLY_NAMES[kind]
     case 'NodeLabelInsertNewlines':
       return params.nodeLabelInsertNewlinesAt ? `Wrap node labels @ ${params.nodeLabelInsertNewlinesAt}` : FRIENDLY_NAMES[kind]
     case 'EdgeLabelMaxLength':
-      return params.edgeLabelMaxLength ? `Edge labels ≤ ${params.edgeLabelMaxLength}` : FRIENDLY_NAMES[kind]
+      return params.edgeLabelMaxLength != null ? `Edge labels ≤ ${params.edgeLabelMaxLength}` : FRIENDLY_NAMES[kind]
     case 'EdgeLabelInsertNewlines':
       return params.edgeLabelInsertNewlinesAt ? `Wrap edge labels @ ${params.edgeLabelInsertNewlinesAt}` : FRIENDLY_NAMES[kind]
     case 'InvertGraph':
