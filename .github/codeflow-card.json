@@ -612,6 +612,108 @@
           "total": 568
         }
       ]
+    },
+    {
+      "at": "2026-07-14T23:27:17.655Z",
+      "sha": "d796dc7075f0dd773685ddaccb8fcfefe05b468c",
+      "pr": null,
+      "actor": "michiel",
+      "files": 887,
+      "functions": 2399,
+      "loc": 238346,
+      "languages": 21,
+      "topLanguages": [
+        {
+          "ext": "rs",
+          "pct": 32,
+          "lines": 75322
+        },
+        {
+          "ext": "md",
+          "pct": 26,
+          "lines": 62067
+        },
+        {
+          "ext": "tsx",
+          "pct": 17,
+          "lines": 40769
+        },
+        {
+          "ext": "json",
+          "pct": 11,
+          "lines": 26622
+        },
+        {
+          "ext": "ts",
+          "pct": 5,
+          "lines": 12590
+        }
+      ],
+      "dead": 109,
+      "deadPct": 4.5,
+      "circular": 1,
+      "godObjects": 1,
+      "avgCoupling": 3.4,
+      "securityIssues": 19,
+      "patterns": 10,
+      "duplicates": 39,
+      "layerViolations": 517,
+      "connections": 3016,
+      "avgFnLines": 15.4,
+      "longestFn": 16,
+      "testFiles": 32,
+      "testRatio": 3.6,
+      "topFolders": [
+        {
+          "name": "frontend",
+          "count": 218
+        },
+        {
+          "name": "layercake-core",
+          "count": 209
+        },
+        {
+          "name": "resources",
+          "count": 136
+        },
+        {
+          "name": "docs",
+          "count": 107
+        },
+        {
+          "name": "layercake-server",
+          "count": 80
+        }
+      ],
+      "folders": 5,
+      "grade": "D",
+      "score": 67,
+      "topBlast": {
+        "path": "layercake-server/src/graphql/types/plan_dag/node.rs",
+        "direct": 256,
+        "transitive": 495,
+        "total": 751
+      },
+      "fragility": [
+        {
+          "path": "layercake-server/src/graphql/types/plan_dag/node.rs",
+          "direct": 256,
+          "transitive": 495,
+          "total": 751
+        },
+        {
+          "path": "layercake-core/src/utils/event_broadcaster.rs",
+          "direct": 147,
+          "transitive": 500,
+          "total": 647
+        },
+        {
+          "path": "layercake-server/src/collaboration/project_actor.rs",
+          "direct": 131,
+          "transitive": 437,
+          "total": 568
+        }
+      ]
     }
   ]
 }
