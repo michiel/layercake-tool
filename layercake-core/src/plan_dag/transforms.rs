@@ -195,9 +195,6 @@ impl GraphTransform {
                 let length = self.params.node_label_max_length.ok_or_else(|| {
                     anyhow!("NodeLabelMaxLength transform requires node_label_max_length")
                 })?;
-                if length == 0 {
-                    return Err(anyhow!("node_label_max_length must be greater than zero"));
-                }
                 graph.truncate_node_labels(length);
                 Some(format!(
                     "### Transform: Node Label Max Length\n- Max length: {}\n- Nodes after: {}",
@@ -227,9 +224,6 @@ impl GraphTransform {
                 let length = self.params.edge_label_max_length.ok_or_else(|| {
                     anyhow!("EdgeLabelMaxLength transform requires edge_label_max_length")
                 })?;
-                if length == 0 {
-                    return Err(anyhow!("edge_label_max_length must be greater than zero"));
-                }
                 graph.truncate_edge_labels(length);
                 Some(format!(
                     "### Transform: Edge Label Max Length\n- Max length: {}\n- Edges after: {}",
