@@ -56,6 +56,7 @@ Initial files:
 - `workflow/inspect-database.md` — read the SQLite file directly (read-only) for inspection.
 - `workflow/run-a-plan-headless.md` — execute a plan with the CLI, no server.
 - `workflow/join-as-collaborator.md` — appear as a user in the multi-user UI (presence/cursors).
+- `workflow/develop-a-story.md` — **(user-flagged, essential)** agents constructing "stories": stories build sequence diagrams from nodes/edges and add commentary, letting us create stories of sequences based on datasets. Must document the story GraphQL ops + how an agent assembles a sequence + commentary. (Investigate the Story node / sequence GraphQL surface first — `export_sequence_artefact_node`, StoryNode config.)
 - `command/serve.md` — start the API/UI server (host/port/open, loopback default).
 - `command/query.md` — the `layercake query` one-shot CLI interface.
 - `command/schema.md` — dump the GraphQL SDL (new command, below).
@@ -128,7 +129,9 @@ Resolve DB path; print path/existence/size (+ optional key-table row counts) as 
 ### Stage 4 — `layercake api info` + `layercake api call`
 `api info [--host --port] [--json]` prints endpoints (`/graphql`, `/graphql/ws`, `/health`), the `x-layercake-session` header name, resolved DB path. `api call --query [--variables] [--url]` POSTs a GraphQL op to a running server, prints JSON. Reuse `reqwest` (already a dep).
 **Verify:** `api call '{ __typename }'` against a live `layercake serve` returns data; `api info --json` parses.
-**Status:** Not Started
+**Status:** Complete
+
+**Notes:** Added `reqwest` to cli. `api.rs`: `info` (endpoints/headers/db, text+json) and `call` (POST GraphQL, `--variables` inline or `@file`, `--url` or `--host/--port`, `--session`, pretty JSON, clear connection-refused error). `Api`/`ApiCommands`. `docs-tool/command/api.md` with the `api call` vs `query` table. Verified against a live server: `__typename`, `projects`, variables transmitted, and no-server error path.
 
 ### Stage 5 — `layercake api join` (agent presence) + visual distinction
 - CLI: `api join --project N --name --id? --color? --agent --url?` opens `/ws/collaboration?project_id=N`, sends `JoinSession` (with new `is_agent`), heartbeats until Ctrl-C.

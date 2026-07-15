@@ -31,6 +31,7 @@ sea-orm-migration = { workspace = true }
 rig = { workspace = true }
 clap-repl = "0.3.2"
 include_dir = { workspace = true }
+reqwest = { workspace = true }
 nu-ansi-term = "0.49.0"
 atty = "0.2"
 rustyline = "12"

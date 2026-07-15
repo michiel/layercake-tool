@@ -11,6 +11,7 @@ use layercake_server::server;
 #[cfg(feature = "console")]
 mod console;
 
+mod api;
 mod db_info;
 mod doc;
 mod query;
@@ -111,6 +112,11 @@ enum Commands {
         #[clap(subcommand)]
         command: SchemaCommands,
     },
+    /// Talk to a running server over HTTP (info / call)
+    Api {
+        #[clap(subcommand)]
+        command: ApiCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -167,6 +173,43 @@ enum SchemaCommands {
         /// Emit introspection JSON instead of SDL
         #[clap(long)]
         json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ApiCommands {
+    /// Print endpoints and headers for a running server
+    Info {
+        /// Full base URL (overrides --host/--port), e.g. http://127.0.0.1:3000
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        #[clap(long)]
+        json: bool,
+    },
+    /// POST a GraphQL operation to a running server and print the JSON response
+    Call {
+        /// The GraphQL query or mutation
+        #[clap(long)]
+        query: String,
+        /// Variables as inline JSON or @path/to/file.json
+        #[clap(long)]
+        variables: Option<String>,
+        /// Full base URL (overrides --host/--port)
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        /// Value for the x-layercake-session header
+        #[clap(long)]
+        session: Option<String>,
     },
 }
 
@@ -274,6 +317,33 @@ async fn main() -> Result<()> {
         },
         Commands::Schema { command } => match command {
             SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
+        },
+        Commands::Api { command } => match command {
+            ApiCommands::Info {
+                url,
+                host,
+                port,
+                database,
+                json,
+            } => api::info(url.as_deref(), &host, port, &database, json)?,
+            ApiCommands::Call {
+                query,
+                variables,
+                url,
+                host,
+                port,
+                session,
+            } => {
+                api::call(
+                    &query,
+                    variables.as_deref(),
+                    url.as_deref(),
+                    &host,
+                    port,
+                    session.as_deref(),
+                )
+                .await?
+            }
         },
     }
 

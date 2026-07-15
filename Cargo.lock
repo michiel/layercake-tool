@@ -2500,6 +2500,7 @@ dependencies = [
  "layercake-server",
  "nu-ansi-term 0.49.0",
  "regex",
+ "reqwest",
  "rig-core",
  "rustyline",
  "sea-orm",
