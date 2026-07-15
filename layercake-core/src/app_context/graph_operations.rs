@@ -434,6 +434,39 @@ impl AppContext {
             .map_err(|e| CoreError::internal("Failed to update graph data").with_source(e))
     }
 
+    /// Diff two datasets by their graph_json. Both must belong to the same
+    /// project (read access is authorized on it). Answers "what changed" —
+    /// added/removed/changed nodes and edges.
+    pub async fn diff_datasets(
+        &self,
+        actor: &Actor,
+        from_dataset_id: i32,
+        to_dataset_id: i32,
+    ) -> CoreResult<crate::graph_diff::GraphDiff> {
+        use crate::database::entities::data_sets;
+        use sea_orm::EntityTrait;
+
+        let load = |id: i32| async move {
+            data_sets::Entity::find_by_id(id)
+                .one(&self.db)
+                .await
+                .map_err(|e| CoreError::internal("Failed to load dataset").with_source(e))?
+                .ok_or_else(|| CoreError::not_found("DataSet", id.to_string()))
+        };
+        let from = load(from_dataset_id).await?;
+        let to = load(to_dataset_id).await?;
+
+        if from.project_id != to.project_id {
+            return Err(CoreError::validation(
+                "the two datasets belong to different projects",
+            ));
+        }
+        self.authorize_project_read(actor, from.project_id).await?;
+
+        crate::graph_diff::diff_graph_json(&from.graph_json, &to.graph_json)
+            .map_err(|e| CoreError::internal(format!("Failed to diff dataset graphs: {}", e)))
+    }
+
     /// Delete computed graphs whose originating DAG node no longer exists.
     /// Returns the pruned graph ids.
     pub async fn prune_orphaned_graphs(

@@ -92,6 +92,25 @@ impl Query {
         Ok(GraphSummary::from(summary))
     }
 
+    /// Structural diff between two datasets' graphs — added/removed/changed
+    /// nodes and edges. Answers "what did the merge/transform do?".
+    #[graphql(name = "diffDatasets")]
+    async fn diff_datasets(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "fromDatasetId")] from_dataset_id: i32,
+        #[graphql(name = "toDatasetId")] to_dataset_id: i32,
+    ) -> Result<crate::graphql::types::graph_diff::GraphDiff> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let diff = context
+            .app
+            .diff_datasets(&actor, from_dataset_id, to_dataset_id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+        Ok(diff.into())
+    }
+
     async fn graph_page(
         &self,
         ctx: &Context<'_>,
