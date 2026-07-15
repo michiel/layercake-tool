@@ -44,7 +44,20 @@ pub async fn start_server(
         Err(e) => warn!("Failed to reconcile interrupted graph executions: {}", e),
     }
 
-    let app = app::create_app(db, cors_origin, database_path.to_string()).await?;
+    // Report an absolute database path so tools that resolve it from a
+    // different working directory (e.g. `layercake doctor --port N`) open the
+    // right file. The file exists by now (migrations ran above), so
+    // canonicalize succeeds; fall back to the raw value for `:memory:` or edge
+    // cases.
+    let absolute_database_path = if database_path == ":memory:" {
+        database_path.to_string()
+    } else {
+        std::fs::canonicalize(database_path)
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| database_path.to_string())
+    };
+
+    let app = app::create_app(db, cors_origin, absolute_database_path).await?;
 
     // Log all HTTP routes dynamically
     log_routes(port);
