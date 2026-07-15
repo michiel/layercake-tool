@@ -171,6 +171,17 @@ enum SchemaCommands {
         /// Emit introspection JSON instead of SDL
         #[clap(long)]
         json: bool,
+        /// Only the Mutation root type
+        #[clap(long)]
+        only_mutations: bool,
+        /// Only input object types
+        #[clap(long)]
+        only_inputs: bool,
+    },
+    /// Print a single type's SDL (type / input / enum / …)
+    Type {
+        /// The type name, e.g. SequenceEdgeRefInput
+        name: String,
     },
 }
 
@@ -328,7 +339,12 @@ async fn main() -> Result<()> {
             DocCommands::Guide { name } => doc::print_doc("guide", &name)?,
         },
         Commands::Schema { command } => match command {
-            SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
+            SchemaCommands::Dump {
+                json,
+                only_mutations,
+                only_inputs,
+            } => schema_dump::dump(json, only_mutations, only_inputs).await?,
+            SchemaCommands::Type { name } => schema_dump::print_type(&name)?,
         },
         Commands::Doctor {
             project,
