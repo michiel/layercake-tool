@@ -24,6 +24,11 @@ pub struct SequenceStoryContext {
     pub participants: Vec<SequenceParticipant>,
     pub graph_data: SequenceGraphData,
     pub layers: Vec<SequenceLayer>,
+    /// Non-fatal problems encountered while building the context (e.g. a
+    /// sequence edge reference that didn't resolve). Surfaced so an empty or
+    /// partial diagram is never silently reported as success.
+    #[serde(default)]
+    pub warnings: Vec<String>,
 }
 
 pub async fn build_story_context(
@@ -77,7 +82,7 @@ pub async fn build_story_context(
         tags: serde_json::from_str::<Vec<String>>(&story.tags).unwrap_or_default(),
     };
 
-    let (sequence_entries, participants_map) = build_sequence_entries(
+    let (sequence_entries, participants_map, mut warnings) = build_sequence_entries(
         &sequence_models,
         &dataset_contexts,
         &layer_overrides,
@@ -97,12 +102,22 @@ pub async fn build_story_context(
 
     let layer_entries = graph_data.layers.clone();
 
+    if !sequence_models.is_empty() && participants.is_empty() {
+        warnings.push(format!(
+            "story '{}' (id {}): {} sequence(s) produced no participants — the diagram will be empty",
+            story_summary.name,
+            story_summary.id,
+            sequence_models.len()
+        ));
+    }
+
     Ok(SequenceStoryContext {
         story: story_summary,
         sequences: sequence_entries,
         participants,
         graph_data,
         layers: layer_entries,
+        warnings,
     })
 }
 
@@ -387,10 +402,12 @@ fn build_sequence_entries(
 ) -> (
     Vec<SequenceRender>,
     IndexMap<(i32, String), SequenceParticipant>,
+    Vec<String>,
 ) {
     let mut participants: IndexMap<(i32, String), SequenceParticipant> = IndexMap::new();
     let mut alias_set: HashSet<String> = HashSet::new();
     let mut results = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
 
     let mut all_nodes: HashMap<String, &SequenceNode> = HashMap::new();
     for ctx in dataset_contexts.values() {
@@ -400,32 +417,63 @@ fn build_sequence_entries(
     }
 
     for sequence in sequences {
-        let edge_order: Vec<SequenceEdgeRef> =
-            serde_json::from_str(&sequence.edge_order).unwrap_or_default();
+        let edge_order: Vec<SequenceEdgeRef> = match serde_json::from_str(&sequence.edge_order) {
+            Ok(order) => order,
+            Err(e) => {
+                warnings.push(format!(
+                    "sequence '{}' (id {}): could not parse edge_order ({}); it will render empty",
+                    sequence.name, sequence.id, e
+                ));
+                Vec::new()
+            }
+        };
+        let requested_steps = edge_order.len();
         let mut steps = Vec::new();
 
         for (index, edge_ref) in edge_order.into_iter().enumerate() {
             let dataset = match dataset_contexts.get(&edge_ref.dataset_id) {
                 Some(ctx) => ctx,
                 None => {
+                    warnings.push(format!(
+                        "sequence '{}' step {}: dataset {} is not enabled for this story",
+                        sequence.name, index, edge_ref.dataset_id
+                    ));
                     continue;
                 }
             };
 
             let edge = match resolve_edge(dataset, &edge_ref.edge_id) {
                 Some(edge) => edge,
-                None => continue,
+                None => {
+                    warnings.push(format!(
+                        "sequence '{}' step {}: edge '{}' not found in dataset {}",
+                        sequence.name, index, edge_ref.edge_id, edge_ref.dataset_id
+                    ));
+                    continue;
+                }
             };
 
             let source_node = match all_nodes.get(&edge.source) {
                 Some(node) => node,
-                None => continue,
+                None => {
+                    warnings.push(format!(
+                        "sequence '{}' step {}: source node '{}' of edge '{}' not found",
+                        sequence.name, index, edge.source, edge_ref.edge_id
+                    ));
+                    continue;
+                }
             };
             let source_dataset = dataset_contexts.get(&source_node.dataset_id).unwrap();
 
             let target_node = match all_nodes.get(&edge.target) {
                 Some(node) => node,
-                None => continue,
+                None => {
+                    warnings.push(format!(
+                        "sequence '{}' step {}: target node '{}' of edge '{}' not found",
+                        sequence.name, index, edge.target, edge_ref.edge_id
+                    ));
+                    continue;
+                }
             };
             let target_dataset = dataset_contexts.get(&target_node.dataset_id).unwrap();
 
@@ -478,6 +526,15 @@ fn build_sequence_entries(
             });
         }
 
+        // A sequence that requested steps but resolved none is the classic
+        // "green but empty" case — make it loud.
+        if requested_steps > 0 && steps.is_empty() {
+            warnings.push(format!(
+                "sequence '{}' (id {}): all {} step(s) were skipped; it will render empty",
+                sequence.name, sequence.id, requested_steps
+            ));
+        }
+
         results.push(SequenceRender {
             id: sequence.id,
             name: sequence.name.clone(),
@@ -486,7 +543,7 @@ fn build_sequence_entries(
         });
     }
 
-    (results, participants)
+    (results, participants, warnings)
 }
 
 fn get_or_create_participant<'a>(
@@ -763,7 +820,7 @@ mod story_participant_tests {
     fn only_story_edges_become_participants_and_steps() {
         let contexts = ctx_with(vec![edge("e1","n1","n2","calls")]);
         let sequences = vec![seq(&["e1"])];
-        let (results, participants) = build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        let (results, participants, _warnings) = build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
         // Exactly 2 participants (n1,n2) — NOT n3.
         assert_eq!(participants.len(), 2, "participants: {:?}", participants.keys().collect::<Vec<_>>());
         assert_eq!(results.len(), 1);
@@ -779,7 +836,7 @@ mod story_participant_tests {
         // so we still get the story's participants/steps — not zero.
         let contexts = ctx_with(vec![edge("n1:n2", "n1", "n2", "calls")]);
         let sequences = vec![seq(&["n1:n2"])];
-        let (results, participants) =
+        let (results, participants, _warnings) =
             build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
         assert_eq!(participants.len(), 2);
         assert_eq!(results[0].steps.len(), 1);
@@ -792,7 +849,7 @@ mod story_participant_tests {
         // The fallback matches by endpoints.
         let contexts = ctx_with(vec![edge("e1", "n1", "n2", "calls")]);
         let sequences = vec![seq(&["n1:n2"])];
-        let (results, participants) =
+        let (results, participants, _warnings) =
             build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
         assert_eq!(participants.len(), 2);
         assert_eq!(results[0].steps.len(), 1);
@@ -802,7 +859,7 @@ mod story_participant_tests {
     fn edge_comment_is_appended_to_message_label() {
         let contexts = ctx_with(vec![edge_c("e1", "n1", "n2", "calls", "async")]);
         let sequences = vec![seq(&["e1"])];
-        let (results, _) =
+        let (results, _, _) =
             build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
         assert_eq!(results[0].steps[0].label, "calls: async");
     }
@@ -813,9 +870,18 @@ mod story_participant_tests {
         // as a participant — it renders empty.
         let contexts = ctx_with(vec![edge("e1", "n1", "n2", "calls")]);
         let sequences = vec![seq(&["does-not-exist"])];
-        let (results, participants) =
+        let (results, participants, warnings) =
             build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
         assert_eq!(participants.len(), 0, "must not include unrelated nodes");
         assert_eq!(results[0].steps.len(), 0);
+        // ...and it must be surfaced as a warning, not silently green.
+        assert!(
+            warnings.iter().any(|w| w.contains("does-not-exist")),
+            "expected an unresolved-edge warning, got: {warnings:?}"
+        );
+        assert!(
+            warnings.iter().any(|w| w.contains("all 1 step(s) were skipped")),
+            "expected an empty-sequence warning, got: {warnings:?}"
+        );
     }
 }
