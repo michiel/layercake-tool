@@ -2,6 +2,7 @@
 
 **Date:** 2026-07-15
 **Branch:** `feat/web-first-remove-tauri`
+**Status:** ✅ All stages complete (Stages 1–4). Ready for review/merge.
 **Goal:** Remove the Tauri desktop shell and instead ship the existing web UI embedded inside the `layercake-server` binary. The binary serves the SPA same-origin over HTTP; it works both as a local desktop replacement (bind loopback, optionally auto-open browser) and as a self-hosted server (`--host 0.0.0.0`).
 
 ## Context / Findings
