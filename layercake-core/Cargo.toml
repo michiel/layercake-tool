@@ -60,7 +60,6 @@ spreadsheet-ods = { workspace = true }
 icu_locale_core = { workspace = true }
 zip = { workspace = true }
 
-layercake-code-analysis = { path = "../layercake-code-analysis" }
 layercake-projections = { path = "../layercake-projections" }
 
 [dev-dependencies]

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use layercake_code_analysis::cli::CodeAnalysisArgs;
 use tracing::info;
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
@@ -65,8 +64,6 @@ enum Commands {
         #[clap(subcommand)]
         command: DbCommands,
     },
-    #[clap(alias = "ca")]
-    CodeAnalysis(CodeAnalysisArgs),
     #[cfg(feature = "console")]
     Console {
         /// Optional database path; defaults to layercake.db
@@ -184,9 +181,6 @@ async fn main() -> Result<()> {
                 server::migrate_database(&database, direction).await?;
             }
         },
-        Commands::CodeAnalysis(args) => {
-            layercake_code_analysis::cli::run(args)?;
-        }
         #[cfg(feature = "console")]
         Commands::Console { database } => {
             console::run_console(console::ConsoleOptions { database }).await?;

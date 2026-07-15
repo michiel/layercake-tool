@@ -6,7 +6,6 @@ use sea_orm::{
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
-use crate::graphql::types::code_analysis::CodeAnalysisProfile;
 use crate::graphql::types::graph::Graph;
 use crate::graphql::types::plan::Plan;
 use crate::graphql::types::plan_dag::DataSetReference;
@@ -66,39 +65,6 @@ impl Query {
             .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
 
         Ok(project.map(Project::from))
-    }
-
-    async fn code_analysis_profiles(
-        &self,
-        ctx: &Context<'_>,
-        project_id: i32,
-    ) -> Result<Vec<CodeAnalysisProfile>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let profiles = context
-            .app
-            .code_analysis_service()
-            .list(project_id)
-            .await
-            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-        Ok(profiles
-            .into_iter()
-            .map(CodeAnalysisProfile::from)
-            .collect())
-    }
-
-    async fn code_analysis_profile(
-        &self,
-        ctx: &Context<'_>,
-        id: String,
-    ) -> Result<Option<CodeAnalysisProfile>> {
-        let context = ctx.data::<GraphQLContext>()?;
-        let profile = context
-            .app
-            .code_analysis_service()
-            .get(id)
-            .await
-            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
-        Ok(profile.map(CodeAnalysisProfile::from))
     }
 
     async fn graph_summary(&self, ctx: &Context<'_>, dataset_id: i32) -> Result<GraphSummary> {
