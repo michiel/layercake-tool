@@ -5,7 +5,6 @@ pub mod projection;
 pub mod sequence;
 pub mod story;
 // REMOVED: node, edge - dead code, GraphQL types not used
-pub mod code_analysis;
 pub mod data_set;
 pub mod graph;
 pub mod graph_data;
@@ -22,7 +21,6 @@ pub mod scalars;
 pub mod system_setting;
 pub mod user;
 
-pub use code_analysis::*;
 pub use data_set::*;
 pub use graph_data::*;
 pub use graph_edit::*;
