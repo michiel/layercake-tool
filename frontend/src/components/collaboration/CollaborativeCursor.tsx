@@ -1,10 +1,11 @@
 import { memo } from 'react'
-import { IconPointer } from '@tabler/icons-react'
+import { IconPointer, IconRobot } from '@tabler/icons-react'
 
 interface CollaborativeCursorProps {
   userId: string
   userName: string
   avatarColor: string
+  isAgent?: boolean
   position: { x: number; y: number }
   viewport: { x: number; y: number; zoom: number }
   selectedNodeId?: string
@@ -13,6 +14,7 @@ interface CollaborativeCursorProps {
 export const CollaborativeCursor = memo(({
   userName,
   avatarColor,
+  isAgent,
   position,
   viewport,
   selectedNodeId
@@ -47,14 +49,24 @@ export const CollaborativeCursor = memo(({
           gap: 4,
         }}
       >
-        <IconPointer
-          size={20}
-          style={{
-            color: avatarColor,
-            filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
-            transform: 'rotate(-45deg)',
-          }}
-        />
+        {isAgent ? (
+          <IconRobot
+            size={20}
+            style={{
+              color: avatarColor,
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+            }}
+          />
+        ) : (
+          <IconPointer
+            size={20}
+            style={{
+              color: avatarColor,
+              filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.3))',
+              transform: 'rotate(-45deg)',
+            }}
+          />
+        )}
 
         {/* User name label */}
         <div
@@ -71,6 +83,7 @@ export const CollaborativeCursor = memo(({
             marginTop: -2,
           }}
         >
+          {isAgent && '🤖 '}
           {userName}
           {selectedNodeId && (
             <span style={{ opacity: 0.8, marginLeft: 4, fontSize: 10 }}>

@@ -55,7 +55,7 @@ async fn join_sends_bulk_presence_to_new_user_and_notifies_existing() {
     // First user joins an empty project.
     let (tx_a, mut client_a) = FakeClient::new();
     coord
-        .join_project(1, "a".into(), "Alice".into(), None, tx_a)
+        .join_project(1, "a".into(), "Alice".into(), None, false, tx_a)
         .await
         .unwrap();
 
@@ -72,7 +72,7 @@ async fn join_sends_bulk_presence_to_new_user_and_notifies_existing() {
     // UserPresence notification about Bob.
     let (tx_b, mut client_b) = FakeClient::new();
     coord
-        .join_project(1, "b".into(), "Bob".into(), None, tx_b)
+        .join_project(1, "b".into(), "Bob".into(), None, false, tx_b)
         .await
         .unwrap();
 
@@ -101,11 +101,11 @@ async fn cursor_update_is_broadcast_to_other_users_in_document() {
     let (tx_a, mut client_a) = FakeClient::new();
     let (tx_b, mut client_b) = FakeClient::new();
     coord
-        .join_project(7, "a".into(), "Alice".into(), None, tx_a)
+        .join_project(7, "a".into(), "Alice".into(), None, false, tx_a)
         .await
         .unwrap();
     coord
-        .join_project(7, "b".into(), "Bob".into(), None, tx_b)
+        .join_project(7, "b".into(), "Bob".into(), None, false, tx_b)
         .await
         .unwrap();
 
@@ -158,7 +158,7 @@ async fn leave_removes_user_and_empty_project_is_dropped() {
 
     let (tx_a, _client_a) = FakeClient::new();
     coord
-        .join_project(3, "a".into(), "Alice".into(), None, tx_a)
+        .join_project(3, "a".into(), "Alice".into(), None, false, tx_a)
         .await
         .unwrap();
 
@@ -188,7 +188,7 @@ async fn dead_connection_is_cleaned_up_on_next_broadcast() {
     // Alice's receiver is dropped immediately => her connection is dead.
     let (tx_dead, dead_client) = FakeClient::new();
     coord
-        .join_project(9, "a".into(), "Alice".into(), None, tx_dead)
+        .join_project(9, "a".into(), "Alice".into(), None, false, tx_dead)
         .await
         .unwrap();
     drop(dead_client);
@@ -197,7 +197,7 @@ async fn dead_connection_is_cleaned_up_on_next_broadcast() {
     // connection is cleaned up. After that only Bob remains.
     let (tx_b, _client_b) = FakeClient::new();
     coord
-        .join_project(9, "b".into(), "Bob".into(), None, tx_b)
+        .join_project(9, "b".into(), "Bob".into(), None, false, tx_b)
         .await
         .unwrap();
 
@@ -233,7 +233,7 @@ async fn concurrent_joins_all_register() {
         let coord = coord.clone();
         handles.push(tokio::spawn(async move {
             coord
-                .join_project(5, format!("u{}", i), format!("User {}", i), None, tx)
+                .join_project(5, format!("u{}", i), format!("User {}", i), None, false, tx)
                 .await
         }));
     }
@@ -256,11 +256,11 @@ async fn switch_document_broadcasts_activity() {
     let (tx_a, mut client_a) = FakeClient::new();
     let (tx_b, mut client_b) = FakeClient::new();
     coord
-        .join_project(2, "a".into(), "Alice".into(), None, tx_a)
+        .join_project(2, "a".into(), "Alice".into(), None, false, tx_a)
         .await
         .unwrap();
     coord
-        .join_project(2, "b".into(), "Bob".into(), None, tx_b)
+        .join_project(2, "b".into(), "Bob".into(), None, false, tx_b)
         .await
         .unwrap();
     let _ = client_a.drain();

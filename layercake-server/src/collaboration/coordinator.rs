@@ -37,6 +37,7 @@ impl CollaborationCoordinator {
                     user_id,
                     user_name,
                     avatar_color,
+                    is_agent,
                     sender,
                     response,
                 } => {
@@ -47,7 +48,9 @@ impl CollaborationCoordinator {
                         .entry(project_id)
                         .or_insert_with(|| ProjectActor::spawn(project_id));
 
-                    let result = project.join(user_id, user_name, avatar_color, sender).await;
+                    let result = project
+                        .join(user_id, user_name, avatar_color, is_agent, sender)
+                        .await;
                     let _ = response.send(result);
                 }
 
@@ -151,6 +154,7 @@ impl CoordinatorHandle {
         user_id: String,
         user_name: String,
         avatar_color: Option<String>,
+        is_agent: bool,
         sender: mpsc::Sender<crate::server::websocket::types::ServerMessage>,
     ) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -160,6 +164,7 @@ impl CoordinatorHandle {
                 user_id,
                 user_name,
                 avatar_color,
+                is_agent,
                 sender,
                 response: tx,
             })

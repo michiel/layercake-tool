@@ -190,6 +190,24 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
 - **Pipeline Stages** – add Rust modules under `layercake-core/src/pipeline` and wire them into plan execution for custom transformations.
 - **Frontend Components** – React components live under `frontend/src/components`; Plan/Graph editors leverage ReactFlow and Mantine for rapid iteration.
 
+## Agents / API access
+
+Layercake is built to be driven by AI agents against a running instance. The
+binary ships embedded, discoverable docs:
+
+```bash
+layercake doc list                       # discover agent workflows & commands
+layercake schema dump                    # full GraphQL API surface (offline)
+layercake api info                       # endpoints + session header
+layercake api call --query '{ … }'       # run a GraphQL op on a running server
+layercake db info                        # database file location/size
+layercake api join --project N --agent   # appear as a collaborator in the UI
+```
+
+Start with `layercake doc list`, then read the workflow that matches your task
+(e.g. `layercake doc workflow develop-a-story`, `edit-a-plan`,
+`join-as-collaborator`). See `docs-tool/` for the source of these guides.
+
 ## Documentation & References
 
 - [BUILD.md](BUILD.md) – platform prerequisites and packaging instructions.

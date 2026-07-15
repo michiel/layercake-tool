@@ -52,6 +52,7 @@ export const CollaborativeCursors = memo(({
             userId={user.userId}
             userName={user.userName}
             avatarColor={user.avatarColor}
+            isAgent={user.isAgent}
             position={{ x: position.x, y: position.y }}
             viewport={viewport}
             selectedNodeId={canvasData.selectedNodeId}

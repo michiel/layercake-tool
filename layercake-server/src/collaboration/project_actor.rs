@@ -47,6 +47,7 @@ impl ProjectActor {
         user_id: String,
         user_name: String,
         avatar_color: Option<String>,
+        is_agent: bool,
         sender: mpsc::Sender<ServerMessage>,
     ) -> Result<(), String> {
         let (tx, rx) = tokio::sync::oneshot::channel();
@@ -55,6 +56,7 @@ impl ProjectActor {
                 user_id,
                 user_name,
                 avatar_color,
+                is_agent,
                 sender,
                 response: tx,
             })
@@ -164,6 +166,7 @@ struct UserData {
     user_id: String,
     user_name: String,
     avatar_color: String,
+    is_agent: bool,
     #[allow(dead_code)]
     joined_at: Instant,
     last_active: Instant,
@@ -245,6 +248,7 @@ impl ProjectState {
                     user_id,
                     user_name,
                     avatar_color,
+                    is_agent,
                     sender,
                     response,
                 } => {
@@ -254,6 +258,7 @@ impl ProjectState {
                         avatar_color: avatar_color
                             .clone()
                             .unwrap_or_else(|| "#4A90E2".to_string()),
+                        is_agent,
                         joined_at: Instant::now(),
                         last_active: Instant::now(),
                     };
@@ -427,6 +432,7 @@ impl ProjectState {
                     user_id: user_data.user_id.clone(),
                     user_name: user_data.user_name.clone(),
                     avatar_color: user_data.avatar_color.clone(),
+                    is_agent: user_data.is_agent,
                     is_online: true,
                     last_active: format_instant(user_data.last_active),
                     documents,
@@ -460,6 +466,7 @@ impl ProjectState {
             user_id: user_data.user_id.clone(),
             user_name: user_data.user_name.clone(),
             avatar_color: user_data.avatar_color.clone(),
+            is_agent: user_data.is_agent,
             is_online: true,
             last_active: format_instant(user_data.last_active),
             documents,
@@ -478,6 +485,7 @@ impl ProjectState {
             user_id: user_id.to_string(),
             user_name: String::new(),
             avatar_color: String::new(),
+            is_agent: false,
             is_online: false,
             last_active: format_instant(Instant::now()),
             documents: HashMap::new(),

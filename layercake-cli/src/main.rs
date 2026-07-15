@@ -10,8 +10,12 @@ use layercake_server::server;
 #[cfg(feature = "console")]
 mod console;
 
+mod api;
+mod db_info;
+mod doc;
 mod query;
 mod query_payloads;
+mod schema_dump;
 mod schema_introspection;
 use query::QueryArgs;
 mod repl;
@@ -95,6 +99,21 @@ enum Commands {
         #[clap(subcommand)]
         command: GuideCommands,
     },
+    /// Print embedded agent-facing documentation (workflows and commands)
+    Doc {
+        #[clap(subcommand)]
+        command: DocCommands,
+    },
+    /// Inspect the GraphQL API surface
+    Schema {
+        #[clap(subcommand)]
+        command: SchemaCommands,
+    },
+    /// Talk to a running server over HTTP (info / call)
+    Api {
+        #[clap(subcommand)]
+        command: ApiCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -108,6 +127,15 @@ enum DbCommands {
         direction: server::MigrateDirection,
         #[clap(short, long, default_value = "layercake.db")]
         database: String,
+    },
+    /// Show the database file location and size (filesystem-only, safe while a
+    /// server has the DB open)
+    Info {
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        /// Emit machine-readable JSON
+        #[clap(long)]
+        json: bool,
     },
 }
 
@@ -123,6 +151,89 @@ enum GuideCommands {
     Agent,
     /// Output the graph model documentation
     Model,
+}
+
+#[derive(Subcommand, Debug)]
+enum DocCommands {
+    /// List all available workflow and command docs
+    List,
+    /// Print a workflow doc (docs-tool/workflow/<name>.md)
+    Workflow { name: String },
+    /// Print a command doc (docs-tool/command/<name>.md)
+    Command { name: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum SchemaCommands {
+    /// Print the GraphQL schema (SDL by default; --json for introspection)
+    Dump {
+        /// Emit introspection JSON instead of SDL
+        #[clap(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ApiCommands {
+    /// Print endpoints and headers for a running server
+    Info {
+        /// Full base URL (overrides --host/--port), e.g. http://127.0.0.1:3000
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        #[clap(long)]
+        json: bool,
+    },
+    /// POST a GraphQL operation to a running server and print the JSON response
+    Call {
+        /// The GraphQL query or mutation
+        #[clap(long)]
+        query: String,
+        /// Variables as inline JSON or @path/to/file.json
+        #[clap(long)]
+        variables: Option<String>,
+        /// Full base URL (overrides --host/--port)
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        /// Value for the x-layercake-session header
+        #[clap(long)]
+        session: Option<String>,
+    },
+    /// Join a project's collaboration session so the caller appears as a user
+    /// in the multi-user UI (holds the connection until Ctrl-C)
+    Join {
+        /// Project id to join
+        #[clap(long)]
+        project: i32,
+        /// Display name shown to other collaborators
+        #[clap(long)]
+        name: String,
+        /// Stable user id (defaults to an agent-<pid> id)
+        #[clap(long)]
+        id: Option<String>,
+        /// Avatar colour (hex)
+        #[clap(long)]
+        color: Option<String>,
+        /// Mark this presence as an agent (shows an Agent badge in the UI)
+        #[clap(long)]
+        agent: bool,
+        /// Full base URL (overrides --host/--port)
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+    },
 }
 
 #[tokio::main]
@@ -180,6 +291,9 @@ async fn main() -> Result<()> {
                 info!("Running database migration: {:?}", direction);
                 server::migrate_database(&database, direction).await?;
             }
+            DbCommands::Info { database, json } => {
+                db_info::run(&database, json)?;
+            }
         },
         #[cfg(feature = "console")]
         Commands::Console { database } => {
@@ -214,6 +328,63 @@ async fn main() -> Result<()> {
             GuideCommands::Model => {
                 const MODEL_GUIDE: &str = include_str!("../../LAYERCAKE_MODEL_GUIDE.md");
                 print!("{}", MODEL_GUIDE);
+            }
+        },
+        Commands::Doc { command } => match command {
+            DocCommands::List => doc::print_list(),
+            DocCommands::Workflow { name } => doc::print_doc("workflow", &name)?,
+            DocCommands::Command { name } => doc::print_doc("command", &name)?,
+        },
+        Commands::Schema { command } => match command {
+            SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
+        },
+        Commands::Api { command } => match command {
+            ApiCommands::Info {
+                url,
+                host,
+                port,
+                database,
+                json,
+            } => api::info(url.as_deref(), &host, port, &database, json)?,
+            ApiCommands::Call {
+                query,
+                variables,
+                url,
+                host,
+                port,
+                session,
+            } => {
+                api::call(
+                    &query,
+                    variables.as_deref(),
+                    url.as_deref(),
+                    &host,
+                    port,
+                    session.as_deref(),
+                )
+                .await?
+            }
+            ApiCommands::Join {
+                project,
+                name,
+                id,
+                color,
+                agent,
+                url,
+                host,
+                port,
+            } => {
+                api::join(
+                    project,
+                    name,
+                    id,
+                    color,
+                    agent,
+                    url.as_deref(),
+                    &host,
+                    port,
+                )
+                .await?
             }
         },
     }

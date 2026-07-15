@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { IconUser, IconUsers } from '@tabler/icons-react'
+import { IconRobot, IconUser, IconUsers } from '@tabler/icons-react'
 import { UserPresenceData, ConnectionState } from '../../types/websocket'
 import { Group, Stack } from '../layout-primitives'
 import { Avatar, AvatarFallback } from '../ui/avatar'
@@ -57,11 +57,22 @@ export const UserPresenceIndicator = memo(({
                 <Group gap="xs">
                   <Avatar className="h-8 w-8" style={{ backgroundColor: user.avatarColor }}>
                     <AvatarFallback style={{ backgroundColor: user.avatarColor }}>
-                      <IconUser className="h-3.5 w-3.5 text-white" />
+                      {user.isAgent ? (
+                        <IconRobot className="h-3.5 w-3.5 text-white" />
+                      ) : (
+                        <IconUser className="h-3.5 w-3.5 text-white" />
+                      )}
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="text-sm font-medium">{user.userName}</p>
+                    <p className="text-sm font-medium">
+                      {user.userName}
+                      {user.isAgent && (
+                        <Badge variant="secondary" className="ml-1.5 text-[10px] align-middle">
+                          Agent
+                        </Badge>
+                      )}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       Last active: {new Date(user.lastActive).toLocaleTimeString()}
                     </p>

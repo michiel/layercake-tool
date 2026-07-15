@@ -203,6 +203,7 @@ async fn handle_client_message(
                     data.user_id.clone(),
                     data.user_name,
                     Some(data.avatar_color),
+                    data.is_agent,
                     tx.clone(),
                 )
                 .await?;
