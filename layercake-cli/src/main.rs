@@ -211,6 +211,32 @@ enum ApiCommands {
         #[clap(long)]
         session: Option<String>,
     },
+    /// Join a project's collaboration session so the caller appears as a user
+    /// in the multi-user UI (holds the connection until Ctrl-C)
+    Join {
+        /// Project id to join
+        #[clap(long)]
+        project: i32,
+        /// Display name shown to other collaborators
+        #[clap(long)]
+        name: String,
+        /// Stable user id (defaults to an agent-<pid> id)
+        #[clap(long)]
+        id: Option<String>,
+        /// Avatar colour (hex)
+        #[clap(long)]
+        color: Option<String>,
+        /// Mark this presence as an agent (shows an Agent badge in the UI)
+        #[clap(long)]
+        agent: bool,
+        /// Full base URL (overrides --host/--port)
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+    },
 }
 
 #[tokio::main]
@@ -341,6 +367,28 @@ async fn main() -> Result<()> {
                     &host,
                     port,
                     session.as_deref(),
+                )
+                .await?
+            }
+            ApiCommands::Join {
+                project,
+                name,
+                id,
+                color,
+                agent,
+                url,
+                host,
+                port,
+            } => {
+                api::join(
+                    project,
+                    name,
+                    id,
+                    color,
+                    agent,
+                    url.as_deref(),
+                    &host,
+                    port,
                 )
                 .await?
             }

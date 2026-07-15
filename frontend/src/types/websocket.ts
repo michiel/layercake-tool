@@ -85,6 +85,8 @@ export interface UserPresenceData {
   userId: string;
   userName: string;
   avatarColor: string;
+  /** True when this presence is an automated agent rather than a human. */
+  isAgent?: boolean;
   isOnline: boolean;
   lastActive: string;
   documents: Record<string, DocumentPresence>;

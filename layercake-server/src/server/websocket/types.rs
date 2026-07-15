@@ -66,6 +66,8 @@ pub struct JoinSessionData {
     pub user_id: String,
     pub user_name: String,
     pub avatar_color: String,
+    #[serde(default)]
+    pub is_agent: bool,
     pub document_id: Option<String>,
 }
 
@@ -109,6 +111,8 @@ pub struct UserPresenceData {
     pub user_id: String,
     pub user_name: String,
     pub avatar_color: String,
+    #[serde(default)]
+    pub is_agent: bool,
     pub is_online: bool,
     pub last_active: String,
     pub documents: std::collections::HashMap<String, DocumentPresence>,
@@ -145,6 +149,7 @@ pub struct UserPresence {
     pub user_id: String,
     pub user_name: String,
     pub avatar_color: String,
+    pub is_agent: bool,
     pub is_online: bool,
     pub last_active: Instant,
 }

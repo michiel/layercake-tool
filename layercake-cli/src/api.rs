@@ -6,8 +6,11 @@
 //! directly with no server.
 
 use anyhow::{anyhow, Context, Result};
+use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
 use serde_json::json;
+use std::time::Duration;
+use tokio_tungstenite::tungstenite::Message;
 
 /// Build the base URL from an explicit `--url` or host/port.
 fn base_url(url: Option<&str>, host: &str, port: u16) -> String {
@@ -111,6 +114,86 @@ pub async fn call(
 
     if !status.is_success() {
         return Err(anyhow!("server returned HTTP {}", status));
+    }
+    Ok(())
+}
+
+/// Connect to the collaboration WebSocket and hold a presence session so the
+/// agent appears as a collaborator in the multi-user UI until interrupted.
+pub async fn join(
+    project: i32,
+    name: String,
+    id: Option<String>,
+    color: Option<String>,
+    is_agent: bool,
+    url: Option<&str>,
+    host: &str,
+    port: u16,
+) -> Result<()> {
+    let base = base_url(url, host, port);
+    let ws_base = base.replacen("http", "ws", 1);
+    let ws_url = format!("{}/ws/collaboration?project_id={}", ws_base, project);
+
+    // A stable per-session id if the caller didn't supply one. Kept simple —
+    // uniqueness only needs to hold within a running server.
+    let user_id = id.unwrap_or_else(|| format!("agent-{}-{}", project, std::process::id()));
+    let avatar_color = color.unwrap_or_else(|| "#7c3aed".to_string());
+
+    eprintln!("Connecting to {} …", ws_url);
+    let (mut ws, _resp) = tokio_tungstenite::connect_async(&ws_url)
+        .await
+        .with_context(|| format!("connecting to {} (is a server running there?)", ws_url))?;
+
+    // Announce presence.
+    let join = json!({
+        "type": "join_session",
+        "data": {
+            "userId": user_id,
+            "userName": name,
+            "avatarColor": avatar_color,
+            "isAgent": is_agent,
+        }
+    });
+    ws.send(Message::Text(join.to_string().into())).await?;
+    eprintln!(
+        "Joined project {} as \"{}\" ({}). Press Ctrl-C to leave.",
+        project, name, user_id
+    );
+
+    // Heartbeat + drain incoming messages until Ctrl-C or the socket closes.
+    let mut ticker = tokio::time::interval(Duration::from_secs(10));
+    loop {
+        tokio::select! {
+            _ = ticker.tick() => {
+                if ws.send(Message::Text(json!({"type":"ping"}).to_string().into())).await.is_err() {
+                    eprintln!("Connection closed by server.");
+                    break;
+                }
+            }
+            msg = ws.next() => {
+                match msg {
+                    Some(Ok(Message::Text(t))) => {
+                        // Surface presence/errors on stdout so agents can react.
+                        println!("{}", t);
+                    }
+                    Some(Ok(Message::Close(_))) | None => {
+                        eprintln!("Connection closed.");
+                        break;
+                    }
+                    Some(Err(e)) => {
+                        return Err(anyhow!("websocket error: {}", e));
+                    }
+                    _ => {}
+                }
+            }
+            _ = tokio::signal::ctrl_c() => {
+                eprintln!("\nLeaving …");
+                let leave = json!({"type":"leave_session","data":{"documentId":null}});
+                let _ = ws.send(Message::Text(leave.to_string().into())).await;
+                let _ = ws.close(None).await;
+                break;
+            }
+        }
     }
     Ok(())
 }

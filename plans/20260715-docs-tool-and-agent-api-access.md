@@ -138,7 +138,9 @@ Resolve DB path; print path/existence/size (+ optional key-table row counts) as 
 - Protocol: add `is_agent: bool` (`#[serde(default)]`) to `JoinSessionData` + `UserPresenceData` and the collaboration presence structs; thread through `project_actor`/handler.
 - Frontend: add `isAgent` to `types/websocket.ts`; `UserPresenceIndicator` shows a bot icon + "Agent" badge; `CollaborativeCursor` uses a distinct style for agents.
 **Verify:** a second WS client (or browser) sees the agent join with `is_agent=true`; humans still render normally (default false); `tsc --noEmit` clean.
-**Status:** Not Started
+**Status:** Complete
+
+**Notes:** Threaded `is_agent: bool` end-to-end server-side (mirroring `avatar_color`): `JoinSessionData`/`UserPresenceData`/`UserPresence` (websocket/types.rs), `CoordinatorCommand::JoinProject`/`ProjectCommand::Join` (collaboration/types.rs), `join_project`/`join` fns (coordinator.rs, project_actor.rs), `UserData` + 3 `UserPresenceData` build sites, handler passes `data.is_agent`. All `#[serde(default)]` → backward-compatible (humans omit it → false). CLI `api join` (tokio-tungstenite): connects `/ws/collaboration?project_id=N`, sends `join_session` with `isAgent`, heartbeats, prints presence, clean leave on Ctrl-C. Frontend: `isAgent?` on `UserPresenceData`, `UserPresenceIndicator` (robot icon + Agent badge), `CollaborativeCursor(s)` (robot cursor + 🤖 label). **Verified E2E:** observer WS client received `user_presence` with `"isAgent":true`; server+cli build; `tsc --noEmit` clean. `docs-tool/workflow/join-as-collaborator.md`.
 
 ### Stage 6 — Fill out `docs-tool/` + discovery + README
 Complete all workflow/command md files; cross-reference; document the `query`-vs-`api call` distinction prominently; README "Agents / API access" pointer.
