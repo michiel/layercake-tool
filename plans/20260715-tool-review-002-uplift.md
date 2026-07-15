@@ -2,6 +2,7 @@
 
 **Date:** 2026-07-15
 **Source:** `reviews/tool-review-002.md` (post-uplift session, project 36).
+**Status:** All stages (1–6) complete on `fix/tool-review-002-uplift`; N4/doctor-fix filed as #88/#89.
 **Approach:** structural over patches (per project direction / memory). Validate every finding against current master first — the reviewer's build predated PR #87, so several "remaining" items are already shipped.
 
 ## Validation: what's stale vs. live (checked against master)
