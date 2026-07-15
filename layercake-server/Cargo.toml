@@ -44,6 +44,7 @@ futures-util = { workspace = true }
 dashmap = { workspace = true }
 url = { workspace = true }
 include_dir = { workspace = true }
+mime_guess = "2.0"
 handlebars = { workspace = true }
 regex = { workspace = true }
 notify = { workspace = true }

@@ -3686,6 +3686,7 @@ dependencies = [
  "layercake-core",
  "layercake-projections",
  "lazy_static",
+ "mime_guess",
  "notify",
  "once_cell",
  "regex",

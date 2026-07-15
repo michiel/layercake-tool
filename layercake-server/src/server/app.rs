@@ -235,6 +235,11 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
 
     let app = app.nest_service("/projections/viewer", get_service(projections_viewer));
 
+    // Serve the embedded web UI for any route not matched above. This is the
+    // catch-all, so all API/asset routes registered earlier take priority and
+    // unknown paths fall back to the SPA shell (client-side routing).
+    let app = app.fallback(crate::server::static_assets::spa_fallback);
+
     Ok(app)
 }
 
