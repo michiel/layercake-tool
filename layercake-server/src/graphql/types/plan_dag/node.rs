@@ -83,6 +83,23 @@ impl PlanDagNode {
         // For now, return the raw JSON. In the future, this could parse to specific types
         Ok(self.config.clone())
     }
+
+    /// The dataset primary key this node references, if any.
+    ///
+    /// Plan DAG nodes are keyed by opaque hash ids (e.g. `dataset_766f8bef…`),
+    /// while dataset/graph mutations take the integer PK. The link lives inside
+    /// the node's `config` JSON (`dataSetId`); this surfaces it as a first-class
+    /// field so agents don't have to parse `config` by hand to join the two.
+    #[graphql(name = "linkedDataSetId")]
+    async fn linked_data_set_id(&self) -> Option<i32> {
+        let config: serde_json::Value = serde_json::from_str(&self.config).ok()?;
+        config
+            .get("dataSetId")
+            .or_else(|| config.get("datasetId"))
+            .or_else(|| config.get("dataSetId"))
+            .and_then(|v| v.as_i64())
+            .map(|v| v as i32)
+    }
 }
 
 // Conversions from database entities
