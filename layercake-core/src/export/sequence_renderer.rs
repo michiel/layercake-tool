@@ -138,6 +138,8 @@ pub struct SequenceEdge {
     pub source: String,
     pub target: String,
     pub label: String,
+    #[serde(default)]
+    pub comment: Option<String>,
     pub dataset_id: i32,
     pub dataset_name: String,
 }

@@ -85,28 +85,15 @@ pub async fn build_story_context(
         true,
     );
 
-    let mut participants: Vec<SequenceParticipant> = participants_map.values().cloned().collect();
+    // Participants are ONLY the nodes that appear as endpoints of the edges
+    // referenced by the story's sequences (built in build_sequence_entries).
+    // We intentionally do NOT fall back to "all nodes in the datasets" — a
+    // story renders its selected sequence, not the entire graph. An empty
+    // result means the sequences reference no resolvable edges, which should
+    // render as an empty diagram, not a wall of unconnected boxes.
+    let participants: Vec<SequenceParticipant> = participants_map.values().cloned().collect();
     let mut graph_data = build_sequence_graph_data(&dataset_contexts);
     graph_data.layers = build_project_layer_entries(&project_layers_list);
-
-    if participants.is_empty() && !graph_data.nodes.is_empty() {
-        participants = graph_data
-            .nodes
-            .iter()
-            .map(|node| SequenceParticipant {
-                alias: format!("p{}_{}", node.dataset_id, sanitize_identifier(&node.id)),
-                id: node.id.clone(),
-                label: node.label.clone(),
-                dataset_id: node.dataset_id,
-                dataset_name: node.dataset_name.clone(),
-                layer: node.layer.clone(),
-                layer_color: None,
-                partition_id: node.belongs_to.clone(),
-                partition_label: node.partition_label.clone(),
-                partition_layer_color: None,
-            })
-            .collect();
-    }
 
     let layer_entries = graph_data.layers.clone();
 
@@ -282,6 +269,13 @@ fn parse_dataset_context(model: &data_sets::Model) -> ParsedDatasetContext {
             continue;
         }
         let label = extract_label(&edge, &edge_id);
+        let comment = value_to_string(edge.get("comment"))
+            .or_else(|| value_to_string(edge.get("comments")))
+            .or_else(|| {
+                edge.get("attrs")
+                    .and_then(|attrs| value_to_string(attrs.get("comment")))
+            })
+            .filter(|c| !c.trim().is_empty());
         edges_map.insert(
             edge_id.clone(),
             SequenceEdge {
@@ -289,6 +283,7 @@ fn parse_dataset_context(model: &data_sets::Model) -> ParsedDatasetContext {
                 source,
                 target,
                 label,
+                comment,
                 dataset_id: model.id,
                 dataset_name: model.name.clone(),
             },
@@ -359,6 +354,30 @@ fn build_sequence_graph_data(
     }
 }
 
+/// Resolve a sequence's stored `edge_id` against a dataset's edges.
+///
+/// The stored id is whatever the UI captured from the dataset's graph JSON
+/// (the raw edge `id`). If that direct lookup misses — e.g. the graph JSON had
+/// no edge `id`, so the backend keyed the edge by its `source:target` composite
+/// while the UI stored something else — fall back to matching by the
+/// `source:target` composite so the sequence still resolves.
+fn resolve_edge<'a>(dataset: &'a ParsedDatasetContext, edge_id: &str) -> Option<&'a SequenceEdge> {
+    if let Some(edge) = dataset.edges.get(edge_id) {
+        return Some(edge);
+    }
+    // Fallback 1: the stored id is a "source:target" composite.
+    if let Some((source, target)) = edge_id.split_once(':') {
+        if let Some(edge) = dataset
+            .edges
+            .values()
+            .find(|e| e.source == source && e.target == target)
+        {
+            return Some(edge);
+        }
+    }
+    None
+}
+
 fn build_sequence_entries(
     sequences: &[sequences::Model],
     dataset_contexts: &HashMap<i32, ParsedDatasetContext>,
@@ -393,7 +412,7 @@ fn build_sequence_entries(
                 }
             };
 
-            let edge = match dataset.edges.get(&edge_ref.edge_id) {
+            let edge = match resolve_edge(dataset, &edge_ref.edge_id) {
                 Some(edge) => edge,
                 None => continue,
             };
@@ -437,13 +456,23 @@ fn build_sequence_entries(
 
             let note_position = edge_ref.note_position.as_ref().map(note_position_to_str);
 
+            // Surface the edge's comment alongside its label on the message,
+            // matching the interactive preview ("label: comment").
+            let label = match &edge.comment {
+                Some(comment) if !edge.label.is_empty() => {
+                    format!("{}: {}", edge.label, comment)
+                }
+                Some(comment) => comment.clone(),
+                None => edge.label.clone(),
+            };
+
             steps.push(SequenceStep {
                 id: format!("seq{}_{}", sequence.id, index),
                 dataset_id: dataset.dataset_id,
                 dataset_name: dataset.name.clone(),
                 source: source_ref,
                 target: target_ref,
-                label: edge.label.clone(),
+                label,
                 note: edge_ref.note.clone(),
                 note_position,
             });
@@ -694,4 +723,99 @@ fn value_to_bool(value: Option<&Value>) -> bool {
             _ => false,
         })
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod story_participant_tests {
+    use super::*;
+
+    fn node(id: &str, label: &str) -> SequenceNode {
+        SequenceNode { id: id.into(), label: label.into(), layer: None, dataset_id: 1, dataset_name: "d".into(), belongs_to: None, partition_label: None, is_partition: false }
+    }
+    fn edge(id: &str, s: &str, t: &str, label: &str) -> SequenceEdge {
+        SequenceEdge { id: id.into(), source: s.into(), target: t.into(), label: label.into(), comment: None, dataset_id: 1, dataset_name: "d".into() }
+    }
+    fn edge_c(id: &str, s: &str, t: &str, label: &str, comment: &str) -> SequenceEdge {
+        SequenceEdge { id: id.into(), source: s.into(), target: t.into(), label: label.into(), comment: Some(comment.into()), dataset_id: 1, dataset_name: "d".into() }
+    }
+    fn ctx_with(edges: Vec<SequenceEdge>) -> HashMap<i32, ParsedDatasetContext> {
+        let mut nodes = IndexMap::new();
+        nodes.insert("n1".to_string(), node("n1","Alice"));
+        nodes.insert("n2".to_string(), node("n2","Bob"));
+        nodes.insert("n3".to_string(), node("n3","Unused")); // should NOT appear as participant
+        let mut em = IndexMap::new();
+        for e in edges { em.insert(e.id.clone(), e); }
+        let mut m = HashMap::new();
+        m.insert(1, ParsedDatasetContext { dataset_id: 1, name: "d".into(), nodes, edges: em, partitions: HashMap::new() });
+        m
+    }
+    fn seq(edge_ids: &[&str]) -> sequences::Model {
+        let order: Vec<serde_json::Value> = edge_ids.iter().map(|id| json!({"datasetId":1,"edgeId":id,"note":"hi"})).collect();
+        sequences::Model {
+            id: 1, story_id: 1, name: "Seq".into(), description: None,
+            enabled_dataset_ids: "[1]".into(),
+            edge_order: serde_json::to_string(&order).unwrap(),
+            created_at: chrono::Utc::now(), updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn only_story_edges_become_participants_and_steps() {
+        let contexts = ctx_with(vec![edge("e1","n1","n2","calls")]);
+        let sequences = vec![seq(&["e1"])];
+        let (results, participants) = build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        // Exactly 2 participants (n1,n2) — NOT n3.
+        assert_eq!(participants.len(), 2, "participants: {:?}", participants.keys().collect::<Vec<_>>());
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].steps.len(), 1, "expected 1 step");
+        assert_eq!(results[0].steps[0].label, "calls");
+        assert_eq!(results[0].steps[0].note.as_deref(), Some("hi"));
+    }
+
+    #[test]
+    fn resolves_edge_by_source_target_when_stored_id_is_composite() {
+        // Dataset edges keyed "n1:n2" (graph JSON had no edge id), and the story
+        // stored the same composite. The source:target fallback must resolve it
+        // so we still get the story's participants/steps — not zero.
+        let contexts = ctx_with(vec![edge("n1:n2", "n1", "n2", "calls")]);
+        let sequences = vec![seq(&["n1:n2"])];
+        let (results, participants) =
+            build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        assert_eq!(participants.len(), 2);
+        assert_eq!(results[0].steps.len(), 1);
+        assert_eq!(results[0].steps[0].label, "calls");
+    }
+
+    #[test]
+    fn resolves_edge_when_stored_composite_but_dataset_has_real_id() {
+        // Dataset edge has a real id "e1" but the story stored "n1:n2" (composite).
+        // The fallback matches by endpoints.
+        let contexts = ctx_with(vec![edge("e1", "n1", "n2", "calls")]);
+        let sequences = vec![seq(&["n1:n2"])];
+        let (results, participants) =
+            build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        assert_eq!(participants.len(), 2);
+        assert_eq!(results[0].steps.len(), 1);
+    }
+
+    #[test]
+    fn edge_comment_is_appended_to_message_label() {
+        let contexts = ctx_with(vec![edge_c("e1", "n1", "n2", "calls", "async")]);
+        let sequences = vec![seq(&["e1"])];
+        let (results, _) =
+            build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        assert_eq!(results[0].steps[0].label, "calls: async");
+    }
+
+    #[test]
+    fn unresolvable_edge_yields_no_participants_not_all_nodes() {
+        // A truly missing edge reference must NOT fall back to dumping every node
+        // as a participant — it renders empty.
+        let contexts = ctx_with(vec![edge("e1", "n1", "n2", "calls")]);
+        let sequences = vec![seq(&["does-not-exist"])];
+        let (results, participants) =
+            build_sequence_entries(&sequences, &contexts, &HashMap::new(), &HashMap::new(), true);
+        assert_eq!(participants.len(), 0, "must not include unrelated nodes");
+        assert_eq!(results[0].steps.len(), 0);
+    }
 }
