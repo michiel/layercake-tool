@@ -5,7 +5,9 @@ Connect to a running instance and run GraphQL queries/mutations.
 ## Start / find the server
 
 ```bash
-layercake serve                      # http://127.0.0.1:3000 (loopback)
+layercake serve                      # http://127.0.0.1:3000 (loopback; the default —
+                                     #   your project may run on another port, e.g. 3001.
+                                     #   `layercake api info` tells you the live one)
 layercake serve --host 0.0.0.0 --port 8080   # expose on a network
 layercake api info                   # print endpoints + headers for the running server
 ```

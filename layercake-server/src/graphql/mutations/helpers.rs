@@ -79,11 +79,34 @@ pub struct StoredSequenceArtefactNodeConfig {
 #[derive(Debug, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StoredSequenceRenderConfig {
+    /// `containNodes` may be stored as a string ("one"/"all") by the API or as a
+    /// boolean by the UI. Accept both so a UI edit doesn't silently drop the
+    /// whole render config (true → "one", false → "all").
+    #[serde(default, deserialize_with = "deserialize_contain_nodes")]
     pub contain_nodes: Option<String>,
     pub built_in_styles: Option<String>,
     pub show_notes: Option<bool>,
     pub render_all_sequences: Option<bool>,
     pub enabled_sequence_ids: Option<Vec<i32>>,
+}
+
+fn deserialize_contain_nodes<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::Deserialize;
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrBool {
+        S(String),
+        B(bool),
+    }
+    Ok(match Option::<StringOrBool>::deserialize(deserializer)? {
+        Some(StringOrBool::S(s)) => Some(s),
+        Some(StringOrBool::B(true)) => Some("one".to_string()),
+        Some(StringOrBool::B(false)) => Some("all".to_string()),
+        None => None,
+    })
 }
 
 /// Stored render configuration
@@ -484,6 +507,9 @@ pub struct PlanExecutionResult {
     pub success: bool,
     pub message: String,
     pub output_files: Vec<String>,
+    /// Non-fatal problems encountered during execution (e.g. a story sequence
+    /// that resolved no steps). Empty on a fully clean run.
+    pub warnings: Vec<String>,
 }
 
 #[derive(async_graphql::SimpleObject)]
@@ -491,6 +517,8 @@ pub struct NodeExecutionResult {
     pub success: bool,
     pub message: String,
     pub node_id: String,
+    /// Non-fatal problems encountered during execution. Empty on a clean run.
+    pub warnings: Vec<String>,
 }
 
 #[derive(async_graphql::SimpleObject)]
@@ -506,4 +534,32 @@ pub struct ExportNodeOutputResult {
     pub content: String, // Base64 encoded
     pub filename: String,
     pub mime_type: String,
+}
+
+#[cfg(test)]
+mod contain_nodes_tests {
+    use super::StoredSequenceRenderConfig;
+
+    #[test]
+    fn accepts_string_and_bool_contain_nodes() {
+        // String form (API).
+        let s: StoredSequenceRenderConfig =
+            serde_json::from_str(r#"{"containNodes":"all","showNotes":true}"#).unwrap();
+        assert_eq!(s.contain_nodes.as_deref(), Some("all"));
+        assert_eq!(s.show_notes, Some(true));
+
+        // Bool form (UI) — must not drop the rest of the config.
+        let b: StoredSequenceRenderConfig =
+            serde_json::from_str(r#"{"containNodes":true,"showNotes":false}"#).unwrap();
+        assert_eq!(b.contain_nodes.as_deref(), Some("one"));
+        assert_eq!(b.show_notes, Some(false));
+
+        let bf: StoredSequenceRenderConfig =
+            serde_json::from_str(r#"{"containNodes":false}"#).unwrap();
+        assert_eq!(bf.contain_nodes.as_deref(), Some("all"));
+
+        // Absent.
+        let n: StoredSequenceRenderConfig = serde_json::from_str(r#"{}"#).unwrap();
+        assert_eq!(n.contain_nodes, None);
+    }
 }

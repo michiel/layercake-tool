@@ -1,16 +1,75 @@
 //! `layercake doctor` — scan a project for structural health problems.
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use layercake_core::database::connection::{establish_connection, get_database_url};
 use layercake_core::doctor::{run_diagnostics, Severity};
+use std::time::Duration;
 
-pub async fn run(project: i32, database: Option<&str>, json: bool) -> Result<()> {
-    let db = establish_connection(&get_database_url(database)).await?;
+/// Resolve the database path: explicit `--database` wins; otherwise ask a
+/// running server's `/health` (so `doctor --project N` works cwd-independently
+/// when the server is up).
+async fn resolve_database(
+    database: Option<&str>,
+    url: Option<&str>,
+    host: &str,
+    port: u16,
+) -> Result<String> {
+    if let Some(db) = database {
+        return Ok(db.to_string());
+    }
+    let base = match url {
+        Some(u) => u.trim_end_matches('/').to_string(),
+        None => format!("http://{}:{}", host, port),
+    };
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(800))
+        .build()?;
+    let resp = client
+        .get(format!("{}/health", base))
+        .send()
+        .await
+        .map_err(|e| {
+            anyhow!(
+                "no --database given and could not reach a server at {} to resolve it ({}). \
+                 Pass --database <path>, or --host/--port/--url of a running server.",
+                base,
+                e
+            )
+        })?;
+    let body: serde_json::Value = resp.json().await?;
+    body.get("database")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| {
+            anyhow!(
+                "server at {} did not report a database path (older server?). Pass --database.",
+                base
+            )
+        })
+}
+
+pub async fn run(
+    project: i32,
+    database: Option<&str>,
+    url: Option<&str>,
+    host: &str,
+    port: u16,
+    strict: bool,
+    json: bool,
+) -> Result<()> {
+    let database = resolve_database(database, url, host, port).await?;
+    let db = establish_connection(&get_database_url(Some(&database))).await?;
     let report = run_diagnostics(&db, project).await?;
+
+    let warning_count = report
+        .findings
+        .iter()
+        .filter(|f| f.severity == Severity::Warning)
+        .count();
 
     if json {
         println!("{}", serde_json::to_string_pretty(&report)?);
-        return finish(report.error_count());
+        return finish(report.error_count(), warning_count, strict);
     }
 
     if report.is_healthy() {
@@ -27,11 +86,12 @@ pub async fn run(project: i32, database: Option<&str>, json: bool) -> Result<()>
         };
         println!("  [{}] {}: {}", tag, f.check, f.message);
     }
-    finish(report.error_count())
+    finish(report.error_count(), warning_count, strict)
 }
 
-fn finish(error_count: usize) -> Result<()> {
-    if error_count > 0 {
+fn finish(error_count: usize, warning_count: usize, strict: bool) -> Result<()> {
+    let fail = error_count > 0 || (strict && warning_count > 0);
+    if fail {
         // Non-zero exit so scripts/CI can gate on it.
         std::process::exit(1);
     }

@@ -87,9 +87,11 @@ impl PlanDagNodesMutation {
         };
 
         let config_value = if let Some(config) = config {
-            Some(serde_json::from_str::<JsonValue>(&config).map_err(|e| {
+            let value = serde_json::from_str::<JsonValue>(&config).map_err(|e| {
                 StructuredError::bad_request(format!("Invalid node configuration JSON: {}", e))
-            })?)
+            })?;
+            validate_render_target_extension(&value)?;
+            Some(value)
         } else {
             None
         };
@@ -254,6 +256,7 @@ impl PlanDagNodesMutation {
             .await
             .map_err(|e| StructuredError::service("DagExecutor::execute_affected_nodes", e))?;
 
+        let warnings = executor.take_warnings();
         Ok(NodeExecutionResult {
             success: true,
             message: format!(
@@ -261,6 +264,81 @@ impl PlanDagNodesMutation {
                 node_id
             ),
             node_id,
+            warnings,
         })
+    }
+}
+
+/// If a node config is a sequence-artefact config (`renderTarget` +
+/// `outputPath`), reject a `renderTarget` that doesn't match the output file
+/// extension. This catches the silent drift where a UI edit flips
+/// MermaidSequence→PlantUmlSequence while `outputPath` stays `.mmd` (so a
+/// `.mmd` file ends up containing PlantUML).
+fn validate_render_target_extension(config: &JsonValue) -> Result<()> {
+    let (Some(target), Some(path)) = (
+        config.get("renderTarget").and_then(|v| v.as_str()),
+        config.get("outputPath").and_then(|v| v.as_str()),
+    ) else {
+        return Ok(());
+    };
+
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    let (allowed, kind): (&[&str], &str) = match target {
+        "MermaidSequence" => (&["mmd", "md"], "MermaidSequence"),
+        "PlantUmlSequence" => (&["puml", "txt"], "PlantUmlSequence"),
+        _ => return Ok(()), // unknown/other target → don't constrain
+    };
+
+    if !allowed.contains(&ext.as_str()) {
+        return Err(StructuredError::validation(
+            "outputPath",
+            format!(
+                "renderTarget {} expects an output extension of {} but outputPath is '{}'. \
+                 Update the extension or the renderTarget so they match.",
+                kind,
+                allowed
+                    .iter()
+                    .map(|e| format!(".{}", e))
+                    .collect::<Vec<_>>()
+                    .join(" or "),
+                path
+            ),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod render_target_validation_tests {
+    use super::validate_render_target_extension;
+    use serde_json::json;
+
+    #[test]
+    fn rejects_mismatched_extension() {
+        // MermaidSequence writing to .puml → reject.
+        let bad = json!({"renderTarget":"MermaidSequence","outputPath":"scenario.puml"});
+        assert!(validate_render_target_extension(&bad).is_err());
+        // PlantUmlSequence writing to .mmd → reject (the reviewer's exact drift).
+        let bad2 = json!({"renderTarget":"PlantUmlSequence","outputPath":"scenario.mmd"});
+        assert!(validate_render_target_extension(&bad2).is_err());
+    }
+
+    #[test]
+    fn accepts_matching_extension_and_ignores_non_sequence_configs() {
+        assert!(validate_render_target_extension(
+            &json!({"renderTarget":"MermaidSequence","outputPath":"s.mmd"})
+        )
+        .is_ok());
+        assert!(validate_render_target_extension(
+            &json!({"renderTarget":"PlantUmlSequence","outputPath":"s.puml"})
+        )
+        .is_ok());
+        // A config without renderTarget/outputPath (e.g. a DataSetNode) is untouched.
+        assert!(validate_render_target_extension(&json!({"dataSetId":5})).is_ok());
     }
 }

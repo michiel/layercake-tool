@@ -25,6 +25,9 @@ pub struct DagExecutor {
     dataset_importer: DatasourceImporter,
     graph_data_builder: GraphDataBuilder,
     merge_builder: MergeBuilder,
+    /// Non-fatal warnings accumulated during a run, surfaced on the execution
+    /// result so callers see them without reading logs or context_json.
+    warnings: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 /// Options for creating or updating graph_data records originating from DAG nodes
@@ -64,7 +67,22 @@ impl DagExecutor {
             dataset_importer,
             graph_data_builder,
             merge_builder,
+            warnings: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
         }
+    }
+
+    fn push_warning(&self, warning: impl Into<String>) {
+        if let Ok(mut w) = self.warnings.lock() {
+            w.push(warning.into());
+        }
+    }
+
+    /// Take the warnings accumulated so far, clearing the buffer.
+    pub fn take_warnings(&self) -> Vec<String> {
+        self.warnings
+            .lock()
+            .map(|mut w| std::mem::take(&mut *w))
+            .unwrap_or_default()
     }
 
     fn maybe_context(&self) -> Option<DagExecutionContext> {
@@ -294,6 +312,7 @@ impl DagExecutor {
                 let story_context = build_story_context(&self.db, project_id, story_id).await?;
                 for warning in &story_context.warnings {
                     tracing::warn!(node = %node_id, story = story_id, "{}", warning);
+                    self.push_warning(format!("node '{}': {}", node_id, warning));
                 }
                 self.persist_story_context(project_id, node_id, story_id, &story_context)
                     .await?;

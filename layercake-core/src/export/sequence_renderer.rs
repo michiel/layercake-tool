@@ -280,4 +280,36 @@ mod tests {
         assert!(tgt.contains("note over b\nN"), "{tgt}");
         assert!(!tgt.contains("note over a,b\nN"), "{tgt}");
     }
+
+    // Regression for N8: a ';' in a note/label breaks Mermaid's sequence
+    // grammar (it's a statement terminator). The mermaid_safe helper must
+    // neutralise it so the message/note statement stays on one line.
+    #[test]
+    fn semicolon_in_note_and_label_is_neutralised_for_mermaid() {
+        let mut ctx = SequenceRenderContext::default();
+        ctx.config.show_notes = true;
+        ctx.participants = vec![participant("a", "A", None), participant("b", "B", None)];
+        ctx.first_participant_alias = Some("a".into());
+        ctx.last_participant_alias = Some("b".into());
+        ctx.sequences = vec![SequenceRender {
+            id: 1,
+            name: "S".into(),
+            description: None,
+            steps: vec![SequenceStep {
+                id: "s".into(),
+                dataset_id: 1,
+                dataset_name: "d".into(),
+                source: SequenceParticipantRef { alias: "a".into(), label: "A".into() },
+                target: SequenceParticipantRef { alias: "b".into(), label: "B".into() },
+                label: "resolves; then breaks".into(),
+                note: Some("opacity: no records; audit broken".into()),
+                note_position: Some("both".into()),
+            }],
+        }];
+        let out = to_mermaid_sequence::render(&ctx).unwrap();
+        assert!(!out.contains(';'), "no semicolons should reach Mermaid output:\n{out}");
+        // The text survives, just with ';' swapped for an em-dash.
+        assert!(out.contains("resolves— then breaks"), "{out}");
+        assert!(out.contains("no records— audit broken"), "{out}");
+    }
 }

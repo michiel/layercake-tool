@@ -115,8 +115,20 @@ enum Commands {
         /// Project id to scan
         #[clap(long)]
         project: i32,
-        #[clap(short, long, default_value = "layercake.db")]
-        database: String,
+        /// Database file path. If omitted, resolved from a running server's
+        /// /health (see --host/--port/--url).
+        #[clap(short, long)]
+        database: Option<String>,
+        /// Running server base URL to resolve the DB path from (overrides host/port)
+        #[clap(long)]
+        url: Option<String>,
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
+        #[clap(short, long, default_value = "3000")]
+        port: u16,
+        /// Exit non-zero on warnings too, not just errors (for CI)
+        #[clap(long)]
+        strict: bool,
         /// Emit machine-readable JSON
         #[clap(long)]
         json: bool,
@@ -349,9 +361,22 @@ async fn main() -> Result<()> {
         Commands::Doctor {
             project,
             database,
+            url,
+            host,
+            port,
+            strict,
             json,
         } => {
-            doctor::run(project, Some(&database), json).await?;
+            doctor::run(
+                project,
+                database.as_deref(),
+                url.as_deref(),
+                &host,
+                port,
+                strict,
+                json,
+            )
+            .await?;
         }
         Commands::Api { command } => match command {
             ApiCommands::Info {

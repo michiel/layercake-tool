@@ -22,6 +22,8 @@ layercake doc guide agent              # the AI agent query-interface guide
 layercake doc guide model              # the graph model documentation
 layercake doc guide node-types         # every plan DAG node type + its config
 layercake doc guide graph-json         # the GraphJson schema for datasets
+layercake doc guide render-config      # renderConfig keys per target
+layercake doc guide agent-runbook      # task → workflow/guide index (start here)
 ```
 
 ## For agents

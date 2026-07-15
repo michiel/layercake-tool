@@ -5,39 +5,39 @@ sequenceDiagram
 
 {{#unless (is_empty sequence.participantGroups)}}
   {{#each sequence.participantGroups}}
-box {{#if this.color}}{{this.color}}{{/if}} "{{inline this.label}}"
+box {{#if this.color}}{{this.color}}{{/if}} "{{mermaid_safe this.label}}"
     {{#each this.participants}}
-    participant {{alias}} as "{{inline label}}"
+    participant {{alias}} as "{{mermaid_safe label}}"
     {{/each}}
 end
   {{/each}}
 {{else}}
   {{#each sequence.participants}}
-  participant {{alias}} as "{{inline label}}"
+  participant {{alias}} as "{{mermaid_safe label}}"
   {{/each}}
 {{/unless}}
 
 {{#unless (is_empty sequence.sequences)}}
   {{#each sequence.sequences}}
-%% Sequence: {{inline name}}
+%% Sequence: {{mermaid_safe name}}
     {{#if @root.sequence.firstParticipantAlias}}
-    Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{inline name}}
+    Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{mermaid_safe name}}
     {{/if}}
     {{#each steps}}
       {{#if @root.sequence.config.showNotes}}
         {{#if note}}
           {{#if (stringeq notePosition "source")}}
-    Note over {{source.alias}}: {{inline note}}
+    Note over {{source.alias}}: {{mermaid_safe note}}
           {{else}}
             {{#if (stringeq notePosition "target")}}
-    Note over {{target.alias}}: {{inline note}}
+    Note over {{target.alias}}: {{mermaid_safe note}}
             {{else}}
-    Note over {{source.alias}},{{target.alias}}: {{inline note}}
+    Note over {{source.alias}},{{target.alias}}: {{mermaid_safe note}}
             {{/if}}
           {{/if}}
         {{/if}}
       {{/if}}
-    {{source.alias}}->>{{target.alias}}: {{inline label}}
+    {{source.alias}}->>{{target.alias}}: {{mermaid_safe label}}
     {{/each}}
   {{/each}}
 {{else}}
