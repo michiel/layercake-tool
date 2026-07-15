@@ -76,7 +76,13 @@ The codebase is already **React SPA ↔ Axum GraphQL server**. Tauri is only a d
 **Goal:** Server binds loopback by default, external opt-in, optional browser auto-open.
 **Success Criteria:** `--host` flag (default `127.0.0.1`), `--port` retained; bind uses `{host}:{port}`; optional `--open` launches browser.
 **Tests:** run locally → binds `127.0.0.1`; `--host 0.0.0.0` binds externally; `cargo build -p layercake-server` clean.
-**Status:** Not Started
+**Status:** Complete
+
+**Implementation notes:**
+- `main.rs` + CLI `Serve`: added `--host` (default `127.0.0.1`) and `--open`; `start_server` signature now `(host, port, database, cors_origin, open_browser)`.
+- `server/mod.rs`: bind `{host}:{port}` (was hard-coded `0.0.0.0`); log a clickable loopback URL even when bound to `0.0.0.0`/`::`; added best-effort `open_in_browser` (xdg-open/open/cmd start, non-fatal on failure).
+- Updated both callers (`layercake-server/main.rs`, `layercake-cli` serve).
+- Verified: `--help` shows flags; default bind reachable only on loopback (external IP → unreachable); `--host 0.0.0.0` reachable externally + loopback; URL log shows `127.0.0.1`. `--open` not runtime-tested (no browser in env; path is non-fatal).
 
 ## Stage 4: Remove Tauri crate + CI/build cleanup
 **Goal:** `src-tauri` gone; workspace + CI build without any Tauri toolchain.

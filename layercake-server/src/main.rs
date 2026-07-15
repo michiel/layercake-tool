@@ -10,12 +10,19 @@ use tracing_subscriber::EnvFilter;
 struct ServerArgs {
     #[clap(short, long, global = true)]
     log_level: Option<String>,
+    /// Address to bind. Defaults to loopback (local-only); use 0.0.0.0 to
+    /// expose the server on the network when self-hosting.
+    #[clap(long, default_value = "127.0.0.1")]
+    host: String,
     #[clap(short, long, default_value = "3000")]
     port: u16,
     #[clap(short, long, default_value = "layercake.db")]
     database: String,
     #[clap(long)]
     cors_origin: Option<String>,
+    /// Open the web UI in the default browser once the server is ready.
+    #[clap(long)]
+    open: bool,
 }
 
 #[tokio::main]
@@ -23,8 +30,15 @@ async fn main() -> Result<()> {
     let args = ServerArgs::parse();
     setup_logging(&args.log_level);
 
-    info!("Starting server on port {}", args.port);
-    server::start_server(args.port, &args.database, args.cors_origin.as_deref()).await?;
+    info!("Starting server on {}:{}", args.host, args.port);
+    server::start_server(
+        &args.host,
+        args.port,
+        &args.database,
+        args.cors_origin.as_deref(),
+        args.open,
+    )
+    .await?;
 
     Ok(())
 }

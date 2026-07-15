@@ -19,7 +19,13 @@ use layercake_core::database::{connection::*, migrations::Migrator};
 use sea_orm_migration::prelude::*;
 use tracing::{info, warn};
 
-pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&str>) -> Result<()> {
+pub async fn start_server(
+    host: &str,
+    port: u16,
+    database_path: &str,
+    cors_origin: Option<&str>,
+    open_browser: bool,
+) -> Result<()> {
     let database_url = get_database_url(Some(database_path));
     let db = establish_connection(&database_url).await?;
 
@@ -43,12 +49,39 @@ pub async fn start_server(port: u16, database_path: &str, cors_origin: Option<&s
     // Log all HTTP routes dynamically
     log_routes(port);
 
-    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await?;
-    info!("Server running on http://0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(format!("{}:{}", host, port)).await?;
+    // For the browser URL, present loopback for wildcard binds so the link is clickable.
+    let display_host = if host == "0.0.0.0" || host == "::" {
+        "127.0.0.1"
+    } else {
+        host
+    };
+    let url = format!("http://{}:{}", display_host, port);
+    info!("Server running on {}", url);
+
+    if open_browser {
+        open_in_browser(&url);
+    }
 
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Best-effort launch of the default browser at `url`. Failures are logged, not fatal.
+fn open_in_browser(url: &str) {
+    #[cfg(target_os = "linux")]
+    let cmd = ("xdg-open", vec![url]);
+    #[cfg(target_os = "macos")]
+    let cmd = ("open", vec![url]);
+    #[cfg(target_os = "windows")]
+    let cmd = ("cmd", vec!["/C", "start", "", url]);
+
+    let (program, args) = cmd;
+    match std::process::Command::new(program).args(&args).spawn() {
+        Ok(_) => info!("Opened {} in the default browser", url),
+        Err(e) => warn!("Could not open browser ({}): visit {} manually", e, url),
+    }
 }
 
 fn log_routes(port: u16) {

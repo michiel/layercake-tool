@@ -47,12 +47,19 @@ enum Commands {
     Repl(ReplArgs),
     Query(QueryArgs),
     Serve {
+        /// Address to bind. Defaults to loopback (local-only); use 0.0.0.0 to
+        /// expose the server on the network when self-hosting.
+        #[clap(long, default_value = "127.0.0.1")]
+        host: String,
         #[clap(short, long, default_value = "3000")]
         port: u16,
         #[clap(short, long, default_value = "layercake.db")]
         database: String,
         #[clap(long)]
         cors_origin: Option<String>,
+        /// Open the web UI in the default browser once the server is ready.
+        #[clap(long)]
+        open: bool,
     },
     Db {
         #[clap(subcommand)]
@@ -155,12 +162,14 @@ async fn main() -> Result<()> {
             query::run_query_command(query_args).await?;
         }
         Commands::Serve {
+            host,
             port,
             database,
             cors_origin,
+            open,
         } => {
-            info!("Starting server on port {}", port);
-            server::start_server(port, &database, cors_origin.as_deref()).await?;
+            info!("Starting server on {}:{}", host, port);
+            server::start_server(&host, port, &database, cors_origin.as_deref(), open).await?;
         }
         Commands::Db { command } => match command {
             DbCommands::Init { database } => {
