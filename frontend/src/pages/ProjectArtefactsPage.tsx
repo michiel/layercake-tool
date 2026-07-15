@@ -87,6 +87,9 @@ type ArtefactEntry =
       config: Record<string, any>
       parentGraphId?: string
       parentStoryId?: string
+      // Story entity id (from the parent StoryNode's config) — used to populate
+      // the per-sequence list when editing a SequenceArtefactNode's properties.
+      storyId?: number
     }
 
 const parseConfig = (config?: string | null): Record<string, any> => {
@@ -195,6 +198,7 @@ const ProjectArtefactsPage: React.FC = () => {
     nodeType: PlanDagNodeType | null
     config: any
     metadata: any
+    storyId?: number
   }>({
     open: false,
     nodeId: null,
@@ -407,6 +411,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
 
       storyChildren.forEach((childId) => traverseStory(childId, depth + 1))
 
+      const parentStoryEntityId = parseConfig(node.config).storyId as number | undefined
       sequenceChildren.forEach((child) => {
         storyEntries.push({
           type: 'artefact',
@@ -414,6 +419,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           depth: depth + 1,
           config: parseConfig(child.config),
           parentStoryId: nodeId,
+          storyId: parentStoryEntityId,
         })
       })
     }
@@ -457,12 +463,20 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
     navigate(route)
   }
 
-  const handleEditNode = (nodeId: string, nodeType: string, config: any, metadata: any) => {
+  const handleEditNode = (
+    nodeId: string,
+    nodeType: string,
+    config: any,
+    metadata: any,
+    storyId?: number
+  ) => {
     let dagNodeType: PlanDagNodeType
     if (nodeType === 'GraphArtefactNode') {
       dagNodeType = PlanDagNodeType.GRAPH_ARTEFACT
     } else if (nodeType === 'TreeArtefactNode') {
       dagNodeType = PlanDagNodeType.TREE_ARTEFACT
+    } else if (nodeType === 'SequenceArtefactNode') {
+      dagNodeType = PlanDagNodeType.SEQUENCE_ARTEFACT
     } else if (nodeType === 'ProjectionNode') {
       dagNodeType = PlanDagNodeType.PROJECTION
     } else {
@@ -474,6 +488,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
       nodeType: dagNodeType,
       config: parseConfig(config),
       metadata: metadata || {},
+      storyId,
     })
   }
 
@@ -814,7 +829,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
-                  onClick={() => handleEditNode(entry.node.id, entry.node.nodeType, entry.node.config, entry.node.metadata)}
+                  onClick={() => handleEditNode(entry.node.id, entry.node.nodeType, entry.node.config, entry.node.metadata, entry.type === 'artefact' ? entry.storyId : undefined)}
                 >
                   <IconSettings size={16} />
                 </Button>
@@ -1020,6 +1035,7 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
           nodeId={editNodeDialog.nodeId}
           config={editNodeDialog.config}
           metadata={editNodeDialog.metadata}
+          storyIdHint={editNodeDialog.storyId}
         />
       )}
     </>
