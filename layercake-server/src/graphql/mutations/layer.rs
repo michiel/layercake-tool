@@ -39,6 +39,61 @@ impl LayerMutation {
         Ok(ProjectLayer::from(model))
     }
 
+    /// Apply a curated palette preset in one call: upsert each of the preset's
+    /// swatches as a project layer (keyed by swatch name). Returns the resulting
+    /// project layers. Fails if `presetName` is not a known preset.
+    #[graphql(name = "applyPalettePreset")]
+    async fn apply_palette_preset(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        preset_name: String,
+    ) -> Result<Vec<ProjectLayer>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+
+        let preset = layercake_core::palette::presets()
+            .into_iter()
+            .find(|p| p.name == preset_name)
+            .ok_or_else(|| {
+                let names = layercake_core::palette::presets()
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                Error::new(format!(
+                    "unknown palette preset '{}' (available: {})",
+                    preset_name, names
+                ))
+            })?;
+
+        // Colours are stored without a leading '#', matching upsertProjectLayer.
+        let strip = |c: &str| c.trim_start_matches('#').to_string();
+
+        let mut layers = Vec::with_capacity(preset.swatches.len());
+        for swatch in &preset.swatches {
+            let model = context
+                .app
+                .upsert_project_layer(
+                    &actor,
+                    project_id,
+                    swatch.name.clone(),
+                    swatch.name.clone(),
+                    strip(&swatch.background_color),
+                    strip(&swatch.text_color),
+                    strip(&swatch.border_color),
+                    None,
+                    None,
+                    true,
+                )
+                .await
+                .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+            layers.push(ProjectLayer::from(model));
+        }
+
+        Ok(layers)
+    }
+
     /// Delete a project layer entry (optionally scoped to a source dataset row)
     #[graphql(name = "deleteProjectLayer")]
     async fn delete_project_layer(

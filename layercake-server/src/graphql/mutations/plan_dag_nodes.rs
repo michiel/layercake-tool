@@ -111,9 +111,18 @@ impl PlanDagNodesMutation {
         Ok(Some(PlanDagNode::from(updated)))
     }
 
-    /// Rename a Plan DAG node to a new (human-readable) id. Rewrites every
-    /// reference: connected edges and any computed graph's origin. Fails if the
-    /// new id already exists in the plan.
+    /// Rename a Plan DAG node to a new (human-readable) id.
+    ///
+    /// Behaviour:
+    /// - No-op when `newId == oldId`: returns the current node unchanged.
+    /// - Rejects an empty `newId`, and rejects a `newId` that already exists in
+    ///   the plan (collision).
+    /// - Errors if `oldId` is not found in the plan.
+    /// - In one transaction, rewrites every reference to the node: connected
+    ///   edges (both source and target endpoints) and any computed graph's
+    ///   origin (`graph_data.dag_node_id`).
+    /// - Bumps the plan version (like `updatePlanDagNode`), so collaborators
+    ///   receive the change via the plan-update WS event.
     #[graphql(name = "renamePlanDagNode")]
     async fn rename_plan_dag_node(
         &self,
