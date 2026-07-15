@@ -2,6 +2,7 @@
 
 **Date:** 2026-07-15
 **Source:** `reviews/tool-review-001.md` (agent-driven session on project 36).
+**Status:** Stages 1–7 complete (branch `fix/tool-review-uplift`).
 **Approach:** structural fixes over patches (unify seams, remove masking fallbacks, make failures visible). Validate every finding against current `master` before acting — several sequence-area items overlap recent PRs (#79/#80), so state may differ from the review.
 
 ## Validation of review findings (done against current master)
