@@ -60,6 +60,26 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("inline", Box::new(inline));
 
+    // Emit a value as a YAML double-quoted scalar, escaping backslashes,
+    // quotes, and collapsing newlines. Needed for Mermaid frontmatter fields
+    // like `title:` — an unquoted title containing ':' breaks YAML parsing and
+    // Mermaid rejects the whole diagram.
+    handlebars_helper!(yaml_quote: |v: Value| {
+        let s = match v {
+            Value::String(s) => s,
+            Value::Null => String::new(),
+            other => other.to_string(),
+        };
+        let escaped = s
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ");
+        format!("\"{}\"", escaped)
+    });
+    handlebars.register_helper("yaml_quote", Box::new(yaml_quote));
+
     handlebars_helper!(is_empty: |v: Value| {
         match v {
             serde_json::Value::Array(arr) => arr.is_empty(),

@@ -388,4 +388,29 @@ mod tests {
             "missing_layer class should be present"
         );
     }
+
+    #[test]
+    fn test_mermaid_frontmatter_title_with_colon_is_quoted() {
+        use crate::export::to_mermaid;
+
+        // A ':' in the graph name used to produce `title: Netwealth: PDLC`,
+        // which is invalid YAML frontmatter and made Mermaid reject the diagram.
+        let graph = Graph {
+            name: "Netwealth: PDLC".to_string(),
+            nodes: vec![create_node("n1", "Node 1", "l1")],
+            edges: vec![],
+            layers: vec![create_layer("l1")],
+            annotations: None,
+        };
+        let config = create_test_config();
+        let result = to_mermaid::render(&graph, &config).unwrap();
+
+        // Title must be a quoted YAML scalar, not raw text with a bare colon.
+        assert!(
+            result.contains(r#"title: "Netwealth: PDLC""#),
+            "title should be quoted:\n{result}"
+        );
+        // And it must NOT be HTML-escaped (would be &quot;).
+        assert!(!result.contains("&quot;"), "title should not be HTML-escaped:\n{result}");
+    }
 }
