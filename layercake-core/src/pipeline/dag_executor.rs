@@ -32,12 +32,36 @@ pub struct DagExecutor {
     node_records: std::sync::Arc<std::sync::Mutex<Vec<NodeExecutionRecord>>>,
 }
 
+/// Which phase a node's work happens in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExecutionPhase {
+    /// Ran during `executePlan` (import/build/merge/transform).
+    Execute,
+    /// Rendered lazily on `exportNodeOutput`; `duration_ms` here is 0 because
+    /// no work happens during `executePlan`.
+    Render,
+}
+
+impl ExecutionPhase {
+    /// Classify a node by type: artefact nodes render lazily, everything else
+    /// runs during execution.
+    fn for_node_type(node_type: &str) -> Self {
+        match node_type {
+            "GraphArtefactNode" | "TreeArtefactNode" | "SequenceArtefactNode" | "ProjectionNode" => {
+                ExecutionPhase::Render
+            }
+            _ => ExecutionPhase::Execute,
+        }
+    }
+}
+
 /// Timing/outcome for a single node executed during a DAG run.
 #[derive(Debug, Clone)]
 pub struct NodeExecutionRecord {
     pub node_id: String,
     pub node_type: String,
     pub duration_ms: u64,
+    pub phase: ExecutionPhase,
 }
 
 /// Options for creating or updating graph_data records originating from DAG nodes
@@ -1376,10 +1400,12 @@ impl DagExecutor {
                 .find(|n| n.id == node_id)
                 .map(|n| n.node_type.clone())
                 .unwrap_or_default();
+            let phase = ExecutionPhase::for_node_type(&node_type);
             self.push_node_record(NodeExecutionRecord {
                 node_id: node_id.clone(),
                 node_type,
                 duration_ms: started.elapsed().as_millis() as u64,
+                phase,
             });
         }
 
