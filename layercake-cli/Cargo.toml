@@ -28,7 +28,6 @@ uuid = { workspace = true }
 regex = { workspace = true }
 sea-orm = { workspace = true }
 sea-orm-migration = { workspace = true }
-rig = { workspace = true }
 clap-repl = "0.3.2"
 include_dir = { workspace = true }
 reqwest = { workspace = true }
