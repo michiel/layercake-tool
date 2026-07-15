@@ -3,6 +3,7 @@ use crate::database::entities::{
     graph_data::GraphDataStatus,
     graph_data_edges, graph_data_nodes,
     graph_edits::{self, Entity as GraphEdits},
+    plan_dag_nodes, plans,
 };
 use crate::errors::{CoreError, CoreResult};
 use crate::services::graph_data_edit_applicator::{ApplyResult, GraphDataEditApplicator};
@@ -825,6 +826,90 @@ impl GraphDataService {
 
         Ok(result.rows_affected)
     }
+
+    /// Delete computed graphs whose originating plan DAG node no longer exists.
+    ///
+    /// Computed `graph_data` rows carry a `dag_node_id`; when the DAG is
+    /// reshaped and that node is removed, the computed graph is orphaned (it
+    /// still shows up in `graphs(projectId)` but has no live source). This
+    /// removes those rows and their nodes/edges. Returns the ids that were
+    /// pruned. Dataset/manual graphs are never touched.
+    pub async fn prune_orphaned_graphs(&self, project_id: i32) -> CoreResult<Vec<i32>> {
+        // Live DAG node ids for the project (nodes are scoped by plan_id).
+        let plan_ids: Vec<i32> = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to load plans").with_source(e))?
+            .into_iter()
+            .map(|p| p.id)
+            .collect();
+
+        let live_node_ids: std::collections::HashSet<String> = if plan_ids.is_empty() {
+            std::collections::HashSet::new()
+        } else {
+            plan_dag_nodes::Entity::find()
+                .filter(plan_dag_nodes::Column::PlanId.is_in(plan_ids))
+                .all(&self.db)
+                .await
+                .map_err(|e| CoreError::internal("Failed to load plan nodes").with_source(e))?
+                .into_iter()
+                .map(|n| n.id)
+                .collect()
+        };
+
+        let computed = graph_data::Entity::find()
+            .filter(graph_data::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(|e| CoreError::internal("Failed to load graph_data").with_source(e))?;
+
+        let mut pruned = Vec::new();
+        for g in computed {
+            if g.source_type == "computed" {
+                let orphaned = match &g.dag_node_id {
+                    Some(node_id) => !live_node_ids.contains(node_id),
+                    None => false, // no origin recorded → leave it alone
+                };
+                if orphaned {
+                    self.delete_graph_data_cascade(g.id).await?;
+                    pruned.push(g.id);
+                }
+            }
+        }
+
+        info!(project_id, count = pruned.len(), "Pruned orphaned computed graphs");
+        Ok(pruned)
+    }
+
+    /// Delete a graph_data row and its nodes/edges (FK-safe order).
+    async fn delete_graph_data_cascade(&self, graph_data_id: i32) -> CoreResult<()> {
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal("Failed to begin prune txn").with_source(e))?;
+
+        graph_data_edges::Entity::delete_many()
+            .filter(graph_data_edges::Column::GraphDataId.eq(graph_data_id))
+            .exec(&txn)
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data edges").with_source(e))?;
+        graph_data_nodes::Entity::delete_many()
+            .filter(graph_data_nodes::Column::GraphDataId.eq(graph_data_id))
+            .exec(&txn)
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data nodes").with_source(e))?;
+        graph_data::Entity::delete_by_id(graph_data_id)
+            .exec(&txn)
+            .await
+            .map_err(|e| CoreError::internal("Failed to delete graph_data row").with_source(e))?;
+
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal("Failed to commit prune txn").with_source(e))?;
+        Ok(())
+    }
 }
 
 /// Summary of a replay operation
@@ -893,4 +978,103 @@ pub struct GraphDataEdgeInput {
     pub source_dataset_id: Option<i32>,
     pub attributes: Option<Value>,
     pub created_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[cfg(test)]
+mod prune_tests {
+    use super::*;
+    use crate::database::entities::{plan_dag_nodes, plans, projects};
+    use crate::database::test_utils::setup_test_db;
+    use chrono::Utc;
+    use sea_orm::Set;
+
+    async fn seed_graph(db: &DatabaseConnection, id: i32, source_type: &str, dag_node_id: Option<&str>) {
+        graph_data::ActiveModel {
+            id: Set(id),
+            project_id: Set(1),
+            name: Set(format!("g{id}")),
+            source_type: Set(source_type.into()),
+            dag_node_id: Set(dag_node_id.map(|s| s.to_string())),
+            last_edit_sequence: Set(0),
+            has_pending_edits: Set(false),
+            node_count: Set(0),
+            edge_count: Set(0),
+            status: Set("active".into()),
+            created_at: Set(Utc::now()),
+            updated_at: Set(Utc::now()),
+            ..Default::default()
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn prunes_only_orphaned_computed_graphs() {
+        let db = setup_test_db().await;
+        projects::ActiveModel {
+            id: Set(1),
+            name: Set("P".into()),
+            description: Set(None),
+            tags: Set("[]".into()),
+            import_export_path: Set(None),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        plans::ActiveModel {
+            id: Set(1),
+            project_id: Set(1),
+            name: Set("plan".into()),
+            description: Set(None),
+            tags: Set("[]".into()),
+            yaml_content: Set("".into()),
+            dependencies: Set(None),
+            status: Set("active".into()),
+            version: Set(1),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+        // Live DAG node "live_node".
+        plan_dag_nodes::ActiveModel {
+            id: Set("live_node".into()),
+            plan_id: Set(1),
+            node_type: Set("GraphNode".into()),
+            position_x: Set(0.0),
+            position_y: Set(0.0),
+            source_position: Set(None),
+            target_position: Set(None),
+            metadata_json: Set("{}".into()),
+            config_json: Set("{}".into()),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        seed_graph(&db, 10, "computed", Some("live_node")).await; // keep
+        seed_graph(&db, 11, "computed", Some("dead_node")).await; // prune
+        seed_graph(&db, 12, "dataset", None).await; // keep (not computed)
+        seed_graph(&db, 13, "computed", None).await; // keep (no origin)
+
+        let svc = GraphDataService::new(db.clone());
+        let pruned = svc.prune_orphaned_graphs(1).await.unwrap();
+        assert_eq!(pruned, vec![11]);
+
+        // 11 gone, others remain.
+        let remaining: Vec<i32> = graph_data::Entity::find()
+            .all(&db)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|g| g.id)
+            .collect();
+        assert_eq!(remaining, vec![10, 12, 13]);
+    }
 }

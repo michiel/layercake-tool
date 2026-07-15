@@ -22,7 +22,12 @@ To join a node back to its dataset PK, read `PlanDagNode.linkedDataSetId`
 - **DataSetNode** — brings a dataset's graph into the plan. `config.dataSetId`
   links to the dataset PK. Deleting the node does NOT delete the dataset.
 - **GraphNode** — a computed graph produced by upstream processing; the unit
-  that gets executed into `graph_data`.
+  that gets executed into `graph_data` (`source_type='computed'`, tagged with
+  its `dag_node_id`). **Lifecycle:** deleting the GraphNode from the DAG does
+  NOT auto-delete its computed `graph_data` — it becomes an *orphan* that still
+  appears in `graphs(projectId)`. Run `layercake doctor` to detect orphans and
+  the `pruneOrphanedGraphs(projectId)` mutation to remove them. (Datasets behind
+  a deleted DataSetNode are likewise never auto-deleted.)
 
 ### Transform / combine nodes
 
