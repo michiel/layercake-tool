@@ -145,7 +145,9 @@ Resolve DB path; print path/existence/size (+ optional key-table row counts) as 
 ### Stage 6 — Fill out `docs-tool/` + discovery + README
 Complete all workflow/command md files; cross-reference; document the `query`-vs-`api call` distinction prominently; README "Agents / API access" pointer.
 **Verify:** every command has a doc; `doc list` shows all.
-**Status:** Not Started
+**Status:** Complete
+
+**Notes:** Wrote all remaining docs: workflows `develop-a-story` (grounded in the real Story/Sequence model — createStory → createSequence(edgeOrder w/ note+notePosition) → updatePlanDag(StoryNode→SequenceArtefactNode) → exportNodeOutput; showNotes caveat), `inspect-database`, `run-a-plan-headless`; commands `serve`, `query`. README "Agents / API access" section. `doc list` shows 6 workflows + 6 commands. **Robustness fix:** added `layercake-cli/build.rs` with `rerun-if-changed=../docs-tool` — `include_dir!` alone doesn't re-embed newly-added files (would be a CI trap); verified a new doc appears without touching any .rs.
 
 ### Stage 7 (group C) — Remove the `code-analysis` feature
 **On its own branch/PR** (`feat/remove-code-analysis`, off master) per user decision — not on this branch.
