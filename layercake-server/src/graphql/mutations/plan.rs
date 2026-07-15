@@ -140,6 +140,7 @@ impl PlanMutation {
                 success: true,
                 message: "No nodes to execute in this plan".to_string(),
                 output_files: vec![],
+                warnings: vec![],
             });
         }
 
@@ -164,10 +165,12 @@ impl PlanMutation {
             .await
             .map_err(|e| StructuredError::service("DagExecutor::execute_dag", e))?;
 
+        let warnings = executor.take_warnings();
         Ok(PlanExecutionResult {
             success: true,
             message: format!("Executed {} nodes in topological order", nodes.len()),
             output_files: vec![],
+            warnings,
         })
     }
 

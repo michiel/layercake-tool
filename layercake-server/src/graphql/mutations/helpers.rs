@@ -484,6 +484,9 @@ pub struct PlanExecutionResult {
     pub success: bool,
     pub message: String,
     pub output_files: Vec<String>,
+    /// Non-fatal problems encountered during execution (e.g. a story sequence
+    /// that resolved no steps). Empty on a fully clean run.
+    pub warnings: Vec<String>,
 }
 
 #[derive(async_graphql::SimpleObject)]
@@ -491,6 +494,8 @@ pub struct NodeExecutionResult {
     pub success: bool,
     pub message: String,
     pub node_id: String,
+    /// Non-fatal problems encountered during execution. Empty on a clean run.
+    pub warnings: Vec<String>,
 }
 
 #[derive(async_graphql::SimpleObject)]

@@ -254,6 +254,7 @@ impl PlanDagNodesMutation {
             .await
             .map_err(|e| StructuredError::service("DagExecutor::execute_affected_nodes", e))?;
 
+        let warnings = executor.take_warnings();
         Ok(NodeExecutionResult {
             success: true,
             message: format!(
@@ -261,6 +262,7 @@ impl PlanDagNodesMutation {
                 node_id
             ),
             node_id,
+            warnings,
         })
     }
 }
