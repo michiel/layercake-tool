@@ -13,8 +13,6 @@ import { CreateProjectModal } from './components/project/CreateProjectModal'
 import { TopBar } from './components/layout/TopBar'
 import { useCollaborationV2 } from './hooks/useCollaborationV2'
 import { useConnectionStatus } from './hooks/useConnectionStatus'
-import { CodeAnalysisPage } from './pages/CodeAnalysisPage'
-import { CodeAnalysisDetailPage } from './pages/CodeAnalysisDetailPage'
 import { ProjectArtefactsPage } from './pages/ProjectArtefactsPage'
 import { ProjectLayersPage } from './pages/ProjectLayersPage'
 import { getOrCreateSessionId } from './utils/session'
@@ -299,12 +297,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     ]
 
     const experimentalChildren: ProjectNavChild[] = [
-      {
-        key: 'code-analysis',
-        label: 'Code analysis',
-        route: `/projects/${projectId}/data-acquisition/code-analysis`,
-        isActive: makeRouteMatcher(`/projects/${projectId}/data-acquisition/code-analysis`),
-      },
       {
         key: 'graphs',
         label: 'Graphs',
@@ -2194,16 +2186,6 @@ function App() {
           <Route path="/projects/:projectId/datasets" element={
             <ErrorBoundary>
               <DataSetsPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/data-acquisition/code-analysis" element={
-            <ErrorBoundary>
-              <CodeAnalysisPage />
-            </ErrorBoundary>
-          } />
-          <Route path="/projects/:projectId/data-acquisition/code-analysis/:profileId" element={
-            <ErrorBoundary>
-              <CodeAnalysisDetailPage />
             </ErrorBoundary>
           } />
           <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={

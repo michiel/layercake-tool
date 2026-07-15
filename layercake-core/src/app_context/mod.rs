@@ -11,9 +11,8 @@ use crate::services::graph_analysis_service::GraphAnalysisService;
 use crate::services::graph_edit_service::GraphEditService;
 use crate::services::plan_service::PlanService;
 use crate::services::{
-    code_analysis_service::CodeAnalysisService, data_set_service::DataSetService,
-    dataset_bulk_service::DataSetBulkService, AuthorizationService, ExportService, GraphService,
-    ImportService, PlanDagService, ProjectRole,
+    data_set_service::DataSetService, dataset_bulk_service::DataSetBulkService,
+    AuthorizationService, ExportService, GraphService, ImportService, PlanDagService, ProjectRole,
 };
 mod data_set_operations;
 mod graph_operations;
@@ -38,7 +37,6 @@ pub struct AppContext {
     plan_service: Arc<PlanService>,
     graph_edit_service: Arc<GraphEditService>,
     graph_analysis_service: Arc<GraphAnalysisService>,
-    code_analysis_service: Arc<CodeAnalysisService>,
 }
 
 impl AppContext {
@@ -59,7 +57,6 @@ impl AppContext {
         let graph_analysis_service = Arc::new(GraphAnalysisService::new(db.clone()));
         let data_set_service = Arc::new(DataSetService::new(db.clone()));
         let data_set_bulk_service = Arc::new(DataSetBulkService::new(db.clone()));
-        let code_analysis_service = Arc::new(CodeAnalysisService::new(db.clone()));
 
         Self {
             db,
@@ -73,7 +70,6 @@ impl AppContext {
             plan_service,
             graph_edit_service,
             graph_analysis_service,
-            code_analysis_service,
         }
     }
 
@@ -213,10 +209,6 @@ impl AppContext {
         project_id: i32,
     ) -> crate::errors::CoreResult<()> {
         self.authorize_project_write(actor, project_id).await
-    }
-
-    pub fn code_analysis_service(&self) -> &Arc<CodeAnalysisService> {
-        &self.code_analysis_service
     }
 
     #[allow(dead_code)]

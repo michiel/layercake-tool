@@ -8,7 +8,6 @@ pub mod plan_dag_delta;
 
 // Mutation modules
 mod auth;
-mod code_analysis;
 mod collaboration;
 mod data_set;
 mod graph;
@@ -35,7 +34,6 @@ use async_graphql::*;
 pub struct Mutation(
     pub auth::AuthMutation,
     pub collaboration::CollaborationMutation,
-    pub code_analysis::CodeAnalysisMutation,
     pub data_set::DataSetMutation,
     pub graph::GraphMutation,
     pub graph_data::GraphDataMutation,
