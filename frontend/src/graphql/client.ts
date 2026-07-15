@@ -44,7 +44,7 @@ export const getGraphQLEndpoints = (override?: GraphQLEndpointOverride) => {
   }
 }
 
-// Create Apollo Client - must be called after initializeTauriServer() in Tauri mode
+// Lazily-created singleton Apollo Client (see the exported proxy below).
 let apolloClientInstance: ApolloClient | null = null
 
 function createApolloClient(override?: GraphQLEndpointOverride): ApolloClient {

@@ -161,20 +161,10 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         )
         .route("/api/library/upload", post(library::upload_library_item));
 
-    // Serve projections build assets if available
-    // When running in Tauri, cwd is src-tauri, so go up one level
-    let mut projections_path =
-        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-
-    // If we're in src-tauri directory, go up one level to project root
-    if projections_path.ends_with("src-tauri") {
-        projections_path = projections_path
-            .parent()
-            .unwrap_or(&projections_path)
-            .to_path_buf();
-    }
-
-    let projections_path = projections_path.join("projections-frontend/dist");
+    // Serve projections build assets if available (relative to the cwd).
+    let projections_path = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("projections-frontend/dist");
     tracing::info!("Serving projections from: {}", projections_path.display());
 
     let projections_static = get_service(
@@ -212,19 +202,9 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         .with_state(state);
 
     // Serve standalone projection viewer build at /projections/viewer/*
-    // When running in Tauri, cwd is src-tauri, so go up one level
-    let mut projections_viewer_path =
-        std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-
-    // If we're in src-tauri directory, go up one level to project root
-    if projections_viewer_path.ends_with("src-tauri") {
-        projections_viewer_path = projections_viewer_path
-            .parent()
-            .unwrap_or(&projections_viewer_path)
-            .to_path_buf();
-    }
-
-    let projections_viewer_path = projections_viewer_path.join("projections-frontend/dist");
+    let projections_viewer_path = std::env::current_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("projections-frontend/dist");
     tracing::info!(
         "Serving projection viewer from: {}",
         projections_viewer_path.display()

@@ -88,7 +88,21 @@ The codebase is already **React SPA ↔ Axum GraphQL server**. Tauri is only a d
 **Goal:** `src-tauri` gone; workspace + CI build without any Tauri toolchain.
 **Success Criteria:** `src-tauri/` deleted, removed from workspace `members`; root `package.json` + `scripts/` Tauri bits removed; `tauri-build.yml` deleted; `release.yml` builds plain binary with frontend built first; `cargo build --workspace` succeeds with no Tauri crates in `cargo tree`.
 **Tests:** `cargo build --workspace`; `cargo tree --workspace | grep -i tauri` empty; single binary runs and serves UI.
-**Status:** Not Started
+**Status:** Complete
+
+**Implementation notes:**
+- Removed `src-tauri` from workspace `members` and deleted the `[workspace.dependencies]` Tauri block (`tauri`, `tauri-build`, `tauri-plugin-dialog`, `tauri-plugin-shell`); `reqwest` kept (used by `layercake-core`).
+- Deleted `src-tauri/`, `scripts/build-{linux,macos,windows}.sh`, `scripts/run-frontend.js` (dead wrapper into src-tauri), `.github/workflows/tauri-build.yml`.
+- Root `package.json`: removed `tauri:*` scripts + `tauri`/`desktop` keywords; added `build:binary` (`frontend:build` then `cargo build --release -p layercake-server`).
+- `release.yml`: dropped GTK/webkit apt libs, `cargo install tauri-cli`, `cargo tauri build`, artifact-collection + tauri upload; build web UI BEFORE the Rust build; build `--package layercake-cli`; keep cross build + `actions-rust-release` (`executable-name: layercake`).
+- `dev.sh`: removed the entire `--tauri` mode; now web-only (no args). Syntax-checked with `bash -n`.
+- `app.rs`: removed the dead `src-tauri` cwd fixups for projections paths.
+- `frontend/.env.production`: removed the `VITE_API_BASE_URL=http://localhost:3030` override (was Tauri-specific and would wrongly pin the same-origin prod build).
+- `projections-frontend/src/main.tsx`: default API base to `window.location.origin` (was hard-coded `localhost:3001`; `?apiBase=` / `VITE_API_BASE_URL` still override).
+- Stale comment fixes: `client.ts` (removed `initializeTauriServer` mention).
+- README.md + BUILD.md updated (via subagent) — no Tauri references remain.
+- Verified: workspace parses; `cargo tree --workspace | grep -i tauri` empty; crate count **583 → 470** (−113); `cargo check --workspace` passes; frontend build + `tsc --noEmit` clean; shipped `layercake serve` binary serves `/health` (JSON), `/` (embedded UI html), same-origin `/graphql` (`{"projects":[]}`), and `/projections/viewer/1` (html).
+- **Remaining intentional "Tauri" mentions:** explanatory code comments in `PlanVisualEditor.tsx` (pointer-drag history) and `projections-frontend/main.tsx` (`?apiBase=` override) — kept as accurate history, not dead references.
 
 ## Open Questions / Notes
 - **DatabaseSettings.tsx**: **DECIDED — remove** the component + its route/menu entry (option a). Relies on Tauri-only IPC (`get_database_info`, `reinitialize_database`, `show_database_location`) with no web equivalent. Self-hosted admins manage the SQLite file directly. File a bd issue to track possible GraphQL reimplementation later.
