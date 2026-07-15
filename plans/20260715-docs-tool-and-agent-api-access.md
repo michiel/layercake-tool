@@ -114,7 +114,9 @@ Add `Doc`/`DocCommands` (`list` / `workflow <name>` / `command <name>`) via `inc
 ### Stage 2 — `layercake schema dump [--json]`
 Build the GraphQL schema standalone (no DB context) in the CLI (depends on `layercake-server` types) and print `.sdl()`; `--json` → introspection query result.
 **Verify:** SDL contains `type Query`, `type Mutation`, `Project`; runs with no server/DB.
-**Status:** Not Started
+**Status:** Complete
+
+**Notes:** Added `sdl()` / `introspection_json()` / `build_schema_for_introspection()` to `layercake-server/src/graphql/schema.rs` (keeps async-graphql encapsulated in the server crate — cli has no async_graphql dep). cli `schema_dump.rs` delegates to those. `Schema` command with `Dump { --json }`. Verified SDL has core types, `--json` is valid introspection JSON, and NO db file is created (truly offline).
 
 ### Stage 3 — `layercake db info [--database] [--json]`
 Resolve DB path; print path/existence/size (+ optional key-table row counts) as text or JSON.

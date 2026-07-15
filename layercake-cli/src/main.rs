@@ -14,6 +14,7 @@ mod console;
 mod doc;
 mod query;
 mod query_payloads;
+mod schema_dump;
 mod schema_introspection;
 use query::QueryArgs;
 mod repl;
@@ -104,6 +105,11 @@ enum Commands {
         #[clap(subcommand)]
         command: DocCommands,
     },
+    /// Inspect the GraphQL API surface
+    Schema {
+        #[clap(subcommand)]
+        command: SchemaCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -142,6 +148,16 @@ enum DocCommands {
     Workflow { name: String },
     /// Print a command doc (docs-tool/command/<name>.md)
     Command { name: String },
+}
+
+#[derive(Subcommand, Debug)]
+enum SchemaCommands {
+    /// Print the GraphQL schema (SDL by default; --json for introspection)
+    Dump {
+        /// Emit introspection JSON instead of SDL
+        #[clap(long)]
+        json: bool,
+    },
 }
 
 #[tokio::main]
@@ -242,6 +258,9 @@ async fn main() -> Result<()> {
             DocCommands::List => doc::print_list(),
             DocCommands::Workflow { name } => doc::print_doc("workflow", &name)?,
             DocCommands::Command { name } => doc::print_doc("command", &name)?,
+        },
+        Commands::Schema { command } => match command {
+            SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
         },
     }
 
