@@ -1985,7 +1985,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-cli"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "atty",
@@ -2014,7 +2014,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-core"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2093,7 +2093,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-server"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-graphql",
@@ -2142,7 +2142,7 @@ dependencies = [
 
 [[package]]
 name = "layercake-test-utils"
-version = "0.3.8"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "sea-orm",
