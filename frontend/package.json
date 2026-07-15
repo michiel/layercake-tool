@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && cross-env NODE_OPTIONS=--max-old-space-size=4096 vite build",
     "preview": "vite preview",
     "type-check": "tsc --noEmit"
   },
@@ -16,6 +16,7 @@
   "devDependencies": {
     "@tweakpane/core": "^2.0.5",
     "@types/dagre": "^0.7.52",
+    "cross-env": "^7.0.3",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
     "@types/react-router-dom": "^5.3.3",

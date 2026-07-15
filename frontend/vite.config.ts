@@ -29,7 +29,12 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // Sourcemaps are disabled for production: this build is embedded into the
+    // layercake binary (include_dir!), so shipping ~30MB of .map files would
+    // bloat the binary for no runtime benefit — and generating them for an
+    // 11k-module bundle is what drove the CI build out of memory. Set
+    // VITE_SOURCEMAP=true to opt back in when debugging a production bundle.
+    sourcemap: process.env.VITE_SOURCEMAP === 'true',
     rollupOptions: {
       output: {
         manualChunks: {
