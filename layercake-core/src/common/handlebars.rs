@@ -60,6 +60,25 @@ pub fn get_handlebars() -> Handlebars<'static> {
     });
     handlebars.register_helper("inline", Box::new(inline));
 
+    // Like `inline`, but also neutralises characters that break Mermaid's
+    // sequence-diagram grammar when they appear in free text. Mermaid treats
+    // `;` as a statement terminator, so a note/label containing `;` truncates
+    // the statement mid-line (with a misleading error on the *next* line).
+    // Replace it with an em-dash. Use this for note/label/name text in the
+    // Mermaid sequence template.
+    handlebars_helper!(mermaid_safe: |v: Value| {
+        let s = match v {
+            Value::String(s) => s,
+            Value::Null => String::new(),
+            other => other.to_string(),
+        };
+        s.split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .replace(';', "—")
+    });
+    handlebars.register_helper("mermaid_safe", Box::new(mermaid_safe));
+
     // Emit a value as a YAML double-quoted scalar, escaping backslashes,
     // quotes, and collapsing newlines. Needed for Mermaid frontmatter fields
     // like `title:` — an unquoted title containing ':' breaks YAML parsing and
