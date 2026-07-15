@@ -9,6 +9,7 @@ pub mod data_set;
 pub mod graph;
 pub mod graph_data;
 pub mod graph_diff;
+pub mod palette;
 pub mod graph_edge;
 pub mod graph_edit;
 pub mod graph_node;

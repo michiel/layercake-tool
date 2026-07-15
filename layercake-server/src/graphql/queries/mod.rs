@@ -201,6 +201,32 @@ impl Query {
         Ok(sequence.map(Sequence::from))
     }
 
+    /// Curated, WCAG-AA-validated colour palettes to apply to project layers.
+    #[graphql(name = "palettePresets")]
+    async fn palette_presets(&self) -> Vec<crate::graphql::types::palette::Palette> {
+        layercake_core::palette::presets()
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+
+    /// WCAG contrast check for a background/text colour pair (hex).
+    #[graphql(name = "checkContrast")]
+    async fn check_contrast(
+        &self,
+        background: String,
+        text: String,
+    ) -> Result<crate::graphql::types::palette::ContrastResult> {
+        layercake_core::palette::check_contrast(&background, &text)
+            .map(Into::into)
+            .ok_or_else(|| {
+                crate::graphql::errors::StructuredError::validation(
+                    "colors",
+                    "background and text must be hex colours like #rrggbb",
+                )
+            })
+    }
+
     /// Build a story's sequence render context and return it as a JSON string,
     /// without going through the Handlebars template. Lets a client render the
     /// diagram itself, or inspect participants/steps/warnings directly.
