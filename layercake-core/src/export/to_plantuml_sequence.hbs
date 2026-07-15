@@ -27,14 +27,16 @@ participant {{alias}} as "{{inline label}}"{{#if layerColor}} {{layerColor}}{{/i
 note over {{source.alias}}
 {{inline note}}
 end note
-          {{else if (stringeq notePosition "target")}}
+          {{else}}
+            {{#if (stringeq notePosition "target")}}
 note over {{target.alias}}
 {{inline note}}
 end note
-          {{else}}
+            {{else}}
 note over {{source.alias}},{{target.alias}}
 {{inline note}}
 end note
+            {{/if}}
           {{/if}}
         {{/if}}
       {{/if}}

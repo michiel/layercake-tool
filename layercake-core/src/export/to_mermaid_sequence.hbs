@@ -28,10 +28,12 @@ end
         {{#if note}}
           {{#if (stringeq notePosition "source")}}
     Note over {{source.alias}}: {{inline note}}
-          {{else if (stringeq notePosition "target")}}
-    Note over {{target.alias}}: {{inline note}}
           {{else}}
+            {{#if (stringeq notePosition "target")}}
+    Note over {{target.alias}}: {{inline note}}
+            {{else}}
     Note over {{source.alias}},{{target.alias}}: {{inline note}}
+            {{/if}}
           {{/if}}
         {{/if}}
       {{/if}}
