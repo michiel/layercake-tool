@@ -120,6 +120,21 @@ sequenceDiagram
   ...
 ```
 
+## Preview without rendering
+
+To inspect the resolved participants/steps/warnings (or render the diagram
+yourself client-side) without the Handlebars template:
+
+```bash
+layercake api call --query '
+  query($p:Int!,$s:Int!){ previewStoryContext(projectId:$p, storyId:$s) }' \
+  --variables '{"p":1,"s":42}'
+```
+
+Returns the `SequenceStoryContext` as JSON (participants, sequences[].steps,
+and any build `warnings`). If `steps` is empty or `warnings` is non-empty, the
+diagram will be blank — run `layercake doctor --project <id>` to see why.
+
 ## Summary of the ops, in order
 
 `createStory` → `createSequence` (×N) → `updatePlanDag` (add StoryNode +

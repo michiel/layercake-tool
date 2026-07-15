@@ -54,6 +54,22 @@ impl AppContext {
         Ok(apply_preview_limit(content, format, max_rows))
     }
 
+    /// Build the story's `SequenceStoryContext` and return it as JSON, without
+    /// running it through a Handlebars template. Lets a client render the
+    /// diagram itself (and inspect participants/steps/warnings directly).
+    pub async fn preview_story_context_json(
+        &self,
+        _actor: &Actor,
+        project_id: i32,
+        story_id: i32,
+    ) -> CoreResult<String> {
+        let context = build_story_context(&self.db, project_id, story_id)
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to build story context: {}", e)))?;
+        serde_json::to_string(&context)
+            .map_err(|e| CoreError::internal(format!("Failed to serialize story context: {}", e)))
+    }
+
     #[allow(dead_code)]
     pub async fn preview_sequence_export(
         &self,
