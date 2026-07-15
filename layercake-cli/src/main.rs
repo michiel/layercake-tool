@@ -11,6 +11,7 @@ use layercake_server::server;
 #[cfg(feature = "console")]
 mod console;
 
+mod doc;
 mod query;
 mod query_payloads;
 mod schema_introspection;
@@ -98,6 +99,11 @@ enum Commands {
         #[clap(subcommand)]
         command: GuideCommands,
     },
+    /// Print embedded agent-facing documentation (workflows and commands)
+    Doc {
+        #[clap(subcommand)]
+        command: DocCommands,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -126,6 +132,16 @@ enum GuideCommands {
     Agent,
     /// Output the graph model documentation
     Model,
+}
+
+#[derive(Subcommand, Debug)]
+enum DocCommands {
+    /// List all available workflow and command docs
+    List,
+    /// Print a workflow doc (docs-tool/workflow/<name>.md)
+    Workflow { name: String },
+    /// Print a command doc (docs-tool/command/<name>.md)
+    Command { name: String },
 }
 
 #[tokio::main]
@@ -221,6 +237,11 @@ async fn main() -> Result<()> {
                 const MODEL_GUIDE: &str = include_str!("../../LAYERCAKE_MODEL_GUIDE.md");
                 print!("{}", MODEL_GUIDE);
             }
+        },
+        Commands::Doc { command } => match command {
+            DocCommands::List => doc::print_list(),
+            DocCommands::Workflow { name } => doc::print_doc("workflow", &name)?,
+            DocCommands::Command { name } => doc::print_doc("command", &name)?,
         },
     }
 
