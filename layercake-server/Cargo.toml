@@ -22,7 +22,6 @@ tracing-subscriber = { workspace = true }
 tokio = { workspace = true }
 base64 = "0.22"
 once_cell = "1.19"
-rig = { workspace = true }
 
 axum = { workspace = true }
 tower = { workspace = true }
