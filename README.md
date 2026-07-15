@@ -218,7 +218,3 @@ Start with `layercake doc list`, then read the workflow that matches your task
 
 Layercake is evolving rapidly toward distributed collaborative graph editing and automation-focused workflows. Issues, pull requests, and design discussions are welcome!
 
-## Code flow card
-
-<img src=".github/codeflow-card.svg" alt="CodeFlow card" />
-
