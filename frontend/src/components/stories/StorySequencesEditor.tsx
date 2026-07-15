@@ -11,7 +11,9 @@ import {
   IconX,
   IconGripVertical,
   IconArrowNarrowRight,
+  IconSettings,
 } from '@tabler/icons-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Group, Stack } from '@/components/layout-primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,10 @@ import {
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
 import { SequenceDiagramDialog } from '@/components/stories/SequenceDiagramDialog'
 import { GET_PROJECT_LAYERS, ProjectLayer } from '@/graphql/layers'
+import { GET_PLAN_DAG } from '@/graphql/plan-dag'
+import { NodeConfigDialog } from '@/components/editors/PlanVisualEditor/NodeConfigDialog'
+import { PlanDagNodeType } from '@/types/plan-dag'
+import { UPDATE_PLAN_DAG_NODE } from '@/graphql/plan-dag'
 
 type GraphEdge = { id: string; source: string; target: string; label?: string; comments?: string }
 type GraphNode = { id: string; label?: string; name?: string; layer?: string }
@@ -86,6 +92,50 @@ export const StorySequencesEditor = ({
     skip: !projectId,
   })
   const projectLayers: ProjectLayer[] = (layersData as any)?.projectLayers || []
+
+  // Resolve the SequenceArtefactNode downstream of this story's StoryNode so the
+  // "edit properties" (render settings) button can edit its config — the same
+  // form used by the artefacts page.
+  const { data: planDagData, refetch: refetchPlanDag } = useQuery(GET_PLAN_DAG, {
+    variables: { projectId, planId: null },
+    skip: !projectId,
+  })
+  const sequenceArtefactNode = useMemo(() => {
+    const dag = (planDagData as any)?.getPlanDag
+    if (!dag) return null
+    const nodes: any[] = dag.nodes ?? []
+    const edges: any[] = dag.edges ?? []
+    const parse = (c: any) => {
+      try { return typeof c === 'string' ? JSON.parse(c) : (c ?? {}) } catch { return {} }
+    }
+    // Find the StoryNode bound to this story entity.
+    const storyNode = nodes.find(
+      (n) => n.nodeType === 'StoryNode' && parse(n.config).storyId === storyId
+    )
+    if (!storyNode) return null
+    // Its downstream SequenceArtefactNode(s). Use the first if several exist.
+    const downstreamIds = edges.filter((e) => e.source === storyNode.id).map((e) => e.target)
+    return (
+      nodes.find(
+        (n) => n.nodeType === 'SequenceArtefactNode' && downstreamIds.includes(n.id)
+      ) ?? null
+    )
+  }, [planDagData, storyId])
+
+  const [renderSettingsOpen, setRenderSettingsOpen] = useState(false)
+  const [updatePlanDagNode] = useMutation(UPDATE_PLAN_DAG_NODE)
+  const handleSaveRenderSettings = async (nodeId: string, config: any, metadata: any) => {
+    await updatePlanDagNode({
+      variables: {
+        projectId,
+        planId: null,
+        nodeId,
+        updates: { config: JSON.stringify(config), metadata },
+      },
+    })
+    setRenderSettingsOpen(false)
+    await refetchPlanDag()
+  }
 
   const datasetGraphs = useMemo(() => {
     const map = new Map<number, { graph: GraphData; json: string; name: string }>()
@@ -420,10 +470,34 @@ export const StorySequencesEditor = ({
         <CardHeader>
           <Group justify="between" align="center">
             <CardTitle className="text-base">Sequences</CardTitle>
-            <Button size="sm" onClick={handleAddSequence} disabled={sequencesLoading || datasetsLoading}>
-              <IconPlus className="mr-2 h-4 w-4" />
-              Add Section
-            </Button>
+            <Group gap="xs" align="center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8"
+                        onClick={() => setRenderSettingsOpen(true)}
+                        disabled={!sequenceArtefactNode}
+                      >
+                        <IconSettings className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {sequenceArtefactNode
+                      ? 'Edit render properties (target, contain nodes, layers)'
+                      : 'No sequence artefact node in the plan for this story yet'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Button size="sm" onClick={handleAddSequence} disabled={sequencesLoading || datasetsLoading}>
+                <IconPlus className="mr-2 h-4 w-4" />
+                Add Section
+              </Button>
+            </Group>
           </Group>
         </CardHeader>
         <CardContent className="grid gap-3 md:grid-cols-3">
@@ -792,6 +866,27 @@ export const StorySequencesEditor = ({
         notePosition={edgeEditorPayload?.notePosition}
         onSave={handleEdgeEditSave}
       />
+      {sequenceArtefactNode && (
+        <NodeConfigDialog
+          opened={renderSettingsOpen}
+          onClose={() => setRenderSettingsOpen(false)}
+          nodeType={PlanDagNodeType.SEQUENCE_ARTEFACT}
+          projectId={projectId}
+          onSave={handleSaveRenderSettings}
+          nodeId={sequenceArtefactNode.id}
+          config={(() => {
+            try {
+              return typeof sequenceArtefactNode.config === 'string'
+                ? JSON.parse(sequenceArtefactNode.config)
+                : (sequenceArtefactNode.config ?? {})
+            } catch {
+              return {}
+            }
+          })()}
+          metadata={sequenceArtefactNode.metadata || {}}
+          storyIdHint={storyId}
+        />
+      )}
     </>
   )
 }

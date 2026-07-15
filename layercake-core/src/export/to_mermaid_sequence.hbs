@@ -5,37 +5,37 @@ sequenceDiagram
 
 {{#unless (is_empty sequence.participantGroups)}}
   {{#each sequence.participantGroups}}
-box {{#if this.color}}{{this.color}}{{/if}} "{{this.label}}"
+box {{#if this.color}}{{this.color}}{{/if}} "{{inline this.label}}"
     {{#each this.participants}}
-    participant {{alias}} as "{{label}}"
+    participant {{alias}} as "{{inline label}}"
     {{/each}}
 end
   {{/each}}
 {{else}}
   {{#each sequence.participants}}
-  participant {{alias}} as "{{label}}"
+  participant {{alias}} as "{{inline label}}"
   {{/each}}
 {{/unless}}
 
 {{#unless (is_empty sequence.sequences)}}
   {{#each sequence.sequences}}
-%% Sequence: {{name}}
+%% Sequence: {{inline name}}
     {{#if @root.sequence.firstParticipantAlias}}
-    Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{name}}
+    Note over {{@root.sequence.firstParticipantAlias}},{{@root.sequence.lastParticipantAlias}}: {{inline name}}
     {{/if}}
     {{#each steps}}
       {{#if @root.sequence.config.showNotes}}
         {{#if note}}
           {{#if (stringeq notePosition "source")}}
-    Note over {{source.alias}}: {{note}}
+    Note over {{source.alias}}: {{inline note}}
           {{else if (stringeq notePosition "target")}}
-    Note over {{target.alias}}: {{note}}
+    Note over {{target.alias}}: {{inline note}}
           {{else}}
-    Note over {{source.alias}},{{target.alias}}: {{note}}
+    Note over {{source.alias}},{{target.alias}}: {{inline note}}
           {{/if}}
         {{/if}}
       {{/if}}
-    {{source.alias}}->>{{target.alias}}: {{label}}
+    {{source.alias}}->>{{target.alias}}: {{inline label}}
     {{/each}}
   {{/each}}
 {{else}}
