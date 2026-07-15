@@ -13,6 +13,7 @@ mod console;
 mod api;
 mod db_info;
 mod doc;
+mod doctor;
 mod query;
 mod query_payloads;
 mod schema_dump;
@@ -108,6 +109,17 @@ enum Commands {
     Api {
         #[clap(subcommand)]
         command: ApiCommands,
+    },
+    /// Scan a project for structural health problems
+    Doctor {
+        /// Project id to scan
+        #[clap(long)]
+        project: i32,
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        /// Emit machine-readable JSON
+        #[clap(long)]
+        json: bool,
     },
 }
 
@@ -318,6 +330,13 @@ async fn main() -> Result<()> {
         Commands::Schema { command } => match command {
             SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
         },
+        Commands::Doctor {
+            project,
+            database,
+            json,
+        } => {
+            doctor::run(project, Some(&database), json).await?;
+        }
         Commands::Api { command } => match command {
             ApiCommands::Info {
                 url,

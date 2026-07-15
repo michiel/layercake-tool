@@ -9,6 +9,7 @@ pub mod pipeline;
 pub mod plan;
 pub mod plan_dag;
 pub mod plan_execution;
+pub mod doctor;
 pub mod sequence_context;
 pub mod sequence_types;
 pub mod story_types;
