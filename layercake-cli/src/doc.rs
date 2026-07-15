@@ -38,7 +38,7 @@ pub fn print_list() {
 
 fn list_string() -> String {
     let mut out = String::from("Available documentation:\n");
-    for kind in ["workflow", "command"] {
+    for kind in ["workflow", "command", "guide"] {
         out.push_str(&format!("\n{}s:\n", kind));
         let mut names = names_in(kind);
         names.sort();
