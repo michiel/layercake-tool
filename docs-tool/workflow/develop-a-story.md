@@ -25,7 +25,8 @@ follow-up — set `enabledGraphIds` via the API for now.)
   edge becomes a sequence-diagram message `source ->> target: <edge label>`.
 - Each edge reference (`SequenceEdgeRef`) is one **step + commentary**:
   `{ datasetId, edgeId, note?, notePosition? }`. The `note` is the commentary;
-  `notePosition` is `Source | Target | Both`.
+  `notePosition` is `Source | Target | Both`. **If `notePosition` is null/unset
+  it defaults to `Both`** (`Note over source,target`).
 - **Participants (lifelines) are derived** from the edges' endpoints — you do not
   author them.
 - Rendering happens through the plan DAG: a **StoryNode** (`{ storyId }`) feeds a
