@@ -156,9 +156,17 @@ Delete the crate + server/core/frontend files; apply the careful registration ed
 **Verify:** `cargo build --workspace` + `cargo tree | grep code.analysis` empty (except kept migration); `tsc --noEmit`; server tests pass; migrations still run against an existing DB.
 **Status:** Not Started
 
-### Stage F3 (investigate, non-blocking, may defer) — unify agent identity across HTTP mutations + WS presence
+### Stage F3 (investigate, non-blocking) — unify agent identity across HTTP mutations + WS presence
 Decide whether agent GraphQL mutations should be attributed to the same identity shown in presence, and whether it needs a server change. Report; implement only if cheap and you approve.
-**Status:** Not Started
+**Status:** Investigated → **NOT implemented (correctly deferred).** The premise was wrong: attribution isn't the hard part, and it does NOT meet the "cheap" bar.
+
+**Findings:**
+- The identity already unifies: the frontend `x-layercake-session` id (`user-<uuid>` from one localStorage key) is the SAME value used for WS presence `user_id`. Every mutation resolver already resolves it via `context.actor_for_request(ctx)` → `Actor{user_id}`.
+- The delta event `PlanDagDeltaEvent` (`graphql/types/json_patch.rs:59-84`) already has `user_id`/`client_id` fields; the frontend delta subscription already selects them (`plan-dag.ts:319-320`).
+- **BUT the live-delta pipeline is entirely dead code:** `publish_plan_dag_delta`/`publish_delta_event` have NO callers. Mutations write the DB and broadcast nothing. `client_id` never reaches the server. No UI renders "X changed this".
+- So "attribute agent mutations" requires first BUILDING real-time JSON-patch delta broadcast across the node/edge/plan mutation paths (`plan_dag_nodes.rs`, `plan_dag_edges.rs`, `plan_dag.rs` / core `plan_dag_operations.rs`), client-id echo suppression, and frontend attribution UI. That's a substantial collaboration feature, not a cleanup follow-up.
+
+**Decision:** keep deferred; do NOT build speculatively. Filed as a tracked issue for a real, scoped effort. Attribution itself is a ~1-line add *once* delta broadcast exists.
 
 ## Decisions locked
 - Doc command: **embed + list + print** (`include_dir!`).
