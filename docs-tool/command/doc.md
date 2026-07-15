@@ -20,6 +20,8 @@ layercake doc workflow edit-a-plan
 layercake doc command schema
 layercake doc guide agent              # the AI agent query-interface guide
 layercake doc guide model              # the graph model documentation
+layercake doc guide node-types         # every plan DAG node type + its config
+layercake doc guide graph-json         # the GraphJson schema for datasets
 ```
 
 ## For agents
