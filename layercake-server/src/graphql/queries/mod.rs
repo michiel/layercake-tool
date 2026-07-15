@@ -92,6 +92,25 @@ impl Query {
         Ok(GraphSummary::from(summary))
     }
 
+    /// Structural diff between two datasets' graphs — added/removed/changed
+    /// nodes and edges. Answers "what did the merge/transform do?".
+    #[graphql(name = "diffDatasets")]
+    async fn diff_datasets(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "fromDatasetId")] from_dataset_id: i32,
+        #[graphql(name = "toDatasetId")] to_dataset_id: i32,
+    ) -> Result<crate::graphql::types::graph_diff::GraphDiff> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let diff = context
+            .app
+            .diff_datasets(&actor, from_dataset_id, to_dataset_id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+        Ok(diff.into())
+    }
+
     async fn graph_page(
         &self,
         ctx: &Context<'_>,
@@ -180,6 +199,32 @@ impl Query {
         let sequence = sequences::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(sequence.map(Sequence::from))
+    }
+
+    /// Curated, WCAG-AA-validated colour palettes to apply to project layers.
+    #[graphql(name = "palettePresets")]
+    async fn palette_presets(&self) -> Vec<crate::graphql::types::palette::Palette> {
+        layercake_core::palette::presets()
+            .into_iter()
+            .map(Into::into)
+            .collect()
+    }
+
+    /// WCAG contrast check for a background/text colour pair (hex).
+    #[graphql(name = "checkContrast")]
+    async fn check_contrast(
+        &self,
+        background: String,
+        text: String,
+    ) -> Result<crate::graphql::types::palette::ContrastResult> {
+        layercake_core::palette::check_contrast(&background, &text)
+            .map(Into::into)
+            .ok_or_else(|| {
+                crate::graphql::errors::StructuredError::validation(
+                    "colors",
+                    "background and text must be hex colours like #rrggbb",
+                )
+            })
     }
 
     /// Build a story's sequence render context and return it as a JSON string,

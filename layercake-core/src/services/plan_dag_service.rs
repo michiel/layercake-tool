@@ -351,6 +351,108 @@ impl PlanDagService {
         Ok(result_node)
     }
 
+    /// Rename a Plan DAG node to a new (human-readable) id, rewriting every
+    /// reference to it: connected edges' source/target and any computed graph's
+    /// `dag_node_id`. Fails if `new_id` already exists in the plan.
+    pub async fn rename_node(
+        &self,
+        project_id: i32,
+        plan_id: Option<i32>,
+        old_id: String,
+        new_id: String,
+    ) -> CoreResult<PlanDagNode> {
+        use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
+
+        if new_id.trim().is_empty() {
+            return Err(CoreError::validation("new node id cannot be empty"));
+        }
+        if new_id == old_id {
+            // No-op rename; return the current node.
+            let node = plan_dag_nodes::Entity::find()
+                .filter(plan_dag_nodes::Column::Id.eq(&new_id))
+                .one(&self.db)
+                .await
+                .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+                .ok_or_else(|| CoreError::not_found("PlanDagNode", old_id))?;
+            return Ok(PlanDagNode::from(node));
+        }
+
+        let plan = self.resolve_plan(project_id, plan_id).await?;
+        let backend = self.db.get_database_backend();
+
+        // Old node must exist; new id must be free (within the plan).
+        let exists = |id: &str| {
+            plan_dag_nodes::Entity::find().filter(
+                plan_dag_nodes::Column::PlanId
+                    .eq(plan.id)
+                    .and(plan_dag_nodes::Column::Id.eq(id.to_string())),
+            )
+        };
+        if exists(&old_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .is_none()
+        {
+            return Err(CoreError::not_found("PlanDagNode", old_id));
+        }
+        if exists(&new_id)
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .is_some()
+        {
+            return Err(CoreError::validation(format!(
+                "a node with id '{}' already exists in this plan",
+                new_id
+            )));
+        }
+
+        let txn = self
+            .db
+            .begin()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to begin rename txn: {}", e)))?;
+
+        let stmts = [
+            (
+                "UPDATE plan_dag_nodes SET id = ? WHERE plan_id = ? AND id = ?",
+                vec![new_id.clone().into(), plan.id.into(), old_id.clone().into()],
+            ),
+            (
+                "UPDATE plan_dag_edges SET source_node_id = ? WHERE plan_id = ? AND source_node_id = ?",
+                vec![new_id.clone().into(), plan.id.into(), old_id.clone().into()],
+            ),
+            (
+                "UPDATE plan_dag_edges SET target_node_id = ? WHERE plan_id = ? AND target_node_id = ?",
+                vec![new_id.clone().into(), plan.id.into(), old_id.clone().into()],
+            ),
+            (
+                "UPDATE graph_data SET dag_node_id = ? WHERE project_id = ? AND dag_node_id = ?",
+                vec![new_id.clone().into(), project_id.into(), old_id.clone().into()],
+            ),
+        ];
+        for (sql, params) in stmts {
+            txn.execute(Statement::from_sql_and_values(backend, sql, params))
+                .await
+                .map_err(|e| CoreError::internal(format!("Rename failed: {}", e)))?;
+        }
+
+        txn.commit()
+            .await
+            .map_err(|e| CoreError::internal(format!("Failed to commit rename: {}", e)))?;
+
+        let _ = self.bump_plan_version(plan.id).await;
+
+        let renamed = plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::Id.eq(&new_id))
+            .one(&self.db)
+            .await
+            .map_err(|e| CoreError::internal(format!("Database error: {}", e)))?
+            .ok_or_else(|| CoreError::not_found("PlanDagNode", new_id))?;
+        Ok(PlanDagNode::from(renamed))
+    }
+
     /// Delete a Plan DAG node and its connected edges
     pub async fn delete_node(
         &self,
@@ -1413,15 +1515,114 @@ impl PlanDagService {
 
 #[cfg(test)]
 mod tests {
-    #[allow(unused_imports)]
     use super::*;
+    use crate::database::entities::{plan_dag_edges, plan_dag_nodes, plans, projects};
+    use crate::database::test_utils::setup_test_db;
+    use sea_orm::Set;
 
-    // Note: These would be integration tests requiring a test database
-    // For now, just testing the service creation
+    async fn seed(db: &DatabaseConnection) {
+        projects::ActiveModel {
+            id: Set(1),
+            name: Set("P".into()),
+            description: Set(None),
+            tags: Set("[]".into()),
+            import_export_path: Set(None),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        plans::ActiveModel {
+            id: Set(1),
+            project_id: Set(1),
+            name: Set("plan".into()),
+            description: Set(None),
+            tags: Set("[]".into()),
+            yaml_content: Set("".into()),
+            dependencies: Set(None),
+            status: Set("active".into()),
+            version: Set(1),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+        for (id, ty) in [("a", "DataSetNode"), ("b", "GraphNode")] {
+            plan_dag_nodes::ActiveModel {
+                id: Set(id.into()),
+                plan_id: Set(1),
+                node_type: Set(ty.into()),
+                position_x: Set(0.0),
+                position_y: Set(0.0),
+                source_position: Set(None),
+                target_position: Set(None),
+                metadata_json: Set("{}".into()),
+                config_json: Set("{}".into()),
+                created_at: Set(Utc::now().into()),
+                updated_at: Set(Utc::now().into()),
+            }
+            .insert(db)
+            .await
+            .unwrap();
+        }
+        plan_dag_edges::ActiveModel {
+            id: Set("e1".into()),
+            plan_id: Set(1),
+            source_node_id: Set("a".into()),
+            target_node_id: Set("b".into()),
+            metadata_json: Set("{}".into()),
+            created_at: Set(Utc::now().into()),
+            updated_at: Set(Utc::now().into()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
 
-    #[test]
-    fn test_service_creation() {
-        // This would require a real database connection for proper testing
-        // We'll add integration tests when we have a test database setup
+    #[tokio::test]
+    async fn rename_updates_node_and_edges() {
+        let db = setup_test_db().await;
+        seed(&db).await;
+        let svc = PlanDagService::new(db.clone());
+
+        svc.rename_node(1, Some(1), "a".into(), "source_data".into())
+            .await
+            .unwrap();
+
+        // Node renamed.
+        assert!(plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::Id.eq("source_data"))
+            .one(&db)
+            .await
+            .unwrap()
+            .is_some());
+        assert!(plan_dag_nodes::Entity::find()
+            .filter(plan_dag_nodes::Column::Id.eq("a"))
+            .one(&db)
+            .await
+            .unwrap()
+            .is_none());
+        // Edge source followed.
+        let edge = plan_dag_edges::Entity::find_by_id("e1")
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(edge.source_node_id, "source_data");
+        assert_eq!(edge.target_node_id, "b");
+    }
+
+    #[tokio::test]
+    async fn rename_to_existing_id_is_rejected() {
+        let db = setup_test_db().await;
+        seed(&db).await;
+        let svc = PlanDagService::new(db.clone());
+        let err = svc
+            .rename_node(1, Some(1), "a".into(), "b".into())
+            .await
+            .unwrap_err();
+        assert!(format!("{err}").contains("already exists"), "{err}");
     }
 }

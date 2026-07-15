@@ -28,6 +28,16 @@ pub struct DagExecutor {
     /// Non-fatal warnings accumulated during a run, surfaced on the execution
     /// result so callers see them without reading logs or context_json.
     warnings: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+    /// Per-node execution records (id, type, duration) accumulated during a run.
+    node_records: std::sync::Arc<std::sync::Mutex<Vec<NodeExecutionRecord>>>,
+}
+
+/// Timing/outcome for a single node executed during a DAG run.
+#[derive(Debug, Clone)]
+pub struct NodeExecutionRecord {
+    pub node_id: String,
+    pub node_type: String,
+    pub duration_ms: u64,
 }
 
 /// Options for creating or updating graph_data records originating from DAG nodes
@@ -68,6 +78,7 @@ impl DagExecutor {
             graph_data_builder,
             merge_builder,
             warnings: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
+            node_records: std::sync::Arc::new(std::sync::Mutex::new(Vec::new())),
         }
     }
 
@@ -77,11 +88,25 @@ impl DagExecutor {
         }
     }
 
+    fn push_node_record(&self, record: NodeExecutionRecord) {
+        if let Ok(mut r) = self.node_records.lock() {
+            r.push(record);
+        }
+    }
+
     /// Take the warnings accumulated so far, clearing the buffer.
     pub fn take_warnings(&self) -> Vec<String> {
         self.warnings
             .lock()
             .map(|mut w| std::mem::take(&mut *w))
+            .unwrap_or_default()
+    }
+
+    /// Take the per-node execution records accumulated so far, clearing them.
+    pub fn take_node_records(&self) -> Vec<NodeExecutionRecord> {
+        self.node_records
+            .lock()
+            .map(|mut r| std::mem::take(&mut *r))
             .unwrap_or_default()
     }
 
@@ -1335,6 +1360,7 @@ impl DagExecutor {
                 plan_id,
                 node_id = node_id.as_str()
             );
+            let started = std::time::Instant::now();
             self.execute_node(
                 project_id,
                 plan_id,
@@ -1345,6 +1371,16 @@ impl DagExecutor {
             )
             .instrument(span)
             .await?;
+            let node_type = nodes
+                .iter()
+                .find(|n| n.id == node_id)
+                .map(|n| n.node_type.clone())
+                .unwrap_or_default();
+            self.push_node_record(NodeExecutionRecord {
+                node_id: node_id.clone(),
+                node_type,
+                duration_ms: started.elapsed().as_millis() as u64,
+            });
         }
 
         Ok(())

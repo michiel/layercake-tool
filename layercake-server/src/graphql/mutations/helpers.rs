@@ -510,6 +510,26 @@ pub struct PlanExecutionResult {
     /// Non-fatal problems encountered during execution (e.g. a story sequence
     /// that resolved no steps). Empty on a fully clean run.
     pub warnings: Vec<String>,
+    /// Per-node execution timings, in topological order.
+    pub node_results: Vec<NodeExecutionTiming>,
+}
+
+/// Timing for a single node in a plan execution.
+#[derive(async_graphql::SimpleObject)]
+pub struct NodeExecutionTiming {
+    pub node_id: String,
+    pub node_type: String,
+    pub duration_ms: i64,
+}
+
+impl From<layercake_core::pipeline::NodeExecutionRecord> for NodeExecutionTiming {
+    fn from(r: layercake_core::pipeline::NodeExecutionRecord) -> Self {
+        Self {
+            node_id: r.node_id,
+            node_type: r.node_type,
+            duration_ms: r.duration_ms as i64,
+        }
+    }
 }
 
 #[derive(async_graphql::SimpleObject)]

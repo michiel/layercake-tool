@@ -291,6 +291,20 @@ impl AppContext {
             .await
     }
 
+    pub async fn rename_plan_dag_node(
+        &self,
+        actor: &Actor,
+        project_id: i32,
+        plan_id: Option<i32>,
+        old_id: String,
+        new_id: String,
+    ) -> CoreResult<PlanDagNode> {
+        self.authorize_project_write(actor, project_id).await?;
+        self.plan_dag_service
+            .rename_node(project_id, plan_id, old_id, new_id)
+            .await
+    }
+
     pub async fn delete_plan_dag_node(
         &self,
         actor: &Actor,

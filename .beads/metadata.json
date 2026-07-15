@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "layercake_tool",
+  "project_id": "e6df9eb9-43df-486a-b25e-939aa3952979"
+}
