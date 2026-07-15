@@ -1020,6 +1020,108 @@
           "total": 514
         }
       ]
+    },
+    {
+      "at": "2026-07-15T03:09:08.169Z",
+      "sha": "aabf96ce62e8a4262f09e6f8fae15eb77b9f9616",
+      "pr": null,
+      "actor": "michiel",
+      "files": 856,
+      "functions": 2184,
+      "loc": 217587,
+      "languages": 21,
+      "topLanguages": [
+        {
+          "ext": "rs",
+          "pct": 31,
+          "lines": 68179
+        },
+        {
+          "ext": "md",
+          "pct": 29,
+          "lines": 62754
+        },
+        {
+          "ext": "tsx",
+          "pct": 18,
+          "lines": 39212
+        },
+        {
+          "ext": "json",
+          "pct": 9,
+          "lines": 18683
+        },
+        {
+          "ext": "ts",
+          "pct": 6,
+          "lines": 12445
+        }
+      ],
+      "dead": 108,
+      "deadPct": 4.9,
+      "circular": 1,
+      "godObjects": 1,
+      "avgCoupling": 3.3,
+      "securityIssues": 18,
+      "patterns": 10,
+      "duplicates": 37,
+      "layerViolations": 451,
+      "connections": 2786,
+      "avgFnLines": 15.3,
+      "longestFn": 16,
+      "testFiles": 30,
+      "testRatio": 3.5,
+      "topFolders": [
+        {
+          "name": "frontend",
+          "count": 212
+        },
+        {
+          "name": "layercake-core",
+          "count": 204
+        },
+        {
+          "name": "resources",
+          "count": 136
+        },
+        {
+          "name": "docs",
+          "count": 107
+        },
+        {
+          "name": "layercake-server",
+          "count": 79
+        }
+      ],
+      "folders": 5,
+      "grade": "D",
+      "score": 67,
+      "topBlast": {
+        "path": "layercake-server/src/graphql/types/plan_dag/node.rs",
+        "direct": 244,
+        "transitive": 463,
+        "total": 707
+      },
+      "fragility": [
+        {
+          "path": "layercake-server/src/graphql/types/plan_dag/node.rs",
+          "direct": 244,
+          "transitive": 463,
+          "total": 707
+        },
+        {
+          "path": "layercake-core/src/utils/event_broadcaster.rs",
+          "direct": 128,
+          "transitive": 471,
+          "total": 599
+        },
+        {
+          "path": "layercake-core/src/errors/core_error.rs",
+          "direct": 107,
+          "transitive": 407,
+          "total": 514
+        }
+      ]
     }
   ]
 }
