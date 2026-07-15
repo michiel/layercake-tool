@@ -5,6 +5,18 @@ Stories turn graph nodes and edges into **sequence diagrams with commentary** �
 a core use case: you read a dataset's graph, choose an ordered path of edges,
 attach commentary, and render a sequence diagram.
 
+## Sourcing: datasets vs computed graphs
+
+A story sources its edges from either:
+- **`enabledDatasetIds`** — raw dataset PKs (`data_sets`), or
+- **`enabledGraphIds`** — computed graph ids (`graph_data`, a GraphNode's
+  output). Use this to build a story from a *merged* graph rather than raw
+  datasets.
+
+A `SequenceEdgeRef.datasetId` may be either a dataset id OR a computed graph id;
+whatever you enabled on the story. (Frontend picker for computed graphs is a
+follow-up — set `enabledGraphIds` via the API for now.)
+
 ## Mental model
 
 - A **Story** is a curated collection of **Sequences** (belongs to a project,

@@ -1371,6 +1371,7 @@ impl AppContext {
                 enabled_dataset_ids: Set(
                     serde_json::to_string(&mapped_dataset_ids).unwrap_or_else(|_| "[]".into())
                 ),
+                enabled_graph_ids: Set("[]".into()),
                 layer_config: Set(
                     serde_json::to_string(&story.layer_config).unwrap_or_else(|_| "{}".into())
                 ),

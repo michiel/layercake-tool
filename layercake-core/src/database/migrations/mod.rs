@@ -50,6 +50,7 @@ mod m20260123_000001_create_plan_dag_annotations;
 mod m20260709_000001_rebuild_graph_edits_drop_graphs_fk;
 mod m20260715_000001_drop_code_analysis_profiles;
 mod m20260715_000002_normalise_sequence_edge_order;
+mod m20260715_000003_add_enabled_graph_ids_to_stories;
 
 pub struct Migrator;
 
@@ -107,6 +108,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260709_000001_rebuild_graph_edits_drop_graphs_fk::Migration),
             Box::new(m20260715_000001_drop_code_analysis_profiles::Migration),
             Box::new(m20260715_000002_normalise_sequence_edge_order::Migration),
+            Box::new(m20260715_000003_add_enabled_graph_ids_to_stories::Migration),
         ]
     }
 }

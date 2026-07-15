@@ -34,6 +34,11 @@ impl StoryMutation {
                 ))
             })?;
 
+        let enabled_graph_ids_json =
+            serde_json::to_string(&input.enabled_graph_ids.unwrap_or_default()).map_err(|e| {
+                StructuredError::bad_request(format!("Failed to serialize enabled_graph_ids: {}", e))
+            })?;
+
         let layer_config_json = serde_json::to_string(&input.layer_config.unwrap_or_default())
             .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to serialize layer_config: {}", e))
@@ -45,6 +50,7 @@ impl StoryMutation {
             description: Set(input.description),
             tags: Set(tags_json),
             enabled_dataset_ids: Set(enabled_dataset_ids_json),
+            enabled_graph_ids: Set(enabled_graph_ids_json),
             layer_config: Set(layer_config_json),
             created_at: Set(now),
             updated_at: Set(now),
@@ -100,6 +106,13 @@ impl StoryMutation {
                 ))
             })?;
             story.enabled_dataset_ids = Set(json);
+        }
+
+        if let Some(enabled_graph_ids) = input.enabled_graph_ids {
+            let json = serde_json::to_string(&enabled_graph_ids).map_err(|e| {
+                StructuredError::bad_request(format!("Failed to serialize enabled_graph_ids: {}", e))
+            })?;
+            story.enabled_graph_ids = Set(json);
         }
 
         if let Some(layer_config) = input.layer_config {

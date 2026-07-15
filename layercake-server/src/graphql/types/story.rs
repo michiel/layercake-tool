@@ -29,6 +29,10 @@ pub struct Story {
     pub tags: Vec<String>,
     #[graphql(name = "enabledDatasetIds")]
     pub enabled_dataset_ids: Vec<i32>,
+    /// Computed graph_data ids this story also sources edges from (GraphNode
+    /// outputs), in addition to raw datasets.
+    #[graphql(name = "enabledGraphIds")]
+    pub enabled_graph_ids: Vec<i32>,
     #[graphql(name = "layerConfig")]
     pub layer_config: Vec<StoryLayerConfig>,
     #[graphql(name = "createdAt")]
@@ -42,6 +46,8 @@ impl From<stories::Model> for Story {
         let tags: Vec<String> = serde_json::from_str(&model.tags).unwrap_or_default();
         let enabled_dataset_ids: Vec<i32> =
             serde_json::from_str(&model.enabled_dataset_ids).unwrap_or_default();
+        let enabled_graph_ids: Vec<i32> =
+            serde_json::from_str(&model.enabled_graph_ids).unwrap_or_default();
         let layer_config: Vec<StoryLayerConfig> =
             serde_json::from_str(&model.layer_config).unwrap_or_default();
 
@@ -52,6 +58,7 @@ impl From<stories::Model> for Story {
             description: model.description,
             tags,
             enabled_dataset_ids,
+            enabled_graph_ids,
             layer_config,
             created_at: model.created_at,
             updated_at: model.updated_at,
@@ -110,6 +117,8 @@ pub struct CreateStoryInput {
     pub tags: Option<Vec<String>>,
     #[graphql(name = "enabledDatasetIds")]
     pub enabled_dataset_ids: Option<Vec<i32>>,
+    #[graphql(name = "enabledGraphIds")]
+    pub enabled_graph_ids: Option<Vec<i32>>,
     #[graphql(name = "layerConfig")]
     pub layer_config: Option<Vec<StoryLayerConfig>>,
 }
@@ -121,6 +130,8 @@ pub struct UpdateStoryInput {
     pub tags: Option<Vec<String>>,
     #[graphql(name = "enabledDatasetIds")]
     pub enabled_dataset_ids: Option<Vec<i32>>,
+    #[graphql(name = "enabledGraphIds")]
+    pub enabled_graph_ids: Option<Vec<i32>>,
     #[graphql(name = "layerConfig")]
     pub layer_config: Option<Vec<StoryLayerConfig>>,
 }

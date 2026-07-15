@@ -65,7 +65,17 @@ pub async fn build_story_context(
             .await?
     };
 
-    let dataset_contexts = build_dataset_contexts(&datasets);
+    let mut dataset_contexts = build_dataset_contexts(&datasets);
+
+    // A story may also source from computed graphs (a GraphNode's output). Load
+    // each enabled graph_data id as an additional context, keyed by its id so
+    // sequence edge refs can target it via `datasetId`.
+    let graph_ids = parse_story_graph_ids(&story.enabled_graph_ids);
+    for graph_id in graph_ids {
+        if let Some(ctx) = build_graph_data_context(db, graph_id).await? {
+            dataset_contexts.insert(ctx.dataset_id, ctx);
+        }
+    }
     let story_layer_config = parse_story_layer_config(&story.layer_config);
     let layer_overrides = build_story_layer_overrides(&story_layer_config);
 
@@ -171,6 +181,92 @@ pub fn apply_render_config(
 
 pub fn parse_story_dataset_ids(value: &str) -> Vec<i32> {
     serde_json::from_str(value).unwrap_or_default()
+}
+
+pub fn parse_story_graph_ids(value: &str) -> Vec<i32> {
+    serde_json::from_str(value).unwrap_or_default()
+}
+
+/// Load a computed graph (graph_data + its nodes/edges) into the same
+/// `ParsedDatasetContext` shape used for datasets, so a story can reference its
+/// edges. Keyed by the graph_data id. Returns None if the graph doesn't exist.
+async fn build_graph_data_context(
+    db: &DatabaseConnection,
+    graph_id: i32,
+) -> Result<Option<ParsedDatasetContext>> {
+    use crate::database::entities::{graph_data, graph_data_edges, graph_data_nodes};
+
+    let graph = match graph_data::Entity::find_by_id(graph_id).one(db).await? {
+        Some(g) => g,
+        None => return Ok(None),
+    };
+
+    let node_models = graph_data_nodes::Entity::find()
+        .filter(graph_data_nodes::Column::GraphDataId.eq(graph_id))
+        .all(db)
+        .await?;
+    let edge_models = graph_data_edges::Entity::find()
+        .filter(graph_data_edges::Column::GraphDataId.eq(graph_id))
+        .all(db)
+        .await?;
+
+    let mut nodes: IndexMap<String, SequenceNode> = IndexMap::new();
+    let mut partitions: HashMap<String, String> = HashMap::new();
+    for n in &node_models {
+        let label = n.label.clone().unwrap_or_else(|| n.external_id.clone());
+        if n.is_partition {
+            partitions.insert(n.external_id.clone(), label.clone());
+        }
+        nodes.insert(
+            n.external_id.clone(),
+            SequenceNode {
+                id: n.external_id.clone(),
+                label,
+                layer: n.layer.clone(),
+                dataset_id: graph.id,
+                dataset_name: graph.name.clone(),
+                belongs_to: n.belongs_to.clone(),
+                partition_label: None,
+                is_partition: n.is_partition,
+            },
+        );
+    }
+    for node in nodes.values_mut() {
+        if let Some(parent) = node.belongs_to.as_ref() {
+            if let Some(label) = partitions.get(parent) {
+                node.partition_label = Some(label.clone());
+            }
+        }
+    }
+
+    let mut edges: IndexMap<String, SequenceEdge> = IndexMap::new();
+    for e in &edge_models {
+        let edge_id = if e.external_id.is_empty() {
+            format!("{}:{}", e.source, e.target)
+        } else {
+            e.external_id.clone()
+        };
+        edges.insert(
+            edge_id.clone(),
+            SequenceEdge {
+                id: edge_id,
+                source: e.source.clone(),
+                target: e.target.clone(),
+                label: e.label.clone().unwrap_or_default(),
+                comment: e.comment.clone().filter(|c| !c.trim().is_empty()),
+                dataset_id: graph.id,
+                dataset_name: graph.name.clone(),
+            },
+        );
+    }
+
+    Ok(Some(ParsedDatasetContext {
+        dataset_id: graph.id,
+        name: graph.name,
+        nodes,
+        edges,
+        partitions,
+    }))
 }
 
 pub fn parse_story_layer_config(value: &str) -> Vec<StoryLayerConfig> {
@@ -883,5 +979,71 @@ mod story_participant_tests {
             warnings.iter().any(|w| w.contains("all 1 step(s) were skipped")),
             "expected an empty-sequence warning, got: {warnings:?}"
         );
+    }
+}
+
+#[cfg(test)]
+mod graph_source_tests {
+    use super::*;
+    use crate::database::entities::{
+        graph_data, graph_data_edges, graph_data_nodes, projects, stories,
+    };
+    use crate::database::test_utils::setup_test_db;
+    use chrono::Utc;
+    use sea_orm::{ActiveModelTrait, Set};
+
+    #[tokio::test]
+    async fn story_sources_edges_from_a_computed_graph() {
+        let db = setup_test_db().await;
+        projects::ActiveModel {
+            id: Set(1), name: Set("P".into()), description: Set(None), tags: Set("[]".into()),
+            import_export_path: Set(None), created_at: Set(Utc::now().into()), updated_at: Set(Utc::now().into()),
+        }.insert(&db).await.unwrap();
+
+        // A computed graph (graph_data id 500) with 2 nodes + 1 edge.
+        graph_data::ActiveModel {
+            id: Set(500), project_id: Set(1), name: Set("merged".into()),
+            source_type: Set("computed".into()), dag_node_id: Set(Some("gnode".into())),
+            last_edit_sequence: Set(0), has_pending_edits: Set(false),
+            node_count: Set(2), edge_count: Set(1), status: Set("active".into()),
+            created_at: Set(Utc::now()), updated_at: Set(Utc::now()),
+            ..Default::default()
+        }.insert(&db).await.unwrap();
+        for (ext, label) in [("a", "Alice"), ("b", "Bob")] {
+            graph_data_nodes::ActiveModel {
+                graph_data_id: Set(500), external_id: Set(ext.into()), label: Set(Some(label.into())),
+                layer: Set(None), weight: Set(Some(1.0)), is_partition: Set(false),
+                belongs_to: Set(None), comment: Set(None), source_dataset_id: Set(None),
+                attributes: Set(None), created_at: Set(Utc::now()),
+                ..Default::default()
+            }.insert(&db).await.unwrap();
+        }
+        graph_data_edges::ActiveModel {
+            graph_data_id: Set(500), external_id: Set("e1".into()), source: Set("a".into()),
+            target: Set("b".into()), label: Set(Some("calls".into())), layer: Set(None),
+            weight: Set(Some(1.0)), comment: Set(None), source_dataset_id: Set(None),
+            attributes: Set(None), created_at: Set(Utc::now()),
+            ..Default::default()
+        }.insert(&db).await.unwrap();
+
+        // Story sources from the computed graph (not a dataset), sequence uses e1.
+        stories::ActiveModel {
+            id: Set(1), project_id: Set(1), name: Set("S".into()), description: Set(None),
+            tags: Set("[]".into()), enabled_dataset_ids: Set("[]".into()),
+            enabled_graph_ids: Set("[500]".into()), layer_config: Set("[]".into()),
+            created_at: Set(Utc::now().into()), updated_at: Set(Utc::now().into()),
+        }.insert(&db).await.unwrap();
+        sequences::ActiveModel {
+            id: Set(1), story_id: Set(1), name: Set("seq".into()), description: Set(None),
+            enabled_dataset_ids: Set("[500]".into()),
+            edge_order: Set(r#"[{"datasetId":500,"edgeId":"e1"}]"#.into()),
+            created_at: Set(Utc::now()), updated_at: Set(Utc::now()),
+        }.insert(&db).await.unwrap();
+
+        let ctx = build_story_context(&db, 1, 1).await.unwrap();
+        assert_eq!(ctx.participants.len(), 2, "expected Alice+Bob from computed graph");
+        assert_eq!(ctx.sequences[0].steps.len(), 1);
+        assert_eq!(ctx.sequences[0].steps[0].label, "calls");
+        assert!(ctx.warnings.is_empty(), "warnings: {:?}", ctx.warnings);
     }
 }
