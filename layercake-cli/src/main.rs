@@ -11,6 +11,7 @@ use layercake_server::server;
 #[cfg(feature = "console")]
 mod console;
 
+mod db_info;
 mod doc;
 mod query;
 mod query_payloads;
@@ -124,6 +125,15 @@ enum DbCommands {
         #[clap(short, long, default_value = "layercake.db")]
         database: String,
     },
+    /// Show the database file location and size (filesystem-only, safe while a
+    /// server has the DB open)
+    Info {
+        #[clap(short, long, default_value = "layercake.db")]
+        database: String,
+        /// Emit machine-readable JSON
+        #[clap(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -214,6 +224,9 @@ async fn main() -> Result<()> {
             } => {
                 info!("Running database migration: {:?}", direction);
                 server::migrate_database(&database, direction).await?;
+            }
+            DbCommands::Info { database, json } => {
+                db_info::run(&database, json)?;
             }
         },
         Commands::CodeAnalysis(args) => {

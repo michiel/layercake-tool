@@ -121,7 +121,9 @@ Build the GraphQL schema standalone (no DB context) in the CLI (depends on `laye
 ### Stage 3 — `layercake db info [--database] [--json]`
 Resolve DB path; print path/existence/size (+ optional key-table row counts) as text or JSON.
 **Verify:** against a scratch DB and a missing path.
-**Status:** Not Started
+**Status:** Complete
+
+**Notes:** `db_info.rs` reports path/absolute/exists/size, filesystem-only (safe while server holds the DB). Added `DbCommands::Info { database, json }`. `docs-tool/command/db.md`. Verified text + `--json` + missing-file. Deferred `--stats` (table row counts, needs a read-only connection) as not needed now.
 
 ### Stage 4 — `layercake api info` + `layercake api call`
 `api info [--host --port] [--json]` prints endpoints (`/graphql`, `/graphql/ws`, `/health`), the `x-layercake-session` header name, resolved DB path. `api call --query [--variables] [--url]` POSTs a GraphQL op to a running server, prints JSON. Reuse `reqwest` (already a dep).
@@ -141,6 +143,7 @@ Complete all workflow/command md files; cross-reference; document the `query`-vs
 **Status:** Not Started
 
 ### Stage 7 (group C) — Remove the `code-analysis` feature
+**On its own branch/PR** (`feat/remove-code-analysis`, off master) per user decision — not on this branch.
 Delete the crate + server/core/frontend files; apply the careful registration edits (see the code-analysis section). **Keep the historical DB migration.** Remove frontend routes/nav/imports.
 **Verify:** `cargo build --workspace` + `cargo tree | grep code.analysis` empty (except kept migration); `tsc --noEmit`; server tests pass; migrations still run against an existing DB.
 **Status:** Not Started
