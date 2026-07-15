@@ -6,8 +6,11 @@ database is required, because the type system does not depend on runtime data.
 ## Usage
 
 ```bash
-layercake schema dump            # GraphQL SDL (schema definition language)
-layercake schema dump --json     # introspection JSON (for codegen/tooling)
+layercake schema dump                 # full GraphQL SDL
+layercake schema dump --json          # introspection JSON (for codegen/tooling)
+layercake schema dump --only-inputs   # just the input object types
+layercake schema dump --only-mutations# just the Mutation root
+layercake schema type <Name>          # one type's SDL, e.g. SequenceEdgeRefInput
 ```
 
 ## Examples

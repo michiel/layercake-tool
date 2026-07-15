@@ -64,6 +64,95 @@ impl AppContext {
         Ok(project.map(ProjectSummary::from))
     }
 
+    /// Export a full project (datasets, plan DAG, stories, sequences, layers) as
+    /// a single JSON document — for snapshotting a session or reproducing a bug.
+    /// Read access is authorized on the project.
+    pub async fn export_project_json(
+        &self,
+        actor: &Actor,
+        project_id: i32,
+    ) -> CoreResult<serde_json::Value> {
+        use crate::database::entities::{
+            data_sets, plan_dag_edges, plan_dag_nodes, plans, project_layers, sequences, stories,
+        };
+        use sea_orm::{ColumnTrait, QueryFilter};
+
+        self.authorize_project_read(actor, project_id).await?;
+
+        fn load_err(what: &'static str) -> impl Fn(sea_orm::DbErr) -> CoreError {
+            move |e| CoreError::internal(format!("export: {}: {}", what, e))
+        }
+
+        let project = projects::Entity::find_by_id(project_id)
+            .one(&self.db)
+            .await
+            .map_err(load_err("project"))?
+            .ok_or_else(|| CoreError::not_found("Project", project_id.to_string()))?;
+
+        let datasets = data_sets::Entity::find()
+            .filter(data_sets::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(load_err("datasets"))?;
+
+        let plan_models = plans::Entity::find()
+            .filter(plans::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(load_err("plans"))?;
+        let plan_ids: Vec<i32> = plan_models.iter().map(|p| p.id).collect();
+
+        let (dag_nodes, dag_edges) = if plan_ids.is_empty() {
+            (Vec::new(), Vec::new())
+        } else {
+            let nodes = plan_dag_nodes::Entity::find()
+                .filter(plan_dag_nodes::Column::PlanId.is_in(plan_ids.clone()))
+                .all(&self.db)
+                .await
+                .map_err(load_err("plan_dag_nodes"))?;
+            let edges = plan_dag_edges::Entity::find()
+                .filter(plan_dag_edges::Column::PlanId.is_in(plan_ids.clone()))
+                .all(&self.db)
+                .await
+                .map_err(load_err("plan_dag_edges"))?;
+            (nodes, edges)
+        };
+
+        let story_models = stories::Entity::find()
+            .filter(stories::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(load_err("stories"))?;
+        let story_ids: Vec<i32> = story_models.iter().map(|s| s.id).collect();
+        let sequence_models = if story_ids.is_empty() {
+            Vec::new()
+        } else {
+            sequences::Entity::find()
+                .filter(sequences::Column::StoryId.is_in(story_ids))
+                .all(&self.db)
+                .await
+                .map_err(load_err("sequences"))?
+        };
+
+        let layers = project_layers::Entity::find()
+            .filter(project_layers::Column::ProjectId.eq(project_id))
+            .all(&self.db)
+            .await
+            .map_err(load_err("project_layers"))?;
+
+        Ok(serde_json::json!({
+            "formatVersion": 1,
+            "project": project,
+            "datasets": datasets,
+            "plans": plan_models,
+            "planDagNodes": dag_nodes,
+            "planDagEdges": dag_edges,
+            "stories": story_models,
+            "sequences": sequence_models,
+            "projectLayers": layers,
+        }))
+    }
+
     pub async fn create_project(
         &self,
         actor: &Actor,

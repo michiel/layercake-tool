@@ -13,6 +13,8 @@ pub struct Model {
     pub tags: String, // JSON array of strings
     #[sea_orm(column_type = "Text", default_value = "[]")]
     pub enabled_dataset_ids: String, // JSON array of dataset IDs
+    #[sea_orm(column_type = "Text", default_value = "[]")]
+    pub enabled_graph_ids: String, // JSON array of computed graph_data IDs
     #[sea_orm(column_type = "Text", default_value = "{}")]
     pub layer_config: String, // JSON layer configuration
     pub created_at: ChronoDateTimeUtc,

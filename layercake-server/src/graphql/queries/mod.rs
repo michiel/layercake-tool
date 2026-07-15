@@ -67,6 +67,20 @@ impl Query {
         Ok(project.map(Project::from))
     }
 
+    /// Export a full project (datasets, plan DAG, stories, sequences, layers)
+    /// as a JSON string — for snapshotting a session or reproducing a bug.
+    #[graphql(name = "exportProject")]
+    async fn export_project(&self, ctx: &Context<'_>, id: i32) -> Result<String> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let value = context
+            .app
+            .export_project_json(&actor, id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+        serde_json::to_string(&value).map_err(|e| e.into())
+    }
+
     async fn graph_summary(&self, ctx: &Context<'_>, dataset_id: i32) -> Result<GraphSummary> {
         let context = ctx.data::<GraphQLContext>()?;
         let summary = context
@@ -166,6 +180,25 @@ impl Query {
         let sequence = sequences::Entity::find_by_id(id).one(&context.db).await?;
 
         Ok(sequence.map(Sequence::from))
+    }
+
+    /// Build a story's sequence render context and return it as a JSON string,
+    /// without going through the Handlebars template. Lets a client render the
+    /// diagram itself, or inspect participants/steps/warnings directly.
+    #[graphql(name = "previewStoryContext")]
+    async fn preview_story_context(
+        &self,
+        ctx: &Context<'_>,
+        #[graphql(name = "projectId")] project_id: i32,
+        #[graphql(name = "storyId")] story_id: i32,
+    ) -> Result<String> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        context
+            .app
+            .preview_story_context_json(&actor, project_id, story_id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)
     }
 
     /// List project-wide layers (project palette)

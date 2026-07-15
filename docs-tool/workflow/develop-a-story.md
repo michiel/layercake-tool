@@ -5,6 +5,18 @@ Stories turn graph nodes and edges into **sequence diagrams with commentary** �
 a core use case: you read a dataset's graph, choose an ordered path of edges,
 attach commentary, and render a sequence diagram.
 
+## Sourcing: datasets vs computed graphs
+
+A story sources its edges from either:
+- **`enabledDatasetIds`** — raw dataset PKs (`data_sets`), or
+- **`enabledGraphIds`** — computed graph ids (`graph_data`, a GraphNode's
+  output). Use this to build a story from a *merged* graph rather than raw
+  datasets.
+
+A `SequenceEdgeRef.datasetId` may be either a dataset id OR a computed graph id;
+whatever you enabled on the story. (Frontend picker for computed graphs is a
+follow-up — set `enabledGraphIds` via the API for now.)
+
 ## Mental model
 
 - A **Story** is a curated collection of **Sequences** (belongs to a project,
@@ -119,6 +131,21 @@ sequenceDiagram
   user->>cart: add item
   ...
 ```
+
+## Preview without rendering
+
+To inspect the resolved participants/steps/warnings (or render the diagram
+yourself client-side) without the Handlebars template:
+
+```bash
+layercake api call --query '
+  query($p:Int!,$s:Int!){ previewStoryContext(projectId:$p, storyId:$s) }' \
+  --variables '{"p":1,"s":42}'
+```
+
+Returns the `SequenceStoryContext` as JSON (participants, sequences[].steps,
+and any build `warnings`). If `steps` is empty or `warnings` is non-empty, the
+diagram will be blank — run `layercake doctor --project <id>` to see why.
 
 ## Summary of the ops, in order
 

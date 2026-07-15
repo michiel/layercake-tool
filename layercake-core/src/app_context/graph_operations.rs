@@ -434,6 +434,18 @@ impl AppContext {
             .map_err(|e| CoreError::internal("Failed to update graph data").with_source(e))
     }
 
+    /// Delete computed graphs whose originating DAG node no longer exists.
+    /// Returns the pruned graph ids.
+    pub async fn prune_orphaned_graphs(
+        &self,
+        actor: &Actor,
+        project_id: i32,
+    ) -> CoreResult<Vec<i32>> {
+        self.authorize_project_write(actor, project_id).await?;
+        let service = crate::services::GraphDataService::new(self.db.clone());
+        service.prune_orphaned_graphs(project_id).await
+    }
+
     pub async fn replay_graph_data_edits(
         &self,
         actor: &Actor,

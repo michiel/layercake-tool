@@ -319,6 +319,7 @@ mod tests {
             description: Set(None),
             tags: Set("[]".into()),
             enabled_dataset_ids: Set("[10]".into()),
+            enabled_graph_ids: Set("[]".into()),
             layer_config: Set("[]".into()),
             created_at: Set(Utc::now().into()),
             updated_at: Set(Utc::now().into()),
