@@ -111,6 +111,28 @@ impl PlanDagNodesMutation {
         Ok(Some(PlanDagNode::from(updated)))
     }
 
+    /// Rename a Plan DAG node to a new (human-readable) id. Rewrites every
+    /// reference: connected edges and any computed graph's origin. Fails if the
+    /// new id already exists in the plan.
+    #[graphql(name = "renamePlanDagNode")]
+    async fn rename_plan_dag_node(
+        &self,
+        ctx: &Context<'_>,
+        project_id: i32,
+        plan_id: Option<i32>,
+        #[graphql(name = "oldId")] old_id: String,
+        #[graphql(name = "newId")] new_id: String,
+    ) -> Result<Option<PlanDagNode>> {
+        let context = ctx.data::<GraphQLContext>()?;
+        let actor = context.actor_for_request(ctx).await;
+        let renamed = context
+            .app
+            .rename_plan_dag_node(&actor, project_id, plan_id, old_id, new_id)
+            .await
+            .map_err(crate::graphql::errors::core_error_to_graphql_error)?;
+        Ok(Some(PlanDagNode::from(renamed)))
+    }
+
     /// Delete a Plan DAG node
     async fn delete_plan_dag_node(
         &self,
