@@ -38,6 +38,23 @@ const buildInitialConfig = (rawConfig: SequenceArtefactNodeConfig): SequenceArte
   useStoryLayers: rawConfig.useStoryLayers ?? true,
 });
 
+// The server rejects a renderTarget whose outputPath extension doesn't match
+// (MermaidSequence → .mmd/.md, PlantUmlSequence → .puml/.txt). Keep the two in
+// sync so switching the target doesn't produce a save error.
+const extensionForTarget = (target: SequenceArtefactRenderTarget): string =>
+  target === 'PlantUmlSequence' ? 'puml' : 'mmd';
+
+const syncOutputPathExtension = (
+  outputPath: string,
+  target: SequenceArtefactRenderTarget
+): string => {
+  if (!outputPath) return outputPath; // empty → server auto-generates
+  const ext = extensionForTarget(target);
+  return /\.[^./\\]+$/.test(outputPath)
+    ? outputPath.replace(/\.[^./\\]+$/, `.${ext}`) // swap existing extension
+    : `${outputPath}.${ext}`; // append when none
+};
+
 export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfigFormProps> = ({
   config,
   setConfig,
@@ -265,10 +282,16 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
             <Select
               value={localConfig.renderTarget}
               onValueChange={(value) =>
-                updateConfigState(prev => ({
-                  ...prev,
-                  renderTarget: value as SequenceArtefactRenderTarget,
-                }))
+                updateConfigState(prev => {
+                  const renderTarget = value as SequenceArtefactRenderTarget;
+                  return {
+                    ...prev,
+                    renderTarget,
+                    // Keep the output extension consistent with the target so
+                    // the server's renderTarget↔extension validation passes.
+                    outputPath: syncOutputPathExtension(prev.outputPath, renderTarget),
+                  };
+                })
               }
             >
               <SelectTrigger id="render-target">
