@@ -40,9 +40,16 @@ pub struct AppState {
     pub projections_schema: ProjectionsSchema,
     #[allow(dead_code)] // Exposed for future REST handlers or tests
     pub projection_service: Arc<ProjectionService>,
+    /// The database path this server was started with, surfaced on /health so
+    /// tools like `layercake doctor --port N` can resolve it cwd-independently.
+    pub database_path: String,
 }
 
-pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Result<Router> {
+pub async fn create_app(
+    db: DatabaseConnection,
+    cors_origin: Option<&str>,
+    database_path: String,
+) -> Result<Router> {
     let system_settings = Arc::new(
         SystemSettingsService::new(db.clone())
             .await
@@ -125,6 +132,7 @@ pub async fn create_app(db: DatabaseConnection, cors_origin: Option<&str>) -> Re
         coordinator_handle,
         projections_schema,
         projection_service,
+        database_path,
     };
 
     let cors = match cors_origin {

@@ -6,13 +6,19 @@ otherwise only surface as a silently empty diagram or a stale computed graph.
 ## Usage
 
 ```bash
-layercake doctor --project 36                 # human-readable report
+layercake doctor --project 36                 # resolves the DB from a running server
+layercake doctor --project 36 --port 3001     # …on a non-default port
+layercake doctor --project 36 --database ./my.db   # or point at the file directly
 layercake doctor --project 36 --json          # machine-readable
-layercake doctor --project 36 --database ./my.db
+layercake doctor --project 36 --strict        # exit non-zero on warnings too (CI)
 ```
 
-Exits non-zero if any **error**-severity finding is present (so CI/scripts can
-gate on it).
+If `--database` is omitted, the DB path is resolved from a running server's
+`/health` (via `--host`/`--port`/`--url`), so `doctor` works from any directory
+when the server is up — no need to be in the same folder as `layercake.db`.
+
+Exits non-zero if any **error**-severity finding is present; with `--strict`,
+any **warning** also fails.
 
 ## Checks
 

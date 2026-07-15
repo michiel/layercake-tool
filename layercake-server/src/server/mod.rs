@@ -44,7 +44,7 @@ pub async fn start_server(
         Err(e) => warn!("Failed to reconcile interrupted graph executions: {}", e),
     }
 
-    let app = app::create_app(db, cors_origin).await?;
+    let app = app::create_app(db, cors_origin, database_path.to_string()).await?;
 
     // Log all HTTP routes dynamically
     log_routes(port);
