@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Spinner } from '@/components/ui/spinner'
 import { GET_STORY, UPDATE_STORY, Story, StoryLayerConfig, UpdateStoryInput } from '@/graphql/stories'
 import { GET_DATASOURCES, DataSet } from '@/graphql/datasets'
+import { GET_GRAPHS } from '@/graphql/graphs'
 import { StorySequencesEditor } from '@/components/stories/StorySequencesEditor'
 import { StoryLayersTab } from '@/components/stories/StoryLayersTab'
 
@@ -60,6 +61,7 @@ export const StoryPage = () => {
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [enabledDatasetIds, setEnabledDatasetIds] = useState<number[]>([])
+  const [enabledGraphIds, setEnabledGraphIds] = useState<number[]>([])
   const [layerConfig, setLayerConfig] = useState<StoryLayerConfig[]>([])
   const [hasChanges, setHasChanges] = useState(false)
 
@@ -78,6 +80,14 @@ export const StoryPage = () => {
     skip: !projectIdNum,
   })
   const allDatasets: DataSet[] = (datasetsData as any)?.dataSets || []
+
+  const { data: graphsData } = useQuery(GET_GRAPHS, {
+    variables: { projectId: projectIdNum },
+    skip: !projectIdNum,
+  })
+  // Computed graphs (a GraphNode's output) the story can also source edges from.
+  const graphs: Array<{ id: number; name: string; nodeCount?: number; edgeCount?: number }> =
+    ((graphsData as any)?.graphs || []).filter((g: any) => (g.edgeCount || 0) > 0)
 
   // Filter to only show datasets with edge data
   const datasets = allDatasets.filter((ds) => {
@@ -107,6 +117,7 @@ export const StoryPage = () => {
       setDescription(story.description || '')
       setTagsInput(story.tags.join(', '))
       setEnabledDatasetIds(story.enabledDatasetIds)
+      setEnabledGraphIds(story.enabledGraphIds || [])
       setLayerConfig(story.layerConfig || [])
       setHasChanges(false)
     }
@@ -129,6 +140,7 @@ export const StoryPage = () => {
       description: description || undefined,
       tags,
       enabledDatasetIds,
+      enabledGraphIds,
       layerConfig: cleanLayerConfig,
     }
 
@@ -150,6 +162,13 @@ export const StoryPage = () => {
       prev.includes(datasetId)
         ? prev.filter((id) => id !== datasetId)
         : [...prev, datasetId]
+    )
+    setHasChanges(true)
+  }
+
+  const toggleGraph = (graphId: number) => {
+    setEnabledGraphIds((prev) =>
+      prev.includes(graphId) ? prev.filter((id) => id !== graphId) : [...prev, graphId]
     )
     setHasChanges(true)
   }
@@ -341,6 +360,36 @@ export const StoryPage = () => {
                     </div>
                   ))}
                 </Stack>
+              )}
+
+              {graphs.length > 0 && (
+                <>
+                  <p className="text-sm font-medium mt-6 mb-1">Computed graphs</p>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    A story can also source edges from a computed graph (a GraphNode's
+                    merged/transformed output), not just raw datasets.
+                  </p>
+                  <Stack gap="sm">
+                    {graphs.map((graph) => (
+                      <div key={graph.id} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`graph-${graph.id}`}
+                          checked={enabledGraphIds.includes(graph.id)}
+                          onCheckedChange={() => toggleGraph(graph.id)}
+                        />
+                        <label
+                          htmlFor={`graph-${graph.id}`}
+                          className="flex-1 text-sm cursor-pointer"
+                        >
+                          <div className="font-medium">{graph.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {graph.nodeCount || 0} nodes, {graph.edgeCount || 0} edges (computed)
+                          </div>
+                        </label>
+                      </div>
+                    ))}
+                  </Stack>
+                </>
               )}
             </CardContent>
           </Card>

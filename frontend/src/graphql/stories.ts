@@ -10,6 +10,7 @@ export const LIST_STORIES = gql`
       description
       tags
       enabledDatasetIds
+      enabledGraphIds
       layerConfig {
         sourceDatasetId
         mode
@@ -31,6 +32,7 @@ export const GET_STORY = gql`
       description
       tags
       enabledDatasetIds
+      enabledGraphIds
       layerConfig {
         sourceDatasetId
         mode
@@ -52,6 +54,7 @@ export const CREATE_STORY = gql`
       description
       tags
       enabledDatasetIds
+      enabledGraphIds
       layerConfig {
         sourceDatasetId
         mode
@@ -73,6 +76,7 @@ export const UPDATE_STORY = gql`
       description
       tags
       enabledDatasetIds
+      enabledGraphIds
       layerConfig {
         sourceDatasetId
         mode
@@ -108,6 +112,7 @@ export interface Story {
   description: string | null
   tags: string[]
   enabledDatasetIds: number[]
+  enabledGraphIds: number[]
   layerConfig: StoryLayerConfig[]
   sequenceCount: number
   createdAt: string
@@ -120,6 +125,7 @@ export interface CreateStoryInput {
   description?: string
   tags?: string[]
   enabledDatasetIds?: number[]
+  enabledGraphIds?: number[]
   layerConfig?: StoryLayerConfig[]
 }
 
@@ -128,6 +134,7 @@ export interface UpdateStoryInput {
   description?: string
   tags?: string[]
   enabledDatasetIds?: number[]
+  enabledGraphIds?: number[]
   layerConfig?: StoryLayerConfig[]
 }
 
