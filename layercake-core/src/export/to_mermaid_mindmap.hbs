@@ -1,5 +1,5 @@
 ---
-{{#if graph_name}}title: {{graph_name}}
+{{#if graph_name}}title: {{{yaml_quote graph_name}}}
 {{/if}}{{#with config.target_options.mermaid as |mm|}}
 config:
   theme: {{mm.theme}}

@@ -67,4 +67,13 @@ you stop it (Ctrl-C). See `layercake doc workflow join-as-collaborator`.
   no server. Use `api call` when a server is up and you want live UI updates.
 - Mutations broadcast deltas to connected browsers automatically — no extra step
   is needed for the edit to appear live.
+- **`metadata` needs a subfield selection**: query it as `metadata { label description }`
+  and write it as `{ label description }`. A bare `metadata` errors with the
+  generic GraphQL "must have a selection of subfields".
+- Node **`id`s are user-choosable and idempotent** — pass your own string id and
+  the server keeps it. Edges without ids get generated `edge_XXXX` ids.
+- To join a node to its dataset PK, read `PlanDagNode.linkedDataSetId` rather than
+  parsing `config` by hand.
+- Node types, their config, and io: `layercake doc guide node-types`. The
+  `graphJson` shape: `layercake doc guide graph-json`.
 - Full API surface: `layercake schema dump`. Endpoints/headers: `layercake api info`.

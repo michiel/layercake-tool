@@ -82,6 +82,23 @@ impl Story {
 
         Ok(count as i32)
     }
+
+    /// The sequences that belong to this story, ordered by id.
+    async fn sequences(&self, ctx: &Context<'_>) -> Result<Vec<crate::graphql::types::Sequence>> {
+        use sea_orm::{ColumnTrait, QueryFilter, QueryOrder};
+
+        let context = ctx.data::<GraphQLContext>()?;
+        let models = sequences::Entity::find()
+            .filter(sequences::Column::StoryId.eq(self.id))
+            .order_by_asc(sequences::Column::Id)
+            .all(&context.db)
+            .await?;
+
+        Ok(models
+            .into_iter()
+            .map(crate::graphql::types::Sequence::from)
+            .collect())
+    }
 }
 
 #[derive(InputObject)]

@@ -4,6 +4,7 @@ use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 
 use crate::graphql::context::GraphQLContext;
 use crate::graphql::errors::StructuredError;
+use crate::graphql::types::sequence::edge_refs_to_persisted_json;
 use crate::graphql::types::{CreateSequenceInput, Sequence, UpdateSequenceInput};
 use layercake_core::database::entities::sequences;
 
@@ -33,7 +34,7 @@ impl SequenceMutation {
                 ))
             })?;
 
-        let edge_order_json = serde_json::to_string(&input.edge_order.unwrap_or_default())
+        let edge_order_json = edge_refs_to_persisted_json(input.edge_order.unwrap_or_default())
             .map_err(|e| {
                 StructuredError::bad_request(format!("Failed to serialize edge_order: {}", e))
             })?;
@@ -98,7 +99,7 @@ impl SequenceMutation {
         }
 
         if let Some(edge_order) = input.edge_order {
-            let json = serde_json::to_string(&edge_order).map_err(|e| {
+            let json = edge_refs_to_persisted_json(edge_order).map_err(|e| {
                 StructuredError::bad_request(format!("Failed to serialize edge_order: {}", e))
             })?;
             sequence.edge_order = Set(json);

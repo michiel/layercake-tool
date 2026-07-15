@@ -292,6 +292,9 @@ impl DagExecutor {
                     .story_id
                     .ok_or_else(|| anyhow!("Story node {} is not configured", node_id))?;
                 let story_context = build_story_context(&self.db, project_id, story_id).await?;
+                for warning in &story_context.warnings {
+                    tracing::warn!(node = %node_id, story = story_id, "{}", warning);
+                }
                 self.persist_story_context(project_id, node_id, story_id, &story_context)
                     .await?;
             }

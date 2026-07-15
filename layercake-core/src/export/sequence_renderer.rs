@@ -236,4 +236,48 @@ mod tests {
         // Partition box grouping with layer colour.
         assert!(out.contains(r#"box "Group One" #00ff00"#), "{out}");
     }
+
+    fn ctx_with_note(position: &str) -> SequenceRenderContext {
+        let mut ctx = SequenceRenderContext::default();
+        ctx.config.show_notes = true;
+        ctx.participants = vec![participant("a", "A", None), participant("b", "B", None)];
+        ctx.first_participant_alias = Some("a".into());
+        ctx.last_participant_alias = Some("b".into());
+        ctx.sequences = vec![SequenceRender {
+            id: 1,
+            name: "S".into(),
+            description: None,
+            steps: vec![SequenceStep {
+                id: "s".into(),
+                dataset_id: 1,
+                dataset_name: "d".into(),
+                source: SequenceParticipantRef { alias: "a".into(), label: "A".into() },
+                target: SequenceParticipantRef { alias: "b".into(), label: "B".into() },
+                label: "x".into(),
+                note: Some("N".into()),
+                note_position: Some(position.into()),
+            }],
+        }];
+        ctx
+    }
+
+    // Regression for the {{else if}} mis-route: handlebars-rust treats a
+    // block-standalone `{{else if}}` as a plain `{{else}}`, so the "target"
+    // branch was dead and always fell through to "both". Nested else/if fixes it.
+    #[test]
+    fn note_position_routes_correctly_mermaid() {
+        let src = to_mermaid_sequence::render(&ctx_with_note("source")).unwrap();
+        assert!(src.contains("Note over a: N") && !src.contains("Note over a,b: N"), "{src}");
+        let tgt = to_mermaid_sequence::render(&ctx_with_note("target")).unwrap();
+        assert!(tgt.contains("Note over b: N") && !tgt.contains("Note over a,b: N"), "{tgt}");
+        let both = to_mermaid_sequence::render(&ctx_with_note("both")).unwrap();
+        assert!(both.contains("Note over a,b: N"), "{both}");
+    }
+
+    #[test]
+    fn note_position_routes_correctly_plantuml() {
+        let tgt = to_plantuml_sequence::render(&ctx_with_note("target")).unwrap();
+        assert!(tgt.contains("note over b\nN"), "{tgt}");
+        assert!(!tgt.contains("note over a,b\nN"), "{tgt}");
+    }
 }
