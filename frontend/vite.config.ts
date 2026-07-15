@@ -2,20 +2,14 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-const isTauri =
-  Boolean(process.env.TAURI_CONFIG_DIR) ||
-  process.env.TAURI === 'true' ||
-  Boolean(process.env.TAURI_PLATFORM) ||
-  Boolean(process.env.TAURI_ENV_PLATFORM)
-
 const alias: Record<string, string> = {
   '@': path.resolve(__dirname, './src'),
   'web-worker': path.resolve(__dirname, 'src/utils/dummy-web-worker.js'),
 }
 
-if (!isTauri) {
-  alias['@tauri-apps/api/core'] = path.resolve(__dirname, 'src/utils/tauri-api-mock.js')
-}
+// In dev, the Vite server proxies API traffic to the Rust server so the app can
+// use same-origin relative endpoints (matching the embedded production build).
+const apiTarget = process.env.VITE_API_BASE_URL || 'http://localhost:3001'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -28,10 +22,9 @@ export default defineConfig({
       port: 1421,
     },
     proxy: {
-      '/api': {
-        target: process.env.VITE_API_BASE_URL || 'http://localhost:3001',
-        changeOrigin: true,
-      },
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/graphql': { target: apiTarget, changeOrigin: true, ws: true },
+      '/projections': { target: apiTarget, changeOrigin: true, ws: true },
     },
   },
   build: {

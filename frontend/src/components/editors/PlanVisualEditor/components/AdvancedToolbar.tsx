@@ -35,7 +35,6 @@ interface AdvancedToolbarProps {
   onClear: () => void;
 }
 
-const isTauri = !!(window as any).__TAURI__;
 
 export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
   readonly = false,
@@ -132,7 +131,7 @@ export const AdvancedToolbar: React.FC<AdvancedToolbarProps> = ({
                     variant="secondary"
                     className="h-7 w-7 cursor-grab text-white hover:opacity-80"
                     style={{ backgroundColor: nodeType.color }}
-                    draggable={!isTauri}
+                    draggable
                     onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
                     onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
                   >

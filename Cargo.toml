@@ -5,7 +5,6 @@ members = [
     "layercake-core",
     "layercake-server",
     "layercake-test-utils",
-    "src-tauri",
     "layercake-projections",
     "layercake-integration-tests",
 ]
@@ -81,9 +80,3 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 
 # Agent integration dependencies
 rig = { version = "0.25.0", package = "rig-core" }
-
-# Tauri dependencies
-tauri = { version = "2.0", features = ["macos-private-api"] }
-tauri-build = { version = "2.0", features = [] }
-tauri-plugin-dialog = { version = "2.0" }
-tauri-plugin-shell = { version = "2.0" }

@@ -598,27 +598,6 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
-                      variant={isActiveRoute('/settings/database') ? 'default' : 'ghost'}
-                      className={navCollapsed ? 'justify-center px-2' : 'w-full justify-start'}
-                      asChild
-                    >
-                      <Link to="/settings/database">
-                        {navCollapsed ? (
-                          <IconSettings className="h-4 w-4" />
-                        ) : (
-                          <>
-                            <IconSettings className="h-4 w-4 mr-2" />
-                            Database Settings
-                          </>
-                        )}
-                      </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Database Settings</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
                       variant={isActiveRoute('/settings/system') ? 'default' : 'ghost'}
                       className={`${navCollapsed ? 'justify-center px-2' : 'w-full justify-start'} mt-2`}
                       asChild
@@ -2104,7 +2083,6 @@ const LegacyPlanRedirect = () => {
 
 import { GraphsPage } from './components/graphs/GraphsPage'
 import { GraphEditorPage } from './pages/GraphEditorPage'
-import { DatabaseSettings } from './components/settings/DatabaseSettings'
 import { SystemSettingsPage } from './pages/SystemSettingsPage'
 import PageContainer from './components/layout/PageContainer'
 import { EditProjectPage } from './pages/EditProjectPage'
@@ -2231,11 +2209,6 @@ function App() {
           <Route path="/projects/:projectId/datasets/:dataSetId/edit" element={
             <ErrorBoundary>
               <DataSetEditor />
-            </ErrorBoundary>
-          } />
-          <Route path="/settings/database" element={
-            <ErrorBoundary>
-              <DatabaseSettings />
             </ErrorBoundary>
           } />
           <Route path="/settings/system" element={

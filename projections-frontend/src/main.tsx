@@ -9,10 +9,15 @@ import { getMainDefinition } from '@apollo/client/utilities'
 import { createClient } from 'graphql-ws'
 import App from './app'
 
-// Get API base URL from query parameter (for Tauri) or environment variable (for web)
+// Resolve the API base URL. The viewer is normally served same-origin by the
+// layercake binary, so it defaults to window.location.origin. An explicit
+// `?apiBase=` query param or VITE_API_BASE_URL (dev) overrides that.
 const urlParams = new URLSearchParams(window.location.search)
 const apiBaseFromUrl = urlParams.get('apiBase')
-const baseUrl = apiBaseFromUrl || (import.meta.env.VITE_API_BASE_URL as string | undefined) || 'http://localhost:3001'
+const baseUrl =
+  apiBaseFromUrl ||
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+  window.location.origin
 console.log('[Projections Viewer] Using API base URL:', baseUrl)
 
 const httpUrl = `${baseUrl}/projections/graphql`

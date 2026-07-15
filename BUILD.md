@@ -1,6 +1,6 @@
 # Layercake Build Guide
 
-This document describes how to build Layercake desktop application for different platforms.
+This document describes how to build Layercake, which ships as a single native `layercake` binary per platform. The web UI is compiled into the binary at build time, so the frontend must be built before the Rust build.
 
 ## Prerequisites
 
@@ -8,7 +8,6 @@ This document describes how to build Layercake desktop application for different
 
 - **Rust** (1.70+): Install from [rustup.rs](https://rustup.rs/)
 - **Node.js** (18+) and npm
-- **Tauri CLI**: Installed automatically via Cargo
 
 ### Platform-Specific
 
@@ -16,37 +15,24 @@ This document describes how to build Layercake desktop application for different
 ```bash
 # Debian/Ubuntu
 sudo apt update
-sudo apt install libwebkit2gtk-4.1-dev \
-  build-essential \
+sudo apt install build-essential \
   curl \
   wget \
   file \
-  libxdo-dev \
-  libssl-dev \
-  libayatana-appindicator3-dev \
-  librsvg2-dev
+  libssl-dev
 
 # Fedora
-sudo dnf install webkit2gtk4.1-devel \
-  openssl-devel \
+sudo dnf install openssl-devel \
   curl \
   wget \
-  file \
-  libappindicator-gtk3-devel \
-  librsvg2-devel
+  file
 
 # Arch
-sudo pacman -S webkit2gtk-4.1 \
-  base-devel \
+sudo pacman -S base-devel \
   curl \
   wget \
   file \
-  openssl \
-  appmenu-gtk-module \
-  gtk3 \
-  libappindicator-gtk3 \
-  librsvg \
-  libvips
+  openssl
 ```
 
 #### macOS
@@ -57,7 +43,6 @@ xcode-select --install
 
 #### Windows
 - **Visual Studio** (2019 or later) with C++ build tools
-- **WebView2**: Usually pre-installed on Windows 10/11
 
 ## Development Build
 
@@ -67,16 +52,13 @@ xcode-select --install
 # Install frontend dependencies
 npm run frontend:install
 
-# Run in development mode
-npm run tauri:dev
+# Run backend + Vite dev server together
+./dev.sh
 ```
 
-This will:
-1. Start the Vite dev server at `http://localhost:5173`
-2. Start the embedded backend server on port `3030`
-3. Launch the Tauri window pointed at the dev server
+`./dev.sh` runs the Rust backend on port `3001` and the Vite dev server on `1422`, streaming logs to `backend.log` and `frontend.log`.
 
-_Tip:_ Run `npm run frontend:dev` when you only need the standalone web app without the Tauri shell.
+Alternatively, run the two pieces yourself: start the Vite dev server with `npm run frontend:dev`, and run the backend with `layercake serve` (or `cargo run -p layercake-cli -- serve`).
 
 ### Backend Only
 
@@ -91,150 +73,58 @@ npm run backend:test
 ### Frontend Only
 
 ```bash
-# Development server (without Tauri)
+# Development server
 npm run frontend:dev
 
-# Production build
+# Production build (also embedded into the binary)
 npm run frontend:build
 ```
 
 ## Production Build
 
-### All Platforms (Quick)
+### Single Binary
+
+The web UI is embedded into the binary via `include_dir!`, so the frontend build MUST precede the cargo build. The `build:binary` script does both in order:
 
 ```bash
-# Build for current platform
-npm run tauri:build
+# Builds the frontend, then the release binary
+npm run build:binary
 ```
 
-### Platform-Specific Builds
-
-#### Linux
+This is equivalent to running the two steps manually:
 
 ```bash
-# Using build script
-npm run tauri:build:linux
-
-# Or manually
-cd src-tauri
-cargo tauri build
+npm run frontend:build                     # produces frontend/dist
+cargo build --release -p layercake-cli     # embeds frontend/dist into the binary
 ```
 
-**Output**:
-- AppImage: `src-tauri/target/release/bundle/appimage/`
-- Deb package: `src-tauri/target/release/bundle/deb/`
+**Output**: `target/release/layercake`
 
-**Supported Formats**:
-- AppImage (universal)
-- .deb (Debian/Ubuntu)
+Releases ship a single native binary per platform (linux-x86_64, windows-x86_64, macos-aarch64) through GitHub releases — there are no OS-native installers.
 
-#### macOS
+### Running the Binary
 
 ```bash
-# Using build script
-npm run tauri:build:macos
-
-# Or manually
-cd src-tauri
-cargo tauri build
+layercake serve --open
 ```
 
-**Output**:
-- App bundle: `src-tauri/target/release/bundle/macos/`
-- DMG: `src-tauri/target/release/bundle/dmg/`
-
-**Code Signing** (Optional but recommended for distribution):
-```bash
-# Set signing identity in tauri.conf.json
-# Or use environment variables
-export APPLE_CERTIFICATE="Developer ID Application: Your Name (TEAMID)"
-export APPLE_CERTIFICATE_PASSWORD="your-password"
-cargo tauri build
-```
-
-**Notarization** (Required for distribution):
-```bash
-# After building, notarize with Apple
-xcrun notarytool submit \
-  src-tauri/target/release/bundle/dmg/Layercake_0.1.7_aarch64.dmg \
-  --apple-id "your@email.com" \
-  --team-id "TEAMID" \
-  --password "app-specific-password" \
-  --wait
-
-# Staple the notarization
-xcrun stapler staple \
-  src-tauri/target/release/bundle/dmg/Layercake_0.1.7_aarch64.dmg
-```
-
-#### Windows
-
-```bash
-# Using build script (Git Bash or WSL)
-npm run tauri:build:windows
-
-# Or manually
-cd src-tauri
-cargo tauri build
-```
-
-**Output**:
-- MSI installer: `src-tauri/target/release/bundle/msi/`
-- NSIS installer: `src-tauri/target/release/bundle/nsis/` (if configured)
-
-**Code Signing** (Optional):
-1. Obtain a code signing certificate
-2. Update `tauri.conf.json` with certificate thumbprint
-3. Build as normal
+`--open` auto-launches the browser. By default the server binds to loopback (`127.0.0.1:3000`) for local-first use; pass `--host 0.0.0.0` to self-host or expose it on a network. Other flags: `--port`, `--database`, `--cors-origin`.
 
 ## Build Configuration
-
-### tauri.conf.json
-
-Key configuration options:
-
-```json
-{
-  "productName": "Layercake",
-  "version": "0.1.7",
-  "identifier": "com.layercake.app",
-  "build": {
-    "beforeDevCommand": "node ./scripts/run-frontend.js dev -- --host 127.0.0.1 --port 5173",
-    "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "node ./scripts/run-frontend.js build",
-    "frontendDist": "../frontend/dist"
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [...],
-    "category": "DeveloperTool"
-  }
-}
-```
 
 ### Environment Variables
 
 #### Development
 
 - `RUST_LOG`: Set log level (e.g., `debug`, `info`, `warn`)
-- `VITE_API_BASE_URL`: Override backend URL (default: `http://localhost:3030`)
-
-#### Production
-
-- `TAURI_SIGNING_PRIVATE_KEY`: Private key for update signing
-- `TAURI_SIGNING_PUBLIC_KEY`: Public key for update verification
-- `APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_SPECIFIC_PASSWORD`: Credentials for macOS signing and notarization pipelines
-- `WINDOWS_CERT_THUMBPRINT` (or `WINDOWS_CERT_PATH` + `WINDOWS_CERT_PASSWORD`): Certificate configuration for Windows signing
+- `VITE_API_BASE_URL`: Override backend URL (default: `http://localhost:3001`)
 
 ## Troubleshooting
 
 ### Build Failures
 
-**"Failed to bundle project"**
-- Ensure all dependencies are installed
-- Check that frontend build completed successfully
-- Verify icons exist in `src-tauri/icons/`
+**Frontend not embedded / stale UI**
+- The web UI is compiled into the binary from `frontend/dist`. Run `npm run frontend:build` before the cargo build (or use `npm run build:binary`, which orders them correctly).
 
 **"cargo not found"**
 ```bash
@@ -242,53 +132,26 @@ Key configuration options:
 source $HOME/.cargo/env
 ```
 
-**"WebKit not found" (Linux)**
-```bash
-# Install WebKit development files
-sudo apt install libwebkit2gtk-4.1-dev
-```
-
 ### Runtime Issues
 
 **"Failed to connect to backend"**
-- Check that port 3030 is not in use
-- Verify database path is writable
-- Check logs in app data directory
+- Check that the chosen port (default `3000`) is not in use
+- Verify the database path is writable
 
 **"Database locked"**
-- Close all instances of the app
-- Delete lock file if present
-- Reinitialise database from settings
+- Close all running instances of the server
+- Delete the lock file if present
+- Reinitialise the database
 
 ## CI/CD
 
-GitHub Actions builds run via `.github/workflows/tauri-build.yml`.  
-The workflow:
-- spins up jobs on Ubuntu, macOS, and Windows runners
-- installs Node 20, Rust stable, and the Tauri CLI
-- installs Linux WebKit dependencies when needed
-- runs `npm run frontend:install` followed by `npm run tauri:build`
-- uploads the bundles from `src-tauri/target/release/bundle/` as artifacts
+The automated release workflow (`.github/workflows/release.yml`) runs on tag creation and produces a single native `layercake` binary per platform (linux-x86_64, windows-x86_64, macos-aarch64), published to GitHub releases. Each job builds the frontend first (`npm run frontend:build`) so the web UI is embedded into the binary, then builds the release binary with cargo. Ensure the frontend can build headlessly before tagging.
 
-**Secrets** (optional but recommended for signed releases):
-- `APPLE_ID`, `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD` for macOS notarization
-- `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_SIGNING_PUBLIC_KEY` for Tauri updater signing
-- `WINDOWS_CERT_THUMBPRINT` (or `WINDOWS_CERT_PATH` + `WINDOWS_CERT_PASSWORD`) for Windows signing
-
-Builds succeed without these secrets, but the resulting artifacts will be unsigned.
-
-The automated release workflow (`.github/workflows/release.yml`) runs on tag creation and now produces both the Rust CLI binaries and the Tauri desktop bundles (AppImage/deb, MSI/EXE, DMG/zip). Frontend builds are triggered through `scripts/run-frontend.js`, which resolves the frontend path relative to the Tauri config so it works in CI environments. Ensure the frontend can build headlessly and that the icon assets are valid Windows resources before tagging.
-
-## Bundle Size Optimization
-
-Current bundle sizes (approximate):
-- Linux AppImage: ~45MB
-- macOS DMG: ~35MB
-- Windows MSI: ~40MB
+## Binary Size Optimization
 
 ### Reducing Size
 
-1. **Strip debug symbols**:
+**Strip debug symbols**:
 ```toml
 # Cargo.toml
 [profile.release]
@@ -298,44 +161,28 @@ lto = true
 codegen-units = 1
 ```
 
-2. **Exclude unnecessary files**: Edit `src-tauri/.taurignore`
-
-3. **Compress assets**: Use optimised icons and images
-
 ## Distribution
 
-### Linux
-- Distribute AppImage for universal compatibility
-- Or publish to package repositories (AUR, PPA, Flathub)
-
-### macOS
-- Distribute signed and notarised DMG
-- Consider Mac App Store for wider reach
-
-### Windows
-- Distribute signed MSI installer
-- Consider Microsoft Store
+- Releases ship a single native binary per platform via GitHub releases (linux-x86_64, windows-x86_64, macos-aarch64).
+- Users can also install the latest binary through the install scripts (`scripts/install.sh` / `scripts/install.ps1`); see the [README](README.md) for details.
 
 ## Support
 
 For build issues:
 1. Check this document
-2. Search [Tauri documentation](https://tauri.app/)
-3. Open issue on GitHub
+2. Open an issue on GitHub
 
 ## Quick Reference
 
 ```bash
 # Development
-npm run tauri:dev                    # Run dev build
+./dev.sh                             # Backend + Vite dev server
 npm run frontend:dev                 # Frontend only
 npm run backend:test                 # Run tests
 
 # Production
-npm run tauri:build                  # Build for current OS
-npm run tauri:build:linux           # Linux only
-npm run tauri:build:macos           # macOS only
-npm run tauri:build:windows         # Windows only
+npm run build:binary                 # Build frontend, then release binary
+layercake serve --open               # Run the binary, open the browser
 
 # Utilities
 npm run install:all                  # Install all dependencies

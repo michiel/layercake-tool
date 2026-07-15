@@ -5,11 +5,7 @@
   "private": true,
   "scripts": {
     "build": "npm run frontend:build",
-    "tauri:dev": "cd src-tauri && cargo tauri dev",
-    "tauri:build": "cd src-tauri && cargo tauri build",
-    "tauri:build:linux": "./scripts/build-linux.sh",
-    "tauri:build:macos": "./scripts/build-macos.sh",
-    "tauri:build:windows": "./scripts/build-windows.sh",
+    "build:binary": "npm run frontend:build && cargo build --release -p layercake-server",
     "frontend:dev": "cd frontend && npm run dev",
     "frontend:build": "cd frontend && npm run build",
     "frontend:install": "cd frontend && npm install",
@@ -25,8 +21,6 @@
     "graph",
     "visualization",
     "transformation",
-    "tauri",
-    "desktop",
     "collaboration"
   ],
   "author": "Layercake Contributors",

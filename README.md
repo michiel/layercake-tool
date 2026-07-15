@@ -1,6 +1,6 @@
 # Layercake
 
-Layercake is an interactive platform for designing, executing, and reviewing graph-based plans. It combines a visual DAG builder, rich graph editors, automated exporters, and collaboration tooling across three surfaces: a Rust backend and CLI, a React web application, and a Tauri desktop shell that bundles everything into a single install.
+Layercake is an interactive platform for designing, executing, and reviewing graph-based plans. It combines a visual DAG builder, rich graph editors, automated exporters, and collaboration tooling. The Rust backend, CLI, and React web UI ship together as a single `layercake` binary: the web UI is embedded directly into the binary and served same-origin with the GraphQL API.
 
 ![Layercake plan architecture](images/layercake-project.svg)
 
@@ -9,7 +9,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 - Visual Workflow Builder – compose plan DAGs with drag-and-drop nodes, data-source wiring, execution states, and automatic dependency tracking.
 - Rich Graph Editing – edit nodes, edges, layers, and metadata in spreadsheet or visual modes with live layout controls, layer toggles, and export-ready previews.
 - Data Source Management – import CSV/TSV assets, persist raw payloads, and replay transformations through the plan pipeline.
-- Desktop & Web Experiences – ship a self-contained Tauri desktop app or run the Vite-powered web UI against the same Rust backend.
+- Single Self-Contained Binary – the web UI is compiled into the `layercake` binary and served same-origin with the GraphQL API; run it locally or self-host, with a Vite-powered dev mode for frontend iteration.
 - Real-Time Collaboration – share presence, edit history, and live cursor state through the GraphQL + WebSocket collaboration layer.
 - Automation & Exporters – run plans headlessly from the CLI, watch for file changes, and emit PlantUML, Graphviz, Mermaid, GML, or custom Handlebars templates.
 - Persistent Storage & Audit – all projects, DAGs, edits, and plan runs are stored in SQLite via SeaORM migrations.
@@ -44,7 +44,6 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 | `layercake-cli/` | Rust CLI binary for plan execution, generators, migrations, updates, and the interactive console. |
 | `layercake-server/` | Rust HTTP/GraphQL server binary for the web UI and collaboration endpoints. |
 | `frontend/` | Vite + React + Mantine UI with ReactFlow-based plan and graph editors. |
-| `src-tauri/` | Tauri 2 shell that embeds the backend, manages SQLite files, and ships the desktop app. |
 | `external-modules/` | Optional integrations (e.g. custom connectors and tooling helpers). |
 | `resources/` | Sample projects, Handlebars templates, reference exports, and shared assets. |
 | `docs/` | Architecture notes, review logs, and migration plans. |
@@ -52,19 +51,18 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 
 ## Application Surfaces
 
-### Desktop App (Tauri 2)
+### Single Binary
 
-- Bundles the backend server and React UI into a single binary, storing data under the OS-specific app data directory.
-- Launch for development with:
+- The web UI (`frontend/dist`) is compiled into the `layercake` binary at build time via `include_dir!`, so the frontend MUST be built before the Rust build.
+- Build the release binary (frontend first, then the Rust binary):
   ```bash
-  npm run tauri:dev
+  npm run build:binary   # runs frontend:build, then cargo build --release -p layercake-cli
   ```
-- Build signed installers per platform:
+- Run the server, serving the embedded web UI same-origin with the GraphQL API:
   ```bash
-  npm run tauri:build       # current platform
-  npm run tauri:build:macos # or tauri:build:linux / tauri:build:windows
+  layercake serve --open   # --open auto-launches the browser
   ```
-- The desktop shell starts an embedded server, negotiates a shared secret, and points the UI at it automatically.
+  By default the server binds to loopback (`127.0.0.1:3000`) for local-first use. Pass `--host 0.0.0.0` to self-host or expose it on a network. Other flags: `--port`, `--database`, `--cors-origin`.
 
 ### Web Application
 
@@ -86,7 +84,7 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 
 Open http://localhost:1422 to access the plan editor, data source manager, graph editors, and system settings.
 
-The repository also ships `./dev.sh` (web) and `./dev.sh --tauri` (desktop) scripts that wire up the services, enforce ports (`3001`/`1422`), initialize the database, and stream logs.
+The repository also ships `./dev.sh` (web dev) which wires up the services, enforces ports (`3001`/`1422`), initializes the database, and streams logs.
 
 ### CLI & Automation
 
@@ -141,7 +139,6 @@ The CLI ships optional features for the interactive console (enabled in default 
 - Rust 1.70+ with `cargo`
 - Node.js 18+ and `npm`
 - Git, make, and platform build dependencies listed in [BUILD.md](BUILD.md)
-- (Desktop builds) Tauri prerequisites for your OS (WebKit2GTK on Linux, Xcode CLT on macOS, MSVC + WebView2 on Windows)
 
 ### Initial Setup
 
@@ -156,12 +153,11 @@ cargo build -p layercake-core -p layercake-cli -p layercake-server
 ### Quick Development Loop
 
 - `./dev.sh` – runs the Rust backend on port `3001` and the Vite dev server on `1422`.
-- `./dev.sh --tauri` – launches the desktop shell with hot reload.
-- Logs stream to `backend.log`, `frontend.log`, and `tauri.log` in the repo root.
+- Logs stream to `backend.log` and `frontend.log` in the repo root.
 
 ### Database & Storage
 
-- The backend uses SQLite via SeaORM, defaulting to `layercake.db` in the repository (dev) or the platform app data dir (desktop).
+- The backend uses SQLite via SeaORM, defaulting to `layercake.db` in the repository (or the path passed to `--database`).
 - Run `cargo run --bin layercake -- db init` after cloning or deleting the database file to reapply migrations.
 - Use `cargo run --bin layercake -- db migrate fresh` to reset schema state during development.
 
@@ -185,7 +181,7 @@ Sample CSVs, plans, and rendered outputs live in `resources/sample-v1`. Import t
   cargo fmt
   cargo clippy --all-targets --all-features
   ```
-- Desktop bundles: `npm run tauri:build` (see [BUILD.md](BUILD.md) for signing/notarization guidance)
+- Release binary: `npm run build:binary` (see [BUILD.md](BUILD.md) for packaging guidance)
 
 ## Extending Layercake
 
