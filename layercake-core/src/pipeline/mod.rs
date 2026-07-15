@@ -8,7 +8,7 @@ mod merge_builder;
 #[allow(dead_code)]
 mod types;
 
-pub use dag_executor::DagExecutor;
+pub use dag_executor::{DagExecutor, NodeExecutionRecord};
 pub use dataset_importer::DatasourceImporter;
 pub use graph_data_builder::GraphDataBuilder;
 pub use merge_builder::MergeBuilder;
