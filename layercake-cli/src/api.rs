@@ -29,12 +29,64 @@ struct ApiInfo {
     collaboration_ws: String,
     session_header: &'static str,
     database: String,
+    /// Whether the server actually responded on `/health`.
+    reachable: bool,
+    /// The version reported by the running server, if reachable.
+    server_version: Option<String>,
+    /// If the requested port wasn't reachable, other localhost ports that are.
+    detected_ports: Vec<u16>,
 }
 
-/// Print the endpoints and headers for a running server.
-pub fn info(url: Option<&str>, host: &str, port: u16, database: &str, json_out: bool) -> Result<()> {
+/// Probe `/health` at a base URL; return the reported version on success.
+async fn probe_health(base: &str) -> Option<String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_millis(600))
+        .build()
+        .ok()?;
+    let resp = client.get(format!("{}/health", base)).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    // Treat any healthy JSON as reachable; surface version if present.
+    Some(
+        body.get("version")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string(),
+    )
+}
+
+/// Print the endpoints and headers for a running server, verifying against a
+/// live `/health` probe rather than trusting the requested port blindly.
+pub async fn info(
+    url: Option<&str>,
+    host: &str,
+    port: u16,
+    database: &str,
+    json_out: bool,
+) -> Result<()> {
     let base = base_url(url, host, port);
     let ws_base = base.replacen("http", "ws", 1);
+
+    let server_version = probe_health(&base).await;
+    let reachable = server_version.is_some();
+
+    // If the requested endpoint isn't answering, scan a few common local ports
+    // so the user isn't stuck on the "wrong port" trap.
+    let mut detected_ports = Vec::new();
+    if !reachable && url.is_none() {
+        for candidate in [3000u16, 3001, 8080, 8000] {
+            if candidate == port {
+                continue;
+            }
+            let candidate_base = format!("http://{}:{}", host, candidate);
+            if probe_health(&candidate_base).await.is_some() {
+                detected_ports.push(candidate);
+            }
+        }
+    }
+
     let info = ApiInfo {
         graphql: format!("{}/graphql", base),
         graphql_ws: format!("{}/graphql/ws", ws_base),
@@ -43,6 +95,9 @@ pub fn info(url: Option<&str>, host: &str, port: u16, database: &str, json_out: 
         session_header: "x-layercake-session",
         database: database.to_string(),
         base_url: base,
+        reachable,
+        server_version,
+        detected_ports,
     };
 
     if json_out {
@@ -55,6 +110,21 @@ pub fn info(url: Option<&str>, host: &str, port: u16, database: &str, json_out: 
         println!("Collaboration (WS): {}", info.collaboration_ws);
         println!("Session header:     {}: <id>", info.session_header);
         println!("Database file:      {}", info.database);
+        match &info.server_version {
+            Some(v) => println!("Server:             reachable (version {})", v),
+            None => {
+                println!("Server:             NOT reachable at this address");
+                if !info.detected_ports.is_empty() {
+                    let hint: Vec<String> =
+                        info.detected_ports.iter().map(|p| p.to_string()).collect();
+                    println!(
+                        "                    a layercake server IS answering on port(s): {} — try --port {}",
+                        hint.join(", "),
+                        info.detected_ports[0]
+                    );
+                }
+            }
+        }
     }
     Ok(())
 }

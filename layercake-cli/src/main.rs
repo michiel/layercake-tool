@@ -344,7 +344,7 @@ async fn main() -> Result<()> {
                 port,
                 database,
                 json,
-            } => api::info(url.as_deref(), &host, port, &database, json)?,
+            } => api::info(url.as_deref(), &host, port, &database, json).await?,
             ApiCommands::Call {
                 query,
                 variables,
