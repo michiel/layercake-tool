@@ -6,9 +6,10 @@ so they work offline and match the binary's version.
 ## Usage
 
 ```bash
-layercake doc list                     # list all workflows and commands
+layercake doc list                     # list all workflows, commands, and guides
 layercake doc workflow <name>          # print docs-tool/workflow/<name>.md
 layercake doc command <name>           # print docs-tool/command/<name>.md
+layercake doc guide <name>             # print docs-tool/guide/<name>.md
 ```
 
 ## Examples
@@ -17,6 +18,8 @@ layercake doc command <name>           # print docs-tool/command/<name>.md
 layercake doc list
 layercake doc workflow edit-a-plan
 layercake doc command schema
+layercake doc guide agent              # the AI agent query-interface guide
+layercake doc guide model              # the graph model documentation
 ```
 
 ## For agents

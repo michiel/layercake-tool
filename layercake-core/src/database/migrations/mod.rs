@@ -48,6 +48,7 @@ mod m20251215_000002_remove_edge_node_fk_constraints;
 mod m20251216_000001_add_import_export_path_to_projects;
 mod m20260123_000001_create_plan_dag_annotations;
 mod m20260709_000001_rebuild_graph_edits_drop_graphs_fk;
+mod m20260715_000001_drop_code_analysis_profiles;
 
 pub struct Migrator;
 
@@ -103,6 +104,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251216_000001_add_import_export_path_to_projects::Migration),
             Box::new(m20260123_000001_create_plan_dag_annotations::Migration),
             Box::new(m20260709_000001_rebuild_graph_edits_drop_graphs_fk::Migration),
+            Box::new(m20260715_000001_drop_code_analysis_profiles::Migration),
         ]
     }
 }

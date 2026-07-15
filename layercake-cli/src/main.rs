@@ -94,12 +94,7 @@ enum Commands {
         #[clap(long)]
         dry_run: bool,
     },
-    /// Output documentation guides
-    Guide {
-        #[clap(subcommand)]
-        command: GuideCommands,
-    },
-    /// Print embedded agent-facing documentation (workflows and commands)
+    /// Print embedded agent-facing documentation (workflows, commands, guides)
     Doc {
         #[clap(subcommand)]
         command: DocCommands,
@@ -146,21 +141,15 @@ enum GenerateCommands {
 }
 
 #[derive(Subcommand, Debug)]
-enum GuideCommands {
-    /// Output the AI agent guide for the query interface
-    Agent,
-    /// Output the graph model documentation
-    Model,
-}
-
-#[derive(Subcommand, Debug)]
 enum DocCommands {
-    /// List all available workflow and command docs
+    /// List all available docs (workflows, commands, guides)
     List,
     /// Print a workflow doc (docs-tool/workflow/<name>.md)
     Workflow { name: String },
     /// Print a command doc (docs-tool/command/<name>.md)
     Command { name: String },
+    /// Print a reference guide (docs-tool/guide/<name>.md), e.g. agent, model
+    Guide { name: String },
 }
 
 #[derive(Subcommand, Debug)]
@@ -320,20 +309,11 @@ async fn main() -> Result<()> {
             };
             update_cmd.execute().await?;
         }
-        Commands::Guide { command } => match command {
-            GuideCommands::Agent => {
-                const AGENT_GUIDE: &str = include_str!("../../LAYERCAKE_AGENT_GUIDE.md");
-                print!("{}", AGENT_GUIDE);
-            }
-            GuideCommands::Model => {
-                const MODEL_GUIDE: &str = include_str!("../../LAYERCAKE_MODEL_GUIDE.md");
-                print!("{}", MODEL_GUIDE);
-            }
-        },
         Commands::Doc { command } => match command {
             DocCommands::List => doc::print_list(),
             DocCommands::Workflow { name } => doc::print_doc("workflow", &name)?,
             DocCommands::Command { name } => doc::print_doc("command", &name)?,
+            DocCommands::Guide { name } => doc::print_doc("guide", &name)?,
         },
         Commands::Schema { command } => match command {
             SchemaCommands::Dump { json } => schema_dump::dump(json).await?,
