@@ -151,6 +151,7 @@ Complete all workflow/command md files; cross-reference; document the `query`-vs
 
 ### Stage 7 (group C) — Remove the `code-analysis` feature
 **On its own branch/PR** (`feat/remove-code-analysis`, off master) per user decision — not on this branch.
+**Status:** Complete (branch `feat/remove-code-analysis`, commit 35921da6). Deleted the crate + server/core/frontend files; kept the historical migration. Verified: workspace build + server tests + tsc clean; post-removal server boots & migrates cleanly against a DB that already had the code-analysis migration applied.
 Delete the crate + server/core/frontend files; apply the careful registration edits (see the code-analysis section). **Keep the historical DB migration.** Remove frontend routes/nav/imports.
 **Verify:** `cargo build --workspace` + `cargo tree | grep code.analysis` empty (except kept migration); `tsc --noEmit`; server tests pass; migrations still run against an existing DB.
 **Status:** Not Started
