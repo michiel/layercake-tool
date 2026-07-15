@@ -163,3 +163,75 @@ pub fn render_sequence_template(
     let rendered = handlebars.render_template(template, &payload)?;
     Ok(rendered)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::{to_mermaid_sequence, to_plantuml_sequence};
+
+    fn participant(alias: &str, label: &str, color: Option<&str>) -> SequenceParticipant {
+        SequenceParticipant {
+            alias: alias.into(),
+            id: alias.into(),
+            label: label.into(),
+            dataset_id: 1,
+            dataset_name: "d".into(),
+            layer_color: color.map(|c| c.into()),
+            ..Default::default()
+        }
+    }
+
+    fn context_with_newlines() -> SequenceRenderContext {
+        let mut ctx = SequenceRenderContext::default();
+        ctx.config.show_notes = true;
+        let a = participant("a", "Alice", Some("#ff0000"));
+        // Labels/notes with embedded newlines used to break the line-based grammars.
+        let b = participant("b", "Bob\nsecond", Some("#00aaff"));
+        ctx.participant_groups = vec![SequenceParticipantGroup {
+            id: "g1".into(),
+            label: "Group\nOne".into(),
+            color: Some("#00ff00".into()),
+            participants: vec![a.clone(), b.clone()],
+        }];
+        ctx.participants = vec![a, b];
+        ctx.first_participant_alias = Some("a".into());
+        ctx.last_participant_alias = Some("b".into());
+        ctx.sequences = vec![SequenceRender {
+            id: 1,
+            name: "Seq\n1".into(),
+            description: None,
+            steps: vec![SequenceStep {
+                id: "s".into(),
+                dataset_id: 1,
+                dataset_name: "d".into(),
+                source: SequenceParticipantRef { alias: "a".into(), label: "Alice".into() },
+                target: SequenceParticipantRef { alias: "b".into(), label: "Bob".into() },
+                label: "line1\nline2".into(),
+                note: Some("note\nwrapped".into()),
+                note_position: Some("both".into()),
+            }],
+        }];
+        ctx
+    }
+
+    #[test]
+    fn newlines_do_not_break_mermaid() {
+        let out = to_mermaid_sequence::render(&context_with_newlines()).unwrap();
+        // A statement line must never be split by a raw newline from free text.
+        assert!(out.contains(r#"participant b as "Bob second""#), "{out}");
+        assert!(out.contains("a->>b: line1 line2"), "{out}");
+        assert!(out.contains("Note over a,b: note wrapped"), "{out}");
+        assert!(!out.contains("line1\nline2"));
+    }
+
+    #[test]
+    fn newlines_do_not_break_plantuml_and_participants_are_coloured() {
+        let out = to_plantuml_sequence::render(&context_with_newlines()).unwrap();
+        assert!(out.contains("a -> b : line1 line2"), "{out}");
+        // Per-participant layer colours (PlantUML capability; Mermaid has none).
+        assert!(out.contains(r#"participant a as "Alice" #ff0000"#), "{out}");
+        assert!(out.contains(r#"participant b as "Bob second" #00aaff"#), "{out}");
+        // Partition box grouping with layer colour.
+        assert!(out.contains(r#"box "Group One" #00ff00"#), "{out}");
+    }
+}

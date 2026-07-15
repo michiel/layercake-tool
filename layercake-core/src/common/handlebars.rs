@@ -46,6 +46,20 @@ pub fn get_handlebars() -> Handlebars<'static> {
     handlebars_helper!(stringeq: |s1: String, s2: String| s1.eq(&s2));
     handlebars.register_helper("stringeq", Box::new(stringeq));
 
+    // Collapse newlines and runs of whitespace into single spaces. Line-based
+    // diagram grammars (Mermaid/PlantUML sequence) treat a raw newline inside a
+    // label/note as a statement break, so free-text labels containing newlines
+    // otherwise produce "Expecting ..., got 'NEWLINE'" parse errors.
+    handlebars_helper!(inline: |v: Value| {
+        let s = match v {
+            Value::String(s) => s,
+            Value::Null => String::new(),
+            other => other.to_string(),
+        };
+        s.split_whitespace().collect::<Vec<_>>().join(" ")
+    });
+    handlebars.register_helper("inline", Box::new(inline));
+
     handlebars_helper!(is_empty: |v: Value| {
         match v {
             serde_json::Value::Array(arr) => arr.is_empty(),
