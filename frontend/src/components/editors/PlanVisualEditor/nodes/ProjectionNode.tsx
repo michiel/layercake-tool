@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { createApolloClientForEndpoint } from '@/graphql/client'
-import { getServerInfo } from '@/utils/tauri'
 
 const EXPORT_PROJECTION = gql`
   mutation ExportProjection($id: ID!) {
@@ -89,40 +88,9 @@ export const ProjectionNode = memo((props: ExtendedNodeProps) => {
 
   const handleOpenProjection = async () => {
     if (!config.projectionId) return
-    if ((window as any).__TAURI__) {
-      try {
-        const serverInfo = await getServerInfo()
-        if (!serverInfo) {
-          showErrorNotification('Open failed', 'Unable to get server information')
-          return
-        }
-        const url = `${serverInfo.url}/projections/viewer/${config.projectionId}?apiBase=${encodeURIComponent(serverInfo.url)}`
-        console.log('Creating Tauri window with URL:', url)
-        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-        const label = `projection-${config.projectionId}-${Date.now()}`
-        const win = new WebviewWindow(label, {
-          url,
-          maximized: true,
-          title: `Projection #${config.projectionId}`
-        })
-        win.once('tauri://created', () => {
-          console.log('Tauri window created successfully')
-          showSuccessNotification('Projection opened', 'New window created.')
-        })
-        win.once('tauri://error', (e: unknown) => {
-          console.error('Tauri window error event:', e)
-          const errorMsg = typeof e === 'string' ? e : (e as any)?.message || JSON.stringify(e)
-          showErrorNotification('Open failed', errorMsg)
-        })
-      } catch (err: any) {
-        console.error('Failed to open projection window', err)
-        showErrorNotification('Open failed', err?.message || 'Unable to open projection viewer')
-      }
-    } else {
-      const apiBase = (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3001'
-      const url = `${apiBase.replace(/\/+$/, '')}/projections/viewer/${config.projectionId}`
-      window.open(url, '_blank', 'noreferrer')
-    }
+    const apiBase = ((import.meta as any).env?.VITE_API_BASE_URL || window.location.origin).replace(/\/+$/, '')
+    const url = `${apiBase}/projections/viewer/${config.projectionId}`
+    window.open(url, '_blank', 'noreferrer')
   }
 
   const handleDownloadProjection = async () => {

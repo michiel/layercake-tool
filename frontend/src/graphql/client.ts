@@ -5,78 +5,42 @@ import { onError } from '@apollo/client/link/error'
 import { setContext } from '@apollo/client/link/context'
 import { createClient } from 'graphql-ws'
 import UploadHttpLink from 'apollo-upload-client/UploadHttpLink.mjs'
-import { getServerInfo, isTauriApp, waitForServer } from '../utils/tauri'
 import { getOrCreateSessionId } from '../utils/session'
 import { extractGraphQLErrorMessage } from '../utils/errorHandling'
 import { showErrorNotification } from '../utils/notifications'
-
-// Store server configuration
-let serverConfig: { url: string; secret: string; wsUrl: string } | null = null
-
-// Initialize server configuration for Tauri
-export async function initializeTauriServer(): Promise<void> {
-  if (!isTauriApp()) {
-    console.log('[GraphQL] Not running in Tauri, using web mode configuration')
-    return
-  }
-
-  console.log('[GraphQL] Initializing Tauri server connection...')
-
-  // Wait for the server to be ready
-  const isReady = await waitForServer()
-  if (!isReady) {
-    throw new Error('Failed to connect to embedded server')
-  }
-
-  // Get server info
-  const info = await getServerInfo()
-  if (!info) {
-    throw new Error('Failed to get server information')
-  }
-
-  serverConfig = {
-    url: info.url,
-    secret: info.secret,
-    wsUrl: info.url.replace('http', 'ws'),
-  }
-
-  console.log('[GraphQL] Tauri server configured:', { url: serverConfig.url })
-
-  // Create the Apollo client now that we have the server config
-  if (!apolloClientInstance) {
-    console.log('[GraphQL] Creating Apollo Client for Tauri mode')
-    apolloClientInstance = createApolloClient()
-  }
-}
 
 export type GraphQLEndpointOverride = {
   httpPath?: string;
   wsPath?: string;
 };
 
-// GraphQL endpoints - configurable for different environments
+/**
+ * Resolve the API base URL.
+ *
+ * When the SPA is served by the layercake-server binary it is same-origin
+ * with the API, so endpoints are relative to `window.location`. The
+ * `VITE_API_BASE_URL` env var overrides this for local development, where the
+ * Vite dev server runs on a different port than the Rust server.
+ */
+const getApiBaseUrl = (): string => {
+  const override = import.meta.env.VITE_API_BASE_URL
+  if (override) {
+    return override.replace(/\/+$/, '')
+  }
+  // Same-origin: the server hosting this page also serves the API.
+  return typeof window !== 'undefined' ? window.location.origin : ''
+}
+
+// GraphQL endpoints - relative to the serving origin (or VITE_API_BASE_URL in dev)
 export const getGraphQLEndpoints = (override?: GraphQLEndpointOverride) => {
   const httpPath = override?.httpPath || '/graphql';
   const wsPath = override?.wsPath || '/graphql/ws';
 
-  // Use Tauri server if configured
-  if (serverConfig) {
-    console.log('[GraphQL] Using Tauri server config:', serverConfig.url)
-    return {
-      httpUrl: `${serverConfig.url}${httpPath}`,
-      wsUrl: `${serverConfig.wsUrl}${wsPath}`,
-      secret: serverConfig.secret,
-    }
-  }
-
-  // Otherwise use environment variables (web mode)
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
-  console.log('[GraphQL] Using web mode config:', baseUrl)
-  const wsBase = baseUrl.replace('http', 'ws')
+  const baseUrl = getApiBaseUrl()
+  const wsBase = baseUrl.replace(/^http/, 'ws')
   return {
     httpUrl: `${baseUrl}${httpPath}`,
     wsUrl: `${wsBase}${wsPath}`,
-    secret: null,
   }
 }
 
@@ -86,22 +50,9 @@ let apolloClientInstance: ApolloClient | null = null
 function createApolloClient(override?: GraphQLEndpointOverride): ApolloClient {
   console.log('[GraphQL] Creating Apollo Client with endpoints:', getGraphQLEndpoints(override))
 
-  // Create authentication link for Tauri secret
+  // Attach the session id to every request.
   const authLink = setContext((_, { headers }) => {
-    const { secret } = getGraphQLEndpoints(override)
     const sessionId = getOrCreateSessionId()
-
-    // Add secret header if available (Tauri mode)
-    if (secret) {
-      return {
-        headers: {
-          ...headers,
-          'x-tauri-secret': secret,
-          'x-layercake-session': sessionId,
-        },
-      }
-    }
-
     return {
       headers: {
         ...headers,
@@ -145,13 +96,7 @@ function createApolloClient(override?: GraphQLEndpointOverride): ApolloClient {
   const wsClient = createClient({
     url: currentWsUrl,
     connectionParams: () => {
-      const { secret } = getGraphQLEndpoints(override)
       const sessionId = getOrCreateSessionId()
-      console.log('[GraphQL WebSocket] Getting connection params, secret:', secret ? 'present' : 'none')
-      // Include secret in WebSocket connection params if available (Tauri mode)
-      if (secret) {
-        return { 'x-tauri-secret': secret, 'x-layercake-session': sessionId }
-      }
       return { 'x-layercake-session': sessionId }
     },
     shouldRetry: () => {
@@ -302,8 +247,7 @@ function createApolloClient(override?: GraphQLEndpointOverride): ApolloClient {
 }
 
 // Export Apollo Client with lazy initialization
-// This ensures the client is only created when first accessed,
-// allowing serverConfig to be set up first in Tauri mode
+// This ensures the client is only created when first accessed.
 export const apolloClient = new Proxy({} as ApolloClient, {
   get(_target, prop, receiver) {
     if (!apolloClientInstance) {

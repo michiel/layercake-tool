@@ -45,7 +45,6 @@ interface ControlPanelProps {
   readonly?: boolean;
 }
 
-const isTauri = !!(window as any).__TAURI__;
 
 export const ControlPanel = ({
   validationLoading,
@@ -144,7 +143,7 @@ export const ControlPanel = ({
                         variant="secondary"
                         className="h-6 w-6 cursor-grab text-white hover:opacity-80"
                         style={{ backgroundColor: nodeType.color }}
-                        draggable={!isTauri}
+                        draggable
                         onDragStart={(event) => handleNodeDragStart(event, nodeType.type)}
                         onMouseDown={(event) => handleNodePointerDragStart(event, nodeType.type)}
                       >

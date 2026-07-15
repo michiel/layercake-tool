@@ -12,7 +12,6 @@ import { PlanDagNodeType } from '../../../../types/plan-dag';
 import { Group } from '../../../layout-primitives';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '../../../ui/tooltip';
 
-const isTauri = !!(window as any).__TAURI__;
 
 interface DraggableNodeProps {
   type: PlanDagNodeType;
@@ -38,7 +37,7 @@ const DraggableNode: React.FC<DraggableNodeProps> = ({ type, label, icon, color,
         <div
           className="p-3 rounded-md cursor-grab hover:opacity-80 transition-opacity flex flex-col items-center gap-1 min-w-[60px]"
           style={{ backgroundColor: color }}
-          draggable={!isTauri}
+          draggable
           onDragStart={handleDragStart}
           onMouseDown={handleMouseDown}
         >

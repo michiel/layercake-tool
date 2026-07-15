@@ -58,7 +58,19 @@ The codebase is already **React SPA ↔ Axum GraphQL server**. Tauri is only a d
 **Goal:** Frontend defaults to same-origin relative endpoints; all Tauri code paths removed.
 **Success Criteria:** `tsc --noEmit` passes with zero `@tauri-apps/*` imports remaining; `main.tsx` renders web-mode only; projection openers use `window.open`; `client.ts` has no secret link; `VITE_API_BASE_URL` still overrides for dev.
 **Tests:** `tsc --noEmit`; `grep -r "@tauri-apps\|__TAURI__\|isTauriApp" frontend/src` returns nothing.
-**Status:** Not Started
+**Status:** Complete
+
+**Implementation notes:**
+- `graphql/client.ts`: replaced Tauri server discovery with `getApiBaseUrl()` → `window.location.origin` (same-origin), `VITE_API_BASE_URL` override for dev. Removed `initializeTauriServer`, secret auth header, ws secret param. Endpoints now relative.
+- `main.tsx`: removed the Tauri init branch + loading/error states; renders web-mode only.
+- Deleted `utils/tauri.ts` and `utils/tauri-api-mock.js`.
+- Projection viewer openers (`ProjectionsPage`, `ProjectArtefactsPage`, `ProjectionNode`): collapsed to the `window.open` web path using `window.location.origin`.
+- `__TAURI__` UI toggles removed (`ControlPanel`, `NodeToolbar`, `AdvancedToolbar`, `PlanVisualEditor`): `draggable` always on; drag/drop guards removed. Removed the Tauri-only pointer-drag machinery (`handleNodePointerDragStart` now a no-op kept for the `AdvancedToolbar` prop; deleted `handlePointerDrop`, `draggingNode` state + preview overlay + unused `Card` import).
+- **DatabaseSettings removed** (per decision): deleted component, its `/settings/database` route, and the nav link in `App.tsx`.
+- `vite.config.ts`: dropped Tauri detection + mock alias; dev proxy now covers `/api`, `/graphql` (ws), `/projections` (ws) so dev uses same-origin relative endpoints.
+- `frontend/package.json`: removed `@tauri-apps/api`, `@tauri-apps/plugin-dialog`, `@tauri-apps/plugin-shell`.
+- Verified: `tsc --noEmit` clean; `npm run build` succeeds; grep for tauri in `frontend/src` empty; rebuilt server serves fresh embedded UI; same-origin `POST /graphql` returns `{"projects":[]}`; removed route falls through to SPA; no server panic. (Real-browser drive skipped — no Chrome in env; covered via curl.)
+- **Follow-up:** file bd issue for possible GraphQL reimplementation of DB info/reinitialise (Stage 4 / session close).
 
 ## Stage 3: Local-first launch ergonomics
 **Goal:** Server binds loopback by default, external opt-in, optional browser auto-open.
