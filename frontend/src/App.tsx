@@ -1348,7 +1348,7 @@ const ProjectDetailPage = () => {
     variables: { projectId: projectIdNum },
     skip: !projectId,
   })
-  const { data: plansData, loading: plansLoading } = useQuery<{ plans: Plan[] }>(LIST_PLANS, {
+  const { data: plansData, loading: plansLoading } = useQuery(LIST_PLANS, {
     variables: { projectId: projectIdNum },
     skip: !projectId,
     fetchPolicy: 'cache-and-network',
@@ -1942,7 +1942,7 @@ const PlanEditorPage = () => {
     data: planData,
     loading: planLoading,
     error: planError,
-  } = useQuery<{ plan: Plan | null }>(GET_PLAN, {
+  } = useQuery(GET_PLAN, {
     variables: { id: planIdNum },
     skip: !planIdNum,
     fetchPolicy: 'cache-and-network',
@@ -2045,7 +2045,7 @@ const LegacyPlanRedirect = () => {
   const navigate = useNavigate()
   const projectIdNum = Number(projectId || 0)
 
-  const { data, loading } = useQuery<{ plans: Array<{ id: number }> }>(LIST_PLANS, {
+  const { data, loading } = useQuery(LIST_PLANS, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
     fetchPolicy: 'network-only',

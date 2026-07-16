@@ -9,6 +9,26 @@ import { getOrCreateSessionId } from '../utils/session'
 import { extractGraphQLErrorMessage } from '../utils/errorHandling'
 import { showErrorNotification } from '../utils/notifications'
 
+// Apollo Client 4.2+ requires any non-default `errorPolicy` used in
+// `defaultOptions` to be declared here for type safety. We default to
+// `errorPolicy: 'all'` (below) so partial data still renders when a request
+// also returns errors — declare that on each operation kind.
+declare module '@apollo/client' {
+  namespace ApolloClient {
+    namespace DeclareDefaultOptions {
+      interface WatchQuery {
+        errorPolicy: 'all'
+      }
+      interface Query {
+        errorPolicy: 'all'
+      }
+      interface Mutate {
+        errorPolicy: 'all'
+      }
+    }
+  }
+}
+
 export type GraphQLEndpointOverride = {
   httpPath?: string;
   wsPath?: string;
