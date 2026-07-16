@@ -349,6 +349,23 @@ async fn test_load_graph() {
 }
 
 #[tokio::test]
+async fn test_missing_projection_is_graceful() {
+    // A deleted/nonexistent projection must be distinguishable so the GraphQL
+    // layer can return null rather than a top-level error: `get` yields None
+    // and `load_graph` yields RecordNotFound (which the resolver maps to null).
+    let db = setup_db().await;
+    let service = ProjectionService::new(db);
+
+    let missing_id = 999_999;
+    assert!(service.get(missing_id).await.unwrap().is_none());
+
+    match service.load_graph(missing_id).await {
+        Err(sea_orm::DbErr::RecordNotFound(_)) => {}
+        other => panic!("expected RecordNotFound for a missing projection, got {other:?}"),
+    }
+}
+
+#[tokio::test]
 async fn test_save_and_get_state() {
     let db = setup_db().await;
     let graph_id = seed_graph_data(&db).await;
