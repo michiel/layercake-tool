@@ -7,6 +7,19 @@ use reqwest::Client;
 use std::path::PathBuf;
 use tokio::io::AsyncWriteExt;
 
+/// A checksum/signature companion, not an installable artefact.
+fn is_sidecar(name: &str) -> bool {
+    const SIDECAR_SUFFIXES: [&str; 4] = [".sha256", ".sha512", ".sig", ".asc"];
+    SIDECAR_SUFFIXES
+        .iter()
+        .any(|suffix| name.ends_with(suffix))
+}
+
+/// A downloadable release archive we know how to extract.
+fn is_release_archive(name: &str) -> bool {
+    name.ends_with(".tar.gz") || name.ends_with(".tgz") || name.ends_with(".zip")
+}
+
 /// Default updater implementation
 pub struct DefaultUpdater {
     version_manager: Box<dyn VersionManager + Send + Sync>,
@@ -49,12 +62,16 @@ impl DefaultUpdater {
             return Ok(asset);
         }
 
-        // Try partial matches
+        // Try partial matches, excluding checksum/signature sidecars — those
+        // also contain the os/arch but are not the archive we want to install
+        // (e.g. "layercake-v0.4.0-linux-x86_64.tar.gz.sha256").
         let candidates: Vec<_> = release
             .assets
             .iter()
             .filter(|asset| {
-                asset.name.contains(&platform.os) && asset.name.contains(&platform.arch)
+                asset.name.contains(&platform.os)
+                    && asset.name.contains(&platform.arch)
+                    && !is_sidecar(&asset.name)
             })
             .collect();
 
@@ -65,14 +82,18 @@ impl DefaultUpdater {
             ))),
             1 => Ok(candidates[0]),
             _ => {
-                // Multiple candidates, try to find the best match
-                for asset in &candidates {
-                    if asset.name.ends_with(&platform.extension) {
-                        return Ok(asset);
-                    }
-                }
-                // If no exact extension match, return the first candidate
-                Ok(candidates[0])
+                // Multiple candidates: prefer a real release archive.
+                candidates
+                    .iter()
+                    .find(|asset| is_release_archive(&asset.name))
+                    .copied()
+                    .or_else(|| candidates.first().copied())
+                    .ok_or_else(|| {
+                        UpdateError::VerificationError(format!(
+                            "No compatible asset found for platform {}-{}",
+                            platform.os, platform.arch
+                        ))
+                    })
             }
         }
     }
@@ -261,7 +282,10 @@ impl Updater for DefaultUpdater {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::update::{DefaultBinaryManager, DefaultPlatformDetector, GitHubVersionManager};
+    use crate::update::{
+        DefaultBinaryManager, DefaultPlatformDetector, GitHubVersionManager, ReleaseAsset,
+        ReleaseInfo,
+    };
 
     #[tokio::test]
     async fn test_updater_creation() {
@@ -275,5 +299,61 @@ mod tests {
 
         // Basic test that updater can be created
         assert!(!updater.temp_dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn sidecar_and_archive_classification() {
+        assert!(is_sidecar("layercake-v0.4.0-linux-x86_64.tar.gz.sha256"));
+        assert!(!is_sidecar("layercake-v0.4.0-linux-x86_64.tar.gz"));
+        assert!(is_release_archive("layercake-v0.4.0-linux-x86_64.tar.gz"));
+        assert!(is_release_archive("layercake-v0.4.0-windows-x86_64.zip"));
+        assert!(!is_release_archive("layercake-v0.4.0-linux-x86_64.tar.gz.sha256"));
+    }
+
+    fn asset(name: &str) -> ReleaseAsset {
+        ReleaseAsset {
+            name: name.to_string(),
+            download_url: format!("https://example.invalid/{name}"),
+            size: 1,
+            content_type: None,
+        }
+    }
+
+    #[test]
+    fn find_asset_prefers_archive_over_sha256_sidecar() {
+        // Real v0.4.0 asset layout: archive + its .sha256 both match os/arch.
+        let release = ReleaseInfo {
+            tag_name: "v0.4.0".to_string(),
+            name: "v0.4.0".to_string(),
+            body: None,
+            prerelease: false,
+            published_at: None,
+            assets: vec![
+                asset("layercake-v0.4.0-linux-x86_64.tar.gz"),
+                asset("layercake-v0.4.0-linux-x86_64.tar.gz.sha256"),
+                asset("layercake-v0.4.0-linux-aarch64.tar.gz"),
+                asset("layercake-v0.4.0-linux-aarch64.tar.gz.sha256"),
+            ],
+        };
+        let updater = DefaultUpdater::new(
+            Box::new(GitHubVersionManager::new("michiel/layercake-tool".to_string())),
+            Box::new(DefaultPlatformDetector::new()),
+            Box::new(DefaultBinaryManager::new()),
+        );
+
+        for (arch, expected) in [
+            ("x86_64", "layercake-v0.4.0-linux-x86_64.tar.gz"),
+            ("aarch64", "layercake-v0.4.0-linux-aarch64.tar.gz"),
+        ] {
+            let platform = PlatformInfo {
+                os: "linux".to_string(),
+                arch: arch.to_string(),
+                extension: String::new(),
+            };
+            let picked = updater
+                .find_asset_for_platform(&release, &platform)
+                .expect("an archive must be selected");
+            assert_eq!(picked.name, expected, "arch {arch} must pick the archive, not the .sha256");
+        }
     }
 }

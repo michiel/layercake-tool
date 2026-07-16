@@ -33,6 +33,15 @@ Layercake is an interactive platform for designing, executing, and reviewing gra
 
 - **Post-install:** ensure the chosen install directory is on `PATH` (the scripts remind you how) and verify by running `layercake --version`.
 
+- **Supported release platforms:** `linux-x86_64`, `linux-aarch64`, `macos-aarch64`, and `windows-x86_64`. Pre-built archives are published on the [releases page](https://github.com/michiel/layercake-tool/releases); other platforms can build from source (see [BUILD.md](BUILD.md)).
+
+- **Updating:** once installed, upgrade in place with the built-in updater — it downloads the latest release for your platform, verifies its checksum, and replaces the binary:
+  ```bash
+  layercake update            # check, confirm, then install the latest release
+  layercake update --check    # only report whether an update is available
+  layercake update --backup   # keep a backup of the current binary (roll back with --rollback)
+  ```
+
 ## Removed Features
 - The chat, RAG, and MCP surfaces have been pulled from this workspace so the product now focuses on the plan editor, graph tools, data acquisition, and exporter flows. See `plans/20260122-de-feature.md` for the implementation log and rationale behind the de-feature effort.
 
