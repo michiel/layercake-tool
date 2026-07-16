@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { useMutation, useQuery } from '@apollo/client/react'
 import {
   IconDatabase,
@@ -28,7 +28,10 @@ import { Separator } from '../components/ui/separator'
 import { showSuccessNotification } from '../utils/notifications'
 import { handleMutationErrors } from '../utils/graphqlHelpers'
 
-const SOURCE_MANAGEMENT_QUERY = gql`
+const SOURCE_MANAGEMENT_QUERY: TypedDocumentNode<
+  SourceManagementResponse,
+  { projectId: number; fileScope?: string | null }
+> = gql`
   query SourceManagement($projectId: Int!, $fileScope: String) {
     dataAcquisitionFiles(projectId: $projectId) {
       id
@@ -49,7 +52,17 @@ const SOURCE_MANAGEMENT_QUERY = gql`
   }
 `
 
-const INGEST_FILE = gql`
+const INGEST_FILE: TypedDocumentNode<
+  {
+    ingestFile: {
+      fileId: string
+      checksum: string
+      chunkCount: number
+      indexed: boolean
+    }
+  },
+  { input: Record<string, unknown> }
+> = gql`
   mutation IngestFile($input: IngestFileInput!) {
     ingestFile(input: $input) {
       fileId
@@ -60,7 +73,10 @@ const INGEST_FILE = gql`
   }
 `
 
-const UPDATE_FILE = gql`
+const UPDATE_FILE: TypedDocumentNode<
+  { updateIngestedFile: ProjectFile },
+  { input: Record<string, unknown> }
+> = gql`
   mutation UpdateIngestedFile($input: UpdateIngestedFileInput!) {
     updateIngestedFile(input: $input) {
       id
@@ -75,19 +91,34 @@ const UPDATE_FILE = gql`
   }
 `
 
-const DELETE_FILE = gql`
+const DELETE_FILE: TypedDocumentNode<
+  { deleteFile: boolean },
+  { input: Record<string, unknown> }
+> = gql`
   mutation DeleteFile($input: DeleteFileInput!) {
     deleteFile(input: $input)
   }
 `
 
-const TOGGLE_FILE_INDEX = gql`
+const TOGGLE_FILE_INDEX: TypedDocumentNode<
+  { toggleFileIndex: boolean },
+  { input: Record<string, unknown> }
+> = gql`
   mutation ToggleFileIndex($input: ToggleFileIndexInput!) {
     toggleFileIndex(input: $input)
   }
 `
 
-const GET_FILE_CONTENT = gql`
+const GET_FILE_CONTENT: TypedDocumentNode<
+  {
+    getFileContent: {
+      filename: string
+      mediaType: string
+      content: string
+    }
+  },
+  { input: Record<string, unknown> }
+> = gql`
   mutation GetFileContent($input: GetFileContentInput!) {
     getFileContent(input: $input) {
       filename
@@ -97,7 +128,18 @@ const GET_FILE_CONTENT = gql`
   }
 `
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  {
+    projects: Array<{
+      id: number
+      name: string
+      description?: string | null
+      createdAt: string
+      updatedAt: string
+    }>
+  },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -152,11 +194,9 @@ export const SourceManagementPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const numericProjectId = projectId ? parseInt(projectId, 10) : NaN
 
-  const { data: projectsData, loading: projectsLoading } = useQuery<{
-    projects: Array<{ id: number; name: string }>
-  }>(GET_PROJECTS)
+  const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find(
-    (p: any) => p.id === numericProjectId,
+    (p) => p.id === numericProjectId,
   )
 
   const [tagInput, setTagInput] = useState('')
@@ -166,7 +206,7 @@ export const SourceManagementPage: React.FC = () => {
   const [editFilename, setEditFilename] = useState('')
   const [editTags, setEditTags] = useState('')
 
-  const { data, loading, refetch } = useQuery<SourceManagementResponse>(
+  const { data, loading, refetch } = useQuery(
     SOURCE_MANAGEMENT_QUERY,
     {
       variables: {
@@ -295,7 +335,7 @@ export const SourceManagementPage: React.FC = () => {
       return
     }
 
-    const data = (result.data as any)?.getFileContent
+    const data = result.data?.getFileContent
     if (data) {
       // Decode base64 and create download
       const bytes = atob(data.content)

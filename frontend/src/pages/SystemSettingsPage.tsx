@@ -6,7 +6,6 @@ import {
   SystemSetting,
   SystemSettingValueType,
   UPDATE_SYSTEM_SETTING,
-  GetSystemSettingsResponse,
 } from '../graphql/systemSettings'
 import { showErrorNotification, showSuccessNotification } from '../utils/notifications'
 import PageContainer from '../components/layout/PageContainer'
@@ -25,7 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Textarea } from '../components/ui/textarea'
 
 export const SystemSettingsPage: React.FC = () => {
-  const { data, loading, error, refetch } = useQuery<GetSystemSettingsResponse>(GET_SYSTEM_SETTINGS)
+  const { data, loading, error, refetch } = useQuery(GET_SYSTEM_SETTINGS)
   const [updateSetting, { loading: saving }] = useMutation(UPDATE_SYSTEM_SETTING)
   const [selectedSetting, setSelectedSetting] = useState<SystemSetting | null>(null)
   const [value, setValue] = useState('')

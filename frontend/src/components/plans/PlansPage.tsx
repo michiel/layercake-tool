@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery } from '@apollo/client/react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { LIST_PLANS, DELETE_PLAN, DUPLICATE_PLAN } from '@/graphql/plans'
 import { Plan } from '@/types/plan'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
@@ -17,7 +17,10 @@ import { CreatePlanModal } from './CreatePlanModal'
 import { EditPlanModal } from './EditPlanModal'
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
-const GET_PROJECT = gql`
+const GET_PROJECT: TypedDocumentNode<
+  { project: { id: number; name: string; description?: string | null } | null },
+  { id: number }
+> = gql`
   query GetProject($id: Int!) {
     project(id: $id) {
       id
@@ -43,7 +46,7 @@ export const PlansPage = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [planToEdit, setPlanToEdit] = useState<Plan | null>(null)
 
-  const { data: projectData } = useQuery<{ project: { id: number; name: string; description?: string | null } }>(GET_PROJECT, {
+  const { data: projectData } = useQuery(GET_PROJECT, {
     variables: { id: projectIdNum },
     skip: !projectIdNum,
     fetchPolicy: 'cache-and-network',
@@ -54,7 +57,7 @@ export const PlansPage = () => {
     loading,
     error,
     refetch,
-  } = useQuery<{ plans: Plan[] }>(LIST_PLANS, {
+  } = useQuery(LIST_PLANS, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
     fetchPolicy: 'cache-and-network',

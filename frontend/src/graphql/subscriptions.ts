@@ -1,7 +1,10 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
 // Plan DAG Update Subscription
-export const PLAN_DAG_UPDATED_SUBSCRIPTION = gql`
+export const PLAN_DAG_UPDATED_SUBSCRIPTION: TypedDocumentNode<
+  { planDagUpdated: PlanDagUpdateEvent },
+  { planId: string }
+> = gql`
   subscription PlanDagUpdated($planId: ID!) {
     planDagUpdated(planId: $planId) {
       planId
@@ -31,7 +34,10 @@ export const PLAN_DAG_UPDATED_SUBSCRIPTION = gql`
 `
 
 // User Presence Subscription
-export const USER_PRESENCE_CHANGED_SUBSCRIPTION = gql`
+export const USER_PRESENCE_CHANGED_SUBSCRIPTION: TypedDocumentNode<
+  { userPresenceChanged: UserPresenceEvent },
+  { planId: string }
+> = gql`
   subscription UserPresenceChanged($planId: ID!) {
     userPresenceChanged(planId: $planId) {
       userId
@@ -49,7 +55,10 @@ export const USER_PRESENCE_CHANGED_SUBSCRIPTION = gql`
 `
 
 // All Collaboration Events Subscription
-export const COLLABORATION_EVENTS_SUBSCRIPTION = gql`
+export const COLLABORATION_EVENTS_SUBSCRIPTION: TypedDocumentNode<
+  { collaborationEvents: CollaborationEvent },
+  { planId: string }
+> = gql`
   subscription CollaborationEvents($planId: ID!) {
     collaborationEvents(planId: $planId) {
       eventId

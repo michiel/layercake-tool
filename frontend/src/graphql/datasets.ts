@@ -1,7 +1,10 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
 // Query to fetch all DataSets for a project
-export const GET_DATASOURCES = gql`
+export const GET_DATASOURCES: TypedDocumentNode<
+  { dataSets: DataSet[] },
+  { projectId: number }
+> = gql`
   query GetDataSets($projectId: Int!) {
     dataSets(projectId: $projectId) {
       id
@@ -32,7 +35,10 @@ export const GET_DATASOURCES = gql`
 `
 
 // Query to fetch a single DataSet by ID
-export const GET_DATASOURCE = gql`
+export const GET_DATASOURCE: TypedDocumentNode<
+  { dataSet: DataSet | null },
+  { id: number }
+> = gql`
   query GetDataSet($id: Int!) {
     dataSet(id: $id) {
       id
@@ -63,7 +69,10 @@ export const GET_DATASOURCE = gql`
 `
 
 // Mutation to create a new DataSet from uploaded file
-export const CREATE_DATASOURCE_FROM_FILE = gql`
+export const CREATE_DATASOURCE_FROM_FILE: TypedDocumentNode<
+  { createDataSetFromFile: DataSet },
+  { input: CreateDataSetInput }
+> = gql`
   mutation CreateDataSetFromFile($input: CreateDataSetInput!) {
     createDataSetFromFile(input: $input) {
       id
@@ -94,7 +103,10 @@ export const CREATE_DATASOURCE_FROM_FILE = gql`
 `
 
 // Mutation to create a new empty DataSet (without file upload)
-export const CREATE_EMPTY_DATASOURCE = gql`
+export const CREATE_EMPTY_DATASOURCE: TypedDocumentNode<
+  { createEmptyDataSet: DataSet },
+  { input: CreateEmptyDataSetInput }
+> = gql`
   mutation CreateEmptyDataSet($input: CreateEmptyDataSetInput!) {
     createEmptyDataSet(input: $input) {
       id
@@ -120,7 +132,10 @@ export const CREATE_EMPTY_DATASOURCE = gql`
 `
 
 // Mutation to bulk upload multiple DataSets with auto-detection
-export const BULK_UPLOAD_DATASOURCES = gql`
+export const BULK_UPLOAD_DATASOURCES: TypedDocumentNode<
+  { bulkUploadDataSets: DataSet[] },
+  { projectId: number; files: BulkUploadDataSetInput[] }
+> = gql`
   mutation BulkUploadDataSets($projectId: Int!, $files: [BulkUploadDataSetInput!]!) {
     bulkUploadDataSets(projectId: $projectId, files: $files) {
       id
@@ -146,7 +161,10 @@ export const BULK_UPLOAD_DATASOURCES = gql`
 `
 
 // Mutation to update DataSet metadata
-export const UPDATE_DATASOURCE = gql`
+export const UPDATE_DATASOURCE: TypedDocumentNode<
+  { updateDataSet: DataSet },
+  { id: number; input: UpdateDataSetInput }
+> = gql`
   mutation UpdateDataSet($id: Int!, $input: UpdateDataSetInput!) {
     updateDataSet(id: $id, input: $input) {
       id
@@ -171,7 +189,10 @@ export const UPDATE_DATASOURCE = gql`
   }
 `
 
-export const VALIDATE_DATASET = gql`
+export const VALIDATE_DATASET: TypedDocumentNode<
+  { validateDataSet: DataSetValidationResult },
+  { id: number }
+> = gql`
   mutation ValidateDataSet($id: Int!) {
     validateDataSet(id: $id) {
       dataSetId
@@ -188,14 +209,20 @@ export const VALIDATE_DATASET = gql`
 `
 
 // Mutation to delete a DataSet
-export const DELETE_DATASOURCE = gql`
+export const DELETE_DATASOURCE: TypedDocumentNode<
+  { deleteDataSet: boolean },
+  { id: number }
+> = gql`
   mutation DeleteDataSet($id: Int!) {
     deleteDataSet(id: $id)
   }
 `
 
 // Mutation to reprocess an existing DataSet
-export const REPROCESS_DATASOURCE = gql`
+export const REPROCESS_DATASOURCE: TypedDocumentNode<
+  { reprocessDataSet: DataSet },
+  { id: number }
+> = gql`
   mutation ReprocessDataSet($id: Int!) {
     reprocessDataSet(id: $id) {
       id
@@ -221,7 +248,10 @@ export const REPROCESS_DATASOURCE = gql`
 `
 
 // Mutation to update graph JSON data
-export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
+export const UPDATE_DATASOURCE_GRAPH_DATA: TypedDocumentNode<
+  { updateDataSetGraphData: DataSet },
+  { id: number; graphJson: string }
+> = gql`
   mutation UpdateDataSetGraphData($id: Int!, $graphJson: String!) {
     updateDataSetGraphData(id: $id, graphJson: $graphJson) {
       id
@@ -247,7 +277,10 @@ export const UPDATE_DATASOURCE_GRAPH_DATA = gql`
 `
 
 // Subscription for DataSet updates
-export const DATASOURCE_UPDATED = gql`
+export const DATASOURCE_UPDATED: TypedDocumentNode<
+  { dataSetUpdated: DataSet },
+  { projectId: number }
+> = gql`
   subscription DataSetUpdated($projectId: Int!) {
     dataSetUpdated(projectId: $projectId) {
       id
@@ -273,7 +306,10 @@ export const DATASOURCE_UPDATED = gql`
 `
 
 // Export data sources as spreadsheet
-export const EXPORT_DATASOURCES = gql`
+export const EXPORT_DATASOURCES: TypedDocumentNode<
+  { exportDataSets: { fileContent: string; filename: string; format: string } },
+  { input: Record<string, unknown> }
+> = gql`
   mutation ExportDataSets($input: ExportDataSetsInput!) {
     exportDataSets(input: $input) {
       fileContent
@@ -284,7 +320,10 @@ export const EXPORT_DATASOURCES = gql`
 `
 
 // Import data sources from spreadsheet
-export const IMPORT_DATASOURCES = gql`
+export const IMPORT_DATASOURCES: TypedDocumentNode<
+  { importDataSets: { dataSets: DataSet[]; createdCount: number; updatedCount: number } },
+  { input: Record<string, unknown> }
+> = gql`
   mutation ImportDataSets($input: ImportDataSetsInput!) {
     importDataSets(input: $input) {
       dataSets {
@@ -313,7 +352,10 @@ export const IMPORT_DATASOURCES = gql`
 `
 
 // Merge multiple data sets into a single new data set
-export const MERGE_DATASOURCES = gql`
+export const MERGE_DATASOURCES: TypedDocumentNode<
+  { mergeDataSets: DataSet },
+  { input: Record<string, unknown> }
+> = gql`
   mutation MergeDataSets($input: MergeDataSetsInput!) {
     mergeDataSets(input: $input) {
       id
@@ -377,7 +419,10 @@ export interface DataSet {
   hasLayers?: boolean
 }
 
-export const GET_GRAPH_SUMMARY = gql`
+export const GET_GRAPH_SUMMARY: TypedDocumentNode<
+  { graphSummary: GraphSummary },
+  { datasetId: number }
+> = gql`
   query GraphSummary($datasetId: Int!) {
     graphSummary(datasetId: $datasetId) {
       nodeCount
@@ -388,7 +433,10 @@ export const GET_GRAPH_SUMMARY = gql`
   }
 `
 
-export const GET_GRAPH_PAGE = gql`
+export const GET_GRAPH_PAGE: TypedDocumentNode<
+  { graphPage: GraphPageSlice },
+  { datasetId: number; limit: number; offset: number; layers?: string[] | null }
+> = gql`
   query GraphPage($datasetId: Int!, $limit: Int!, $offset: Int!, $layers: [String!]) {
     graphPage(datasetId: $datasetId, limit: $limit, offset: $offset, layers: $layers) {
       hasMore

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { useLazyQuery, useMutation, useQuery } from '@apollo/client/react'
 import PageContainer from '@/components/layout/PageContainer'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
@@ -16,7 +16,25 @@ import { createApolloClientForEndpoint } from '@/graphql/client'
 import { LIST_STORIES } from '@/graphql/stories'
 import { LIST_SEQUENCES } from '@/graphql/sequences'
 
-const PROJECTION_EDIT_QUERY = gql`
+type ProjectionEditData = {
+  projection: {
+    id: string
+    name: string
+    projectionType: string
+    projectId: string
+    graphId: string
+  } | null
+  projectionState: {
+    projectionId: string
+    projectionType: string
+    stateJson: Record<string, unknown> | null
+  } | null
+}
+
+const PROJECTION_EDIT_QUERY: TypedDocumentNode<
+  ProjectionEditData,
+  { id: string | undefined }
+> = gql`
   query ProjectionEdit($id: ID!) {
     projection(id: $id) {
       id
@@ -33,13 +51,35 @@ const PROJECTION_EDIT_QUERY = gql`
   }
 `
 
-const SAVE_PROJECTION_STATE = gql`
+const SAVE_PROJECTION_STATE: TypedDocumentNode<
+  { saveProjectionState: boolean },
+  { id: string; state: unknown }
+> = gql`
   mutation SaveProjectionState($id: ID!, $state: JSON!) {
     saveProjectionState(id: $id, state: $state)
   }
 `
 
-const VERIFY_PROJECTION_STORY_MATCH = gql`
+type VerifyProjectionStoryMatchData = {
+  verifyProjectionStoryMatch: {
+    success: boolean
+    sequences: {
+      storyId: number
+      sequenceId: number
+      missingEdges: { datasetId: number; edgeId: string }[]
+    }[]
+  } | null
+}
+
+type ProjectionStorySelectionInput = {
+  storyId: number
+  enabledSequenceIds: number[]
+}
+
+const VERIFY_PROJECTION_STORY_MATCH: TypedDocumentNode<
+  VerifyProjectionStoryMatchData,
+  { projectionId: number; stories: ProjectionStorySelectionInput[] }
+> = gql`
   mutation VerifyProjectionStoryMatch($projectionId: Int!, $stories: [ProjectionStorySelectionInput!]!) {
     verifyProjectionStoryMatch(projectionId: $projectionId, stories: $stories) {
       success
@@ -61,7 +101,6 @@ type StorySelection = {
 }
 
 type SequenceInfo = { id: number; name: string }
-type SequencesQueryResult = { sequences: SequenceInfo[] }
 
 const buildSelectionPayload = (selections: Record<number, StorySelection>) =>
   Object.entries(selections)
@@ -100,21 +139,18 @@ export const ProjectionEditPage = () => {
     skip: !projectIdNum,
   })
 
-  const [loadSequences, { loading: loadingSeq }] = useLazyQuery<SequencesQueryResult, { storyId: number }>(
-    LIST_SEQUENCES,
-    {
-      fetchPolicy: 'cache-first',
-    }
-  )
+  const [loadSequences, { loading: loadingSeq }] = useLazyQuery(LIST_SEQUENCES, {
+    fetchPolicy: 'cache-first',
+  })
 
   const [saveState, { loading: saving }] = useMutation(SAVE_PROJECTION_STATE, {
     client: projectionsClient,
   })
   const [verifyStories, { loading: verifying }] = useMutation(VERIFY_PROJECTION_STORY_MATCH)
 
-  const projection = (projectionData as any)?.projection
-  const projectionState = (projectionData as any)?.projectionState
-  const stories = (storiesData as any)?.stories ?? []
+  const projection = projectionData?.projection
+  const projectionState = projectionData?.projectionState
+  const stories = storiesData?.stories ?? []
 
   const [storyModeEnabled, setStoryModeEnabled] = useState(false)
   const [storySelections, setStorySelections] = useState<Record<number, StorySelection>>({})
@@ -237,12 +273,12 @@ export const ProjectionEditPage = () => {
       const { data } = await verifyStories({
         variables: { projectionId: projectionIdNum, stories: selection },
       })
-      const result = (data as any)?.verifyProjectionStoryMatch
+      const result = data?.verifyProjectionStoryMatch
       if (!result) {
         showErrorNotification('Verification failed', 'No result returned')
         return
       }
-      const missing = (result.sequences as any[]) ?? []
+      const missing = result.sequences ?? []
       setVerificationResult({ success: result.success, missing })
       if (result.success || missing.length === 0) {
         showSuccessNotification('Verified', 'All selected stories match this projection graph.')

@@ -1,7 +1,10 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
 // Query to list all stories for a project
-export const LIST_STORIES = gql`
+export const LIST_STORIES: TypedDocumentNode<
+  { stories: Story[] },
+  { projectId: number }
+> = gql`
   query ListStories($projectId: Int!) {
     stories(projectId: $projectId) {
       id
@@ -23,7 +26,10 @@ export const LIST_STORIES = gql`
 `
 
 // Query to get a single story by ID
-export const GET_STORY = gql`
+export const GET_STORY: TypedDocumentNode<
+  { story: Story | null },
+  { id: number }
+> = gql`
   query GetStory($id: Int!) {
     story(id: $id) {
       id
@@ -45,7 +51,10 @@ export const GET_STORY = gql`
 `
 
 // Mutation to create a new story
-export const CREATE_STORY = gql`
+export const CREATE_STORY: TypedDocumentNode<
+  { createStory: Story },
+  { input: CreateStoryInput }
+> = gql`
   mutation CreateStory($input: CreateStoryInput!) {
     createStory(input: $input) {
       id
@@ -67,7 +76,10 @@ export const CREATE_STORY = gql`
 `
 
 // Mutation to update a story
-export const UPDATE_STORY = gql`
+export const UPDATE_STORY: TypedDocumentNode<
+  { updateStory: Story },
+  { id: number; input: UpdateStoryInput }
+> = gql`
   mutation UpdateStory($id: Int!, $input: UpdateStoryInput!) {
     updateStory(id: $id, input: $input) {
       id
@@ -89,7 +101,10 @@ export const UPDATE_STORY = gql`
 `
 
 // Mutation to delete a story
-export const DELETE_STORY = gql`
+export const DELETE_STORY: TypedDocumentNode<
+  { deleteStory: boolean },
+  { id: number }
+> = gql`
   mutation DeleteStory($id: Int!) {
     deleteStory(id: $id)
   }
@@ -122,7 +137,7 @@ export interface Story {
 export interface CreateStoryInput {
   projectId: number
   name: string
-  description?: string
+  description?: string | null
   tags?: string[]
   enabledDatasetIds?: number[]
   enabledGraphIds?: number[]
@@ -131,7 +146,7 @@ export interface CreateStoryInput {
 
 export interface UpdateStoryInput {
   name?: string
-  description?: string
+  description?: string | null
   tags?: string[]
   enabledDatasetIds?: number[]
   enabledGraphIds?: number[]
@@ -140,7 +155,10 @@ export interface UpdateStoryInput {
 
 // Import/Export mutations
 
-export const EXPORT_STORY = gql`
+export const EXPORT_STORY: TypedDocumentNode<
+  { exportStory: StoryExport },
+  { storyId: number; format: StoryExportFormat }
+> = gql`
   mutation ExportStory($storyId: Int!, $format: StoryExportFormat!) {
     exportStory(storyId: $storyId, format: $format) {
       filename
@@ -150,7 +168,10 @@ export const EXPORT_STORY = gql`
   }
 `
 
-export const IMPORT_STORY = gql`
+export const IMPORT_STORY: TypedDocumentNode<
+  { importStory: StoryImportResult },
+  { projectId: number; format: StoryImportFormat; content: string }
+> = gql`
   mutation ImportStory($projectId: Int!, $format: StoryImportFormat!, $content: String!) {
     importStory(projectId: $projectId, format: $format, content: $content) {
       importedStories {

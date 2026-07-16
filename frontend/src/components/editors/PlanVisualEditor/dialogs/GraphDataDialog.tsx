@@ -12,7 +12,6 @@ import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
 import {
   GET_GRAPH_DETAILS,
-  Graph,
   BULK_UPDATE_GRAPH_DATA,
   ADD_GRAPH_NODE,
   ADD_GRAPH_EDGE,
@@ -35,8 +34,8 @@ export const GraphDataDialog: React.FC<GraphDataDialogProps> = ({
   graphId,
   title = 'Graph Data'
 }) => {
-  const { data, loading, error, refetch } = useQuery<{ graph: Graph }>(GET_GRAPH_DETAILS, {
-    variables: { id: graphId },
+  const { data, loading, error, refetch } = useQuery(GET_GRAPH_DETAILS, {
+    variables: { id: graphId ?? 0 },
     skip: !opened || !graphId,
     fetchPolicy: 'network-only'
   });

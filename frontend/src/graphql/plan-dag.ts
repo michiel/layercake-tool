@@ -1,7 +1,11 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
+import type { PlanDag, PlanDagNode, PlanDagEdge } from '../types/plan-dag'
 
 // Plan DAG Queries
-export const GET_PLAN_DAG = gql`
+export const GET_PLAN_DAG: TypedDocumentNode<
+  { getPlanDag: PlanDag | null },
+  { projectId: number; planId?: number | null }
+> = gql`
   query GetPlanDag($projectId: Int!, $planId: Int) {
     getPlanDag(projectId: $projectId, planId: $planId) {
       version
@@ -58,7 +62,26 @@ export const GET_PLAN_DAG = gql`
   }
 `
 
-export const VALIDATE_PLAN_DAG = gql`
+export const VALIDATE_PLAN_DAG: TypedDocumentNode<
+  {
+    validatePlanDag: {
+      isValid: boolean
+      errors: Array<{
+        nodeId?: string | null
+        edgeId?: string | null
+        nodeType?: string | null
+        message: string
+      }>
+      warnings: Array<{
+        nodeId?: string | null
+        edgeId?: string | null
+        nodeType?: string | null
+        message: string
+      }>
+    }
+  },
+  { planDag: unknown }
+> = gql`
   query ValidatePlanDag($planDag: PlanDagInput!) {
     validatePlanDag(planDag: $planDag) {
       isValid
@@ -79,7 +102,10 @@ export const VALIDATE_PLAN_DAG = gql`
 `
 
 // Plan DAG Mutations
-export const UPDATE_PLAN_DAG = gql`
+export const UPDATE_PLAN_DAG: TypedDocumentNode<
+  { updatePlanDag: PlanDag },
+  { projectId: number; planId?: number | null; planDag: unknown }
+> = gql`
   mutation UpdatePlanDag($projectId: Int!, $planId: Int, $planDag: PlanDagInput!) {
     updatePlanDag(projectId: $projectId, planId: $planId, planDag: $planDag) {
       version
@@ -119,7 +145,10 @@ export const UPDATE_PLAN_DAG = gql`
   }
 `
 
-export const ADD_PLAN_DAG_NODE = gql`
+export const ADD_PLAN_DAG_NODE: TypedDocumentNode<
+  { addPlanDagNode: PlanDagNode },
+  { projectId: number; planId?: number | null; node: unknown }
+> = gql`
   mutation AddPlanDagNode($projectId: Int!, $planId: Int, $node: PlanDagNodeInput!) {
     addPlanDagNode(projectId: $projectId, planId: $planId, node: $node) {
       id
@@ -137,7 +166,15 @@ export const ADD_PLAN_DAG_NODE = gql`
   }
 `
 
-export const UPDATE_PLAN_DAG_NODE = gql`
+export const UPDATE_PLAN_DAG_NODE: TypedDocumentNode<
+  { updatePlanDagNode: PlanDagNode },
+  {
+    projectId: number
+    planId?: number | null
+    nodeId: string
+    updates: unknown
+  }
+> = gql`
   mutation UpdatePlanDagNode($projectId: Int!, $planId: Int, $nodeId: String!, $updates: PlanDagNodeUpdateInput!) {
     updatePlanDagNode(projectId: $projectId, planId: $planId, nodeId: $nodeId, updates: $updates) {
       id
@@ -155,7 +192,10 @@ export const UPDATE_PLAN_DAG_NODE = gql`
   }
 `
 
-export const DELETE_PLAN_DAG_NODE = gql`
+export const DELETE_PLAN_DAG_NODE: TypedDocumentNode<
+  { deletePlanDagNode: { id: string } },
+  { projectId: number; planId?: number | null; nodeId: string }
+> = gql`
   mutation DeletePlanDagNode($projectId: Int!, $planId: Int, $nodeId: String!) {
     deletePlanDagNode(projectId: $projectId, planId: $planId, nodeId: $nodeId) {
       id
@@ -163,7 +203,10 @@ export const DELETE_PLAN_DAG_NODE = gql`
   }
 `
 
-export const ADD_PLAN_DAG_EDGE = gql`
+export const ADD_PLAN_DAG_EDGE: TypedDocumentNode<
+  { addPlanDagEdge: PlanDagEdge },
+  { projectId: number; planId?: number | null; edge: unknown }
+> = gql`
   mutation AddPlanDagEdge($projectId: Int!, $planId: Int, $edge: PlanDagEdgeInput!) {
     addPlanDagEdge(projectId: $projectId, planId: $planId, edge: $edge) {
       id
@@ -177,7 +220,10 @@ export const ADD_PLAN_DAG_EDGE = gql`
   }
 `
 
-export const DELETE_PLAN_DAG_EDGE = gql`
+export const DELETE_PLAN_DAG_EDGE: TypedDocumentNode<
+  { deletePlanDagEdge: { id: string } },
+  { projectId: number; planId?: number | null; edgeId: string }
+> = gql`
   mutation DeletePlanDagEdge($projectId: Int!, $planId: Int, $edgeId: String!) {
     deletePlanDagEdge(projectId: $projectId, planId: $planId, edgeId: $edgeId) {
       id
@@ -185,7 +231,15 @@ export const DELETE_PLAN_DAG_EDGE = gql`
   }
 `
 
-export const UPDATE_PLAN_DAG_EDGE = gql`
+export const UPDATE_PLAN_DAG_EDGE: TypedDocumentNode<
+  { updatePlanDagEdge: PlanDagEdge },
+  {
+    projectId: number
+    planId?: number | null
+    edgeId: string
+    updates: unknown
+  }
+> = gql`
   mutation UpdatePlanDagEdge($projectId: Int!, $planId: Int, $edgeId: String!, $updates: PlanDagEdgeUpdateInput!) {
     updatePlanDagEdge(projectId: $projectId, planId: $planId, edgeId: $edgeId, updates: $updates) {
       id
@@ -199,7 +253,15 @@ export const UPDATE_PLAN_DAG_EDGE = gql`
   }
 `
 
-export const MOVE_PLAN_DAG_NODE = gql`
+export const MOVE_PLAN_DAG_NODE: TypedDocumentNode<
+  { movePlanDagNode: { id: string; position: { x: number; y: number } } },
+  {
+    projectId: number
+    planId?: number | null
+    nodeId: string
+    position: { x: number; y: number }
+  }
+> = gql`
   mutation MovePlanDagNode($projectId: Int!, $planId: Int, $nodeId: String!, $position: PositionInput!) {
     movePlanDagNode(projectId: $projectId, planId: $planId, nodeId: $nodeId, position: $position) {
       id
@@ -211,7 +273,14 @@ export const MOVE_PLAN_DAG_NODE = gql`
   }
 `
 
-export const BATCH_MOVE_PLAN_DAG_NODES = gql`
+export const BATCH_MOVE_PLAN_DAG_NODES: TypedDocumentNode<
+  { batchMovePlanDagNodes: Array<{ id: string; position: { x: number; y: number } }> },
+  {
+    projectId: number
+    planId?: number | null
+    nodePositions: unknown
+  }
+> = gql`
   mutation BatchMovePlanDagNodes($projectId: Int!, $planId: Int, $nodePositions: [NodePositionInput!]!) {
     batchMovePlanDagNodes(projectId: $projectId, planId: $planId, nodePositions: $nodePositions) {
       id
@@ -223,7 +292,22 @@ export const BATCH_MOVE_PLAN_DAG_NODES = gql`
   }
 `
 
-export const VALIDATE_AND_MIGRATE_PLAN_DAG = gql`
+export const VALIDATE_AND_MIGRATE_PLAN_DAG: TypedDocumentNode<
+  {
+    validateAndMigratePlanDag: {
+      checkedNodes: number
+      updatedNodes: Array<{
+        nodeId: string
+        fromType?: string | null
+        toType?: string | null
+        note?: string | null
+      }>
+      warnings: string[]
+      errors: string[]
+    }
+  },
+  { projectId: number; planId?: number | null }
+> = gql`
   mutation ValidateAndMigratePlanDag($projectId: Int!, $planId: Int) {
     validateAndMigratePlanDag(projectId: $projectId, planId: $planId) {
       checkedNodes
@@ -240,7 +324,10 @@ export const VALIDATE_AND_MIGRATE_PLAN_DAG = gql`
 `
 
 // Plan DAG Subscriptions for real-time collaboration
-export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
+export const PLAN_DAG_CHANGED_SUBSCRIPTION: TypedDocumentNode<
+  { planDagChanged: Record<string, unknown> },
+  { projectId: number; planId?: number | null }
+> = gql`
   subscription PlanDagChanged($projectId: Int!, $planId: Int) {
     planDagChanged(projectId: $projectId, planId: $planId) {
       type
@@ -292,7 +379,10 @@ export const PLAN_DAG_CHANGED_SUBSCRIPTION = gql`
   }
 `
 
-export const USER_PRESENCE_SUBSCRIPTION = gql`
+export const USER_PRESENCE_SUBSCRIPTION: TypedDocumentNode<
+  { userPresenceChanged: Record<string, unknown> },
+  { planId: string }
+> = gql`
   subscription UserPresenceChanged($planId: ID!) {
     userPresenceChanged(planId: $planId) {
       userId
@@ -310,7 +400,10 @@ export const USER_PRESENCE_SUBSCRIPTION = gql`
 `
 
 // Delta-based subscription for JSON Patch updates
-export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
+export const PLAN_DAG_DELTA_SUBSCRIPTION: TypedDocumentNode<
+  { planDagDeltaChanged: Record<string, unknown> },
+  { projectId: number; planId?: number | null }
+> = gql`
   subscription PlanDagDeltaChanged($projectId: Int!, $planId: Int) {
     planDagDeltaChanged(projectId: $projectId, planId: $planId) {
       projectId
@@ -330,7 +423,10 @@ export const PLAN_DAG_DELTA_SUBSCRIPTION = gql`
 `
 
 // Execution status subscription for real-time status updates
-export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
+export const NODE_EXECUTION_STATUS_SUBSCRIPTION: TypedDocumentNode<
+  { nodeExecutionStatusChanged: Record<string, unknown> },
+  { projectId: number }
+> = gql`
   subscription NodeExecutionStatusChanged($projectId: Int!) {
     nodeExecutionStatusChanged(projectId: $projectId) {
       projectId
@@ -361,13 +457,19 @@ export const NODE_EXECUTION_STATUS_SUBSCRIPTION = gql`
 
 // Collaboration Mutations
 
-export const JOIN_PROJECT_COLLABORATION = gql`
+export const JOIN_PROJECT_COLLABORATION: TypedDocumentNode<
+  { joinProjectCollaboration: boolean },
+  { projectId: number }
+> = gql`
   mutation JoinProjectCollaboration($projectId: Int!) {
     joinProjectCollaboration(projectId: $projectId)
   }
 `
 
-export const LEAVE_PROJECT_COLLABORATION = gql`
+export const LEAVE_PROJECT_COLLABORATION: TypedDocumentNode<
+  { leaveProjectCollaboration: boolean },
+  { projectId: number }
+> = gql`
   mutation LeaveProjectCollaboration($projectId: Int!) {
     leaveProjectCollaboration(projectId: $projectId)
   }

@@ -1,6 +1,14 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
-export const EXPORT_NODE_OUTPUT = gql`
+export const EXPORT_NODE_OUTPUT: TypedDocumentNode<
+  { exportNodeOutput: ExportNodeOutputResult },
+  {
+    projectId: number
+    nodeId: string
+    planId?: number | null
+    renderConfig?: Record<string, unknown> | null
+  }
+> = gql`
   mutation ExportNodeOutput(
     $projectId: Int!
     $nodeId: String!

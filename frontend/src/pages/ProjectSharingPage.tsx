@@ -1,5 +1,5 @@
 import React from 'react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { useQuery } from '@apollo/client/react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { IconShare, IconLink, IconUsersGroup } from '@tabler/icons-react'
@@ -11,7 +11,18 @@ import { Stack, Group } from '../components/layout-primitives'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  {
+    projects: Array<{
+      id: number
+      name: string
+      description: string | null
+      createdAt: string
+      updatedAt: string
+    }>
+  },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -28,11 +39,9 @@ export const ProjectSharingPage: React.FC = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const projectNumericId = projectId ? parseInt(projectId, 10) : NaN
 
-  const { data: projectsData, loading: projectsLoading } = useQuery<{
-    projects: Array<{ id: number; name: string }>
-  }>(GET_PROJECTS)
+  const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find(
-    (p: any) => p.id === projectNumericId,
+    (p) => p.id === projectNumericId,
   )
 
   if (projectsLoading && !selectedProject) {

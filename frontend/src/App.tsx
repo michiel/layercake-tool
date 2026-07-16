@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Routes, Route, Navigate, useNavigate, useParams, useLocation, Link } from 'react-router-dom'
 import { IconGraph, IconServer, IconDatabase, IconPlus, IconSettings, IconFileDatabase, IconTrash, IconDownload, IconChevronLeft, IconChevronRight, IconFolderPlus, IconBooks, IconAdjustments, IconHierarchy2, IconChevronDown, IconUpload, IconFlask } from '@tabler/icons-react'
 import { useQuery, useMutation } from '@apollo/client/react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { Breadcrumbs } from './components/common/Breadcrumbs'
 import { PlanVisualEditor } from './components/editors/PlanVisualEditor/PlanVisualEditor'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
@@ -31,13 +31,12 @@ import { cn } from './lib/utils'
 import { useTagsFilter } from './hooks/useTagsFilter'
 import { EXPORT_PROJECT_ARCHIVE, EXPORT_PROJECT_AS_TEMPLATE, RESET_PROJECT } from './graphql/libraryItems'
 import { LIST_PLANS, GET_PLAN } from './graphql/plans'
-import { LIST_STORIES, type Story } from './graphql/stories'
+import { LIST_STORIES } from './graphql/stories'
 import { showErrorNotification, showSuccessNotification } from './utils/notifications'
 import { PlansPage } from './components/plans/PlansPage'
 import { ProjectionsPage } from './pages/workbench/ProjectionsPage'
 import { ProjectionViewerPage } from './pages/projections/ProjectionViewerPage'
 import { ProjectionEditPage } from './pages/projections/ProjectionEditPage'
-import type { Plan } from './types/plan'
 
 // Collaboration Context for providing project-level collaboration to all pages
 const CollaborationContext = React.createContext<any>(null)
@@ -59,8 +58,36 @@ type ProjectNavSection = {
   children?: ProjectNavChild[]
 }
 
+// Shape of a project as returned by the queries/mutations in this file
+type ProjectSummary = {
+  id: number
+  name: string
+  description: string
+  importExportPath?: string | null
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+// Reduced project shape returned by import/export mutations
+type ProjectImportExportResult = {
+  id: number
+  name: string
+  description: string
+  importExportPath?: string | null
+}
+
+type SampleProjectSummary = {
+  key: string
+  name: string
+  description?: string | null
+}
+
 // Query to fetch projects
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: ProjectSummary[] },
+  { tags?: string[] | null }
+> = gql`
   query GetProjects($tags: [String!]) {
     projects(tags: $tags) {
       id
@@ -75,13 +102,19 @@ const GET_PROJECTS = gql`
 `
 
 // Mutation to delete a project
-const DELETE_PROJECT = gql`
+const DELETE_PROJECT: TypedDocumentNode<
+  { deleteProject: boolean },
+  { id: string | number }
+> = gql`
   mutation DeleteProject($id: ID!) {
     deleteProject(id: $id)
   }
 `
 
-const GET_SAMPLE_PROJECTS = gql`
+const GET_SAMPLE_PROJECTS: TypedDocumentNode<
+  { sampleProjects: SampleProjectSummary[] },
+  Record<string, never>
+> = gql`
   query GetSampleProjects {
     sampleProjects {
       key
@@ -91,7 +124,10 @@ const GET_SAMPLE_PROJECTS = gql`
   }
 `
 
-const CREATE_SAMPLE_PROJECT = gql`
+const CREATE_SAMPLE_PROJECT: TypedDocumentNode<
+  { createSampleProject: { id: number; name: string; description?: string | null } },
+  { sampleKey: string }
+> = gql`
   mutation CreateSampleProject($sampleKey: String!) {
     createSampleProject(sampleKey: $sampleKey) {
       id
@@ -101,7 +137,10 @@ const CREATE_SAMPLE_PROJECT = gql`
   }
 `
 
-const IMPORT_PROJECT_ARCHIVE = gql`
+const IMPORT_PROJECT_ARCHIVE: TypedDocumentNode<
+  { importProjectArchive: ProjectImportExportResult },
+  { fileContent: string; name?: string | null }
+> = gql`
   mutation ImportProjectArchive($fileContent: String!, $name: String) {
     importProjectArchive(fileContent: $fileContent, name: $name) {
       id
@@ -112,7 +151,10 @@ const IMPORT_PROJECT_ARCHIVE = gql`
   }
 `
 
-const IMPORT_PROJECT_FROM_DIRECTORY = gql`
+const IMPORT_PROJECT_FROM_DIRECTORY: TypedDocumentNode<
+  { importProjectFromDirectory: ProjectImportExportResult },
+  { path: string; name?: string | null; keepConnection?: boolean | null }
+> = gql`
   mutation ImportProjectFromDirectory($path: String!, $name: String, $keepConnection: Boolean) {
     importProjectFromDirectory(path: $path, name: $name, keepConnection: $keepConnection) {
       id
@@ -123,7 +165,10 @@ const IMPORT_PROJECT_FROM_DIRECTORY = gql`
   }
 `
 
-const EXPORT_PROJECT_TO_DIRECTORY = gql`
+const EXPORT_PROJECT_TO_DIRECTORY: TypedDocumentNode<
+  { exportProjectToDirectory: boolean },
+  { projectId: number; path: string; keepConnection?: boolean | null }
+> = gql`
   mutation ExportProjectToDirectory(
     $projectId: Int!
     $path: String!
@@ -137,7 +182,10 @@ const EXPORT_PROJECT_TO_DIRECTORY = gql`
   }
 `
 
-const REIMPORT_PROJECT = gql`
+const REIMPORT_PROJECT: TypedDocumentNode<
+  { reimportProject: ProjectImportExportResult },
+  { projectId: number }
+> = gql`
   mutation ReimportProject($projectId: Int!) {
     reimportProject(projectId: $projectId) {
       id
@@ -148,14 +196,20 @@ const REIMPORT_PROJECT = gql`
   }
 `
 
-const REEXPORT_PROJECT = gql`
+const REEXPORT_PROJECT: TypedDocumentNode<
+  { reexportProject: boolean },
+  { projectId: number }
+> = gql`
   mutation ReexportProject($projectId: Int!) {
     reexportProject(projectId: $projectId)
   }
 `
 
 // Query to fetch Plan DAG for download
-const GET_PLAN_DAG = gql`
+const GET_PLAN_DAG: TypedDocumentNode<
+  { getPlanDag: unknown },
+  { projectId: number }
+> = gql`
   query GetPlanDag($projectId: Int!) {
     getPlanDag(projectId: $projectId) {
       version
@@ -637,29 +691,13 @@ const HomePage = () => {
   const [sampleError, setSampleError] = useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
-  const { data: projectsData } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      importExportPath?: string | null
-      tags: string[]
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS, {
+  const { data: projectsData } = useQuery(GET_PROJECTS, {
     variables: {
       tags: activeTags.length > 0 ? activeTags : null
     }
   })
 
-  const { data: sampleProjectsData, loading: sampleProjectsLoading } = useQuery<{
-    sampleProjects: Array<{
-      key: string
-      name: string
-      description?: string | null
-    }>
-  }>(GET_SAMPLE_PROJECTS)
+  const { data: sampleProjectsData, loading: sampleProjectsLoading } = useQuery(GET_SAMPLE_PROJECTS)
 
   const [createSampleProject, { loading: createSampleLoading }] = useMutation(CREATE_SAMPLE_PROJECT, {
     onCompleted: (result) => {
@@ -1028,30 +1066,14 @@ const ProjectsPage = () => {
   const [selectedSampleKey, setSelectedSampleKey] = useState<string | null>(null)
   const [sampleError, setSampleError] = useState<string | null>(null)
 
-  const { data: projectsData, loading: projectsLoading, error: projectsError, refetch } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      importExportPath?: string | null
-      tags: string[]
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS, {
+  const { data: projectsData, loading: projectsLoading, error: projectsError, refetch } = useQuery(GET_PROJECTS, {
     variables: {
       tags: activeTags.length > 0 ? activeTags : null
     },
     errorPolicy: 'all',
   })
 
-  const { data: sampleProjectsData, loading: sampleProjectsLoading, error: sampleProjectsError } = useQuery<{
-    sampleProjects: Array<{
-      key: string
-      name: string
-      description?: string | null
-    }>
-  }>(GET_SAMPLE_PROJECTS)
+  const { data: sampleProjectsData, loading: sampleProjectsLoading, error: sampleProjectsError } = useQuery(GET_SAMPLE_PROJECTS)
 
   const projects = projectsData?.projects || []
 
@@ -1333,16 +1355,7 @@ const ProjectDetailPage = () => {
   const { projectId } = useParams<{ projectId: string }>()
   const projectIdNum = parseInt(projectId || '0')
 
-  const { data: projectsData, loading: projectsLoading } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      importExportPath?: string | null
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS)
+  const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
 
   const { data: planDagData } = useQuery(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum },
@@ -1353,7 +1366,7 @@ const ProjectDetailPage = () => {
     skip: !projectId,
     fetchPolicy: 'cache-and-network',
   })
-  const { data: storiesData, loading: storiesLoading } = useQuery<{ stories: Story[] }>(LIST_STORIES, {
+  const { data: storiesData, loading: storiesLoading } = useQuery(LIST_STORIES, {
     variables: { projectId: projectIdNum },
     skip: !projectId,
     fetchPolicy: 'cache-and-network',
@@ -1927,16 +1940,7 @@ const PlanEditorPage = () => {
   const planIdNum = Number(planId || 0)
   const collaboration = useCollaboration()
 
-  const { data: projectsData, loading: projectsLoading } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      importExportPath?: string | null
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS)
+  const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
 
   const {
     data: planData,

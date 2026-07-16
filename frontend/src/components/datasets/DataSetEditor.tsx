@@ -28,7 +28,6 @@ import {
   GET_GRAPH_PAGE,
   DataSet,
   DataSetValidationResult,
-  GraphSummary,
   GraphPageSlice,
   UpdateDataSetInput,
   formatFileSize,
@@ -57,9 +56,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Textarea } from '../ui/textarea'
 import PageContainer from '../layout/PageContainer'
 
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  {
+    projects: Array<{
+      id: number
+      name: string
+      description: string
+      createdAt: string
+      updatedAt: string
+    }>
+  },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -102,15 +112,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [validationError, setValidationError] = useState<string | null>(null)
 
   // Query for project info
-  const { data: projectsData } = useQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS)
+  const { data: projectsData } = useQuery(GET_PROJECTS)
   const projects = projectsData?.projects || []
   const selectedProject = projects.find(p => p.id === parseInt(projectId || '0'))
 
@@ -127,7 +129,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
     errorPolicy: 'all'
   })
 
-  const { data: summaryData } = useQuery<{ graphSummary: GraphSummary }>(GET_GRAPH_SUMMARY, {
+  const { data: summaryData } = useQuery(GET_GRAPH_SUMMARY, {
     skip: !datasetIdNum,
     variables: { datasetId: datasetIdNum }
   })
@@ -140,7 +142,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [graphOffset, setGraphOffset] = useState(0)
   const [graphLayerFilters, setGraphLayerFilters] = useState<string[]>([])
 
-  const { loading: graphPageLoading, data: graphPageData } = useQuery<{ graphPage: GraphPageSlice }>(
+  const { loading: graphPageLoading, data: graphPageData } = useQuery(
     GET_GRAPH_PAGE,
     {
       skip: !datasetIdNum,
@@ -152,9 +154,7 @@ export const DataSetEditor: React.FC<DataSetEditorProps> = () => {
   const [updateDataSet, { loading: updateLoading }] = useMutation(UPDATE_DATASOURCE)
   const [reprocessDataSet, { loading: reprocessLoading }] = useMutation(REPROCESS_DATASOURCE)
   const [updateDataSetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
-  const [validateDataSetMutation, { loading: validateLoading }] = useMutation<{
-    validateDataSet: DataSetValidationResult
-  }, { id: number }>(VALIDATE_DATASET)
+  const [validateDataSetMutation, { loading: validateLoading }] = useMutation(VALIDATE_DATASET)
 
   const dataSource: DataSet | null = (dataSourceData as any)?.dataSet || null
   const annotationMarkdown = useMemo(() => {

@@ -1,7 +1,10 @@
-import { gql } from '@apollo/client'
-import { FileFormat, DataType, formatFileSize, getFileFormatDisplayName, getDataTypeDisplayName, detectFileFormat } from './datasets'
+import { gql, type TypedDocumentNode } from '@apollo/client'
+import { FileFormat, DataType, formatFileSize, getFileFormatDisplayName, getDataTypeDisplayName, detectFileFormat, type DataSet } from './datasets'
 
-export const GET_LIBRARY_ITEMS = gql`
+export const GET_LIBRARY_ITEMS: TypedDocumentNode<
+  { libraryItems: LibraryItem[] },
+  { filter?: Record<string, unknown> }
+> = gql`
   query GetLibraryItems($filter: LibraryItemFilterInput) {
     libraryItems(filter: $filter) {
       id
@@ -17,7 +20,10 @@ export const GET_LIBRARY_ITEMS = gql`
   }
 `
 
-export const UPLOAD_LIBRARY_ITEM = gql`
+export const UPLOAD_LIBRARY_ITEM: TypedDocumentNode<
+  { uploadLibraryItem: LibraryItem },
+  { input: UploadLibraryItemInput }
+> = gql`
   mutation UploadLibraryItem($input: UploadLibraryItemInput!) {
     uploadLibraryItem(input: $input) {
       id
@@ -33,13 +39,19 @@ export const UPLOAD_LIBRARY_ITEM = gql`
   }
 `
 
-export const DELETE_LIBRARY_ITEM = gql`
+export const DELETE_LIBRARY_ITEM: TypedDocumentNode<
+  { deleteLibraryItem: boolean },
+  { id: number }
+> = gql`
   mutation DeleteLibraryItem($id: Int!) {
     deleteLibraryItem(id: $id)
   }
 `
 
-export const UPDATE_LIBRARY_ITEM = gql`
+export const UPDATE_LIBRARY_ITEM: TypedDocumentNode<
+  { updateLibraryItem: LibraryItem },
+  { id: number; input: Record<string, unknown> }
+> = gql`
   mutation UpdateLibraryItem($id: Int!, $input: UpdateLibraryItemInput!) {
     updateLibraryItem(id: $id, input: $input) {
       id
@@ -52,7 +64,10 @@ export const UPDATE_LIBRARY_ITEM = gql`
   }
 `
 
-export const REDETECT_LIBRARY_DATASET_TYPE = gql`
+export const REDETECT_LIBRARY_DATASET_TYPE: TypedDocumentNode<
+  { redetectLibraryDatasetType: LibraryItem },
+  { id: number }
+> = gql`
   mutation RedetectLibraryDatasetType($id: Int!) {
     redetectLibraryDatasetType(id: $id) {
       id
@@ -66,7 +81,10 @@ export const REDETECT_LIBRARY_DATASET_TYPE = gql`
   }
 `
 
-export const IMPORT_LIBRARY_DATASETS = gql`
+export const IMPORT_LIBRARY_DATASETS: TypedDocumentNode<
+  { importLibraryDatasets: DataSet[] },
+  { input: ImportLibraryDatasetsInput }
+> = gql`
   mutation ImportLibraryDatasets($input: ImportLibraryDatasetsInput!) {
     importLibraryDatasets(input: $input) {
       id
@@ -87,7 +105,10 @@ export const IMPORT_LIBRARY_DATASETS = gql`
   }
 `
 
-export const SEED_LIBRARY_ITEMS = gql`
+export const SEED_LIBRARY_ITEMS: TypedDocumentNode<
+  { seedLibraryItems: SeedLibraryItemsResult },
+  Record<string, never>
+> = gql`
   mutation SeedLibraryItems {
     seedLibraryItems {
       totalRemoteFiles
@@ -98,7 +119,10 @@ export const SEED_LIBRARY_ITEMS = gql`
   }
 `
 
-export const EXPORT_PROJECT_AS_TEMPLATE = gql`
+export const EXPORT_PROJECT_AS_TEMPLATE: TypedDocumentNode<
+  { exportProjectAsTemplate: LibraryItem },
+  { projectId: number }
+> = gql`
   mutation ExportProjectAsTemplate($projectId: Int!) {
     exportProjectAsTemplate(projectId: $projectId) {
       id
@@ -114,7 +138,10 @@ export const EXPORT_PROJECT_AS_TEMPLATE = gql`
   }
 `
 
-export const EXPORT_PROJECT_ARCHIVE = gql`
+export const EXPORT_PROJECT_ARCHIVE: TypedDocumentNode<
+  { exportProjectArchive: ExportProjectArchivePayload },
+  { projectId: number }
+> = gql`
   mutation ExportProjectArchive($projectId: Int!) {
     exportProjectArchive(projectId: $projectId) {
       filename
@@ -123,7 +150,19 @@ export const EXPORT_PROJECT_ARCHIVE = gql`
   }
 `
 
-export const RESET_PROJECT = gql`
+export const RESET_PROJECT: TypedDocumentNode<
+  {
+    resetProject: {
+      id: number
+      name: string
+      description?: string
+      tags: string[]
+      createdAt: string
+      updatedAt: string
+    }
+  },
+  { projectId: number }
+> = gql`
   mutation ResetProject($projectId: Int!) {
     resetProject(projectId: $projectId) {
       id
@@ -136,7 +175,19 @@ export const RESET_PROJECT = gql`
   }
 `
 
-export const CREATE_PROJECT_FROM_LIBRARY = gql`
+export const CREATE_PROJECT_FROM_LIBRARY: TypedDocumentNode<
+  {
+    createProjectFromLibrary: {
+      id: number
+      name: string
+      description?: string
+      tags: string[]
+      createdAt: string
+      updatedAt: string
+    }
+  },
+  { libraryItemId: number; name?: string }
+> = gql`
   mutation CreateProjectFromLibrary($libraryItemId: Int!, $name: String) {
     createProjectFromLibrary(libraryItemId: $libraryItemId, name: $name) {
       id

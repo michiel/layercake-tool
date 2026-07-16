@@ -27,7 +27,7 @@ import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Spinner } from '../ui/spinner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { Breadcrumbs } from '../common/Breadcrumbs'
 import { Graph, GET_GRAPHS, CREATE_GRAPH, UPDATE_GRAPH, DELETE_GRAPH, EXECUTE_NODE, GET_GRAPH_DETAILS } from '../../graphql/graphs'
 import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../../graphql/plan-dag'
@@ -38,7 +38,10 @@ import { GraphPreviewDialog } from '../visualization'
 import type { GraphData } from '../visualization/GraphPreview'
 import { useProjectPlanSelection } from '../../hooks/useProjectPlanSelection'
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: Array<{ id: number; name: string }> },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -139,26 +142,15 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
   } = useProjectPlanSelection(projectIdNum)
   const planQuerySuffix = selectedPlanId ? `?planId=${selectedPlanId}` : ''
 
-  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
-  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === projectIdNum)
+  const { data: projectsData } = useQuery(GET_PROJECTS)
+  const selectedProject = projectsData?.projects.find((p) => p.id === projectIdNum)
 
-  const { data, loading: graphsLoading, error } = useQuery<{ graphs: Graph[] }>(GET_GRAPHS, {
+  const { data, loading: graphsLoading, error } = useQuery(GET_GRAPHS, {
     variables: { projectId: projectIdNum },
     fetchPolicy: 'cache-and-network'
   })
 
-  interface PlanDagNode {
-    id: string
-    nodeType: string
-  }
-
-  interface PlanDagResponse {
-    getPlanDag: {
-      nodes: PlanDagNode[]
-    }
-  }
-
-  const { data: planDagData, loading: planDagLoading } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
+  const { data: planDagData, loading: planDagLoading } = useQuery(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum, planId: selectedPlanId },
     fetchPolicy: 'cache-and-network',
     skip: !selectedPlanId,
@@ -183,7 +175,7 @@ export const GraphsPage: React.FC<GraphsPageProps> = () => {
     refetchQueries: [{ query: GET_GRAPHS, variables: { projectId: projectIdNum } }]
   })
 
-  const { data: previewDetails, loading: previewLoading, error: previewError } = useQuery<{ graph: Graph }>(
+  const { data: previewDetails, loading: previewLoading, error: previewError } = useQuery(
     GET_GRAPH_DETAILS,
     {
       variables: { id: previewGraphId ?? 0 },

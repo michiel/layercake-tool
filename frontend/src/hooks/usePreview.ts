@@ -2,10 +2,6 @@ import { useQuery } from '@apollo/client/react';
 import {
   GET_DATASOURCE_PREVIEW,
   GET_GRAPH_PREVIEW,
-  GetDataSetPreviewResponse,
-  GetDataSetPreviewVariables,
-  GetGraphPreviewResponse,
-  GetGraphPreviewVariables,
   DataSetPreview,
   GraphPreview,
 } from '../graphql/preview';
@@ -27,10 +23,7 @@ export function useDataSetPreview(
 ) {
   const { limit = 100, offset = 0, skip = false } = options || {};
 
-  const { data, loading, error, refetch } = useQuery<
-    GetDataSetPreviewResponse,
-    GetDataSetPreviewVariables
-  >(GET_DATASOURCE_PREVIEW, {
+  const { data, loading, error, refetch } = useQuery(GET_DATASOURCE_PREVIEW, {
     variables: {
       projectId,
       nodeId,
@@ -64,10 +57,7 @@ export function useGraphPreview(
 ) {
   const { skip = false } = options || {};
 
-  const { data, loading, error, refetch } = useQuery<
-    GetGraphPreviewResponse,
-    GetGraphPreviewVariables
-  >(GET_GRAPH_PREVIEW, {
+  const { data, loading, error, refetch } = useQuery(GET_GRAPH_PREVIEW, {
     variables: {
       projectId,
       nodeId,

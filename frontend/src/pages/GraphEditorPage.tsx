@@ -2,14 +2,14 @@ import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { IconAlertCircle, IconArrowLeft, IconHistory, IconEdit, IconDownload, IconRoute, IconZoomScan, IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { gql } from '@apollo/client';
+import { gql, type TypedDocumentNode } from '@apollo/client';
 import { Breadcrumbs } from '../components/common/Breadcrumbs';
 import { LayercakeGraphEditor, GraphViewMode, GraphOrientation, HierarchyViewMode } from '../components/graphs/LayercakeGraphEditor';
 import { PropertiesAndLayersPanel } from '../components/graphs/PropertiesAndLayersPanel';
 import EditHistoryModal from '../components/graphs/EditHistoryModal';
 import { ReactFlowProvider, Node as FlowNode, Edge as FlowEdge } from 'reactflow';
 import { Graph, GraphNode, UPDATE_GRAPH_NODE, GET_GRAPH_EDIT_COUNT, ADD_GRAPH_NODE, ADD_GRAPH_EDGE, UPDATE_GRAPH_EDGE, DELETE_GRAPH_EDGE, DELETE_GRAPH_NODE } from '../graphql/graphs';
-import { GET_DATASOURCES, UPDATE_DATASOURCE_GRAPH_DATA, DataSet } from '../graphql/datasets';
+import { GET_DATASOURCES, UPDATE_DATASOURCE_GRAPH_DATA } from '../graphql/datasets';
 import { Stack, Group } from '../components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
@@ -32,7 +32,10 @@ declare global {
   }
 }
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: Array<{ id: number; name: string }> },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -41,7 +44,10 @@ const GET_PROJECTS = gql`
   }
 `;
 
-const GET_GRAPH_DETAILS = gql`
+const GET_GRAPH_DETAILS: TypedDocumentNode<
+  { graph: Graph | null },
+  { id: number }
+> = gql`
   query GetGraphDetails($id: Int!) {
     graph(id: $id) {
       id
@@ -115,11 +121,11 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
   const setNodesRef = useRef<React.Dispatch<React.SetStateAction<FlowNode[]>> | null>(null);
   const setEdgesRef = useRef<React.Dispatch<React.SetStateAction<FlowEdge[]>> | null>(null);
 
-  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS);
-  const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
+  const { data: projectsData } = useQuery(GET_PROJECTS);
+  const selectedProject = projectsData?.projects?.find((p: { id: number; name: string }) => p.id === parseInt(projectId || '0'));
 
   // Fetch datasets for target dataset selection
-  const { data: datasetsData } = useQuery<{ dataSets: DataSet[] }>(GET_DATASOURCES, {
+  const { data: datasetsData } = useQuery(GET_DATASOURCES, {
     variables: { projectId: parseInt(projectId || '0') },
     skip: !projectId,
   });
@@ -127,12 +133,12 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
 
   const [updateDatasetGraphData] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA);
 
-  const { data: graphData, loading: graphLoading, error: graphError } = useQuery<{ graph: Graph }, { id: number }>(GET_GRAPH_DETAILS, {
+  const { data: graphData, loading: graphLoading, error: graphError } = useQuery(GET_GRAPH_DETAILS, {
     variables: { id: parseInt(graphId || '0') },
     skip: !graphId,
   });
 
-  const { data: editCountData, refetch: refetchEditCount } = useQuery<{ graphEditCount: number }, { graphId: number; unappliedOnly: boolean }>(
+  const { data: editCountData, refetch: refetchEditCount } = useQuery(
     GET_GRAPH_EDIT_COUNT,
     {
       variables: { graphId: parseInt(graphId || '0'), unappliedOnly: true },
@@ -343,7 +349,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         nodeId,
         label: updates.label,
         layer: updates.layer,
-        attrs: updates.attrs,
+        attributes: updates.attrs,
         belongsTo: updates.belongsTo,
       },
     }).catch(error => {
@@ -425,10 +431,10 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        label: edge.label,
+        label: typeof edge.label === 'string' ? edge.label : undefined,
         layer: edge.data?.layer,
         weight: edge.data?.weight,
-        attrs: edge.data?.attrs,
+        attributes: edge.data?.attrs,
       },
     }).catch(error => {
       console.error('Failed to add edge:', error);
@@ -471,7 +477,7 @@ export const GraphEditorPage: React.FC<GraphEditorPageProps> = () => {
         isPartition: node.data?.isPartition || false,
         belongsTo: belongsTo,
         weight: node.data?.weight,
-        attrs: node.data?.attrs,
+        attributes: node.data?.attrs,
       },
     }).catch(error => {
       console.error('Failed to add node:', error);

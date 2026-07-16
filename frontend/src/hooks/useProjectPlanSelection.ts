@@ -40,7 +40,7 @@ export const useProjectPlanSelection = (projectId: number): UseProjectPlanSelect
     loading,
     error,
     refetch,
-  } = useQuery<{ plans: Plan[] }>(LIST_PLANS, {
+  } = useQuery(LIST_PLANS, {
     variables: { projectId },
     skip: !projectId,
     fetchPolicy: 'cache-and-network',
