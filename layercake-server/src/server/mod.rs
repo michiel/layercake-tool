@@ -26,6 +26,28 @@ pub async fn start_server(
     cors_origin: Option<&str>,
     open_browser: bool,
 ) -> Result<()> {
+    // Warn loudly before creating a brand-new database file, and always report
+    // the absolute location. Running `serve --database layercake.db` from the
+    // wrong directory otherwise silently creates a stray empty DB in the cwd
+    // (and migrations then populate it), which looks like "my data vanished".
+    if database_path != ":memory:" {
+        let path = std::path::Path::new(database_path);
+        let creating = !path.exists();
+        let absolute = std::path::absolute(path)
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| database_path.to_string());
+        if creating {
+            warn!(
+                "Database file '{}' does not exist; creating a new empty database at {}. \
+                 If you expected existing data, stop and re-run from the correct directory \
+                 or pass an absolute --database path.",
+                database_path, absolute
+            );
+        } else {
+            info!("Using database at {}", absolute);
+        }
+    }
+
     let database_url = get_database_url(Some(database_path));
     let db = establish_connection(&database_url).await?;
 
