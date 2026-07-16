@@ -50,25 +50,30 @@ impl ProjectionQuery {
         Ok(model.map(Projection::from))
     }
 
-    async fn projection_graph(&self, ctx: &Context<'_>, id: ID) -> Result<ProjectionGraph> {
+    /// Returns `null` when the projection (or its graph) doesn't exist, so a
+    /// deleted projection renders the client's "not found" state rather than
+    /// surfacing a top-level GraphQL error. Real DB errors still propagate.
+    async fn projection_graph(&self, ctx: &Context<'_>, id: ID) -> Result<Option<ProjectionGraph>> {
         let service = ctx.data::<ProjectionSchemaContext>()?;
         let id: i32 = id
             .parse()
             .map_err(|_| Error::new("invalid projection id"))?;
-        let graph = service.projections.load_graph(id).await?;
-        Ok(ProjectionGraph::from(graph))
+        match service.projections.load_graph(id).await {
+            Ok(graph) => Ok(Some(ProjectionGraph::from(graph))),
+            Err(sea_orm::DbErr::RecordNotFound(_)) => Ok(None),
+            Err(e) => Err(e.into()),
+        }
     }
 
-    async fn projection_state(&self, ctx: &Context<'_>, id: ID) -> Result<ProjectionState> {
+    /// Returns `null` when the projection doesn't exist (see `projection_graph`).
+    async fn projection_state(&self, ctx: &Context<'_>, id: ID) -> Result<Option<ProjectionState>> {
         let service = ctx.data::<ProjectionSchemaContext>()?;
         let id: i32 = id
             .parse()
             .map_err(|_| Error::new("invalid projection id"))?;
-        let model = service
-            .projections
-            .get(id)
-            .await?
-            .ok_or_else(|| Error::new("projection not found"))?;
+        let Some(model) = service.projections.get(id).await? else {
+            return Ok(None);
+        };
 
         let state = service
             .projections
@@ -76,11 +81,11 @@ impl ProjectionQuery {
             .await
             .or(model.settings_json);
 
-        Ok(ProjectionState {
+        Ok(Some(ProjectionState {
             projection_id: ID::from(id.to_string()),
             projection_type: model.projection_type,
             state_json: state.map(Json),
-        })
+        }))
     }
 }
 
