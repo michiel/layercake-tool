@@ -1,17 +1,32 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 - 2026-07-16
+
+### CLI & self-update
+- `layercake update` installs the latest release for your platform: it resolves the correct archive by name (skipping `.sha256`/signature sidecars so it never mistakes a checksum file for the binary), verifies the checksum, and replaces the binary in place. Supports `--check`, `--force`, `--pre-release`, `--backup`/`--rollback`, and `--dry-run`.
+- Added a `linux-aarch64` release target (`layercake-<ver>-linux-aarch64.tar.gz`) alongside `linux-x86_64`, `macos-aarch64`, and `windows-x86_64`; the installer script and updater already resolve it automatically.
 - Added the JSON-first `layercake query` command (and shared GraphQL helpers) so datasets, plans, DAG nodes/edges, and export previews can be managed by CLI or automation using canonical `dataset:/plan:/plannode:` identifiers.
 - Added the `layercake repl` shell that keeps project/plan context, parses simple commands (`set`, `list nodes`, `create node`, `download export`, etc.), and prints structured JSON responses so interactive agents can operate without the browser.
-- Documented the removal of the chat/RAG/MCP surface (see `plans/20260122-de-feature.md`) so the README/AGENTS instructions now advertise only plan, graph, data, and export workflows.
-- Added stub migrations for the previously dropped chat/RAG tables (`m20251030_000008`/`000009`, `m20251103_000010`/`000011`, `m20251112_000022`) so database migration history still satisfies the applied versions list.
-- Ensured `dev.sh` propagates `LAYERCAKE_LOCAL_AUTH_BYPASS` when starting the backend so local plan edits remain authorized even after the environment sample was simplified.
-- Defaulted `LAYERCAKE_LOCAL_AUTH_BYPASS` to `true` for debug builds so standalone local invocations get the prior unrestricted access without needing to set the env var manually.
-- Extended the bypass to default to `true` for all builds/targets so local runs keep unrestricted access unless the environment variable explicitly disables it, avoiding “Actor is not authorized for write:project” errors when editing plans locally.
-- Ensured artefact previews/downloads use the editor’s `projectId`/`planId` context after node creation so preview controls work immediately without reloading the canvas (GraphArtefact nodes now fall back to plan-context IDs when their per-node data is still syncing).
-- Added copy-ID controls in the dataset table, plan cards, and DAG nodes so the canonical `dataset:`, `plan:`, and `plannode:` strings are visible and easily copied for agents to reference.
-- GraphQL Graph/GraphData now expose `graphDataId`/`legacyGraphId` plus `sourceType`; clients should prefer `graphDataId` for all mutations/queries and treat `legacyGraphId` only as a badge/regeneration hint during the single-schema migration.
-- Backend graph queries/validation run solely on `graph_data`; legacy fallbacks removed ahead of the legacy table drop migration (`m20251215_000001_drop_legacy_graph_tables.rs`).
+- `layercake doctor` resolves the database from a running server's `/health`, opens it read-only, refuses a missing/no-tables database with a clear message, and supports `--strict` for CI.
+- `layercake api info` verifies the server via `/health`, reports the server's absolute database path, and detects live ports; `layercake schema type <Name>` gained `--only-inputs`/`--only-mutations`.
+
+### Server & data model
+- Backend graph queries/validation run solely on `graph_data`; legacy graph tables were dropped (`m20251215_000001_drop_legacy_graph_tables.rs`). GraphQL Graph/GraphData expose `graphDataId`/`legacyGraphId` plus `sourceType`; prefer `graphDataId` for all mutations/queries.
+- The server warns loudly (with the resolved absolute path) before creating a new database file, so running from the wrong directory no longer silently creates a stray empty database.
+- Node execution timings carry an `ExecutionPhase` (Execute/Render), exposed as `NodeExecutionTiming.phase`.
+- Added `diffDatasets` (structural graph diff), `renamePlanDagNode`, `exportProject`, `previewStoryContext`, `pruneOrphanedGraphs`, `applyPalettePreset`, and palette-preset/WCAG-contrast queries.
+
+### Stories, sequences & rendering
+- Stories can source sequences from computed graphs via `enabledGraphIds`, with a computed-graph source picker in the UI.
+- Switching a sequence artefact's render target between Mermaid and PlantUML now keeps the output-path extension in sync, and the server validates `renderTarget`↔extension so mismatched outputs are rejected. Neutralised a `;` that broke the Mermaid sequence grammar.
+- Loading a deleted projection in the viewer now shows a clean "not found" state instead of a top-level GraphQL error (`projectionGraph`/`projectionState` return null for a missing projection).
+
+### Frontend
+- Upgraded Mermaid to v11 and migrated to Apollo Client 4.2 (typed `TypedDocumentNode` documents throughout). Removed unused dependencies (assistant-ui, top-level react-dnd, stale `@types`). Fixed a latent bug where graph node/edge `attributes` were silently dropped on add/update.
+
+### Removed features & auth
+- Removed the chat/RAG/MCP surface (see `plans/20260122-de-feature.md`); added stub migrations so migration history still satisfies the applied-versions list.
+- `LAYERCAKE_LOCAL_AUTH_BYPASS` defaults to `true` for local runs (unless explicitly disabled), avoiding "Actor is not authorized for write:project" errors when editing plans locally; `dev.sh` propagates it to the backend.
 
 ## v0.3.6 - 2025-11-26
 - Added full Story and Sequence authoring workflows (GraphQL, UI editor, artefact previews, export fixes) so workbench projects can narrate execution paths alongside graph artefacts.
