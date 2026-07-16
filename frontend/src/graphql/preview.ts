@@ -1,8 +1,11 @@
-import { gql } from '@apollo/client';
+import { gql, type TypedDocumentNode } from '@apollo/client';
 import { Layer } from './graphs';
 
 // DataSet Preview Query
-export const GET_DATASOURCE_PREVIEW = gql`
+export const GET_DATASOURCE_PREVIEW: TypedDocumentNode<
+  GetDataSetPreviewResponse,
+  GetDataSetPreviewVariables
+> = gql`
   query GetDataSetPreview(
     $projectId: Int!
     $nodeId: String!
@@ -38,7 +41,10 @@ export const GET_DATASOURCE_PREVIEW = gql`
 `;
 
 // Graph Preview Query
-export const GET_GRAPH_PREVIEW = gql`
+export const GET_GRAPH_PREVIEW: TypedDocumentNode<
+  GetGraphPreviewResponse,
+  GetGraphPreviewVariables
+> = gql`
   query GetGraphPreview($projectId: Int!, $nodeId: String!) {
     graphPreview(projectId: $projectId, nodeId: $nodeId) {
       nodeId
@@ -210,7 +216,10 @@ export function getExecutionStateLabel(state: string): string {
 }
 
 // Execute Node Mutation
-export const EXECUTE_NODE = gql`
+export const EXECUTE_NODE: TypedDocumentNode<
+  { executeNode: NodeExecutionResult },
+  { projectId: number; nodeId: string }
+> = gql`
   mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
     executeNode(projectId: $projectId, nodeId: $nodeId) {
       success
@@ -227,7 +236,10 @@ export interface NodeExecutionResult {
 }
 
 // Execute Plan (DAG) Mutation
-export const EXECUTE_PLAN = gql`
+export const EXECUTE_PLAN: TypedDocumentNode<
+  { executePlan: PlanExecutionResult },
+  { projectId: number; planId: number }
+> = gql`
   mutation ExecutePlan($projectId: Int!, $planId: Int!) {
     executePlan(projectId: $projectId, planId: $planId) {
       success
@@ -244,7 +256,10 @@ export interface PlanExecutionResult {
 }
 
 // Clear Project Execution State Mutation (resets all graph data, keeps config and datasets)
-export const CLEAR_PROJECT_EXECUTION = gql`
+export const CLEAR_PROJECT_EXECUTION: TypedDocumentNode<
+  { clearProjectExecution: ExecutionActionResult },
+  { projectId: number }
+> = gql`
   mutation ClearProjectExecution($projectId: Int!) {
     clearProjectExecution(projectId: $projectId) {
       success
@@ -254,7 +269,10 @@ export const CLEAR_PROJECT_EXECUTION = gql`
 `;
 
 // Stop Plan Execution Mutation
-export const STOP_PLAN_EXECUTION = gql`
+export const STOP_PLAN_EXECUTION: TypedDocumentNode<
+  { stopPlanExecution: ExecutionActionResult },
+  { projectId: number }
+> = gql`
   mutation StopPlanExecution($projectId: Int!) {
     stopPlanExecution(projectId: $projectId) {
       success

@@ -69,7 +69,7 @@ export const SequenceArtefactNodeConfigForm: React.FC<SequenceArtefactNodeConfig
 
   // Fetch sequences if we have a storyId (from connected StoryNode)
   const { data: sequencesData, loading: sequencesLoading } = useQuery(LIST_SEQUENCES, {
-    variables: { storyId },
+    variables: { storyId: storyId ?? 0 },
     skip: !storyId,
   });
   const sequences: Sequence[] = (sequencesData as any)?.sequences || [];

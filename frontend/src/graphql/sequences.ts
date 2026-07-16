@@ -1,7 +1,10 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
 // Query to list all sequences for a story
-export const LIST_SEQUENCES = gql`
+export const LIST_SEQUENCES: TypedDocumentNode<
+  { sequences: Sequence[] },
+  { storyId: number }
+> = gql`
   query ListSequences($storyId: Int!) {
     sequences(storyId: $storyId) {
       id
@@ -23,7 +26,10 @@ export const LIST_SEQUENCES = gql`
 `
 
 // Query to get a single sequence by ID
-export const GET_SEQUENCE = gql`
+export const GET_SEQUENCE: TypedDocumentNode<
+  { sequence: Sequence | null },
+  { id: number }
+> = gql`
   query GetSequence($id: Int!) {
     sequence(id: $id) {
       id
@@ -45,7 +51,10 @@ export const GET_SEQUENCE = gql`
 `
 
 // Mutation to create a new sequence
-export const CREATE_SEQUENCE = gql`
+export const CREATE_SEQUENCE: TypedDocumentNode<
+  { createSequence: Sequence },
+  { input: CreateSequenceInput }
+> = gql`
   mutation CreateSequence($input: CreateSequenceInput!) {
     createSequence(input: $input) {
       id
@@ -67,7 +76,10 @@ export const CREATE_SEQUENCE = gql`
 `
 
 // Mutation to update a sequence
-export const UPDATE_SEQUENCE = gql`
+export const UPDATE_SEQUENCE: TypedDocumentNode<
+  { updateSequence: Sequence },
+  { id: number; input: UpdateSequenceInput }
+> = gql`
   mutation UpdateSequence($id: Int!, $input: UpdateSequenceInput!) {
     updateSequence(id: $id, input: $input) {
       id
@@ -89,7 +101,10 @@ export const UPDATE_SEQUENCE = gql`
 `
 
 // Mutation to delete a sequence
-export const DELETE_SEQUENCE = gql`
+export const DELETE_SEQUENCE: TypedDocumentNode<
+  { deleteSequence: boolean },
+  { id: number }
+> = gql`
   mutation DeleteSequence($id: Int!) {
     deleteSequence(id: $id)
   }
@@ -121,14 +136,14 @@ export interface Sequence {
 export interface CreateSequenceInput {
   storyId: number
   name: string
-  description?: string
+  description?: string | null
   enabledDatasetIds?: number[]
   edgeOrder?: SequenceEdgeRef[]
 }
 
 export interface UpdateSequenceInput {
   name?: string
-  description?: string
+  description?: string | null
   enabledDatasetIds?: number[]
   edgeOrder?: SequenceEdgeRef[]
 }

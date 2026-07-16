@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { AttributesMap } from '@/utils/attributes'
 
 export interface Layer {
@@ -98,7 +98,10 @@ export interface ReplaySummary {
   details: EditResult[]
 }
 
-export const GET_GRAPHS = gql`
+export const GET_GRAPHS: TypedDocumentNode<
+  { graphs: Graph[] },
+  { projectId: number }
+> = gql`
   query GetGraphs($projectId: Int!) {
     graphs(projectId: $projectId) {
       id
@@ -126,7 +129,10 @@ export const GET_GRAPHS = gql`
   }
 `
 
-export const GET_GRAPH_DETAILS = gql`
+export const GET_GRAPH_DETAILS: TypedDocumentNode<
+  { graph: Graph | null },
+  { id: number }
+> = gql`
   query GetGraphDetails($id: Int!) {
     graph(id: $id) {
       id
@@ -174,7 +180,10 @@ export const GET_GRAPH_DETAILS = gql`
   }
 `
 
-export const CREATE_GRAPH = gql`
+export const CREATE_GRAPH: TypedDocumentNode<
+  { createGraph: { id: number } },
+  { input: Record<string, unknown> }
+> = gql`
   mutation CreateGraph($input: CreateGraphInput!) {
     createGraph(input: $input) {
       id
@@ -182,7 +191,10 @@ export const CREATE_GRAPH = gql`
   }
 `
 
-export const UPDATE_GRAPH = gql`
+export const UPDATE_GRAPH: TypedDocumentNode<
+  { updateGraph: { id: number } },
+  { id: number; input: Record<string, unknown> }
+> = gql`
   mutation UpdateGraph($id: Int!, $input: UpdateGraphInput!) {
     updateGraph(id: $id, input: $input) {
       id
@@ -190,13 +202,19 @@ export const UPDATE_GRAPH = gql`
   }
 `
 
-export const DELETE_GRAPH = gql`
+export const DELETE_GRAPH: TypedDocumentNode<
+  { deleteGraph: boolean },
+  { id: number }
+> = gql`
   mutation DeleteGraph($id: Int!) {
     deleteGraph(id: $id)
   }
 `
 
-export const EXECUTE_NODE = gql`
+export const EXECUTE_NODE: TypedDocumentNode<
+  { executeNode: { success: boolean; message: string; nodeId: string } },
+  { projectId: number; nodeId: string }
+> = gql`
   mutation ExecuteNode($projectId: Int!, $nodeId: String!) {
     executeNode(projectId: $projectId, nodeId: $nodeId) {
       success
@@ -206,7 +224,10 @@ export const EXECUTE_NODE = gql`
   }
 `
 
-export const VALIDATE_GRAPH = gql`
+export const VALIDATE_GRAPH: TypedDocumentNode<
+  { validateGraph: GraphValidationResult },
+  { id: number }
+> = gql`
   mutation ValidateGraph($id: Int!) {
     validateGraph(id: $id) {
       graphId
@@ -222,7 +243,25 @@ export const VALIDATE_GRAPH = gql`
   }
 `
 
-export const UPDATE_GRAPH_NODE = gql`
+export const UPDATE_GRAPH_NODE: TypedDocumentNode<
+  {
+    updateGraphNode: {
+      id: string
+      label?: string
+      layer?: string
+      attributes?: AttributesMap
+      belongsTo?: string
+    }
+  },
+  {
+    graphId: number
+    nodeId: string
+    label?: string
+    layer?: string
+    attributes?: unknown
+    belongsTo?: string
+  }
+> = gql`
   mutation UpdateGraphNode(
     $graphId: Int!
     $nodeId: String!
@@ -248,7 +287,29 @@ export const UPDATE_GRAPH_NODE = gql`
   }
 `
 
-export const ADD_GRAPH_NODE = gql`
+export const ADD_GRAPH_NODE: TypedDocumentNode<
+  {
+    addGraphNode: {
+      id: string
+      label?: string
+      layer?: string
+      isPartition: boolean
+      belongsTo?: string
+      weight?: number
+      attributes?: AttributesMap
+    }
+  },
+  {
+    graphId: number
+    id: string
+    label?: string
+    layer?: string
+    isPartition: boolean
+    belongsTo?: string
+    weight?: number
+    attributes?: unknown
+  }
+> = gql`
   mutation AddGraphNode(
     $graphId: Int!
     $id: String!
@@ -280,7 +341,29 @@ export const ADD_GRAPH_NODE = gql`
   }
 `
 
-export const ADD_GRAPH_EDGE = gql`
+export const ADD_GRAPH_EDGE: TypedDocumentNode<
+  {
+    addGraphEdge: {
+      id: string
+      source: string
+      target: string
+      label?: string
+      layer?: string
+      weight?: number
+      attributes?: AttributesMap
+    }
+  },
+  {
+    graphId: number
+    id: string
+    source: string
+    target: string
+    label?: string
+    layer?: string
+    weight?: number
+    attributes?: unknown
+  }
+> = gql`
   mutation AddGraphEdge(
     $graphId: Int!
     $id: String!
@@ -312,7 +395,25 @@ export const ADD_GRAPH_EDGE = gql`
   }
 `
 
-export const UPDATE_GRAPH_EDGE = gql`
+export const UPDATE_GRAPH_EDGE: TypedDocumentNode<
+  {
+    updateGraphEdge: {
+      id: string
+      source: string
+      target: string
+      label?: string
+      layer?: string
+      attributes?: AttributesMap
+    }
+  },
+  {
+    graphId: number
+    edgeId: string
+    label?: string
+    layer?: string
+    attributes?: unknown
+  }
+> = gql`
   mutation UpdateGraphEdge(
     $graphId: Int!
     $edgeId: String!
@@ -337,19 +438,28 @@ export const UPDATE_GRAPH_EDGE = gql`
   }
 `
 
-export const DELETE_GRAPH_EDGE = gql`
+export const DELETE_GRAPH_EDGE: TypedDocumentNode<
+  { deleteGraphEdge: boolean },
+  { graphId: number; edgeId: string }
+> = gql`
   mutation DeleteGraphEdge($graphId: Int!, $edgeId: String!) {
     deleteGraphEdge(graphId: $graphId, edgeId: $edgeId)
   }
 `
 
-export const DELETE_GRAPH_NODE = gql`
+export const DELETE_GRAPH_NODE: TypedDocumentNode<
+  { deleteGraphNode: boolean },
+  { graphId: number; nodeId: string }
+> = gql`
   mutation DeleteGraphNode($graphId: Int!, $nodeId: String!) {
     deleteGraphNode(graphId: $graphId, nodeId: $nodeId)
   }
 `
 
-export const BULK_UPDATE_GRAPH_DATA = gql`
+export const BULK_UPDATE_GRAPH_DATA: TypedDocumentNode<
+  { bulkUpdateGraphData: boolean },
+  { graphId: number; nodes?: Record<string, unknown>[] }
+> = gql`
   mutation BulkUpdateGraphData(
     $graphId: Int!
     $nodes: [GraphNodeUpdateInput!]
@@ -361,7 +471,10 @@ export const BULK_UPDATE_GRAPH_DATA = gql`
   }
 `
 
-export const GET_GRAPH_EDITS = gql`
+export const GET_GRAPH_EDITS: TypedDocumentNode<
+  { graphEdits: GraphEdit[] },
+  { graphId: number; unappliedOnly?: boolean }
+> = gql`
   query GetGraphEdits($graphId: Int!, $unappliedOnly: Boolean) {
     graphEdits(graphId: $graphId, unappliedOnly: $unappliedOnly) {
       id
@@ -380,13 +493,19 @@ export const GET_GRAPH_EDITS = gql`
   }
 `
 
-export const GET_GRAPH_EDIT_COUNT = gql`
+export const GET_GRAPH_EDIT_COUNT: TypedDocumentNode<
+  { graphEditCount: number },
+  { graphId: number; unappliedOnly?: boolean }
+> = gql`
   query GetGraphEditCount($graphId: Int!, $unappliedOnly: Boolean) {
     graphEditCount(graphId: $graphId, unappliedOnly: $unappliedOnly)
   }
 `
 
-export const REPLAY_GRAPH_EDITS = gql`
+export const REPLAY_GRAPH_EDITS: TypedDocumentNode<
+  { replayGraphEdits: ReplaySummary },
+  { graphId: number }
+> = gql`
   mutation ReplayGraphEdits($graphId: Int!) {
     replayGraphEdits(graphId: $graphId) {
       total
@@ -405,7 +524,10 @@ export const REPLAY_GRAPH_EDITS = gql`
   }
 `
 
-export const CLEAR_GRAPH_EDITS = gql`
+export const CLEAR_GRAPH_EDITS: TypedDocumentNode<
+  { clearGraphEdits: boolean },
+  { graphId: number }
+> = gql`
   mutation ClearGraphEdits($graphId: Int!) {
     clearGraphEdits(graphId: $graphId)
   }

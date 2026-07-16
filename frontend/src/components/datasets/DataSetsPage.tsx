@@ -55,9 +55,20 @@ import {
 
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
-const GET_PROJECTS = gql`
+interface ProjectSummary {
+  id: number
+  name: string
+  description: string
+  createdAt: string
+  updatedAt: string
+}
+
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: ProjectSummary[] },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -89,15 +100,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
   const [deleteMerged, setDeleteMerged] = useState(false)
 
   // Query for project info
-  const { data: projectsData } = useProjectsQuery<{
-    projects: Array<{
-      id: number
-      name: string
-      description: string
-      createdAt: string
-      updatedAt: string
-    }>
-  }>(GET_PROJECTS)
+  const { data: projectsData } = useProjectsQuery(GET_PROJECTS)
   const projects = projectsData?.projects || []
   const selectedProject = projects.find(p => p.id === projectNumericId)
 
@@ -132,8 +135,8 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
     useMutation(IMPORT_LIBRARY_DATASETS)
   const [mergeDataSets, { loading: mergeLoading }] = useMutation(MERGE_DATASOURCES)
 
-  const dataSources: DataSet[] = (dataSourcesData as any)?.dataSets || []
-  const libraryItems: LibraryItem[] = (libraryItemsData as any)?.libraryItems || []
+  const dataSources: DataSet[] = dataSourcesData?.dataSets || []
+  const libraryItems: LibraryItem[] = libraryItemsData?.libraryItems || []
 
   useEffect(() => {
     if (!libraryImportModalOpen) {
@@ -407,7 +410,7 @@ export const DataSetsPage: React.FC<DataSetsPageProps> = () => {
         }
       })
 
-      const data = (result.data as any)?.exportDataSets
+      const data = result.data?.exportDataSets
       if (data) {
         // Decode base64 to binary
         const binaryString = atob(data.fileContent)

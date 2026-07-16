@@ -63,9 +63,7 @@ export const GraphNode = memo((props: GraphNodeProps) => {
   const planId = data.planId as number | undefined
   const { updateNode } = usePlanDagCQRSMutations({ projectId: projectId || 0, planId: planId || 0 })
   const [updateGraphName] = useMutation(UPDATE_GRAPH)
-  const [validateGraphMutation, { loading: validatingGraph }] = useMutation<{
-    validateGraph: GraphValidationResult
-  }, { id: number }>(VALIDATE_GRAPH)
+  const [validateGraphMutation, { loading: validatingGraph }] = useMutation(VALIDATE_GRAPH)
 
   const config = data.config as GraphNodeConfig
 

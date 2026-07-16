@@ -140,7 +140,7 @@ export const SequenceEditorPage = () => {
   const story: Story | null = (storyData as any)?.story || null
 
   const { data: sequenceData, loading: sequenceLoading } = useQuery(GET_SEQUENCE, {
-    variables: { id: sequenceIdNum },
+    variables: { id: sequenceIdNum ?? 0 },
     skip: !sequenceIdNum,
   })
   const sequence: Sequence | null = (sequenceData as any)?.sequence || null

@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 
 export type SystemSettingValueType = 'String' | 'Text' | 'Url' | 'Integer' | 'Float' | 'Boolean' | 'Enum' | 'Secret'
 
@@ -23,7 +23,10 @@ export interface UpdateSystemSettingResponse {
   updateSystemSetting: SystemSetting
 }
 
-export const GET_SYSTEM_SETTINGS = gql`
+export const GET_SYSTEM_SETTINGS: TypedDocumentNode<
+  GetSystemSettingsResponse,
+  Record<string, never>
+> = gql`
   query GetSystemSettings {
     systemSettings {
       key
@@ -40,7 +43,10 @@ export const GET_SYSTEM_SETTINGS = gql`
   }
 `
 
-export const UPDATE_SYSTEM_SETTING = gql`
+export const UPDATE_SYSTEM_SETTING: TypedDocumentNode<
+  UpdateSystemSettingResponse,
+  { input: Record<string, unknown> }
+> = gql`
   mutation UpdateSystemSetting($input: SystemSettingUpdateInput!) {
     updateSystemSetting(input: $input) {
       key

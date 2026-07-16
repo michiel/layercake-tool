@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@apollo/client/react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { hexToRgb } from '@/utils/color'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
@@ -148,6 +148,18 @@ const normalizeHexValue = (value: string, fallback: string) => {
   return value.startsWith('#') ? value : `#${value.replace(/^#/, '')}`
 }
 
+const LAYERS_PROJECT_NAME: TypedDocumentNode<
+  { project: { id: number; name: string } | null },
+  { id: number }
+> = gql`
+  query LayersProjectName($id: Int!) {
+    project(id: $id) {
+      id
+      name
+    }
+  }
+`
+
 export const ProjectLayersPage = () => {
   const navigate = useNavigate()
   const { projectId } = useParams<{ projectId: string }>()
@@ -172,20 +184,10 @@ export const ProjectLayersPage = () => {
     }
   )
 
-  const { data: projectInfo } = useQuery<{ project: { id: number; name: string } | null }>(
-    gql`
-      query LayersProjectName($id: Int!) {
-        project(id: $id) {
-          id
-          name
-        }
-      }
-    `,
-    {
-      variables: { id: projectIdNum },
-      skip: !projectIdNum,
-    }
-  )
+  const { data: projectInfo } = useQuery(LAYERS_PROJECT_NAME, {
+    variables: { id: projectIdNum },
+    skip: !projectIdNum,
+  })
   const projectName = projectInfo?.project?.name ?? `Project ${projectIdNum}`
 
   const [upsertLayer, { loading: upserting }] = useMutation(UPSERT_PROJECT_LAYER)
@@ -198,16 +200,16 @@ export const ProjectLayersPage = () => {
   const [updateAutoPaletteGraph] = useMutation(UPDATE_DATASOURCE_GRAPH_DATA)
 
   const projectLayers: ProjectLayer[] = useMemo(
-    () => ((layersData as any)?.projectLayers as ProjectLayer[] | undefined) ?? [],
+    () => layersData?.projectLayers ?? [],
     [layersData]
   )
   const missingLayers: string[] = useMemo(
-    () => ((layersData as any)?.missingLayers as string[] | undefined) ?? [],
+    () => layersData?.missingLayers ?? [],
     [layersData]
   )
   // Filter to only show datasets with layer data
   const layerDatasets = useMemo(() => {
-    const allDataSets: any[] = ((datasetsData as any)?.dataSets as any[] | undefined) ?? []
+    const allDataSets: any[] = datasetsData?.dataSets ?? []
     return allDataSets.filter((ds) => {
       try {
         const parsed = JSON.parse(ds.graphJson ?? '{}')

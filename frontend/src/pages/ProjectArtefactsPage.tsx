@@ -17,7 +17,7 @@ import {
   IconExternalLink,
   IconPresentation,
 } from '@tabler/icons-react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { GET_PLAN_DAG, UPDATE_PLAN_DAG_NODE } from '../graphql/plan-dag'
 import { EXPORT_NODE_OUTPUT } from '../graphql/export'
 import { Stack, Group } from '../components/layout-primitives'
@@ -45,7 +45,10 @@ import { useProjectPlanSelection } from '../hooks/useProjectPlanSelection'
 import { fallbackExportFilename } from '../utils/exportFilename'
 import { cn } from '../lib/utils'
 
-const GET_PROJECTS = gql`
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: Array<{ id: number; name: string }> },
+  Record<string, never>
+> = gql`
   query GetProjects {
     projects {
       id
@@ -68,13 +71,6 @@ type PlanDagEdge = {
   id: string
   source: string
   target: string
-}
-
-type PlanDagResponse = {
-  getPlanDag: {
-    nodes: PlanDagNode[]
-    edges: PlanDagEdge[]
-  }
 }
 
 type ArtefactEntry =
@@ -142,7 +138,7 @@ const ProjectArtefactsPage: React.FC = () => {
   const projectIdNum = Number(projectId || 0)
   const projectIdParam = projectId ?? (projectIdNum ? String(projectIdNum) : '')
 
-  const { data: projectsData } = useQuery<{ projects: Array<{ id: number; name: string }> }>(GET_PROJECTS)
+  const { data: projectsData } = useQuery(GET_PROJECTS)
   const selectedProject = projectsData?.projects.find((p: { id: number; name: string }) => p.id === projectIdNum)
 
   const {
@@ -160,7 +156,7 @@ const ProjectArtefactsPage: React.FC = () => {
     navigate(`/projects/${selectedProject.id}/plans`)
   }
 
-  const { data, loading: planDagLoading, error } = useQuery<PlanDagResponse>(GET_PLAN_DAG, {
+  const { data, loading: planDagLoading, error } = useQuery(GET_PLAN_DAG, {
     variables: { projectId: projectIdNum, planId: selectedPlanId },
     fetchPolicy: 'cache-and-network',
     skip: !selectedPlanId,
@@ -319,8 +315,8 @@ const [exportForPreview] = useMutation(EXPORT_NODE_OUTPUT, {
   })
 
   const entries = useMemo<ArtefactEntry[]>(() => {
-    const nodes = data?.getPlanDag?.nodes ?? []
-    const edges = data?.getPlanDag?.edges ?? []
+    const nodes = (data?.getPlanDag?.nodes ?? []) as unknown as PlanDagNode[]
+    const edges = (data?.getPlanDag?.edges ?? []) as unknown as PlanDagEdge[]
     if (!nodes.length) return []
 
     const nodeMap = new Map(nodes.map((node) => [node.id, node]))

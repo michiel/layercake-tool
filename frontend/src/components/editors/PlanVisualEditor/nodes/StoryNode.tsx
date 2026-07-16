@@ -30,7 +30,7 @@ export const StoryNode = memo((props: ExtendedNodeProps) => {
 
   // Fetch story details if configured
   const { data: storyData, loading: storyLoading } = useQuery(GET_STORY, {
-    variables: { id: storyId },
+    variables: { id: storyId ?? 0 },
     skip: !storyId || storyId <= 0,
   })
 

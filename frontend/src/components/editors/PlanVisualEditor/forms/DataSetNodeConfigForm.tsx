@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { IconAlertCircle, IconLoader2 } from '@tabler/icons-react';
 import { useQuery } from '@apollo/client/react';
-import { gql } from '@apollo/client';
+import { gql, type TypedDocumentNode } from '@apollo/client';
 import { DataSetNodeConfig, NodeMetadata } from '../../../../types/plan-dag';
 import { Stack } from '@/components/layout-primitives';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -9,7 +9,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // GraphQL query for available data sets
-const GET_AVAILABLE_DATA_SETS = gql`
+const GET_AVAILABLE_DATA_SETS: TypedDocumentNode<
+  GetAvailableDataSetsData,
+  { projectId: number }
+> = gql`
   query GetAvailableDataSets($projectId: Int!) {
     dataSets(projectId: $projectId) {
       id
@@ -55,7 +58,7 @@ export const DataSetNodeConfigForm: React.FC<DataSetNodeConfigFormProps> = ({
   });
   const lastSentConfigRef = React.useRef<DataSetNodeConfig>(localConfig);
 
-  const { data, loading, error } = useQuery<GetAvailableDataSetsData>(GET_AVAILABLE_DATA_SETS, {
+  const { data, loading, error } = useQuery(GET_AVAILABLE_DATA_SETS, {
     variables: { projectId },
     skip: !projectId,
   });

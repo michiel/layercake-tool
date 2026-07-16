@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import { useMutation } from '@apollo/client/react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -27,7 +27,19 @@ import { Stack } from '@/components/layout-primitives'
 import { showErrorNotification } from '@/utils/notifications'
 import { UPDATE_PLAN_DAG } from '../../graphql/plan-dag'
 
-const CREATE_PROJECT = gql`
+const CREATE_PROJECT: TypedDocumentNode<
+  {
+    createProject: {
+      id: number
+      name: string
+      description?: string
+      tags?: string[]
+      createdAt: string
+      updatedAt: string
+    }
+  },
+  { input: Record<string, unknown> }
+> = gql`
   mutation CreateProject($input: CreateProjectInput!) {
     createProject(input: $input) {
       id
@@ -80,26 +92,12 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
   onSuccess,
   defaultTags = []
 }) => {
-  const [createProject, { loading }] = useMutation<{
-    createProject: {
-      id: number
-      name: string
-      description?: string
-      createdAt: string
-      updatedAt: string
-    }
-  }>(CREATE_PROJECT, {
+  const [createProject, { loading }] = useMutation(CREATE_PROJECT, {
     refetchQueries: [{ query: GET_PROJECTS }],
     awaitRefetchQueries: true
   })
 
-  const [initializePlanDag] = useMutation<{
-    updatePlanDag: {
-      success: boolean
-      errors: string[]
-      planDag: any
-    }
-  }>(UPDATE_PLAN_DAG)
+  const [initializePlanDag] = useMutation(UPDATE_PLAN_DAG)
 
   const form = useForm<CreateProjectFormValues>({
     resolver: zodResolver(createProjectSchema),

@@ -10,7 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Stack } from '@/components/layout-primitives';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useQuery, useMutation } from '@apollo/client/react';
-import { GET_DATASOURCE, DataSet, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasets';
+import { GET_DATASOURCE, UPDATE_DATASOURCE_GRAPH_DATA } from '../../../../graphql/datasets';
 import { GraphSpreadsheetEditor, GraphData } from '../../../editors/GraphSpreadsheetEditor/GraphSpreadsheetEditor';
 import { sanitizeAttributes } from '@/utils/attributes';
 
@@ -27,8 +27,8 @@ export const DataSetDataDialog: React.FC<DataSetDataDialogProps> = ({
   dataSetId,
   title = 'Data Set Data'
 }) => {
-  const { data, loading, error, refetch } = useQuery<{ dataSet: DataSet }>(GET_DATASOURCE, {
-    variables: { id: dataSetId },
+  const { data, loading, error, refetch } = useQuery(GET_DATASOURCE, {
+    variables: { id: dataSetId ?? 0 },
     skip: !opened || !dataSetId,
     fetchPolicy: 'network-only'
   });

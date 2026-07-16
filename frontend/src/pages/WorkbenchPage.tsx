@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@apollo/client/react'
-import { gql } from '@apollo/client'
+import { gql, type TypedDocumentNode } from '@apollo/client'
 import { Breadcrumbs } from '@/components/common/Breadcrumbs'
 import PageContainer from '@/components/layout/PageContainer'
 import { Group } from '@/components/layout-primitives'
@@ -22,9 +22,19 @@ import {
 import { showErrorNotification, showSuccessNotification } from '@/utils/notifications'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useProjectPlanSelection } from '@/hooks/useProjectPlanSelection'
-import { LIST_STORIES, type Story } from '@/graphql/stories'
+import { LIST_STORIES } from '@/graphql/stories'
 
-const GET_PROJECTS = gql`
+interface WorkbenchProject {
+  id: number
+  name: string
+  description?: string | null
+  updatedAt?: string | null
+}
+
+const GET_PROJECTS: TypedDocumentNode<
+  { projects: WorkbenchProject[] },
+  Record<string, never>
+> = gql`
   query GetProjectsForWorkbench {
     projects {
       id
@@ -41,9 +51,9 @@ export const WorkbenchPage = () => {
   const projectIdNum = Number(projectId || 0)
 
   const { data: projectsData, loading: projectsLoading } = useQuery(GET_PROJECTS)
-  const projects = (projectsData as any)?.projects || []
+  const projects = projectsData?.projects ?? []
   const project = useMemo(
-    () => projects.find((p: any) => p.id === projectIdNum),
+    () => projects.find((p) => p.id === projectIdNum),
     [projects, projectIdNum]
   )
 
@@ -53,7 +63,7 @@ export const WorkbenchPage = () => {
     loading: plansLoading,
     selectPlan,
   } = useProjectPlanSelection(projectIdNum)
-  const { data: storiesData, loading: storiesLoading } = useQuery<{ stories: Story[] }>(LIST_STORIES, {
+  const { data: storiesData, loading: storiesLoading } = useQuery(LIST_STORIES, {
     variables: { projectId: projectIdNum },
     skip: !projectIdNum,
     fetchPolicy: 'cache-and-network',
@@ -75,7 +85,7 @@ export const WorkbenchPage = () => {
       const { data } = await resetProjectMutation({
         variables: { projectId: projectIdNum },
       })
-      const result = (data as any)?.resetProject
+      const result = data?.resetProject
 
       if (result) {
         showSuccessNotification(
