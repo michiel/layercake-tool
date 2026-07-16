@@ -20,6 +20,9 @@ here; each row points at the workflow/guide/command with the detail.
 | Drive a running server over HTTP | `doc workflow drive-via-api`; `api call` |
 | Edit a plan DAG (nodes/edges) | `doc workflow edit-a-plan` |
 | Understand node types + their config | `doc guide node-types` |
+| Trace dataset → computed graph → exported bytes | `doc guide graph-lifecycle` |
+| List curated colour palettes / apply one in a call | `palettePresets` query; `applyPalettePreset(projectId, presetName)` mutation |
+| Check a colour pair passes WCAG before using it | `checkContrast(background, text)` query |
 | Know the `graphJson` shape for datasets | `doc guide graph-json` |
 | Author a story → sequence diagram | `doc workflow develop-a-story` |
 | Source a story from a merged graph | `develop-a-story` (§ `enabledGraphIds`) |
@@ -44,3 +47,13 @@ here; each row points at the workflow/guide/command with the detail.
 - Sequence notes render only when `renderConfig.showNotes` is true; an unset
   `notePosition` means `Both`.
 - `execute*` results now carry a `warnings` array — check it.
+
+## Common pitfalls (symptom → cause → fix)
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| Diagram renders empty (no error) | Stale/missing computed graph for the artefact's source node | `layercake doctor --project <id>`; re-execute the producing Graph/Merge/Transform node (see `doc guide graph-lifecycle`) |
+| A `.mmd` output contains `@startuml` (or `.puml` contains `sequenceDiagram`) | `renderTarget` was switched but `outputPath` extension stayed stale | Now guarded: the server rejects a mismatched target/extension, and the UI rewrites the extension on switch. Set `outputPath` extension to match the target (`.mmd`/`.md` for Mermaid, `.puml`/`.txt` for PlantUML) |
+| `mmdc` rejects the rendered output | Stray semicolons in labels breaking Mermaid syntax | Now neutralised in the templates; re-render |
+| `doctor` errors "database file does not exist" or resolves the wrong DB | Run from a different cwd than the server with a relative `--database` | `doctor` resolves a running server's **absolute** path via `/health`; pass `--port`/`--url`, or give an absolute `--database` |
+| `api call` with a hex colour silently drops/garbles it | Unquoted `#rrggbb` in `--variables` — `#` starts a shell comment, and bare hex isn't valid JSON | Quote hex as a JSON string and pass variables via a file: `--variables @vars.json` with `{"backgroundColor": "1f2937"}` (colours are stored without the leading `#`) |

@@ -118,6 +118,7 @@ async fn project_export_import_roundtrip_restores_assets() -> Result<()> {
         description: Set(Some("roundtrip story".to_string())),
         tags: Set(json!(["critical"]).to_string()),
         enabled_dataset_ids: Set(json!([dataset.id]).to_string()),
+        enabled_graph_ids: Set(json!([]).to_string()),
         layer_config: Set(json!({ "layer-1": { "visible": true } }).to_string()),
         created_at: Set(now),
         updated_at: Set(now),

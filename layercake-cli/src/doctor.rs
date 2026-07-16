@@ -1,9 +1,20 @@
 //! `layercake doctor` — scan a project for structural health problems.
 
 use anyhow::{anyhow, Result};
-use layercake_core::database::connection::{establish_connection, get_database_url};
+use layercake_core::database::connection::establish_connection;
 use layercake_core::doctor::{run_diagnostics, Severity};
+use sea_orm::{ConnectionTrait, DatabaseConnection, Statement};
 use std::time::Duration;
+
+/// Whether a table exists in the connected SQLite database.
+async fn has_table(db: &DatabaseConnection, name: &str) -> Result<bool> {
+    let stmt = Statement::from_sql_and_values(
+        db.get_database_backend(),
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [name.into()],
+    );
+    Ok(db.query_one(stmt).await?.is_some())
+}
 
 /// Resolve the database path: explicit `--database` wins; otherwise ask a
 /// running server's `/health` (so `doctor --project N` works cwd-independently
@@ -58,7 +69,32 @@ pub async fn run(
     json: bool,
 ) -> Result<()> {
     let database = resolve_database(database, url, host, port).await?;
-    let db = establish_connection(&get_database_url(Some(&database))).await?;
+
+    // Never create a database by resolving to a wrong/relative path — the file
+    // must already exist, and open it read-only so diagnostics can't mutate it.
+    if database != ":memory:" && !std::path::Path::new(&database).exists() {
+        return Err(anyhow!(
+            "database file does not exist: {}\n(if a server is running, pass --port/--url so \
+             doctor resolves its absolute path, or pass an absolute --database)",
+            database
+        ));
+    }
+    let db_url = if database == ":memory:" {
+        "sqlite::memory:".to_string()
+    } else {
+        format!("sqlite://{}?mode=ro", database)
+    };
+    let db = establish_connection(&db_url).await?;
+
+    // Sentinel: a real layercake DB has a `plans` table. Fail clearly rather
+    // than propagating a raw "no such table" from a check.
+    if !has_table(&db, "plans").await? {
+        return Err(anyhow!(
+            "this doesn't look like a layercake database (no 'plans' table): {}",
+            database
+        ));
+    }
+
     let report = run_diagnostics(&db, project).await?;
 
     let warning_count = report

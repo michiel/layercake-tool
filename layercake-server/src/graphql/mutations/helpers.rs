@@ -514,12 +514,33 @@ pub struct PlanExecutionResult {
     pub node_results: Vec<NodeExecutionTiming>,
 }
 
+/// Which phase a node's work happens in.
+#[derive(async_graphql::Enum, Copy, Clone, Eq, PartialEq)]
+pub enum ExecutionPhase {
+    /// Ran during executePlan (import/build/merge/transform).
+    Execute,
+    /// Rendered lazily on exportNodeOutput; durationMs is 0 during executePlan.
+    Render,
+}
+
+impl From<layercake_core::pipeline::ExecutionPhase> for ExecutionPhase {
+    fn from(p: layercake_core::pipeline::ExecutionPhase) -> Self {
+        match p {
+            layercake_core::pipeline::ExecutionPhase::Execute => ExecutionPhase::Execute,
+            layercake_core::pipeline::ExecutionPhase::Render => ExecutionPhase::Render,
+        }
+    }
+}
+
 /// Timing for a single node in a plan execution.
 #[derive(async_graphql::SimpleObject)]
 pub struct NodeExecutionTiming {
     pub node_id: String,
     pub node_type: String,
     pub duration_ms: i64,
+    /// Whether the node ran during execution or renders lazily on export.
+    /// Artefact nodes are `Render` (durationMs 0 here).
+    pub phase: ExecutionPhase,
 }
 
 impl From<layercake_core::pipeline::NodeExecutionRecord> for NodeExecutionTiming {
@@ -528,6 +549,7 @@ impl From<layercake_core::pipeline::NodeExecutionRecord> for NodeExecutionTiming
             node_id: r.node_id,
             node_type: r.node_type,
             duration_ms: r.duration_ms as i64,
+            phase: r.phase.into(),
         }
     }
 }

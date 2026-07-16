@@ -37,8 +37,15 @@ struct ApiInfo {
     detected_ports: Vec<u16>,
 }
 
-/// Probe `/health` at a base URL; return the reported version on success.
-async fn probe_health(base: &str) -> Option<String> {
+/// The subset of `/health` we consume.
+struct HealthInfo {
+    version: String,
+    /// The (absolute) database path the server reports, if any.
+    database: Option<String>,
+}
+
+/// Probe `/health` at a base URL; return its info on success.
+async fn probe_health(base: &str) -> Option<HealthInfo> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(600))
         .build()
@@ -48,13 +55,17 @@ async fn probe_health(base: &str) -> Option<String> {
         return None;
     }
     let body: serde_json::Value = resp.json().await.ok()?;
-    // Treat any healthy JSON as reachable; surface version if present.
-    Some(
-        body.get("version")
+    Some(HealthInfo {
+        version: body
+            .get("version")
             .and_then(|v| v.as_str())
             .unwrap_or("unknown")
             .to_string(),
-    )
+        database: body
+            .get("database")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string()),
+    })
 }
 
 /// Print the endpoints and headers for a running server, verifying against a
@@ -69,8 +80,15 @@ pub async fn info(
     let base = base_url(url, host, port);
     let ws_base = base.replacen("http", "ws", 1);
 
-    let server_version = probe_health(&base).await;
-    let reachable = server_version.is_some();
+    let health = probe_health(&base).await;
+    let reachable = health.is_some();
+    // Prefer the server's (absolute) database path when reachable; fall back to
+    // the CLI's --database value otherwise.
+    let database_display = health
+        .as_ref()
+        .and_then(|h| h.database.clone())
+        .unwrap_or_else(|| database.to_string());
+    let server_version = health.as_ref().map(|h| h.version.clone());
 
     // If the requested endpoint isn't answering, scan a few common local ports
     // so the user isn't stuck on the "wrong port" trap.
@@ -93,7 +111,7 @@ pub async fn info(
         health: format!("{}/health", base),
         collaboration_ws: format!("{}/ws/collaboration?project_id=<N>", ws_base),
         session_header: "x-layercake-session",
-        database: database.to_string(),
+        database: database_display,
         base_url: base,
         reachable,
         server_version,
