@@ -61,10 +61,6 @@ export default defineConfig({
           ],
           'vendor-apollo': ['@apollo/client', 'graphql', 'graphql-ws'],
           'vendor-reactflow': ['reactflow'],
-          'vendor-assistant': [
-            '@assistant-ui/react',
-            '@assistant-ui/react-markdown',
-          ],
           // Layout engine - now much smaller with dagre instead of ELK
           'layout': ['dagre'],
           // Heavy visualization libraries (lazy loaded)
